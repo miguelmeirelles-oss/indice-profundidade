@@ -128,6 +128,24 @@
   .n2{background:#e6f4ea;color:#1a7a3c}
   .nv{background:var(--branco);color:var(--cinza);border-color:#d7deea}
   .tent{font-size:12px;color:var(--cinza);margin-right:6px}
+  .painelTopo{background:var(--bloco);border:2.5px solid var(--navy);
+        border-radius:16px;padding:16px 18px;margin-bottom:18px}
+  .painelTopo .grande{font-size:40px;font-weight:bold;color:var(--menu);
+        line-height:1}
+  .painelTopo .sub{font-size:14px;color:var(--cinza);margin-top:2px}
+  .prog{height:12px;border:2px solid var(--navy);border-radius:99px;
+        background:var(--branco);overflow:hidden;margin-top:8px}
+  .prog i{display:block;height:100%;background:var(--azul)}
+  .prog i.baixa{background:#e05a5a}
+  .prog i.media{background:#e3b23c}
+  .linhaProg{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .linhaProg>div{flex:1;min-width:190px}
+  .badge{font-size:11px;font-weight:bold;text-transform:uppercase;
+        letter-spacing:.04em;border-radius:99px;padding:2px 8px;margin-right:8px;
+        border:1.5px solid currentColor}
+  .b-basico{color:#1a7a3c}.b-intermediario{color:#8a6100}.b-avancado{color:#8a1c1c}
+  .areaResumo{font-size:13px;color:var(--cinza);font-weight:normal;
+        display:flex;gap:10px;align-items:center}
   .hist{border:2px solid #d7deea;border-radius:12px;padding:12px 14px;
         margin-bottom:12px}
   .hist .cab{display:flex;justify-content:space-between;align-items:center;
@@ -160,6 +178,7 @@
     </div>
     <div class="topo">
       <button class="secundario" id="btArea" onclick="abrirArea()">Área do aluno</button>
+      <button class="secundario oculto" id="btProf" onclick="abrirProfessor()">Painel da turma</button>
     <details class="sug">
       <summary>+ Enviar sugestão</summary>
       <input type="text" id="sNome" placeholder="Nome (opcional)">
@@ -232,6 +251,33 @@
     <div id="erroAuth" class="erro oculto"></div>
   </div>
 
+  <!-- instituição (primeiro acesso) -->
+  <div class="caixa oculto" id="pInstituicao">
+    <h2 style="margin-top:0">Só mais uma coisa</h2>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.55">De qual
+      instituição você é? Serve só para eu saber onde a ferramenta está sendo
+      usada — não aparece para ninguém além do professor responsável.</p>
+    <label for="iInst">Instituição</label>
+    <input type="text" id="iInst" placeholder="Ex.: CEFET/RJ — Engenharia de Alimentos">
+    <div class="botoes">
+      <button onclick="salvarInst()">Salvar</button>
+      <button class="link" onclick="salvarInst(true)">Prefiro não dizer</button>
+    </div>
+  </div>
+
+  <!-- painel do professor -->
+  <div class="caixa oculto" id="pProfessor">
+    <div class="topo" style="justify-content:space-between;margin-bottom:14px">
+      <h2 style="margin:0">Painel da turma</h2>
+      <div class="topo">
+        <button class="link" onclick="abrirCurriculo()">Meu mapa</button>
+        <button class="link" onclick="sairConta()">Sair</button>
+      </div>
+    </div>
+    <div id="resumoProf"></div>
+    <div id="listaProf"></div>
+  </div>
+
   <!-- currículo -->
   <div class="caixa oculto" id="pCurriculo">
     <div class="topo" style="justify-content:space-between;margin-bottom:14px">
@@ -243,6 +289,13 @@
         <button class="link" onclick="mostrar('pInicio')">Modo livre</button>
         <button class="link" onclick="sairConta()">Sair</button>
       </div>
+    </div>
+    <div id="resumoMapa"></div>
+    <div class="chips" id="filtroNivel" style="margin-bottom:14px">
+      <button class="chip ativo" onclick="filtrar('todos', this)">Todos</button>
+      <button class="chip" onclick="filtrar('basico', this)">Básico</button>
+      <button class="chip" onclick="filtrar('intermediario', this)">Intermediário</button>
+      <button class="chip" onclick="filtrar('avancado', this)">Avançado</button>
     </div>
     <div id="listaAreas"></div>
     <p class="aviso">A nota mostrada é a sua melhor tentativa em cada assunto.
@@ -288,7 +341,7 @@
 
     <div class="botoes">
       <button onclick="enviarFala(false)">Enviar</button>
-      <button class="secundario oculto" id="btEncerrar" onclick="enviarFala(true)">Enviar e encerrar</button>
+      <button class="secundario" id="btEncerrar" onclick="enviarFala(true)">Enviar e registrar agora</button>
       <button class="secundario" onclick="recomecar()">Recomeçar do zero</button>
     </div>
     <div id="erroFala" class="erro oculto"></div>
@@ -323,7 +376,8 @@
     </div>
     <div class="botoes">
       <button onclick="continuar()">Responder isso</button>
-      <button class="secundario oculto" id="btEncerrarParcial" onclick="encerrarAgora()">Encerrar e ver o parecer</button>
+      <button class="secundario" id="btEncerrarParcial" onclick="encerrarAgora()">Está bom, registrar</button>
+      <button class="link" onclick="refazerRodada()">Refazer minha última resposta</button>
     </div>
   </div>
 
@@ -388,7 +442,8 @@ function api(acao, dados){
   });
 }
 
-var sessao = {token: localStorage.getItem('ip_token') || '', nome:''};
+var sessao = {token: localStorage.getItem('ip_token') || '', nome:'',
+              professor:false, instituicao:''};
 var subtopicoAtual = null;   // {id, nome} quando a avaliação vem do currículo
 
 var estado = {turnos:[], mapa:null, convite:'', rodada:0,
@@ -406,7 +461,12 @@ api('config').then(function(c){
 
 if(sessao.token){
   api('sessao', {token: sessao.token}).then(function(r){
-    if(r.logado){ sessao.nome = r.nome; document.getElementById('btArea').textContent = 'Meu mapa'; }
+    if(r.logado){
+      sessao.nome = r.nome; sessao.professor = r.professor;
+      sessao.instituicao = r.instituicao || '';
+      document.getElementById('btArea').textContent = 'Meu mapa';
+      document.getElementById('btProf').classList.toggle('oculto', !r.professor);
+    }
     else { sessao.token = ''; localStorage.removeItem('ip_token'); }
   }).catch(function(){});
 }
@@ -438,10 +498,67 @@ function erroAuth(e){
 
 function logou(r){
   sessao.token = r.token; sessao.nome = r.nome;
+  sessao.professor = !!r.professor; sessao.instituicao = r.instituicao || '';
   localStorage.setItem('ip_token', r.token);
   document.getElementById('btArea').textContent = 'Meu mapa';
+  document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
   document.getElementById('erroAuth').classList.add('oculto');
-  abrirCurriculo();
+  if(!sessao.instituicao) mostrar('pInstituicao');
+  else abrirCurriculo();
+}
+
+function salvarInst(pular){
+  var v = pular ? '(não informou)' : document.getElementById('iInst').value.trim();
+  if(!pular && !v){ document.getElementById('iInst').focus(); return; }
+  sessao.instituicao = v;
+  api('salvarInstituicao', {token: sessao.token, instituicao: v})
+    .then(abrirCurriculo).catch(function(){ abrirCurriculo(); });
+}
+
+/* ---------- painel do professor ---------- */
+function abrirProfessor(){
+  api('painelProfessor', {token: sessao.token}).then(function(p){
+    document.getElementById('resumoProf').innerHTML =
+      '<div class="painelTopo"><div class="linhaProg">' +
+      '<div><div class="grande">' + p.totalAlunos + '</div>' +
+        '<div class="sub">alunos cadastrados</div></div>' +
+      '<div><div class="grande">' + p.totalAvaliacoes + '</div>' +
+        '<div class="sub">avaliações registradas</div></div>' +
+      '<div><div class="grande">' + (p.mediaGeral === null ? '—' : p.mediaGeral) +
+        '</div><div class="sub">índice médio da turma</div></div>' +
+      '</div></div>' +
+      (p.instituicoes.length ? '<h2>Instituições</h2><table>' +
+        p.instituicoes.map(function(i){
+          return '<tr><td>' + esc(i.nome) + '</td><td class="num">' +
+                 i.alunos + '</td></tr>';
+        }).join('') + '</table>' : '') +
+      (p.fracos.length ? '<h2>Assuntos com menor domínio</h2><table>' +
+        p.fracos.map(function(f){
+          return '<tr><td>' + esc(f.nome) + '<div class="evid" ' +
+            'style="font-style:normal">' + f.n + ' avaliaç' +
+            (f.n === 1 ? 'ão' : 'ões') + '</div></td><td class="num">' +
+            '<span class="nota ' + classeNota(f.media) + '">' + f.media +
+            '</span></td></tr>';
+        }).join('') + '</table>' : '');
+
+    document.getElementById('listaProf').innerHTML =
+      '<h2>Alunos</h2>' + (p.alunos.length ? '<table>' +
+      p.alunos.map(function(a){
+        return '<tr><td><b style="cursor:pointer;color:var(--azul)" ' +
+          'onclick="verAluno(\'' + a.id + '\')">' + esc(a.nome) + '</b>' +
+          '<div class="evid" style="font-style:normal">' + esc(a.instituicao) +
+          ' · ' + a.assuntos + ' assuntos · última em ' + a.ultima + '</div></td>' +
+          '<td class="num"><span class="nota ' + classeNota(a.media) + '">' +
+          (a.media === null ? '—' : a.media) + '</span></td></tr>';
+      }).join('') + '</table>' : '<p class="aviso">Ninguém avaliado ainda.</p>');
+    mostrar('pProfessor');
+  }).catch(function(e){ alert(e.message); });
+}
+
+function verAluno(id){
+  api('mapaDeAluno', {token: sessao.token, alunoId: id}).then(function(c){
+    desenharMapa(c, true);
+  }).catch(function(e){ alert(e.message); });
 }
 
 function abrirArea(){
@@ -496,33 +613,86 @@ function classeNota(n){
   return 'n2';
 }
 
+var mapaAtual = null, nivelFiltro = 'todos', vendoOutro = false;
+
 function abrirCurriculo(){
   api('curriculo', {token: sessao.token}).then(function(c){
-    document.getElementById('ola').textContent = 'Olá, ' + c.nome + '.';
-    var h = '';
-    c.areas.forEach(function(a){
-      var feitos = a.subtopicos.filter(function(s){ return s.melhor !== null; }).length;
-      h += '<details class="area"' + (feitos ? ' open' : '') + '><summary><span>' +
-        esc(a.nome) + '</span><span class="tent">' + feitos + ' de ' +
-        a.subtopicos.length + '</span></summary><div class="conteudo">';
-      a.subtopicos.forEach(function(s){
-        h += '<div class="sub" onclick="abrirSubtopico(\'' + s.id + '\')">' +
-          '<span class="nome">' + esc(s.nome) + '</span><span>' +
-          (s.tentativas > 1 ? '<span class="tent">' + s.tentativas + 'x</span>' : '') +
-          '<span class="nota ' + classeNota(s.melhor) + '">' +
-          (s.melhor === null ? '—' : s.melhor) + '</span></span></div>';
-      });
-      h += '</div></details>';
-    });
-    document.getElementById('listaAreas').innerHTML = h;
-    mostrar('pCurriculo');
+    desenharMapa(c, false);
   }).catch(function(e){
     if(/sess/i.test(e.message)){ sairConta(); mostrar('pAuth'); }
     else alert(e.message);
   });
 }
 
+function classeBarra(n){
+  if(n === null) return '';
+  return n < 45 ? 'baixa' : (n < 70 ? 'media' : '');
+}
+
+function filtrar(nivel, botao){
+  nivelFiltro = nivel;
+  document.querySelectorAll('#filtroNivel .chip').forEach(function(x){
+    x.classList.remove('ativo');
+  });
+  botao.classList.add('ativo');
+  if(mapaAtual) desenharMapa(mapaAtual, vendoOutro);
+}
+
+function desenharMapa(c, deOutro){
+  mapaAtual = c; vendoOutro = !!deOutro;
+
+  document.getElementById('ola').textContent = deOutro
+    ? c.nome + (c.email ? ' · ' + c.email : '')
+    : 'Olá, ' + c.nome + '.';
+
+  var pct = c.total ? Math.round(c.feitos * 100 / c.total) : 0;
+  document.getElementById('resumoMapa').innerHTML =
+    '<div class="painelTopo"><div class="linhaProg">' +
+    '<div><div class="grande">' + (c.media === null ? '—' : c.media) + '</div>' +
+      '<div class="sub">índice médio nos assuntos já falados</div></div>' +
+    '<div><div class="grande">' + c.feitos + '<span style="font-size:20px;' +
+      'color:var(--cinza)"> / ' + c.total + '</span></div>' +
+      '<div class="sub">assuntos do currículo cobertos (' + pct + '%)</div>' +
+      '<div class="prog"><i style="width:' + pct + '%"></i></div></div>' +
+    '</div></div>' +
+    (deOutro ? '<div class="botoes" style="margin-top:0;margin-bottom:12px">' +
+      '<button class="link" onclick="abrirProfessor()">← voltar ao painel da turma</button></div>' : '');
+
+  var h = '';
+  c.areas.forEach(function(a){
+    var lista = a.subtopicos.filter(function(s){
+      return nivelFiltro === 'todos' || s.nivel === nivelFiltro;
+    });
+    if(!lista.length) return;
+    var feitosF = lista.filter(function(s){ return s.melhor !== null; }).length;
+    var pctA = Math.round(feitosF * 100 / lista.length);
+    h += '<details class="area"' + (feitosF ? ' open' : '') + '><summary>' +
+      '<span>' + esc(a.nome) + '</span>' +
+      '<span class="areaResumo">' +
+        (a.media === null ? '' : '<span class="nota ' + classeNota(a.media) +
+          '">' + a.media + '</span>') +
+        '<span>' + feitosF + '/' + lista.length + '</span></span></summary>' +
+      '<div class="conteudo">' +
+      '<div class="prog" style="margin:4px 8px 12px"><i class="' +
+        classeBarra(a.media) + '" style="width:' + pctA + '%"></i></div>';
+    lista.forEach(function(s){
+      h += '<div class="sub" onclick="abrirSubtopico(\'' + s.id + '\')">' +
+        '<span class="nome"><span class="badge b-' + s.nivel + '">' +
+        (s.nivel === 'basico' ? 'básico' :
+         s.nivel === 'intermediario' ? 'interm.' : 'avanç.') + '</span>' +
+        esc(s.nome) + '</span><span>' +
+        (s.tentativas > 1 ? '<span class="tent">' + s.tentativas + 'x</span>' : '') +
+        '<span class="nota ' + classeNota(s.melhor) + '">' +
+        (s.melhor === null ? '—' : s.melhor) + '</span></span></div>';
+    });
+    h += '</div></details>';
+  });
+  document.getElementById('listaAreas').innerHTML = h;
+  mostrar('pCurriculo');
+}
+
 function abrirSubtopico(id){
+  if(vendoOutro) return;   // no mapa de outro aluno, os cartões não abrem
   api('historico', {token: sessao.token, subtopicoId: id}).then(function(h){
     subtopicoAtual = {id: id, nome: h.subtopico};
     document.getElementById('subTitulo').textContent = h.subtopico;
@@ -566,7 +736,6 @@ function comecarSubtopico(){
     'bastam.';
   campo().value = '';
   document.getElementById('erroFala').classList.add('oculto');
-  document.getElementById('btEncerrar').classList.add('oculto');
   desenharPassos();
   mostrar('pFala');
 }
@@ -675,8 +844,8 @@ function semMicrofone(msg){
 
 /* ---------- navegação ---------- */
 function mostrar(id){
-  ['pInicio','pAuth','pCurriculo','pSubtopico','pFala','pProcessando',
-   'pParcial','pFinal'].forEach(function(p){
+  ['pInicio','pAuth','pInstituicao','pProfessor','pCurriculo','pSubtopico',
+   'pFala','pProcessando','pParcial','pFinal'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
   });
   window.scrollTo({top:0, behavior:'smooth'});
@@ -708,7 +877,6 @@ function comecar(){
       'minutos bastam.';
   campo().value = '';
   document.getElementById('erroFala').classList.add('oculto');
-  document.getElementById('btEncerrar').classList.add('oculto');
   desenharPassos();
   mostrar('pFala');
 }
@@ -721,8 +889,6 @@ function continuar(){
   document.getElementById('conviteTexto').textContent = estado.convite;
   campo().value = '';
   document.getElementById('erroFala').classList.add('oculto');
-  document.getElementById('btEncerrar').classList
-    .toggle('oculto', estado.rodada < estado.rodadasMin - 1);
   desenharPassos();
   mostrar('pFala');
 }
@@ -770,6 +936,23 @@ function enviarFala(encerrar){
     estado.turnos.pop();
     err.textContent = e.message; err.classList.remove('oculto'); mostrar('pFala');
   });
+}
+
+function refazerRodada(){
+  if(!estado.turnos.length) return;
+  var descartado = estado.turnos.pop();
+  estado.rodada = estado.turnos.length;
+  estado.convite = estado.turnos.length ? descartado.pergunta : '';
+  document.getElementById('conviteTitulo').textContent = estado.turnos.length
+    ? 'Rodada ' + (estado.rodada + 1) + ' — refazendo'
+    : 'Rodada 1 — refazendo';
+  if(estado.turnos.length){
+    document.getElementById('conviteTexto').textContent = descartado.pergunta;
+  }
+  campo().value = descartado.resposta;
+  document.getElementById('erroFala').classList.add('oculto');
+  desenharPassos();
+  mostrar('pFala');
 }
 
 function encerrarAgora(){
@@ -841,8 +1024,6 @@ function mostrarParcial(r){
   document.getElementById('mapaParcial').innerHTML = tabelaMapa(r);
   document.getElementById('correcoesParcial').innerHTML = caixaCorrecoes(r.correcoes);
   document.getElementById('proximoConvite').textContent = r.convite;
-  document.getElementById('btEncerrarParcial').classList
-    .toggle('oculto', r.rodada < r.rodadasMin);
   mostrar('pParcial');
 }
 
