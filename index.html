@@ -3,10 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Índice de Profundidade — Engenharia de Alimentos</title>
 <style>
   :root{
     --menu:#17389C; --azul:#2E62C6; --titulo:#3E76C4; --navy:#0E2A5C;
     --bloco:#EFF1F5; --ambar:#F5C518; --branco:#fff; --cinza:#5b6b86;
+    --verde:#1a7a3c; --vermelho:#8a1c1c; --ocre:#b07d00;
   }
   *{box-sizing:border-box}
   body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;
@@ -15,7 +17,6 @@
 
   .caixa{border:2.5px solid var(--navy);border-radius:18px;background:var(--branco);
          box-shadow:4px 5px 0 var(--navy);padding:18px;margin-bottom:18px}
-
   .cabecalho{background:var(--bloco);border:2.5px solid var(--navy);border-radius:18px;
              box-shadow:4px 5px 0 var(--navy);padding:16px 18px;margin-bottom:18px;
              display:flex;gap:14px;align-items:flex-start;justify-content:space-between}
@@ -24,63 +25,73 @@
 
   label{display:block;font-size:13px;font-weight:bold;color:var(--titulo);
         margin:0 0 6px;text-transform:uppercase;letter-spacing:.04em}
-  select,textarea,input[type=text],input[type=email]{
+  textarea,input[type=text],input[type=email]{
     width:100%;padding:11px 12px;font-family:inherit;font-size:15px;color:var(--navy);
     border:2px solid var(--azul);border-radius:12px;background:var(--branco)}
-  textarea{min-height:130px;resize:vertical;line-height:1.5}
-  select:focus,textarea:focus,input:focus{outline:3px solid var(--ambar);outline-offset:1px}
-  .linha{display:flex;gap:14px;flex-wrap:wrap}
-  .linha>div{flex:1;min-width:200px}
+  textarea{min-height:150px;resize:vertical;line-height:1.5}
+  textarea:focus,input:focus{outline:3px solid var(--ambar);outline-offset:1px}
 
   button{font-family:inherit;font-size:15px;font-weight:bold;cursor:pointer;
          border:2.5px solid var(--navy);border-radius:14px;padding:12px 20px;
          background:var(--ambar);color:var(--navy);box-shadow:3px 4px 0 var(--navy)}
   button:hover{transform:translate(1px,1px);box-shadow:2px 3px 0 var(--navy)}
   button:active{transform:translate(3px,4px);box-shadow:0 0 0 var(--navy)}
-  button[disabled]{opacity:.45;cursor:not-allowed;transform:none}
   button.secundario{background:var(--branco)}
-  button.gravar{background:#e23b3b;color:#fff;border-color:var(--navy)}
+  button.gravar{background:#e23b3b;color:#fff}
   button.parar{background:var(--navy);color:#fff}
-  .botoes{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px}
+  .botoes{display:flex;gap:12px;flex-wrap:wrap;margin-top:16px;align-items:center}
 
-  .pergunta{background:var(--bloco);border-left:8px solid var(--azul);
-            border-radius:0 14px 14px 0;padding:16px 18px;margin:4px 0 0}
-  .pergunta .eyebrow{font-size:12px;font-weight:bold;color:var(--titulo);
-            text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-  .pergunta p{margin:0;font-size:17px;line-height:1.5}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .chip{border:2px solid var(--azul);border-radius:999px;padding:7px 14px;
+        font-size:13px;font-weight:bold;color:var(--azul);background:var(--branco);
+        cursor:pointer;box-shadow:none}
+  .chip:hover{background:var(--bloco);transform:none;box-shadow:none}
+  .chip.ativo{background:var(--azul);color:#fff}
 
-  .cronometro{font-size:34px;font-weight:bold;color:var(--menu);
-              font-variant-numeric:tabular-nums;letter-spacing:.02em}
+  .convite{background:var(--bloco);border-left:8px solid var(--ambar);
+           border-radius:0 14px 14px 0;padding:16px 18px}
+  .convite .eyebrow{font-size:12px;font-weight:bold;color:var(--titulo);
+           text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .convite p{margin:0;font-size:17px;line-height:1.5}
+
+  .passos{display:flex;gap:6px;margin-bottom:14px}
+  .passo{flex:1;height:8px;border-radius:99px;background:var(--bloco);
+         border:1.5px solid var(--navy)}
+  .passo.feito{background:var(--azul)}
+
+  .cronometro{font-size:32px;font-weight:bold;color:var(--menu);
+              font-variant-numeric:tabular-nums}
   .ouvindo{display:inline-block;width:12px;height:12px;border-radius:50%;
            background:#e23b3b;margin-right:8px;vertical-align:middle}
   .ouvindo.on{animation:pulsa 1.1s infinite}
   @keyframes pulsa{0%,100%{opacity:1}50%{opacity:.25}}
   @media (prefers-reduced-motion:reduce){.ouvindo.on{animation:none}}
 
-  /* faixa de critérios: largura = peso, preenchimento = pontos obtidos */
-  .faixa{display:flex;width:100%;height:44px;border:2.5px solid var(--navy);
-         border-radius:12px;overflow:hidden;margin:10px 0 6px}
-  .faixa .seg{position:relative;background:var(--bloco);border-right:2px solid var(--navy)}
-  .faixa .seg:last-child{border-right:none}
-  .faixa .seg i{position:absolute;inset:0 auto 0 0;background:var(--azul);display:block}
-  .legenda{font-size:12px;color:var(--cinza);margin:0 0 18px}
-
   .indice{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
   .indice b{font-size:52px;color:var(--menu);line-height:1}
   .indice span{font-size:17px;font-weight:bold;color:var(--titulo)}
+  .delta{font-size:15px;font-weight:bold;color:var(--verde)}
+
+  .faixa{display:flex;width:100%;height:40px;border:2.5px solid var(--navy);
+         border-radius:12px;overflow:hidden;margin:12px 0 6px}
+  .faixa .seg{position:relative;background:var(--bloco);border-right:2px solid var(--navy)}
+  .faixa .seg:last-child{border-right:none}
+  .faixa .seg i{position:absolute;inset:0 auto 0 0;background:var(--azul);display:block}
+  .legenda{font-size:12px;color:var(--cinza);margin:0 0 16px;line-height:1.5}
 
   table{width:100%;border-collapse:collapse;margin-top:8px;font-size:14px}
-  th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #d7deea;vertical-align:top}
-  th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--titulo)}
-  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  td{text-align:left;padding:9px 8px;border-bottom:1px solid #d7deea;vertical-align:top}
+  td.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
   .evid{color:var(--cinza);font-style:italic;font-size:13px;margin-top:4px}
 
   h2{font-size:16px;color:var(--menu);margin:22px 0 8px;text-transform:uppercase;
      letter-spacing:.04em}
   ul{margin:0;padding-left:20px}li{margin-bottom:7px;line-height:1.5}
+  .parecer{background:var(--bloco);border:2.5px solid var(--navy);border-radius:14px;
+           padding:16px 18px;font-size:16px;line-height:1.6;margin-top:6px}
   .erro{background:#fdecec;border:2px solid #e23b3b;border-radius:12px;
-        padding:12px 14px;color:#8a1c1c;font-size:14px}
-  .aviso{font-size:12px;color:var(--cinza);line-height:1.6;margin-top:10px}
+        padding:12px 14px;color:var(--vermelho);font-size:14px;margin-top:14px}
+  .aviso{font-size:12px;color:var(--cinza);line-height:1.6;margin-top:12px}
   .oculto{display:none}
 
   details.sug{border:2px solid var(--azul);border-radius:12px;padding:8px 12px;
@@ -103,7 +114,8 @@
   <div class="cabecalho">
     <div>
       <h1>Índice de Profundidade</h1>
-      <p>Explique um conceito em voz alta e veja até onde sua explicação chegou.</p>
+      <p>Fale sobre um tema e converse com a avaliação: a cada rodada ela pede o
+         que faltou, e a nota acompanha o que você construir.</p>
     </div>
     <details class="sug">
       <summary>+ Enviar sugestão</summary>
@@ -115,160 +127,107 @@
     </details>
   </div>
 
-  <!-- 1. escolha -->
-  <div class="caixa" id="pEscolha">
-    <div class="pergunta" style="border-left-color:var(--ambar)">
-      <div class="eyebrow">Tema livre</div>
-      <p>Escolha um assunto que você acha que domina e explique em voz alta.
-         Sem pergunta, sem cadastro: o sistema descobre o tema pela sua fala e
-         diz o quanto sua explicação se sustenta.</p>
-    </div>
+  <!-- início -->
+  <div class="caixa" id="pInicio">
+    <label>Sobre o que você quer falar?</label>
+    <p style="margin:0;font-size:15px;line-height:1.55">Escolha qualquer assunto de
+      Engenharia de Alimentos e explique como se estivesse ensinando alguém da sua
+      turma. Não precisa escolher da lista — ela é só para destravar.</p>
+    <div class="chips" id="chips"><span class="aviso">carregando sugestões…</span></div>
     <div class="botoes">
-      <button onclick="abrirLivre()">Falar sobre um tema</button>
-    </div>
-
-    <hr style="border:none;border-top:2px solid #d7deea;margin:22px 0 18px">
-
-    <label style="margin-bottom:10px">Ou responda a uma pergunta do banco</label>
-    <div class="linha">
-      <div>
-        <label for="assunto">Assunto</label>
-        <select id="assunto"><option>carregando…</option></select>
-      </div>
-      <div>
-        <label for="nivel">Nível</label>
-        <select id="nivel">
-          <option value="1">1 — Explicação</option>
-          <option value="2" selected>2 — Compreensão</option>
-          <option value="3">3 — Domínio</option>
-        </select>
-      </div>
-    </div>
-    <div class="botoes">
-      <button class="secundario" onclick="pedirPergunta()">Ver a pergunta</button>
+      <button onclick="comecar()">Começar a falar</button>
     </div>
   </div>
 
-  <!-- 1b. tema livre -->
-  <div class="caixa oculto" id="pLivre">
-    <div class="pergunta" style="border-left-color:var(--ambar)">
-      <div class="eyebrow">Tema livre</div>
-      <p>Explique o assunto como se estivesse ensinando alguém da sua turma.
-         Diga o que é, por que funciona assim, onde aparece na indústria e em que
-         situações deixa de valer. Dois a três minutos bastam.</p>
+  <!-- fala -->
+  <div class="caixa oculto" id="pFala">
+    <div class="passos" id="passos"></div>
+    <div class="convite" id="blocoConvite">
+      <div class="eyebrow" id="conviteTitulo">Rodada 1 — fala livre</div>
+      <p id="conviteTexto">Explique o tema que você escolheu: o que é, por que
+        funciona assim, onde aparece na indústria e em que situações deixa de valer.
+        Dois a três minutos bastam.</p>
     </div>
 
     <div class="botoes">
-      <button class="gravar" id="btGravar3" onclick="alternarGravacao(3)">Começar a falar</button>
-      <span class="cronometro" id="cronometro3" style="align-self:center">
-        <span class="ouvindo" id="luz3" style="visibility:hidden"></span>0:00
-      </span>
-    </div>
-
-    <div style="margin-top:16px">
-      <label for="transcricao3">Sua explicação</label>
-      <textarea id="transcricao3" style="min-height:170px" placeholder="Clique em começar a falar. O texto aparece aqui e você pode corrigir antes de enviar."></textarea>
-      <p class="aviso" id="dicaMic3">Confira a transcrição antes de enviar: o
-        reconhecimento de voz erra termos técnicos, e a avaliação usa o texto.</p>
-    </div>
-
-    <div class="botoes">
-      <button onclick="avaliarLivreFront()">Avaliar minha explicação</button>
-      <button class="secundario" onclick="voltar()">Voltar</button>
-    </div>
-    <div id="erroLivre" class="erro oculto" style="margin-top:14px"></div>
-  </div>
-
-  <!-- 2. pergunta e resposta -->
-  <div class="caixa oculto" id="pResposta">
-    <div class="pergunta">
-      <div class="eyebrow" id="eyebrow">Nível 2 — Compreensão</div>
-      <p id="txtPergunta"></p>
-    </div>
-
-    <div class="botoes">
-      <button class="gravar" id="btGravar" onclick="alternarGravacao()">Gravar resposta</button>
-      <span class="cronometro" id="cronometro" style="align-self:center">
+      <button class="gravar" id="btGravar" onclick="alternarGravacao()">Começar a falar</button>
+      <span class="cronometro" id="cronometro">
         <span class="ouvindo" id="luz" style="visibility:hidden"></span>0:00
       </span>
     </div>
 
     <div style="margin-top:16px">
-      <label for="transcricao">Sua resposta</label>
-      <textarea id="transcricao" placeholder="Clique em gravar e explique em voz alta. O texto aparece aqui e você pode corrigir antes de enviar."></textarea>
+      <label for="transcricao">Sua explicação</label>
+      <textarea id="transcricao" placeholder="Clique em começar a falar. O texto aparece aqui e você pode corrigir antes de enviar."></textarea>
       <p class="aviso" id="dicaMic">Confira a transcrição antes de enviar: o
         reconhecimento de voz erra termos técnicos, e a avaliação usa o texto.</p>
     </div>
 
     <div class="botoes">
-      <button onclick="avaliar('direto')">Avaliar minha resposta</button>
-      <button class="secundario" onclick="avaliar('socratico')">Avaliar e me fazer uma pergunta</button>
-      <button class="secundario" onclick="voltar()">Trocar de pergunta</button>
+      <button onclick="enviarFala(false)">Enviar</button>
+      <button class="secundario oculto" id="btEncerrar" onclick="enviarFala(true)">Enviar e encerrar</button>
+      <button class="secundario" onclick="recomecar()">Recomeçar do zero</button>
     </div>
-    <div id="erroResposta" class="erro oculto" style="margin-top:14px"></div>
+    <div id="erroFala" class="erro oculto"></div>
   </div>
 
-  <!-- 3. processando -->
+  <!-- processando -->
   <div class="caixa oculto" id="pProcessando">
-    <p style="margin:0;font-size:16px"><b>Avaliando sua explicação…</b></p>
+    <p style="margin:0;font-size:16px"><b>Avaliando o que você falou…</b></p>
     <p class="aviso">Isso leva alguns segundos.</p>
   </div>
 
-  <!-- 4. resultado -->
-  <div class="caixa oculto" id="pResultado">
-    <div id="rTema" class="eyebrow oculto"
+  <!-- parcial -->
+  <div class="caixa oculto" id="pParcial">
+    <div id="temaParcial" class="eyebrow"
          style="font-size:12px;font-weight:bold;color:var(--titulo);
                 text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px"></div>
     <div class="indice">
-      <b id="rIndice">—</b>
-      <span id="rFaixa"></span>
+      <b id="indiceParcial">—</b>
+      <span id="faixaParcial"></span>
+      <span class="delta" id="deltaParcial"></span>
     </div>
-    <div class="faixa" id="rFaixaVisual"></div>
-    <p class="legenda">Cada bloco é um critério da rubrica. A largura é o peso dele
-      na nota; a parte preenchida é o quanto sua explicação cobriu.</p>
+    <div class="faixa" id="barraParcial"></div>
+    <p class="legenda">Largura de cada bloco é o peso do critério; a parte
+      preenchida é o quanto sua explicação cobriu até agora.</p>
 
-    <div id="rAbrangencia" class="oculto"></div>
-    <div id="rBlocos"></div>
+    <div id="mapaParcial"></div>
 
-    <div id="rSocratica" class="oculto">
-      <div class="pergunta" style="border-left-color:var(--ambar);margin-top:20px">
-        <div class="eyebrow">Ainda dá para testar mais</div>
-        <p id="rPergunta"></p>
-      </div>
-      <div class="botoes">
-        <button onclick="responderAprofundamento()">Responder essa pergunta</button>
-      </div>
+    <div class="convite" style="margin-top:20px">
+      <div class="eyebrow">Vamos continuar</div>
+      <p id="proximoConvite"></p>
     </div>
-
     <div class="botoes">
-      <button class="secundario" onclick="voltar()">Responder outra pergunta</button>
+      <button onclick="continuar()">Responder isso</button>
+      <button class="secundario oculto" id="btEncerrarParcial" onclick="encerrarAgora()">Encerrar e ver o parecer</button>
     </div>
-    <p class="aviso">O áudio não é gravado nem guardado: só o texto transcrito é
-      enviado para avaliação. Assunto, nível e índice ficam registrados de forma
-      anônima para acompanhamento da turma. A avaliação é feita por um modelo de
-      linguagem e serve como diagnóstico de estudo, não como nota.</p>
   </div>
 
-  <!-- 5. rodada socrática -->
-  <div class="caixa oculto" id="pSocratico">
-    <div class="pergunta">
-      <div class="eyebrow">Pergunta de aprofundamento</div>
-      <p id="txtSocratico"></p>
+  <!-- final -->
+  <div class="caixa oculto" id="pFinal">
+    <div id="temaFinal" class="eyebrow"
+         style="font-size:12px;font-weight:bold;color:var(--titulo);
+                text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px"></div>
+    <div class="indice">
+      <b id="indiceFinal">—</b>
+      <span id="faixaFinal"></span>
+      <span class="delta" id="deltaFinal"></span>
     </div>
+    <div class="faixa" id="barraFinal"></div>
+    <p class="legenda" id="legendaFinal"></p>
+
+    <h2>Parecer</h2>
+    <div class="parecer" id="textoParecer"></div>
+
+    <div id="blocosFinal"></div>
+
     <div class="botoes">
-      <button class="gravar" id="btGravar2" onclick="alternarGravacao(2)">Gravar resposta</button>
-      <span class="cronometro" id="cronometro2" style="align-self:center">
-        <span class="ouvindo" id="luz2" style="visibility:hidden"></span>0:00
-      </span>
+      <button class="secundario" onclick="recomecar()">Falar de outro tema</button>
     </div>
-    <div style="margin-top:16px">
-      <label for="transcricao2">Sua resposta</label>
-      <textarea id="transcricao2"></textarea>
-    </div>
-    <div class="botoes">
-      <button onclick="avaliarRodada2()">Enviar e ver o resultado final</button>
-    </div>
-    <div id="erroSocratico" class="erro oculto" style="margin-top:14px"></div>
+    <p class="aviso">O áudio não é gravado nem guardado: apenas o texto transcrito é
+      enviado para avaliação. Tema, número de rodadas e índices ficam registrados de
+      forma anônima para acompanhamento da turma. A avaliação é feita por um modelo
+      de linguagem e serve como diagnóstico de estudo, não como nota.</p>
   </div>
 
 </div>
@@ -281,97 +240,108 @@ var BACKEND = 'https://script.google.com/macros/s/AKfycbxthqK2s3ErBbC8yhUoU9BWIw
 
 function api(acao, dados){
   return fetch(BACKEND, {
-    method: 'POST',
-    // text/plain evita o preflight de CORS, que o Apps Script nao responde
-    headers: {'Content-Type': 'text/plain;charset=utf-8'},
-    body: JSON.stringify({acao: acao, dados: dados || {}})
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({acao:acao, dados:dados||{}})
   })
   .then(function(r){
     if(!r.ok) throw new Error('O servidor respondeu ' + r.status + '.');
     return r.json();
   })
   .then(function(j){
-    if(!j.ok) throw new Error(j.erro || 'Nao deu para concluir.');
+    if(!j.ok) throw new Error(j.erro || 'Não deu para concluir.');
     return j.resultado;
   })
   .catch(function(e){
     if(e instanceof TypeError){
-      throw new Error('Sem conexao com o servidor de avaliacao. ' +
+      throw new Error('Sem conexão com o servidor de avaliação. ' +
         'Verifique sua internet e tente de novo.');
     }
     throw e;
   });
 }
 
-var estado = {pergunta:null, nivel:2, assuntoId:null, historico:[], segundos:0,
-              fluxo:'banco', rodada2:false};
-var rec = null, gravando = false, alvo = 1, t0 = 0, timer = null;
+var estado = {turnos:[], mapa:null, convite:'', rodada:0,
+              indiceInicial:null, indiceAtual:null, segundos:0,
+              rodadasMin:3, rodadasMax:6};
+var rec=null, gravando=false, t0=0, timer=null;
 
-/* ---------- carga inicial ---------- */
-api('listarAssuntos').then(function(lista){
-  var s = document.getElementById('assunto');
-  s.innerHTML = '';
-  if(!lista.length){ s.innerHTML = '<option>nenhum assunto cadastrado</option>'; return; }
-  lista.forEach(function(a){
-    var o = document.createElement('option');
-    o.value = a.id; o.textContent = a.nome; s.appendChild(o);
+/* ---------- sugestões de tema ---------- */
+api('listarTemas').then(function(r){
+  estado.rodadasMin = r.rodadasMin; estado.rodadasMax = r.rodadasMax;
+  var c = document.getElementById('chips');
+  c.innerHTML = '';
+  if(!r.temas.length){ c.innerHTML = '<span class="aviso">Fale sobre o que quiser.</span>'; return; }
+  r.temas.forEach(function(t){
+    var b = document.createElement('button');
+    b.className = 'chip'; b.textContent = t;
+    b.onclick = function(){
+      document.querySelectorAll('.chip').forEach(function(x){ x.classList.remove('ativo'); });
+      b.classList.add('ativo');
+    };
+    c.appendChild(b);
   });
 }).catch(function(){
-  document.getElementById('assunto').innerHTML = '<option>erro ao carregar</option>';
+  document.getElementById('chips').innerHTML =
+    '<span class="aviso">Não deu para carregar as sugestões — fale sobre o que quiser.</span>';
 });
 
-/* ---------- reconhecimento de voz ---------- */
+/* ---------- voz ---------- */
 function iniciarRec(){
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SR) return null;
   var r = new SR();
-  r.lang = 'pt-BR'; r.continuous = true; r.interimResults = true;
+  r.lang='pt-BR'; r.continuous=true; r.interimResults=true;
   return r;
 }
+function campo(){ return document.getElementById('transcricao'); }
 
-function campo(){ return document.getElementById('transcricao' + (alvo === 1 ? '' : alvo)); }
-function botao(){ return document.getElementById('btGravar' + (alvo === 1 ? '' : alvo)); }
-function relogio(){ return document.getElementById('cronometro' + (alvo === 1 ? '' : alvo)); }
-function luz(){ return document.getElementById('luz' + (alvo === 1 ? '' : alvo)); }
-
-function alternarGravacao(qual){
-  alvo = qual || 1;
+function alternarGravacao(){
   if(gravando){ pararGravacao(); return; }
-
   rec = iniciarRec();
   if(!rec){ semMicrofone('Este navegador não reconhece voz. Use o Chrome ou o Edge, ' +
     'ou digite sua resposta no campo abaixo.'); return; }
 
   var base = campo().value ? campo().value.trim() + ' ' : '';
+  var finalizado = '';
 
   rec.onresult = function(ev){
-    var texto = '';
+    var parcial = '';
     for(var i = ev.resultIndex; i < ev.results.length; i++){
-      texto += ev.results[i][0].transcript;
+      var trecho = ev.results[i][0].transcript;
+      if(ev.results[i].isFinal) finalizado += trecho.trim() + ' ';
+      else parcial += trecho;
     }
-    campo().value = base + texto;
+    campo().value = base + finalizado + parcial;
+    campo().scrollTop = campo().scrollHeight;
   };
   rec.onerror = function(ev){
     if(ev.error === 'not-allowed' || ev.error === 'service-not-allowed'){
       semMicrofone('O microfone está bloqueado. Clique no cadeado ao lado do ' +
         'endereço, libere o microfone e recarregue a página. Enquanto isso, ' +
         'você pode digitar a resposta.');
-    } else if(ev.error === 'no-speech'){
-      /* silêncio: ignora */
+      pararGravacao();
+    } else if(ev.error === 'no-speech' || ev.error === 'aborted'){
+      return;   // silêncio: o onend reinicia
     } else {
       semMicrofone('O reconhecimento de voz parou (' + ev.error + '). ' +
         'Você pode continuar digitando.');
+      pararGravacao();
     }
-    pararGravacao();
   };
-  rec.onend = function(){ if(gravando){ try{ rec.start(); }catch(e){} } };
+  rec.onend = function(){
+    if(!gravando) return;
+    base = base + finalizado; finalizado = '';
+    setTimeout(function(){ if(gravando){ try{ rec.start(); }catch(e){} } }, 250);
+  };
 
   try{ rec.start(); }
   catch(e){ semMicrofone('Não deu para acessar o microfone. Digite sua resposta.'); return; }
 
   gravando = true; t0 = Date.now();
-  botao().textContent = 'Terminei'; botao().className = 'parar';
-  luz().style.visibility = 'visible'; luz().className = 'ouvindo on';
+  var b = document.getElementById('btGravar');
+  b.textContent = 'Terminei'; b.className = 'parar';
+  document.getElementById('luz').style.visibility = 'visible';
   timer = setInterval(tique, 250); tique();
 }
 
@@ -379,211 +349,198 @@ function pararGravacao(){
   gravando = false;
   if(rec){ rec.onend = null; try{ rec.stop(); }catch(e){} }
   clearInterval(timer);
-  estado.segundos = Math.round((Date.now() - t0)/1000);
-  botao().textContent = 'Gravar mais'; botao().className = 'gravar';
-  luz().className = 'ouvindo'; luz().style.visibility = 'hidden';
+  estado.segundos += Math.round((Date.now() - t0)/1000);
+  var b = document.getElementById('btGravar');
+  b.textContent = 'Gravar mais'; b.className = 'gravar';
+  document.getElementById('luz').style.visibility = 'hidden';
 }
 
 function tique(){
   var s = Math.floor((Date.now() - t0)/1000);
-  relogio().innerHTML = '<span class="ouvindo on" style="visibility:visible"></span>' +
+  document.getElementById('cronometro').innerHTML =
+    '<span class="ouvindo on" style="visibility:visible"></span>' +
     Math.floor(s/60) + ':' + ('0' + (s % 60)).slice(-2);
 }
 
 function semMicrofone(msg){
-  var d = document.getElementById(alvo === 3 ? 'dicaMic3' : 'dicaMic');
-  if(!d){ alert(msg); campo().focus(); return; }
+  var d = document.getElementById('dicaMic');
   d.textContent = msg; d.style.color = '#8a1c1c'; d.style.fontWeight = 'bold';
   campo().focus();
 }
 
-/* ---------- fluxo ---------- */
+/* ---------- navegação ---------- */
 function mostrar(id){
-  ['pEscolha','pLivre','pResposta','pProcessando','pResultado','pSocratico'].forEach(function(p){
+  ['pInicio','pFala','pProcessando','pParcial','pFinal'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
   });
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
-function abrirLivre(){
-  estado.fluxo = 'livre'; estado.rodada2 = false; estado.historico = [];
-  document.getElementById('transcricao3').value = '';
-  document.getElementById('erroLivre').classList.add('oculto');
-  mostrar('pLivre');
+function desenharPassos(){
+  var p = document.getElementById('passos');
+  p.innerHTML = '';
+  for(var i = 0; i < estado.rodadasMax; i++){
+    var d = document.createElement('div');
+    d.className = 'passo' + (i < estado.rodada ? ' feito' : '');
+    p.appendChild(d);
+  }
 }
 
-function avaliarLivreFront(){
+function comecar(){
+  var ativo = document.querySelector('.chip.ativo');
+  estado = {turnos:[], mapa:null, convite:'', rodada:0, indiceInicial:null,
+            indiceAtual:null, segundos:0,
+            rodadasMin:estado.rodadasMin, rodadasMax:estado.rodadasMax};
+  document.getElementById('conviteTitulo').textContent = 'Rodada 1 — fala livre';
+  document.getElementById('conviteTexto').textContent = ativo
+    ? 'Explique "' + ativo.textContent + '": o que é, por que funciona assim, ' +
+      'onde aparece na indústria e em que situações deixa de valer. Dois a três ' +
+      'minutos bastam. Se preferir, fale de outro assunto — vale qualquer um.'
+    : 'Explique o tema que você escolheu: o que é, por que funciona assim, onde ' +
+      'aparece na indústria e em que situações deixa de valer. Dois a três ' +
+      'minutos bastam.';
+  campo().value = '';
+  document.getElementById('erroFala').classList.add('oculto');
+  document.getElementById('btEncerrar').classList.add('oculto');
+  desenharPassos();
+  mostrar('pFala');
+}
+
+function recomecar(){ if(gravando) pararGravacao(); mostrar('pInicio'); }
+
+function continuar(){
+  document.getElementById('conviteTitulo').textContent =
+    'Rodada ' + (estado.rodada + 1) + ' de até ' + estado.rodadasMax;
+  document.getElementById('conviteTexto').textContent = estado.convite;
+  campo().value = '';
+  document.getElementById('erroFala').classList.add('oculto');
+  document.getElementById('btEncerrar').classList
+    .toggle('oculto', estado.rodada < estado.rodadasMin - 1);
+  desenharPassos();
+  mostrar('pFala');
+}
+
+/* ---------- envio ---------- */
+function enviarFala(encerrar){
   if(gravando) pararGravacao();
-  var texto = document.getElementById('transcricao3').value.trim();
-  var err = document.getElementById('erroLivre');
-  if(texto.split(/\s+/).length < 25){
-    err.textContent = 'Fale um pouco mais antes de enviar — com poucas frases ' +
-      'não dá para avaliar a solidez do que você sabe.';
+  var texto = campo().value.trim();
+  var err = document.getElementById('erroFala');
+  var minimo = estado.turnos.length === 0 ? 25 : 8;
+  if(texto.split(/\s+/).length < minimo){
+    err.textContent = estado.turnos.length === 0
+      ? 'Fale um pouco mais antes de enviar — com poucas frases não dá para ' +
+        'avaliar a solidez do que você sabe.'
+      : 'Desenvolva um pouco mais antes de enviar.';
     err.classList.remove('oculto'); return;
   }
   err.classList.add('oculto');
-  estado.historico = [{pergunta:'(tema livre)', resposta: texto}];
+  estado.turnos.push({pergunta: estado.convite || '(tema livre)', resposta: texto});
   mostrar('pProcessando');
 
-  api('avaliarLivre', {transcricao: texto, segundosFala: estado.segundos})
-    .then(function(r){
-      if(r.fora_do_escopo){
-        err.textContent = 'Não identifiquei um assunto de Engenharia de Alimentos ' +
-          'na sua fala. Escolha um conceito da área e explique de novo.';
-        err.classList.remove('oculto'); mostrar('pLivre'); return;
-      }
-      desenhar(r); mostrar('pResultado');
-    })
-    .catch(function(e){
-      err.textContent = e.message; err.classList.remove('oculto'); mostrar('pLivre');
-    });
-}
-
-function responderAprofundamento(){
-  estado.rodada2 = true;
-  document.getElementById('txtSocratico').textContent =
-    document.getElementById('rPergunta').textContent;
-  document.getElementById('transcricao2').value = '';
-  document.getElementById('erroSocratico').classList.add('oculto');
-  mostrar('pSocratico');
-}
-
-function pedirPergunta(){
-  estado.fluxo = 'banco'; estado.rodada2 = false;
-  estado.assuntoId = document.getElementById('assunto').value;
-  estado.nivel = Number(document.getElementById('nivel').value);
-  estado.historico = [];
-  api('sortearPergunta', {assuntoId: estado.assuntoId, nivel: estado.nivel})
-    .then(function(p){
-      estado.pergunta = p.texto;
-      document.getElementById('txtPergunta').textContent = p.texto;
-      document.getElementById('eyebrow').textContent =
-        document.getElementById('nivel').selectedOptions[0].textContent;
-      document.getElementById('transcricao').value = '';
-      document.getElementById('erroResposta').classList.add('oculto');
-      mostrar('pResposta');
-    })
-    .catch(function(e){ alert(e.message); });
-}
-
-function voltar(){ if(gravando) pararGravacao(); mostrar('pEscolha'); }
-
-function avaliar(modo){
-  if(gravando) pararGravacao();
-  var texto = document.getElementById('transcricao').value.trim();
-  var err = document.getElementById('erroResposta');
-  if(texto.split(/\s+/).length < 12){
-    err.textContent = 'A resposta ficou curta demais para ser avaliada. ' +
-      'Desenvolva mais a explicação.';
-    err.classList.remove('oculto'); return;
-  }
-  err.classList.add('oculto');
-  estado.modo = modo;
-  estado.historico = [{pergunta: estado.pergunta, resposta: texto}];
-  mostrar('pProcessando');
-
-  api('avaliarResposta', {
-    assuntoId: estado.assuntoId, nivel: estado.nivel, pergunta: estado.pergunta,
-    transcricao: texto, modo: modo, segundosFala: estado.segundos
+  api('avaliarConversa', {
+    turnos: estado.turnos, mapaAnterior: estado.mapa, encerrar: !!encerrar,
+    indiceInicial: estado.indiceInicial, segundosFala: estado.segundos
   })
-    .then(function(r){
-      if(modo === 'socratico' && r.pergunta_aprofundamento){
-        document.getElementById('txtSocratico').textContent = r.pergunta_aprofundamento;
-        document.getElementById('transcricao2').value = '';
-        document.getElementById('erroSocratico').classList.add('oculto');
-        mostrar('pSocratico');
-      } else {
-        desenhar(r); mostrar('pResultado');
-      }
-    })
-    .catch(function(e){
-      err.textContent = e.message; err.classList.remove('oculto'); mostrar('pResposta');
-    });
-}
-
-function avaliarRodada2(){
-  if(gravando) pararGravacao();
-  var texto = document.getElementById('transcricao2').value.trim();
-  var err = document.getElementById('erroSocratico');
-  if(texto.split(/\s+/).length < 8){
-    err.textContent = 'Desenvolva um pouco mais antes de enviar.';
-    err.classList.remove('oculto'); return;
-  }
-  var pergunta2 = document.getElementById('txtSocratico').textContent;
-  mostrar('pProcessando');
-
-  var ok = function(r){ desenhar(r); mostrar('pResultado'); };
-  var falha = function(e){
-    err.textContent = e.message; err.classList.remove('oculto'); mostrar('pSocratico');
-  };
-
-  if(estado.fluxo === 'livre'){
-    estado.historico.push({pergunta: pergunta2, resposta: texto});
-    api('avaliarLivre', {transcricao: texto, historico: estado.historico,
-      modo: 'livre-2', segundosFala: estado.segundos}).then(ok).catch(falha);
-    return;
-  }
-
-  api('avaliarResposta', {
-    assuntoId: estado.assuntoId, nivel: estado.nivel, pergunta: pergunta2,
-    transcricao: texto, modo: 'direto', historico: estado.historico,
-    segundosFala: estado.segundos
-  }).then(ok).catch(falha);
-}
-
-/* ---------- resultado ---------- */
-function desenhar(r){
-  document.getElementById('rIndice').textContent = r.indice;
-  document.getElementById('rFaixa').textContent = r.faixa;
-
-  var tema = document.getElementById('rTema');
-  tema.classList.toggle('oculto', !r.tema);
-  if(r.tema) tema.textContent = 'Tema identificado: ' + r.tema;
-
-  var abr = document.getElementById('rAbrangencia');
-  if(r.mapa && r.mapa.length){
-    var sit = {coberto:'coberto', parcial:'tratado por cima', ausente:'não apareceu'};
-    var cor = {coberto:'#1a7a3c', parcial:'#b07d00', ausente:'#8a1c1c'};
-    var h = '<h2>O que uma explicação sólida desse tema cobre</h2>' +
-      '<p class="legenda" style="margin-bottom:8px">Você tratou ' +
-      r.essenciais_cobertos + ' dos ' + r.essenciais_total +
-      ' pontos essenciais. Os títulos abaixo dizem onde olhar — a explicação ' +
-      'fica por sua conta.</p><table>';
-    r.mapa.forEach(function(m){
-      h += '<tr><td>' + esc(m.conceito) +
-        (m.essencial ? '' : ' <span class="evid" style="font-style:normal">(aprofundamento)</span>') +
-        '</td><td class="num" style="color:' + (cor[m.situacao] || '#5b6b86') +
-        ';font-weight:bold">' + (sit[m.situacao] || m.situacao) + '</td></tr>';
-    });
-    abr.innerHTML = h + '</table>';
-    abr.classList.remove('oculto');
-  } else {
-    abr.classList.add('oculto');
-  }
-
-  var soc = document.getElementById('rSocratica');
-  if(r.pergunta_aprofundamento && !estado.rodada2){
-    document.getElementById('rPergunta').textContent = r.pergunta_aprofundamento;
-    soc.classList.remove('oculto');
-  } else {
-    soc.classList.add('oculto');
-  }
-
-  var faixa = document.getElementById('rFaixaVisual');
-  faixa.innerHTML = '';
-  var total = r.criterios.reduce(function(s,c){ return s + c.peso; }, 0) || 100;
-  r.criterios.forEach(function(c){
-    var seg = document.createElement('div');
-    seg.className = 'seg';
-    seg.style.flex = c.peso + ' 0 0';
-    seg.title = c.criterio + ' — ' + c.pontos + ' de ' + c.peso + ' pontos';
-    var i = document.createElement('i');
-    i.style.width = c.percentual + '%';
-    seg.appendChild(i); faixa.appendChild(seg);
+  .then(function(r){
+    if(r.fora_do_escopo){
+      estado.turnos.pop();
+      err.textContent = 'Não identifiquei um assunto de Engenharia de Alimentos ' +
+        'na sua fala. Escolha um conceito da área e explique de novo.';
+      err.classList.remove('oculto'); mostrar('pFala'); return;
+    }
+    estado.rodada = r.rodada;
+    estado.mapa = r.mapa;
+    estado.convite = r.convite;
+    estado.indiceAtual = r.indice;
+    if(estado.indiceInicial === null) estado.indiceInicial = r.indice;
+    estado.rodadasMin = r.rodadasMin; estado.rodadasMax = r.rodadasMax;
+    if(r.encerrado) mostrarFinal(r); else mostrarParcial(r);
+  })
+  .catch(function(e){
+    estado.turnos.pop();
+    err.textContent = e.message; err.classList.remove('oculto'); mostrar('pFala');
   });
+}
 
-  var html = '<h2>Critério por critério</h2><table><tr>' +
-    '<th>Critério</th><th class="num">Pontos</th></tr>';
+function encerrarAgora(){
+  mostrar('pProcessando');
+  api('avaliarConversa', {
+    turnos: estado.turnos, mapaAnterior: estado.mapa, encerrar: true,
+    indiceInicial: estado.indiceInicial, segundosFala: estado.segundos
+  })
+  .then(function(r){ estado.indiceAtual = r.indice; mostrarFinal(r); })
+  .catch(function(e){ alert(e.message); mostrarParcialGuardado(); });
+}
+
+/* ---------- telas de resultado ---------- */
+function barra(destino, criterios){
+  var el = document.getElementById(destino);
+  el.innerHTML = '';
+  criterios.forEach(function(c){
+    var seg = document.createElement('div');
+    seg.className = 'seg'; seg.style.flex = c.peso + ' 0 0';
+    seg.title = c.criterio + ' — ' + c.pontos + ' de ' + c.peso + ' pontos';
+    var i = document.createElement('i'); i.style.width = c.percentual + '%';
+    seg.appendChild(i); el.appendChild(seg);
+  });
+}
+
+function tabelaMapa(r){
+  var sit = {coberto:'coberto', parcial:'por cima', ausente:'não apareceu'};
+  var cor = {coberto:'var(--verde)', parcial:'var(--ocre)', ausente:'var(--vermelho)'};
+  var h = '<h2>O que uma explicação sólida desse tema cobre</h2>' +
+    '<p class="legenda" style="margin-bottom:8px">Você já tratou ' +
+    r.essenciais_cobertos + ' dos ' + r.essenciais_total + ' pontos essenciais. ' +
+    'Os títulos dizem onde olhar — a explicação fica por sua conta.</p><table>';
+  r.mapa.forEach(function(m){
+    h += '<tr><td>' + esc(m.conceito) +
+      (m.essencial ? '' : ' <span class="evid" style="font-style:normal">(aprofundamento)</span>') +
+      '</td><td class="num" style="font-weight:bold;color:' +
+      (cor[m.situacao] || 'var(--cinza)') + '">' +
+      (sit[m.situacao] || m.situacao) + '</td></tr>';
+  });
+  return h + '</table>';
+}
+
+function mostrarParcial(r){
+  document.getElementById('temaParcial').textContent = 'Tema: ' + r.tema +
+    ' · rodada ' + r.rodada + ' de até ' + r.rodadasMax;
+  document.getElementById('indiceParcial').textContent = r.indice;
+  document.getElementById('faixaParcial').textContent = r.faixa;
+  var d = document.getElementById('deltaParcial');
+  var ganho = r.indice - estado.indiceInicial;
+  d.textContent = (r.rodada > 1 && ganho !== 0)
+    ? (ganho > 0 ? '▲ +' + ganho + ' desde a fala livre' : '▼ ' + ganho) : '';
+  d.style.color = ganho >= 0 ? 'var(--verde)' : 'var(--vermelho)';
+  barra('barraParcial', r.criterios);
+  document.getElementById('mapaParcial').innerHTML = tabelaMapa(r);
+  document.getElementById('proximoConvite').textContent = r.convite;
+  document.getElementById('btEncerrarParcial').classList
+    .toggle('oculto', r.rodada < r.rodadasMin);
+  mostrar('pParcial');
+}
+
+function mostrarParcialGuardado(){ mostrar('pParcial'); }
+
+function mostrarFinal(r){
+  document.getElementById('temaFinal').textContent = 'Tema: ' + r.tema +
+    ' · ' + r.rodada + ' rodada' + (r.rodada > 1 ? 's' : '');
+  document.getElementById('indiceFinal').textContent = r.indice;
+  document.getElementById('faixaFinal').textContent = r.faixa;
+  var ganho = r.indice - estado.indiceInicial;
+  var d = document.getElementById('deltaFinal');
+  d.textContent = ganho > 0 ? '▲ +' + ganho + ' desde a fala livre'
+                : ganho < 0 ? '▼ ' + ganho : 'sem variação';
+  d.style.color = ganho >= 0 ? 'var(--verde)' : 'var(--vermelho)';
+  barra('barraFinal', r.criterios);
+  document.getElementById('legendaFinal').textContent =
+    'Você começou em ' + estado.indiceInicial + ' falando livremente e terminou em ' +
+    r.indice + ' depois de ' + (r.rodada - 1) + ' convite' +
+    ((r.rodada - 1) === 1 ? '' : 's') + '.';
+  document.getElementById('textoParecer').textContent = r.parecer;
+
+  var html = tabelaMapa(r);
+  html += '<h2>Critério por critério</h2><table>';
   r.criterios.forEach(function(c){
     html += '<tr><td><b>' + esc(c.criterio) + '</b>';
     if(c.evidencia) html += '<div class="evid">“' + esc(c.evidencia) + '”</div>';
@@ -592,12 +549,10 @@ function desenhar(r){
     html += '</td><td class="num">' + c.pontos + ' / ' + c.peso + '</td></tr>';
   });
   html += '</table>';
-
   html += bloco('O que você demonstrou', r.pontos_fortes);
   html += bloco('Conceitos que ficaram incorretos', r.erros_conceituais);
-  html += bloco('O que dá para aprofundar', r.aprofundar);
-
-  document.getElementById('rBlocos').innerHTML = html;
+  document.getElementById('blocosFinal').innerHTML = html;
+  mostrar('pFinal');
 }
 
 function bloco(titulo, itens){
@@ -621,10 +576,10 @@ function enviarSug(){
     texto: document.getElementById('sTexto').value
   })
   .then(function(t){
-    msg.textContent = t; msg.style.color = '#1a7a3c';
+    msg.textContent = t; msg.style.color = 'var(--verde)';
     document.getElementById('sTexto').value = '';
   })
-  .catch(function(e){ msg.textContent = e.message; msg.style.color = '#8a1c1c'; });
+  .catch(function(e){ msg.textContent = e.message; msg.style.color = 'var(--vermelho)'; });
 }
 </script>
 </body>
