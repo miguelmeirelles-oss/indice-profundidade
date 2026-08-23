@@ -87,6 +87,16 @@
   h2{font-size:16px;color:var(--menu);margin:22px 0 8px;text-transform:uppercase;
      letter-spacing:.04em}
   ul{margin:0;padding-left:20px}li{margin-bottom:7px;line-height:1.5}
+  .correcoes{border:2.5px solid var(--navy);border-left:10px solid #c62828;
+             border-radius:0 14px 14px 0;padding:14px 16px;margin-top:20px;
+             background:var(--branco)}
+  .correcoes .eyebrow{font-size:12px;font-weight:bold;color:#c62828;
+             text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px}
+  .correcoes .item{margin-bottom:14px}
+  .correcoes .item:last-child{margin-bottom:0}
+  .correcoes .dito{font-style:italic;color:var(--cinza);font-size:14px;
+             border-left:3px solid #d7deea;padding-left:10px;margin-bottom:6px}
+  .correcoes .certo{font-size:15px;line-height:1.55}
   .parecer{background:var(--bloco);border:2.5px solid var(--navy);border-radius:14px;
            padding:16px 18px;font-size:16px;line-height:1.6;margin-top:6px}
   .erro{background:#fdecec;border:2px solid #e23b3b;border-radius:12px;
@@ -144,7 +154,7 @@
     <div class="passos" id="passos"></div>
     <div class="convite" id="blocoConvite">
       <div class="eyebrow" id="conviteTitulo">Rodada 1 — fala livre</div>
-      <p id="conviteTexto">Sobre o assunto que deseja falar explique o que é, por que
+      <p id="conviteTexto">Explique o tema que você escolheu: o que é, por que
         funciona assim, onde aparece na indústria e em que situações deixa de valer.
         Dois a três minutos bastam.</p>
     </div>
@@ -192,6 +202,7 @@
       preenchida é o quanto sua explicação cobriu até agora.</p>
 
     <div id="mapaParcial"></div>
+    <div id="correcoesParcial"></div>
 
     <div class="convite" style="margin-top:20px">
       <div class="eyebrow">Vamos continuar</div>
@@ -215,6 +226,8 @@
     </div>
     <div class="faixa" id="barraFinal"></div>
     <p class="legenda" id="legendaFinal"></p>
+
+    <div id="correcoesFinal"></div>
 
     <h2>Parecer</h2>
     <div class="parecer" id="textoParecer"></div>
@@ -502,6 +515,18 @@ function tabelaMapa(r){
   return h + '</table>';
 }
 
+function caixaCorrecoes(correcoes){
+  if(!correcoes || !correcoes.length) return '';
+  var h = '<div class="correcoes"><div class="eyebrow">' +
+    (correcoes.length > 1 ? 'Isso precisa ser corrigido' : 'Isso precisa ser corrigido') +
+    '</div>';
+  correcoes.forEach(function(c){
+    h += '<div class="item"><div class="dito">Você disse: “' + esc(c.afirmacao) +
+         '”</div><div class="certo">' + esc(c.correcao) + '</div></div>';
+  });
+  return h + '</div>';
+}
+
 function mostrarParcial(r){
   document.getElementById('temaParcial').textContent = 'Tema: ' + r.tema +
     ' · rodada ' + r.rodada + ' de até ' + r.rodadasMax;
@@ -514,6 +539,7 @@ function mostrarParcial(r){
   d.style.color = ganho >= 0 ? 'var(--verde)' : 'var(--vermelho)';
   barra('barraParcial', r.criterios);
   document.getElementById('mapaParcial').innerHTML = tabelaMapa(r);
+  document.getElementById('correcoesParcial').innerHTML = caixaCorrecoes(r.correcoes);
   document.getElementById('proximoConvite').textContent = r.convite;
   document.getElementById('btEncerrarParcial').classList
     .toggle('oculto', r.rodada < r.rodadasMin);
@@ -537,6 +563,7 @@ function mostrarFinal(r){
     'Você começou em ' + estado.indiceInicial + ' falando livremente e terminou em ' +
     r.indice + ' depois de ' + (r.rodada - 1) + ' convite' +
     ((r.rodada - 1) === 1 ? '' : 's') + '.';
+  document.getElementById('correcoesFinal').innerHTML = caixaCorrecoes(r.correcoes);
   document.getElementById('textoParecer').textContent = r.parecer;
 
   var html = tabelaMapa(r);
@@ -550,7 +577,6 @@ function mostrarFinal(r){
   });
   html += '</table>';
   html += bloco('O que você demonstrou', r.pontos_fortes);
-  html += bloco('Conceitos que ficaram incorretos', r.erros_conceituais);
   document.getElementById('blocosFinal').innerHTML = html;
   mostrar('pFinal');
 }
