@@ -104,6 +104,37 @@
   .aviso{font-size:12px;color:var(--cinza);line-height:1.6;margin-top:12px}
   .oculto{display:none}
 
+  .topo{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .link{background:none;border:none;box-shadow:none;color:var(--azul);
+        font-size:14px;font-weight:bold;text-decoration:underline;padding:4px 0;
+        cursor:pointer}
+  .link:hover{transform:none;box-shadow:none}
+  .area{border:2.5px solid var(--navy);border-radius:14px;margin-bottom:14px;
+        overflow:hidden}
+  .area>summary{cursor:pointer;list-style:none;padding:14px 16px;
+        background:var(--bloco);font-weight:bold;font-size:16px;color:var(--menu);
+        display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .area>summary::-webkit-details-marker{display:none}
+  .area .conteudo{padding:6px 10px 12px}
+  .sub{display:flex;justify-content:space-between;align-items:center;gap:10px;
+       padding:11px 8px;border-bottom:1px solid #d7deea;cursor:pointer}
+  .sub:last-child{border-bottom:none}
+  .sub:hover{background:var(--bloco)}
+  .sub .nome{font-size:15px}
+  .nota{min-width:52px;text-align:center;font-weight:bold;font-size:14px;
+        border:2px solid var(--navy);border-radius:99px;padding:3px 10px}
+  .n0{background:#fdecec;color:#8a1c1c}
+  .n1{background:#fff4d6;color:#8a6100}
+  .n2{background:#e6f4ea;color:#1a7a3c}
+  .nv{background:var(--branco);color:var(--cinza);border-color:#d7deea}
+  .tent{font-size:12px;color:var(--cinza);margin-right:6px}
+  .hist{border:2px solid #d7deea;border-radius:12px;padding:12px 14px;
+        margin-bottom:12px}
+  .hist .cab{display:flex;justify-content:space-between;align-items:center;
+        gap:10px;flex-wrap:wrap}
+  .hist .quando{font-size:13px;color:var(--cinza)}
+  .hist .gar{font-size:14px;line-height:1.5;margin-top:8px}
+  .hist button{font-size:12px;padding:6px 12px;box-shadow:2px 3px 0 var(--navy)}
   details.sug{border:2px solid var(--azul);border-radius:12px;padding:8px 12px;
               max-width:230px;background:var(--branco)}
   details.sug summary{cursor:pointer;font-size:13px;font-weight:bold;color:var(--azul);
@@ -127,6 +158,8 @@
       <p>Fale sobre um tema e converse com a avaliação: a cada rodada ela pede o
          que faltou, e a nota acompanha o que você construir.</p>
     </div>
+    <div class="topo">
+      <button class="secundario" id="btArea" onclick="abrirArea()">Área do aluno</button>
     <details class="sug">
       <summary>+ Enviar sugestão</summary>
       <input type="text" id="sNome" placeholder="Nome (opcional)">
@@ -135,6 +168,7 @@
       <button class="secundario" onclick="enviarSug()">Enviar</button>
       <p id="sMsg" class="aviso"></p>
     </details>
+    </div>
   </div>
 
   <!-- início -->
@@ -147,6 +181,85 @@
     <div class="botoes">
       <button onclick="comecar()">Começar a falar</button>
     </div>
+  </div>
+
+
+  <!-- login / cadastro -->
+  <div class="caixa oculto" id="pAuth">
+    <h2 style="margin-top:0">Área do aluno</h2>
+    <p style="margin:0 0 14px;font-size:15px;line-height:1.55">Aqui suas
+      avaliações ficam guardadas por assunto, com nota e gargalos, para você
+      acompanhar o que já domina do curso e o que precisa revisar.</p>
+
+    <div id="caixaGoogle" style="margin-bottom:16px"></div>
+
+    <div class="botoes" style="margin-top:0">
+      <button class="secundario" id="abaEntrar" onclick="trocarAba('entrar')">Entrar</button>
+      <button class="secundario" id="abaCriar" onclick="trocarAba('criar')">Criar conta</button>
+    </div>
+
+    <div id="formCriar" class="oculto" style="margin-top:14px">
+      <label for="cNome">Nome</label>
+      <input type="text" id="cNome" placeholder="Como você quer ser chamado">
+      <label for="cEmail" style="margin-top:12px">E-mail</label>
+      <input type="email" id="cEmail" autocomplete="email">
+      <label for="cSenha" style="margin-top:12px">Senha (mínimo 8 caracteres)</label>
+      <input type="password" id="cSenha" autocomplete="new-password">
+      <p class="aviso">Guardamos apenas uma versão embaralhada da senha — ninguém
+        consegue lê-la, nem o professor. Ainda assim, não use aqui uma senha
+        importante de outro serviço.</p>
+      <div class="botoes"><button onclick="criarConta()">Criar conta</button></div>
+    </div>
+
+    <div id="formEntrar" style="margin-top:14px">
+      <label for="eEmail">E-mail</label>
+      <input type="email" id="eEmail" autocomplete="email">
+      <label for="eSenha" style="margin-top:12px">Senha</label>
+      <input type="password" id="eSenha" autocomplete="current-password">
+      <div class="botoes"><button onclick="entrarConta()">Entrar</button></div>
+    </div>
+
+    <p class="aviso" style="border-top:1px solid #d7deea;padding-top:12px">
+      <b>O que fica guardado:</b> seu nome, e-mail e, para cada assunto, a nota e
+      o resumo dos pontos frágeis. O áudio nunca é gravado. <b>O professor da
+      disciplina vê seu nome e seus resultados</b> — a ferramenta serve para
+      acompanhar sua formação, não para punir. Você pode apagar qualquer
+      avaliação ou a conta inteira quando quiser.</p>
+
+    <div class="botoes">
+      <button class="link" onclick="mostrar('pInicio')">Voltar ao modo sem cadastro</button>
+    </div>
+    <div id="erroAuth" class="erro oculto"></div>
+  </div>
+
+  <!-- currículo -->
+  <div class="caixa oculto" id="pCurriculo">
+    <div class="topo" style="justify-content:space-between;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0">Meu mapa do curso</h2>
+        <p class="aviso" style="margin-top:4px" id="ola"></p>
+      </div>
+      <div class="topo">
+        <button class="link" onclick="mostrar('pInicio')">Modo livre</button>
+        <button class="link" onclick="sairConta()">Sair</button>
+      </div>
+    </div>
+    <div id="listaAreas"></div>
+    <p class="aviso">A nota mostrada é a sua melhor tentativa em cada assunto.
+      Clique em um assunto para ver o histórico ou refazer.</p>
+    <div class="botoes">
+      <button class="link" style="color:#8a1c1c" onclick="apagarConta()">Apagar minha conta e todo o histórico</button>
+    </div>
+  </div>
+
+  <!-- subtópico -->
+  <div class="caixa oculto" id="pSubtopico">
+    <button class="link" onclick="abrirCurriculo()">← voltar ao mapa</button>
+    <h2 style="margin:8px 0 4px" id="subTitulo"></h2>
+    <div class="botoes" style="margin-top:10px">
+      <button onclick="comecarSubtopico()">Fazer uma avaliação</button>
+    </div>
+    <div id="listaHistorico" style="margin-top:18px"></div>
   </div>
 
   <!-- fala -->
@@ -235,6 +348,7 @@
     <div id="blocosFinal"></div>
 
     <div class="botoes">
+      <button class="secundario oculto" id="btVoltarMapa" onclick="abrirCurriculo()">Voltar ao meu mapa</button>
       <button class="secundario" onclick="recomecar()">Falar de outro tema</button>
     </div>
     <p class="aviso">O áudio não é gravado nem guardado: apenas o texto transcrito é
@@ -274,10 +388,188 @@ function api(acao, dados){
   });
 }
 
+var sessao = {token: localStorage.getItem('ip_token') || '', nome:''};
+var subtopicoAtual = null;   // {id, nome} quando a avaliação vem do currículo
+
 var estado = {turnos:[], mapa:null, convite:'', rodada:0,
               indiceInicial:null, indiceAtual:null, segundos:0,
               rodadasMin:3, rodadasMax:6};
 var rec=null, gravando=false, t0=0, timer=null;
+
+/* ---------- contas ---------- */
+var clientIdGoogle = '';
+
+api('config').then(function(c){
+  clientIdGoogle = c.googleClientId || '';
+  if(clientIdGoogle) carregarGoogle();
+}).catch(function(){});
+
+if(sessao.token){
+  api('sessao', {token: sessao.token}).then(function(r){
+    if(r.logado){ sessao.nome = r.nome; document.getElementById('btArea').textContent = 'Meu mapa'; }
+    else { sessao.token = ''; localStorage.removeItem('ip_token'); }
+  }).catch(function(){});
+}
+
+function carregarGoogle(){
+  var s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.async = true; s.defer = true;
+  s.onload = function(){
+    try{
+      google.accounts.id.initialize({
+        client_id: clientIdGoogle,
+        callback: function(resp){
+          api('entrarGoogle', {credential: resp.credential})
+            .then(logou).catch(erroAuth);
+        }
+      });
+      google.accounts.id.renderButton(document.getElementById('caixaGoogle'),
+        {theme:'outline', size:'large', text:'continue_with', width:300});
+    }catch(e){}
+  };
+  document.head.appendChild(s);
+}
+
+function erroAuth(e){
+  var el = document.getElementById('erroAuth');
+  el.textContent = e.message; el.classList.remove('oculto');
+}
+
+function logou(r){
+  sessao.token = r.token; sessao.nome = r.nome;
+  localStorage.setItem('ip_token', r.token);
+  document.getElementById('btArea').textContent = 'Meu mapa';
+  document.getElementById('erroAuth').classList.add('oculto');
+  abrirCurriculo();
+}
+
+function abrirArea(){
+  if(sessao.token) abrirCurriculo();
+  else { document.getElementById('erroAuth').classList.add('oculto'); mostrar('pAuth'); }
+}
+
+function trocarAba(qual){
+  document.getElementById('formCriar').classList.toggle('oculto', qual !== 'criar');
+  document.getElementById('formEntrar').classList.toggle('oculto', qual !== 'entrar');
+}
+
+function criarConta(){
+  api('cadastrar', {
+    nome: document.getElementById('cNome').value,
+    email: document.getElementById('cEmail').value,
+    senha: document.getElementById('cSenha').value
+  }).then(logou).catch(erroAuth);
+}
+
+function entrarConta(){
+  api('entrar', {
+    email: document.getElementById('eEmail').value,
+    senha: document.getElementById('eSenha').value
+  }).then(logou).catch(erroAuth);
+}
+
+function sairConta(){
+  api('sair', {token: sessao.token}).catch(function(){});
+  sessao = {token:'', nome:''};
+  localStorage.removeItem('ip_token');
+  document.getElementById('btArea').textContent = 'Área do aluno';
+  mostrar('pInicio');
+}
+
+function apagarConta(){
+  if(!confirm('Isso apaga sua conta e todo o histórico de avaliações. ' +
+              'Não tem como desfazer. Continuar?')) return;
+  api('apagarConta', {token: sessao.token}).then(function(m){
+    alert(m); sessao = {token:'', nome:''};
+    localStorage.removeItem('ip_token');
+    document.getElementById('btArea').textContent = 'Área do aluno';
+    mostrar('pInicio');
+  }).catch(function(e){ alert(e.message); });
+}
+
+/* ---------- currículo ---------- */
+function classeNota(n){
+  if(n === null) return 'nv';
+  if(n < 45) return 'n0';
+  if(n < 70) return 'n1';
+  return 'n2';
+}
+
+function abrirCurriculo(){
+  api('curriculo', {token: sessao.token}).then(function(c){
+    document.getElementById('ola').textContent = 'Olá, ' + c.nome + '.';
+    var h = '';
+    c.areas.forEach(function(a){
+      var feitos = a.subtopicos.filter(function(s){ return s.melhor !== null; }).length;
+      h += '<details class="area"' + (feitos ? ' open' : '') + '><summary><span>' +
+        esc(a.nome) + '</span><span class="tent">' + feitos + ' de ' +
+        a.subtopicos.length + '</span></summary><div class="conteudo">';
+      a.subtopicos.forEach(function(s){
+        h += '<div class="sub" onclick="abrirSubtopico(\'' + s.id + '\')">' +
+          '<span class="nome">' + esc(s.nome) + '</span><span>' +
+          (s.tentativas > 1 ? '<span class="tent">' + s.tentativas + 'x</span>' : '') +
+          '<span class="nota ' + classeNota(s.melhor) + '">' +
+          (s.melhor === null ? '—' : s.melhor) + '</span></span></div>';
+      });
+      h += '</div></details>';
+    });
+    document.getElementById('listaAreas').innerHTML = h;
+    mostrar('pCurriculo');
+  }).catch(function(e){
+    if(/sess/i.test(e.message)){ sairConta(); mostrar('pAuth'); }
+    else alert(e.message);
+  });
+}
+
+function abrirSubtopico(id){
+  api('historico', {token: sessao.token, subtopicoId: id}).then(function(h){
+    subtopicoAtual = {id: id, nome: h.subtopico};
+    document.getElementById('subTitulo').textContent = h.subtopico;
+    var out = '';
+    if(!h.avaliacoes.length){
+      out = '<p class="aviso">Você ainda não falou sobre este assunto.</p>';
+    } else {
+      h.avaliacoes.forEach(function(a){
+        out += '<div class="hist"><div class="cab"><span class="nota ' +
+          classeNota(a.indiceFinal) + '">' + a.indiceFinal + '</span>' +
+          '<span class="quando">' + esc(a.data) + ' · ' + a.rodadas +
+          ' rodadas · começou em ' + a.indiceInicial + '</span>' +
+          '<button class="secundario" onclick="excluirAval(\'' + a.id +
+          '\')">Excluir</button></div>' +
+          (a.gargalos ? '<div class="gar"><b>Gargalos:</b> ' + esc(a.gargalos) + '</div>' : '') +
+          (a.parecer ? '<div class="gar">' + esc(a.parecer) + '</div>' : '') +
+          '</div>';
+      });
+    }
+    document.getElementById('listaHistorico').innerHTML = out;
+    mostrar('pSubtopico');
+  }).catch(function(e){ alert(e.message); });
+}
+
+function excluirAval(id){
+  if(!confirm('Excluir esta avaliação do seu histórico?')) return;
+  api('excluirAvaliacao', {token: sessao.token, id: id})
+    .then(function(){ abrirSubtopico(subtopicoAtual.id); })
+    .catch(function(e){ alert(e.message); });
+}
+
+function comecarSubtopico(){
+  estado = {turnos:[], mapa:null, convite:'', rodada:0, indiceInicial:null,
+            indiceAtual:null, segundos:0,
+            rodadasMin:estado.rodadasMin, rodadasMax:estado.rodadasMax};
+  document.getElementById('conviteTitulo').textContent =
+    'Rodada 1 — ' + subtopicoAtual.nome;
+  document.getElementById('conviteTexto').textContent =
+    'Explique ' + subtopicoAtual.nome + ': o que é, por que funciona assim, onde ' +
+    'aparece na indústria e em que situações deixa de valer. Dois a três minutos ' +
+    'bastam.';
+  campo().value = '';
+  document.getElementById('erroFala').classList.add('oculto');
+  document.getElementById('btEncerrar').classList.add('oculto');
+  desenharPassos();
+  mostrar('pFala');
+}
 
 /* ---------- sugestões de tema ---------- */
 api('listarTemas').then(function(r){
@@ -383,7 +675,8 @@ function semMicrofone(msg){
 
 /* ---------- navegação ---------- */
 function mostrar(id){
-  ['pInicio','pFala','pProcessando','pParcial','pFinal'].forEach(function(p){
+  ['pInicio','pAuth','pCurriculo','pSubtopico','pFala','pProcessando',
+   'pParcial','pFinal'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
   });
   window.scrollTo({top:0, behavior:'smooth'});
@@ -400,6 +693,7 @@ function desenharPassos(){
 }
 
 function comecar(){
+  subtopicoAtual = null;
   var ativo = document.querySelector('.chip.ativo');
   estado = {turnos:[], mapa:null, convite:'', rodada:0, indiceInicial:null,
             indiceAtual:null, segundos:0,
@@ -452,7 +746,10 @@ function enviarFala(encerrar){
 
   api('avaliarConversa', {
     turnos: estado.turnos, mapaAnterior: estado.mapa, encerrar: !!encerrar,
-    indiceInicial: estado.indiceInicial, segundosFala: estado.segundos
+    indiceInicial: estado.indiceInicial, segundosFala: estado.segundos,
+    token: sessao.token,
+    subtopicoId: subtopicoAtual ? subtopicoAtual.id : '',
+    assunto: subtopicoAtual ? subtopicoAtual.nome : ''
   })
   .then(function(r){
     if(r.fora_do_escopo){
@@ -479,7 +776,10 @@ function encerrarAgora(){
   mostrar('pProcessando');
   api('avaliarConversa', {
     turnos: estado.turnos, mapaAnterior: estado.mapa, encerrar: true,
-    indiceInicial: estado.indiceInicial, segundosFala: estado.segundos
+    indiceInicial: estado.indiceInicial, segundosFala: estado.segundos,
+    token: sessao.token,
+    subtopicoId: subtopicoAtual ? subtopicoAtual.id : '',
+    assunto: subtopicoAtual ? subtopicoAtual.nome : ''
   })
   .then(function(r){ estado.indiceAtual = r.indice; mostrarFinal(r); })
   .catch(function(e){ alert(e.message); mostrarParcialGuardado(); });
@@ -578,6 +878,8 @@ function mostrarFinal(r){
   html += '</table>';
   html += bloco('O que você demonstrou', r.pontos_fortes);
   document.getElementById('blocosFinal').innerHTML = html;
+  document.getElementById('btVoltarMapa').classList
+    .toggle('oculto', !(sessao.token && subtopicoAtual));
   mostrar('pFinal');
 }
 
