@@ -395,10 +395,27 @@
 
     <div class="botoes">
       <button onclick="enviarFala(false)">Enviar</button>
-      <button class="secundario" id="btEncerrar" onclick="enviarFala(true)">Enviar e registrar agora</button>
+      <button class="secundario" id="btEncerrar" onclick="enviarFala(true)">Enviar e encerrar</button>
       <button class="secundario" onclick="recomecar()">Recomeçar do zero</button>
     </div>
     <div id="erroFala" class="erro oculto"></div>
+  </div>
+
+  <!-- limite sem cadastro -->
+  <div class="caixa oculto" id="pLimite">
+    <h2 style="margin-top:0">Você usou bastante hoje</h2>
+    <p style="margin:0 0 8px;font-size:16px;line-height:1.6">Chegou ao limite de
+      avaliações sem cadastro por hoje.</p>
+    <p style="margin:0;font-size:16px;line-height:1.6">Se quiser continuar agora,
+      é só criar uma conta — leva dez segundos, não custa nada, e a partir daí
+      suas avaliações ficam guardadas por assunto, com as notas e os pontos que
+      você precisa revisar.</p>
+    <div class="botoes">
+      <button onclick="mostrar('pAuth')">Criar conta ou entrar</button>
+      <button class="secundario" onclick="mostrar('pInicio')">Deixa para amanhã</button>
+    </div>
+    <p class="aviso">Sua resposta não foi perdida: se entrar agora, ela ainda
+      está no campo de texto.</p>
   </div>
 
   <!-- processando -->
@@ -430,7 +447,7 @@
     </div>
     <div class="botoes">
       <button onclick="continuar()">Responder isso</button>
-      <button class="secundario" id="btEncerrarParcial" onclick="encerrarAgora()">Está bom, registrar</button>
+      <button class="secundario" id="btEncerrarParcial" onclick="encerrarAgora()">Está bom, quero o parecer</button>
       <button class="link" onclick="refazerRodada()">Refazer minha última resposta</button>
     </div>
   </div>
@@ -476,7 +493,17 @@
    ================================================================== */
 var BACKEND = 'https://script.google.com/macros/s/AKfycbxthqK2s3ErBbC8yhUoU9BWIwVnJvB3JBkULK6BGmiisybYnjrSQ_dRHDSEmz0gByoQeg/exec';
 
+// Identificador anônimo do navegador, só para contar o uso sem cadastro.
+// Não guarda nada sobre a pessoa — é um número aleatório local.
+var visitante = localStorage.getItem('ip_visitante');
+if(!visitante){
+  visitante = 'v' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+  localStorage.setItem('ip_visitante', visitante);
+}
+
 function api(acao, dados){
+  dados = dados || {};
+  if(dados.turnos || dados.resultado) dados.visitante = visitante;
   return fetch(BACKEND, {
     method:'POST',
     headers:{'Content-Type':'text/plain;charset=utf-8'},
@@ -487,7 +514,18 @@ function api(acao, dados){
     return r.json();
   })
   .then(function(j){
-    if(!j.ok) throw new Error(j.erro || 'Não deu para concluir.');
+    if(!j.ok){
+      // O servidor manda um código; o texto que o aluno lê é montado aqui.
+      if(j.erro === 'COTA'){
+        throw new Error('Os créditos de uso da inteligência artificial ' +
+          'acabaram por hoje. Eles voltam na virada do dia — sua resposta ' +
+          'continua na tela, é só reenviar amanhã. O professor já foi avisado.');
+      }
+      if(j.erro === 'LIMITE_ANONIMO'){
+        throw new Error('LIMITE_ANONIMO');
+      }
+      throw new Error(j.erro || 'Não deu para concluir.');
+    }
     return j.resultado;
   })
   .catch(function(e){
@@ -1030,7 +1068,7 @@ function ajustarModoTeclado(){
 /* ---------- navegação ---------- */
 function mostrar(id, manterPosicao){
   ['pInicio','pAuth','pInstituicao','pProfessor','pCurriculo','pSubtopico',
-   'pFala','pProcessando','pParcial','pFinal'].forEach(function(p){
+   'pFala','pProcessando','pParcial','pFinal','pLimite'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
   });
   // manterPosicao: usado pelo filtro de nível, que só redesenha a lista
@@ -1120,6 +1158,7 @@ function enviarFala(encerrar){
   })
   .catch(function(e){
     estado.turnos.pop();
+    if(e.message === 'LIMITE_ANONIMO'){ mostrar('pLimite'); return; }
     err.textContent = e.message; err.classList.remove('oculto'); mostrar('pFala');
   });
 }
@@ -1163,7 +1202,10 @@ function encerrarAgora(){
     estado.indiceAtual = r.indice;
     mostrarFinal(final);
   })
-  .catch(function(e){ alert(e.message); mostrarParcialGuardado(); });
+  .catch(function(e){
+    if(e.message === 'LIMITE_ANONIMO'){ mostrar('pLimite'); return; }
+    alert(e.message); mostrarParcialGuardado();
+  });
 }
 
 /* ---------- telas de resultado ---------- */
@@ -1214,6 +1256,11 @@ function caixaCorrecoes(correcoes, desconto){
 
 function mostrarParcial(r){
   estado.ultimoParcial = r;   // é este resultado que o botão de encerrar congela
+  // Sem login não há histórico para alimentar: o botão entrega o parecer, não
+  // um registro. O nome acompanha o que ele realmente faz.
+  document.getElementById('btEncerrarParcial').textContent =
+    (sessao.token && subtopicoAtual) ? 'Está bom, registrar'
+                                     : 'Está bom, quero o parecer';
   document.getElementById('temaParcial').textContent = 'Tema: ' + r.tema +
     ' · rodada ' + r.rodada + ' de até ' + r.rodadasMax;
   document.getElementById('indiceParcial').textContent = r.indice;
