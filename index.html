@@ -501,7 +501,7 @@ var subtopicoAtual = null;   // {id, nome} quando a avaliação vem do currícul
 
 var estado = {turnos:[], mapa:null, convite:'', rodada:0,
               indiceInicial:null, indiceAtual:null, segundos:0,
-              rodadasMin:3, rodadasMax:6};
+              ultimoParcial:null, rodadasMin:1, rodadasMax:10};
 var rec=null, gravando=false, t0=0, timer=null;
 
 /* ---------- contas ---------- */
@@ -1044,15 +1044,27 @@ function refazerRodada(){
 }
 
 function encerrarAgora(){
+  var r = estado.ultimoParcial;
+  if(!r) return;
   mostrar('pProcessando');
-  api('avaliarConversa', {
-    turnos: estado.turnos, mapaAnterior: estado.mapa, encerrar: true,
+
+  // Não reavalia: a nota que está na tela é a que vale. A IA só escreve o
+  // parecer, que é a única parte que ainda não existe.
+  api('encerrarConversa', {
+    turnos: estado.turnos, resultado: r,
     indiceInicial: estado.indiceInicial, segundosFala: estado.segundos,
     token: sessao.token,
-    subtopicoId: subtopicoAtual ? subtopicoAtual.id : '',
-    assunto: subtopicoAtual ? subtopicoAtual.nome : ''
+    subtopicoId: subtopicoAtual ? subtopicoAtual.id : ''
   })
-  .then(function(r){ estado.indiceAtual = r.indice; mostrarFinal(r); })
+  .then(function(saida){
+    var final = {};
+    for(var k in r) final[k] = r[k];
+    final.parecer = saida.parecer;
+    final.convite = '';
+    final.encerrado = true;
+    estado.indiceAtual = r.indice;
+    mostrarFinal(final);
+  })
   .catch(function(e){ alert(e.message); mostrarParcialGuardado(); });
 }
 
@@ -1099,6 +1111,7 @@ function caixaCorrecoes(correcoes){
 }
 
 function mostrarParcial(r){
+  estado.ultimoParcial = r;   // é este resultado que o botão de encerrar congela
   document.getElementById('temaParcial').textContent = 'Tema: ' + r.tema +
     ' · rodada ' + r.rodada + ' de até ' + r.rodadasMax;
   document.getElementById('indiceParcial').textContent = r.indice;
