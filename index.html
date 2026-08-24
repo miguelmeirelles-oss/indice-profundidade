@@ -857,6 +857,25 @@ function iniciarRec(){
 }
 function campo(){ return document.getElementById('transcricao'); }
 
+// iPhone e iPad: o reconhecimento da página depende do Ditado do sistema e
+// quase sempre é bloqueado. O microfone do teclado funciona sempre e escreve
+// direto no campo — a avaliação lê o texto, não o áudio.
+var ehIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+var ehAndroid = /Android/.test(navigator.userAgent);
+var ehCelular = ehIOS || ehAndroid;
+
+// No celular o ditado do teclado é mais estável: é do próprio sistema e não
+// tem o ciclo de encerrar e reiniciar que a gravação pela página sofre.
+// Por isso ele é o caminho padrão no celular — no Android a gravação pela
+// página continua disponível para quem preferir.
+var preferirTeclado = ehCelular;
+
+var AVISO_TECLADO = 'Use o microfone do teclado: toque no campo acima e depois ' +
+  'no ícone de microfone, ao lado da barra de espaço. É mais estável no ' +
+  'celular, e a avaliação é exatamente a mesma.';
+var AVISO_IOS = AVISO_TECLADO;
+
 /* Junta dois trechos descartando a sobreposição.
    O reconhecedor do Android reentrega o que já foi finalizado — inclusive na
    sessão seguinte, depois de reiniciar sozinho. Comparando as últimas palavras
@@ -877,10 +896,19 @@ function juntar(a, b){
 }
 
 function alternarGravacao(){
+  if(preferirTeclado){
+    campo().focus();
+    semMicrofone(AVISO_TECLADO);
+    return;
+  }
   if(gravando){ pararGravacao(); return; }
   rec = iniciarRec();
-  if(!rec){ semMicrofone('Este navegador não reconhece voz. Use o Chrome ou o Edge, ' +
-    'ou digite sua resposta no campo abaixo.'); return; }
+  if(!rec){
+    semMicrofone(ehCelular ? AVISO_TECLADO
+      : 'Este navegador não reconhece voz. Use o Chrome ou o Edge, ou digite ' +
+        'sua resposta no campo abaixo.');
+    return;
+  }
 
   var base = campo().value ? campo().value.trim() + ' ' : '';
   var finalizado = '';
@@ -906,9 +934,10 @@ function alternarGravacao(){
   };
   rec.onerror = function(ev){
     if(ev.error === 'not-allowed' || ev.error === 'service-not-allowed'){
-      semMicrofone('O microfone está bloqueado. Clique no cadeado ao lado do ' +
-        'endereço, libere o microfone e recarregue a página. Enquanto isso, ' +
-        'você pode digitar a resposta.');
+      semMicrofone(ehCelular ? AVISO_TECLADO
+        : 'O microfone está bloqueado. Clique no cadeado ao lado do endereço, ' +
+          'libere o microfone e recarregue a página. Enquanto isso, você pode ' +
+          'digitar a resposta.');
       pararGravacao();
     } else if(ev.error === 'no-speech' || ev.error === 'aborted'){
       return;   // silêncio: o onend reinicia
@@ -925,7 +954,11 @@ function alternarGravacao(){
   };
 
   try{ rec.start(); }
-  catch(e){ semMicrofone('Não deu para acessar o microfone. Digite sua resposta.'); return; }
+  catch(e){
+    semMicrofone(ehCelular ? AVISO_TECLADO
+      : 'Não deu para acessar o microfone. Digite sua resposta.');
+    return;
+  }
 
   gravando = true; t0 = Date.now();
   var b = document.getElementById('btGravar');
@@ -940,7 +973,8 @@ function pararGravacao(){
   clearInterval(timer);
   estado.segundos += Math.round((Date.now() - t0)/1000);
   var b = document.getElementById('btGravar');
-  b.textContent = 'Gravar mais'; b.className = 'gravar';
+  b.textContent = preferirTeclado ? 'Usar o microfone do teclado' : 'Gravar mais';
+  b.className = 'gravar';
   document.getElementById('luz').style.visibility = 'hidden';
 }
 
@@ -953,8 +987,40 @@ function tique(){
 
 function semMicrofone(msg){
   var d = document.getElementById('dicaMic');
-  d.textContent = msg; d.style.color = '#8a1c1c'; d.style.fontWeight = 'bold';
+  d.textContent = msg;
+  d.style.color = ehCelular ? 'var(--cinza)' : '#8a1c1c';
+  d.style.fontWeight = ehCelular ? 'normal' : 'bold';
   campo().focus();
+}
+
+// No celular já orientamos antes de o aluno esbarrar em qualquer bloqueio.
+if(ehCelular){
+  document.addEventListener('DOMContentLoaded', function(){
+    ajustarModoTeclado();
+    if(ehAndroid){
+      var b = document.getElementById('btGravar');
+      var link = document.createElement('button');
+      link.className = 'link';
+      link.textContent = 'prefiro gravar pela página';
+      link.onclick = function(){
+        preferirTeclado = false;
+        link.remove();
+        b.textContent = 'Começar a falar';
+        document.getElementById('dicaMic').textContent =
+          'Confira a transcrição antes de enviar: o reconhecimento de voz erra ' +
+          'termos técnicos, e a avaliação usa o texto.';
+        document.getElementById('dicaMic').style.color = 'var(--cinza)';
+      };
+      if(b) b.parentNode.appendChild(link);
+    }
+  });
+}
+
+function ajustarModoTeclado(){
+  var d = document.getElementById('dicaMic');
+  if(d){ d.textContent = AVISO_TECLADO; d.style.color = 'var(--cinza)'; }
+  var b = document.getElementById('btGravar');
+  if(b) b.textContent = 'Usar o microfone do teclado';
 }
 
 /* ---------- navegação ---------- */
