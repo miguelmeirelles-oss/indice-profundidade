@@ -17,11 +17,29 @@
 
   .caixa{border:2.5px solid var(--navy);border-radius:18px;background:var(--branco);
          box-shadow:4px 5px 0 var(--navy);padding:18px;margin-bottom:18px}
-  .cabecalho{background:var(--bloco);border:2.5px solid var(--navy);border-radius:18px;
-             box-shadow:4px 5px 0 var(--navy);padding:16px 18px;margin-bottom:18px;
-             display:flex;gap:14px;align-items:flex-start;justify-content:space-between}
-  .cabecalho h1{margin:0;font-size:21px;color:var(--menu);line-height:1.25}
-  .cabecalho p{margin:6px 0 0;font-size:13px;color:var(--cinza)}
+  .cabecalho{background:var(--menu);border:2.5px solid var(--navy);
+             border-radius:18px;box-shadow:4px 5px 0 var(--navy);
+             padding:26px 26px 22px;margin-bottom:18px;color:#fff}
+  .cabecalho h1{margin:0;font-size:30px;line-height:1.15;color:#fff;
+             letter-spacing:-.01em}
+  .cabecalho p{margin:8px 0 0;font-size:14px;color:#cddaf5;max-width:520px;
+             line-height:1.5}
+  .acoes{display:flex;flex-direction:column;gap:10px;align-items:stretch;
+             min-width:230px}
+  .pill{background:var(--ambar);color:var(--navy);border:2.5px solid var(--navy);
+        border-radius:999px;padding:12px 22px;font-size:14px;font-weight:bold;
+        letter-spacing:.08em;text-transform:uppercase;cursor:pointer;
+        box-shadow:3px 4px 0 rgba(0,0,0,.35);display:flex;
+        justify-content:space-between;align-items:center;gap:14px;width:100%}
+  .pill:hover{transform:translate(1px,1px);box-shadow:2px 3px 0 rgba(0,0,0,.35)}
+  .pill.claro{background:#fff}
+  .pill .seta{font-size:17px;line-height:1}
+  .miniLink{background:none;border:none;box-shadow:none;color:#cddaf5;
+        font-size:13px;text-decoration:underline;padding:2px;cursor:pointer;
+        align-self:flex-end}
+  .miniLink:hover{color:#fff;transform:none;box-shadow:none}
+  .topoFlex{display:flex;gap:26px;justify-content:space-between;
+        align-items:flex-start;flex-wrap:wrap}
 
   label{display:block;font-size:13px;font-weight:bold;color:var(--titulo);
         margin:0 0 6px;text-transform:uppercase;letter-spacing:.04em}
@@ -133,6 +151,35 @@
   .painelTopo .grande{font-size:40px;font-weight:bold;color:var(--menu);
         line-height:1}
   .painelTopo .sub{font-size:14px;color:var(--cinza);margin-top:2px}
+
+  /* --- cartão de destaque do mapa --- */
+  .heroMapa{background:var(--menu);border:2.5px solid var(--navy);
+        border-radius:18px;box-shadow:4px 5px 0 var(--navy);color:#fff;
+        padding:22px;margin-bottom:18px;display:flex;gap:24px;
+        align-items:center;flex-wrap:wrap}
+  .heroMapa .quem{flex:1;min-width:200px}
+  .heroMapa .quem h2{margin:0;font-size:24px;color:#fff;text-transform:none;
+        letter-spacing:0}
+  .heroMapa .quem .inst{font-size:13px;color:#cddaf5;margin-top:2px}
+  .anel{position:relative;width:132px;height:132px;flex:0 0 auto}
+  .anel svg{transform:rotate(-90deg)}
+  .anel .centro{position:absolute;inset:0;display:flex;flex-direction:column;
+        align-items:center;justify-content:center}
+  .anel .centro b{font-size:36px;line-height:1;color:#fff}
+  .anel .centro span{font-size:10px;letter-spacing:.1em;color:#cddaf5;
+        text-transform:uppercase;margin-top:3px}
+  .niveis{display:flex;gap:10px;flex:1;min-width:230px;flex-wrap:wrap}
+  .nivelCard{flex:1;min-width:100px;background:rgba(255,255,255,.12);
+        border:2px solid rgba(255,255,255,.35);border-radius:12px;padding:10px 12px}
+  .nivelCard .t{font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+        color:#cddaf5}
+  .nivelCard .v{font-size:22px;font-weight:bold;color:#fff;line-height:1.2}
+  .nivelCard .p{font-size:11px;color:#cddaf5}
+  .nivelCard .barra{height:6px;border-radius:99px;background:rgba(0,0,0,.25);
+        margin-top:6px;overflow:hidden}
+  .nivelCard .barra i{display:block;height:100%;background:var(--ambar)}
+  .secundaria{font-size:13px;color:#cddaf5;margin:14px 0 0;width:100%;
+        border-top:1px solid rgba(255,255,255,.25);padding-top:12px}
   .prog{height:12px;border:2px solid var(--navy);border-radius:99px;
         background:var(--branco);overflow:hidden;margin-top:8px}
   .prog i{display:block;height:100%;background:var(--azul)}
@@ -153,8 +200,9 @@
   .hist .quando{font-size:13px;color:var(--cinza)}
   .hist .gar{font-size:14px;line-height:1.5;margin-top:8px}
   .hist button{font-size:12px;padding:6px 12px;box-shadow:2px 3px 0 var(--navy)}
-  details.sug{border:2px solid var(--azul);border-radius:12px;padding:8px 12px;
-              max-width:230px;background:var(--branco)}
+  details.sug{border:2px solid rgba(255,255,255,.5);border-radius:12px;
+              padding:12px;background:rgba(255,255,255,.08)}
+  details.sug input,details.sug textarea{background:#fff}
   details.sug summary{cursor:pointer;font-size:13px;font-weight:bold;color:var(--azul);
                       list-style:none}
   details.sug summary::-webkit-details-marker{display:none}
@@ -171,23 +219,28 @@
 <div class="wrap">
 
   <div class="cabecalho">
-    <div>
-      <h1>Índice de Profundidade</h1>
-      <p>Fale sobre um tema e converse com a avaliação: a cada rodada ela pede o
-         que faltou, e a nota acompanha o que você construir.</p>
+    <div class="topoFlex">
+      <div>
+        <h1>Índice de Profundidade</h1>
+        <p>Fale sobre um tema e converse com a avaliação: a cada rodada ela pede
+           o que faltou, e a nota acompanha o que você construir.</p>
+      </div>
+      <div class="acoes">
+        <button class="pill" id="btArea" onclick="abrirArea()">
+          <span id="btAreaTexto">Área do aluno</span><span class="seta">&#10230;</span></button>
+        <button class="pill claro oculto" id="btProf" onclick="abrirProfessor()">
+          <span>Área do professor</span><span class="seta">&#10230;</span></button>
+        <button class="miniLink" onclick="abrirSugestao()">enviar sugestão</button>
+      </div>
     </div>
-    <div class="topo">
-      <button class="secundario" id="btArea" onclick="abrirArea()">Área do aluno</button>
-      <button class="secundario oculto" id="btProf" onclick="abrirProfessor()">Painel da turma</button>
-    <details class="sug">
-      <summary>+ Enviar sugestão</summary>
+    <details class="sug oculto" id="caixaSug" style="margin-top:16px;max-width:100%">
+      <summary style="display:none"></summary>
       <input type="text" id="sNome" placeholder="Nome (opcional)">
       <input type="email" id="sEmail" placeholder="E-mail (opcional)">
       <textarea id="sTexto" placeholder="O que dá para melhorar aqui?"></textarea>
       <button class="secundario" onclick="enviarSug()">Enviar</button>
       <p id="sMsg" class="aviso"></p>
     </details>
-    </div>
   </div>
 
   <!-- início -->
@@ -268,7 +321,7 @@
   <!-- painel do professor -->
   <div class="caixa oculto" id="pProfessor">
     <div class="topo" style="justify-content:space-between;margin-bottom:14px">
-      <h2 style="margin:0">Painel da turma</h2>
+      <h2 style="margin:0">Área do professor</h2>
       <div class="topo">
         <button class="link" onclick="abrirCurriculo()">Meu mapa</button>
         <button class="link" onclick="sairConta()">Sair</button>
@@ -281,10 +334,7 @@
   <!-- currículo -->
   <div class="caixa oculto" id="pCurriculo">
     <div class="topo" style="justify-content:space-between;margin-bottom:14px">
-      <div>
-        <h2 style="margin:0">Meu mapa do curso</h2>
-        <p class="aviso" style="margin-top:4px" id="ola"></p>
-      </div>
+      <h2 style="margin:0">Meu mapa do curso</h2>
       <div class="topo">
         <button class="link" onclick="mostrar('pInicio')">Modo livre</button>
         <button class="link" onclick="sairConta()">Sair</button>
@@ -411,6 +461,9 @@
       de linguagem e serve como diagnóstico de estudo, não como nota.</p>
   </div>
 
+  <p style="text-align:center;font-size:12px;color:var(--cinza);margin:26px 0 8px">
+    Engenharia de Alimentos · CEFET/RJ — <a href="https://engalimentos.com.br"
+    style="color:var(--azul)">engalimentos.com.br</a></p>
 </div>
 
 <script>
@@ -464,7 +517,7 @@ if(sessao.token){
     if(r.logado){
       sessao.nome = r.nome; sessao.professor = r.professor;
       sessao.instituicao = r.instituicao || '';
-      document.getElementById('btArea').textContent = 'Meu mapa';
+      document.getElementById('btAreaTexto').textContent = 'Meu mapa';
       document.getElementById('btProf').classList.toggle('oculto', !r.professor);
     }
     else { sessao.token = ''; localStorage.removeItem('ip_token'); }
@@ -500,7 +553,7 @@ function logou(r){
   sessao.token = r.token; sessao.nome = r.nome;
   sessao.professor = !!r.professor; sessao.instituicao = r.instituicao || '';
   localStorage.setItem('ip_token', r.token);
-  document.getElementById('btArea').textContent = 'Meu mapa';
+  document.getElementById('btAreaTexto').textContent = 'Meu mapa';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
   document.getElementById('erroAuth').classList.add('oculto');
   if(!sessao.instituicao) mostrar('pInstituicao');
@@ -519,13 +572,15 @@ function salvarInst(pular){
 function abrirProfessor(){
   api('painelProfessor', {token: sessao.token}).then(function(p){
     document.getElementById('resumoProf').innerHTML =
-      '<div class="painelTopo"><div class="linhaProg">' +
-      '<div><div class="grande">' + p.totalAlunos + '</div>' +
-        '<div class="sub">alunos cadastrados</div></div>' +
-      '<div><div class="grande">' + p.totalAvaliacoes + '</div>' +
-        '<div class="sub">avaliações registradas</div></div>' +
-      '<div><div class="grande">' + (p.mediaGeral === null ? '—' : p.mediaGeral) +
-        '</div><div class="sub">índice médio da turma</div></div>' +
+      '<div class="heroMapa" style="gap:18px">' +
+      '<div class="niveis" style="min-width:100%">' +
+        '<div class="nivelCard"><div class="t">Alunos</div><div class="v">' +
+          p.totalAlunos + '</div><div class="p">cadastrados</div></div>' +
+        '<div class="nivelCard"><div class="t">Avaliações</div><div class="v">' +
+          p.totalAvaliacoes + '</div><div class="p">registradas</div></div>' +
+        '<div class="nivelCard"><div class="t">Índice médio</div><div class="v">' +
+          (p.mediaGeral === null ? '—' : p.mediaGeral) +
+          '</div><div class="p">da turma</div></div>' +
       '</div></div>' +
       (p.instituicoes.length ? '<h2>Instituições</h2><table>' +
         p.instituicoes.map(function(i){
@@ -561,6 +616,12 @@ function verAluno(id){
   }).catch(function(e){ alert(e.message); });
 }
 
+function abrirSugestao(){
+  var c = document.getElementById('caixaSug');
+  c.classList.toggle('oculto');
+  c.open = true;
+}
+
 function abrirArea(){
   if(sessao.token) abrirCurriculo();
   else { document.getElementById('erroAuth').classList.add('oculto'); mostrar('pAuth'); }
@@ -590,7 +651,8 @@ function sairConta(){
   api('sair', {token: sessao.token}).catch(function(){});
   sessao = {token:'', nome:''};
   localStorage.removeItem('ip_token');
-  document.getElementById('btArea').textContent = 'Área do aluno';
+  document.getElementById('btAreaTexto').textContent = 'Área do aluno';
+  document.getElementById('btProf').classList.add('oculto');
   mostrar('pInicio');
 }
 
@@ -598,9 +660,10 @@ function apagarConta(){
   if(!confirm('Isso apaga sua conta e todo o histórico de avaliações. ' +
               'Não tem como desfazer. Continuar?')) return;
   api('apagarConta', {token: sessao.token}).then(function(m){
-    alert(m); sessao = {token:'', nome:''};
+    alert(m); sessao = {token:'', nome:'', professor:false, instituicao:''};
     localStorage.removeItem('ip_token');
-    document.getElementById('btArea').textContent = 'Área do aluno';
+    document.getElementById('btAreaTexto').textContent = 'Área do aluno';
+    document.getElementById('btProf').classList.add('oculto');
     mostrar('pInicio');
   }).catch(function(e){ alert(e.message); });
 }
@@ -638,25 +701,50 @@ function filtrar(nivel, botao){
   if(mapaAtual) desenharMapa(mapaAtual, vendoOutro);
 }
 
+function anel(valor){
+  var r = 56, circ = 2 * Math.PI * r;
+  var frac = Math.max(0, Math.min(100, valor)) / 100;
+  return '<div class="anel"><svg width="132" height="132" viewBox="0 0 132 132">' +
+    '<circle cx="66" cy="66" r="' + r + '" fill="none" stroke="rgba(0,0,0,.28)" stroke-width="13"/>' +
+    '<circle cx="66" cy="66" r="' + r + '" fill="none" stroke="#F5C518" stroke-width="13" ' +
+    'stroke-linecap="round" stroke-dasharray="' + (circ * frac).toFixed(1) + ' ' +
+    circ.toFixed(1) + '"/></svg>' +
+    '<div class="centro"><b>' + valor + '</b><span>domínio</span></div></div>';
+}
+
+function cartaoNivel(rotulo, dados){
+  if(!dados || !dados.total) return '';
+  var pct = Math.round(dados.feitos * 100 / dados.total);
+  return '<div class="nivelCard"><div class="t">' + rotulo + '</div>' +
+    '<div class="v">' + dados.feitos + '<span style="font-size:13px;' +
+    'font-weight:normal"> / ' + dados.total + '</span></div>' +
+    '<div class="p">' + (dados.media === null ? 'nenhum ainda'
+      : 'média ' + dados.media) + '</div>' +
+    '<div class="barra"><i style="width:' + pct + '%"></i></div></div>';
+}
+
 function desenharMapa(c, deOutro){
   mapaAtual = c; vendoOutro = !!deOutro;
 
-  document.getElementById('ola').textContent = deOutro
-    ? c.nome + (c.email ? ' · ' + c.email : '')
-    : 'Olá, ' + c.nome + '.';
-
-  var pct = c.total ? Math.round(c.feitos * 100 / c.total) : 0;
   document.getElementById('resumoMapa').innerHTML =
-    '<div class="painelTopo"><div class="linhaProg">' +
-    '<div><div class="grande">' + (c.media === null ? '—' : c.media) + '</div>' +
-      '<div class="sub">índice médio nos assuntos já falados</div></div>' +
-    '<div><div class="grande">' + c.feitos + '<span style="font-size:20px;' +
-      'color:var(--cinza)"> / ' + c.total + '</span></div>' +
-      '<div class="sub">assuntos do currículo cobertos (' + pct + '%)</div>' +
-      '<div class="prog"><i style="width:' + pct + '%"></i></div></div>' +
-    '</div></div>' +
+    '<div class="heroMapa">' +
+      anel(c.dominio) +
+      '<div class="quem"><h2>' + esc(deOutro ? c.nome : 'Olá, ' + c.nome) + '</h2>' +
+      '<div class="inst">' + esc(deOutro && c.email ? c.email : (c.instituicao || '')) +
+      '</div></div>' +
+      '<div class="niveis">' +
+        cartaoNivel('Básico · 60%', c.porNivel.basico) +
+        cartaoNivel('Interm. · 30%', c.porNivel.intermediario) +
+        cartaoNivel('Avanç. · 10%', c.porNivel.avancado) +
+      '</div>' +
+      '<p class="secundaria">' + c.feitos + ' de ' + c.total +
+        ' assuntos do currículo já falados' +
+        (c.media === null ? '' : ' · média ' + c.media +
+          ' nas avaliações feitas') +
+        '. O domínio conta o que ainda não foi falado como zero.</p>' +
+    '</div>' +
     (deOutro ? '<div class="botoes" style="margin-top:0;margin-bottom:12px">' +
-      '<button class="link" onclick="abrirProfessor()">← voltar ao painel da turma</button></div>' : '');
+      '<button class="link" onclick="abrirProfessor()">← voltar à área do professor</button></div>' : '');
 
   var h = '';
   c.areas.forEach(function(a){
@@ -669,12 +757,11 @@ function desenharMapa(c, deOutro){
     h += '<details class="area"' + (feitosF ? ' open' : '') + '><summary>' +
       '<span>' + esc(a.nome) + '</span>' +
       '<span class="areaResumo">' +
-        (a.media === null ? '' : '<span class="nota ' + classeNota(a.media) +
-          '">' + a.media + '</span>') +
+        '<span class="nota ' + classeNota(a.dominio) + '">' + a.dominio + '</span>' +
         '<span>' + feitosF + '/' + lista.length + '</span></span></summary>' +
       '<div class="conteudo">' +
       '<div class="prog" style="margin:4px 8px 12px"><i class="' +
-        classeBarra(a.media) + '" style="width:' + pctA + '%"></i></div>';
+        classeBarra(a.dominio) + '" style="width:' + pctA + '%"></i></div>';
     lista.forEach(function(s){
       h += '<div class="sub" onclick="abrirSubtopico(\'' + s.id + '\')">' +
         '<span class="nome"><span class="badge b-' + s.nivel + '">' +
