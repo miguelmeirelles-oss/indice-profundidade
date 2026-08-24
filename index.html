@@ -866,13 +866,17 @@ function alternarGravacao(){
   var base = campo().value ? campo().value.trim() + ' ' : '';
   var finalizado = '';
 
+  // No Android o reconhecedor reentrega os resultados já finalizados a cada
+  // evento. Por isso reconstruímos o texto da lista inteira em vez de somar o
+  // que chega: se o mesmo trecho vier dez vezes, o resultado é o mesmo.
   rec.onresult = function(ev){
-    var parcial = '';
-    for(var i = ev.resultIndex; i < ev.results.length; i++){
+    var fin = '', parcial = '';
+    for(var i = 0; i < ev.results.length; i++){
       var trecho = ev.results[i][0].transcript;
-      if(ev.results[i].isFinal) finalizado += trecho.trim() + ' ';
+      if(ev.results[i].isFinal) fin += trecho.trim() + ' ';
       else parcial += trecho;
     }
+    finalizado = fin;
     campo().value = base + finalizado + parcial;
     campo().scrollTop = campo().scrollHeight;
   };
