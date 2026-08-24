@@ -698,7 +698,7 @@ function filtrar(nivel, botao){
     x.classList.remove('ativo');
   });
   botao.classList.add('ativo');
-  if(mapaAtual) desenharMapa(mapaAtual, vendoOutro);
+  if(mapaAtual) desenharMapa(mapaAtual, vendoOutro, true);
 }
 
 function anel(valor){
@@ -723,7 +723,7 @@ function cartaoNivel(rotulo, dados){
     '<div class="barra"><i style="width:' + pct + '%"></i></div></div>';
 }
 
-function desenharMapa(c, deOutro){
+function desenharMapa(c, deOutro, manterPosicao){
   mapaAtual = c; vendoOutro = !!deOutro;
 
   document.getElementById('resumoMapa').innerHTML =
@@ -775,7 +775,7 @@ function desenharMapa(c, deOutro){
     h += '</div></details>';
   });
   document.getElementById('listaAreas').innerHTML = h;
-  mostrar('pCurriculo');
+  mostrar('pCurriculo', manterPosicao);
 }
 
 function abrirSubtopico(id){
@@ -930,12 +930,13 @@ function semMicrofone(msg){
 }
 
 /* ---------- navegação ---------- */
-function mostrar(id){
+function mostrar(id, manterPosicao){
   ['pInicio','pAuth','pInstituicao','pProfessor','pCurriculo','pSubtopico',
    'pFala','pProcessando','pParcial','pFinal'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
   });
-  window.scrollTo({top:0, behavior:'smooth'});
+  // manterPosicao: usado pelo filtro de nível, que só redesenha a lista
+  if(!manterPosicao) window.scrollTo({top:0, behavior:'smooth'});
 }
 
 function desenharPassos(){
