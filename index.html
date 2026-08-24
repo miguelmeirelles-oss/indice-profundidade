@@ -387,6 +387,10 @@
       <textarea id="transcricao" placeholder="Clique em começar a falar. O texto aparece aqui e você pode corrigir antes de enviar."></textarea>
       <p class="aviso" id="dicaMic">Confira a transcrição antes de enviar: o
         reconhecimento de voz erra termos técnicos, e a avaliação usa o texto.</p>
+      <p class="aviso" style="margin-top:6px">Texto ditado costuma vir sem
+        pontuação, e isso <b>não afeta a sua nota</b> — a avaliação lê os
+        conceitos, não as vírgulas. Vale corrigir apenas os termos técnicos que
+        saírem trocados, porque esses sim podem ser lidos como erro.</p>
     </div>
 
     <div class="botoes">
@@ -1192,14 +1196,18 @@ function tabelaMapa(r){
   return h + '</table>';
 }
 
-function caixaCorrecoes(correcoes){
+function caixaCorrecoes(correcoes, desconto){
   if(!correcoes || !correcoes.length) return '';
-  var h = '<div class="correcoes"><div class="eyebrow">' +
-    (correcoes.length > 1 ? 'Isso precisa ser corrigido' : 'Isso precisa ser corrigido') +
-    '</div>';
+  var h = '<div class="correcoes"><div class="eyebrow">Isso precisa ser corrigido' +
+    (desconto ? ' · −' + desconto + ' pontos' : '') + '</div>';
   correcoes.forEach(function(c){
-    h += '<div class="item"><div class="dito">Você disse: “' + esc(c.afirmacao) +
-         '”</div><div class="certo">' + esc(c.correcao) + '</div></div>';
+    var grave = String(c.gravidade || '').toLowerCase() === 'grave';
+    h += '<div class="item">' +
+      '<span class="badge" style="color:' + (grave ? '#c62828' : 'var(--ocre)') +
+      '">' + (grave ? 'erro grave' : 'deslize') + '</span>' +
+      '<div class="dito" style="margin-top:6px">Você disse: “' +
+      esc(c.afirmacao) + '”</div>' +
+      '<div class="certo">' + esc(c.correcao) + '</div></div>';
   });
   return h + '</div>';
 }
@@ -1217,7 +1225,8 @@ function mostrarParcial(r){
   d.style.color = ganho >= 0 ? 'var(--verde)' : 'var(--vermelho)';
   barra('barraParcial', r.criterios);
   document.getElementById('mapaParcial').innerHTML = tabelaMapa(r);
-  document.getElementById('correcoesParcial').innerHTML = caixaCorrecoes(r.correcoes);
+  document.getElementById('correcoesParcial').innerHTML =
+    caixaCorrecoes(r.correcoes, r.desconto);
   document.getElementById('proximoConvite').textContent = r.convite;
   mostrar('pParcial');
 }
@@ -1239,7 +1248,8 @@ function mostrarFinal(r){
     'Você começou em ' + estado.indiceInicial + ' falando livremente e terminou em ' +
     r.indice + ' depois de ' + (r.rodada - 1) + ' convite' +
     ((r.rodada - 1) === 1 ? '' : 's') + '.';
-  document.getElementById('correcoesFinal').innerHTML = caixaCorrecoes(r.correcoes);
+  document.getElementById('correcoesFinal').innerHTML =
+    caixaCorrecoes(r.correcoes, r.desconto);
   document.getElementById('textoParecer').textContent = r.parecer;
 
   var html = tabelaMapa(r);
