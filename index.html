@@ -857,6 +857,25 @@ function iniciarRec(){
 }
 function campo(){ return document.getElementById('transcricao'); }
 
+/* Junta dois trechos descartando a sobreposição.
+   O reconhecedor do Android reentrega o que já foi finalizado — inclusive na
+   sessão seguinte, depois de reiniciar sozinho. Comparando as últimas palavras
+   do que já existe com as primeiras do que chegou, a repetição é eliminada
+   independentemente de onde ela nasceu. */
+function juntar(a, b){
+  a = (a || '').trim(); b = (b || '').trim();
+  if(!a) return b;
+  if(!b) return a;
+  var pa = a.split(/\s+/), pb = b.split(/\s+/);
+  var max = Math.min(pa.length, pb.length, 40);
+  for(var k = max; k > 0; k--){
+    var fim = pa.slice(pa.length - k).join(' ').toLowerCase();
+    var ini = pb.slice(0, k).join(' ').toLowerCase();
+    if(fim === ini) return pa.concat(pb.slice(k)).join(' ') + ' ';
+  }
+  return a + ' ' + b + ' ';
+}
+
 function alternarGravacao(){
   if(gravando){ pararGravacao(); return; }
   rec = iniciarRec();
@@ -877,7 +896,7 @@ function alternarGravacao(){
       else parcial += trecho;
     }
     finalizado = fin;
-    campo().value = base + finalizado + parcial;
+    campo().value = juntar(base, finalizado + parcial);
     campo().scrollTop = campo().scrollHeight;
   };
   rec.onerror = function(ev){
@@ -896,7 +915,7 @@ function alternarGravacao(){
   };
   rec.onend = function(){
     if(!gravando) return;
-    base = base + finalizado; finalizado = '';
+    base = juntar(base, finalizado); finalizado = '';
     setTimeout(function(){ if(gravando){ try{ rec.start(); }catch(e){} } }, 250);
   };
 
