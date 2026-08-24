@@ -889,14 +889,18 @@ function alternarGravacao(){
   // evento. Por isso reconstruímos o texto da lista inteira em vez de somar o
   // que chega: se o mesmo trecho vier dez vezes, o resultado é o mesmo.
   rec.onresult = function(ev){
-    var fin = '', parcial = '';
+    // No Android os resultados provisórios são CUMULATIVOS: cada um já contém
+    // o anterior. Somar todos multiplica o texto — por isso usamos só o
+    // último. Os finalizados são dobrados um a um com juntar(), que descarta
+    // qualquer sobreposição entre eles.
+    var fin = '', ultimoParcial = '';
     for(var i = 0; i < ev.results.length; i++){
       var trecho = ev.results[i][0].transcript;
-      if(ev.results[i].isFinal) fin += trecho.trim() + ' ';
-      else parcial += trecho;
+      if(ev.results[i].isFinal) fin = juntar(fin, trecho);
+      else ultimoParcial = trecho;
     }
     finalizado = fin;
-    campo().value = juntar(base, finalizado + parcial);
+    campo().value = juntar(base, juntar(finalizado, ultimoParcial)).trim();
     campo().scrollTop = campo().scrollHeight;
   };
   rec.onerror = function(ev){
