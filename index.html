@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Índice de Profundidade — Engenharia de Alimentos</title>
+<title>Índice de Profundidade do conhecimento — Engenharia de Alimentos</title>
 <style>
   :root{
     --menu:#17389C; --azul:#2E62C6; --titulo:#3E76C4; --navy:#0E2A5C;
@@ -221,7 +221,7 @@
   <div class="cabecalho">
     <div class="topoFlex">
       <div>
-        <h1>Índice de Profundidade</h1>
+        <h1>Índice de Profundidade do conhecimento</h1>
         <p>Fale sobre um tema e converse com a avaliação: a cada rodada ela pede
            o que faltou, e a nota acompanha o que você construir.</p>
       </div>
@@ -248,7 +248,7 @@
     <label>Sobre o que você quer falar?</label>
     <p style="margin:0;font-size:15px;line-height:1.55">Escolha qualquer assunto de
       Engenharia de Alimentos e explique como se estivesse ensinando alguém da sua
-      turma. Não precisa escolher da lista — ela é só para destravar.</p>
+      turma. O sistema avaliará sua resposta com base em IA e atribuirá uma nota para a profundidade do seu conhecimento no tema.</p>
     <div class="chips" id="chips"><span class="aviso">carregando sugestões…</span></div>
     <div class="botoes">
       <button onclick="comecar()">Começar a falar</button>
@@ -292,11 +292,8 @@
     </div>
 
     <p class="aviso" style="border-top:1px solid #d7deea;padding-top:12px">
-      <b>O que fica guardado:</b> seu nome, e-mail e, para cada assunto, a nota e
-      o resumo dos pontos frágeis. O áudio nunca é gravado. <b>O professor da
-      disciplina vê seu nome e seus resultados</b> — a ferramenta serve para
-      acompanhar sua formação, não para punir. Você pode apagar qualquer
-      avaliação ou a conta inteira quando quiser.</p>
+      <b>O que fica guardado:</b> seu nome, e-mail e a instituição. O áudio nunca é gravado. <b>O elaborador do site tem acesso a inclusão de temas na plataforma.</b> — a ferramenta serve para você
+      acompanhar a sua formação.</p>
 
     <div class="botoes">
       <button class="link" onclick="mostrar('pInicio')">Voltar ao modo sem cadastro</button>
@@ -316,6 +313,7 @@
       <button onclick="salvarInst()">Salvar</button>
       <button class="link" onclick="salvarInst(true)">Prefiro não dizer</button>
     </div>
+    <div id="erroInst" class="erro oculto"></div>
   </div>
 
   <!-- painel do professor -->
@@ -598,21 +596,35 @@ function logou(r){
   document.getElementById('btAreaTexto').textContent = 'Meu mapa';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
   document.getElementById('erroAuth').classList.add('oculto');
-  if(!sessao.instituicao) mostrar('pInstituicao');
+  if(!sessao.instituicao && !localStorage.getItem('ip_inst')) mostrar('pInstituicao');
   else abrirCurriculo();
 }
 
 function salvarInst(pular){
   var v = pular ? '(não informou)' : document.getElementById('iInst').value.trim();
   if(!pular && !v){ document.getElementById('iInst').focus(); return; }
-  sessao.instituicao = v;
+  var erro = document.getElementById('erroInst');
+  erro.classList.add('oculto');
   api('salvarInstituicao', {token: sessao.token, instituicao: v})
-    .then(abrirCurriculo).catch(function(){ abrirCurriculo(); });
+    .then(function(){
+      sessao.instituicao = v;
+      // guarda também no navegador: se a gravação falhar em algum momento,
+      // o aluno não é perguntado de novo a cada login
+      localStorage.setItem('ip_inst', v);
+      abrirCurriculo();
+    })
+    .catch(function(e){
+      // Antes o erro era engolido e a pergunta voltava a cada acesso.
+      erro.textContent = 'Não deu para guardar: ' + e.message;
+      erro.classList.remove('oculto');
+    });
 }
 
 /* ---------- painel do professor ---------- */
 function abrirProfessor(){
+  var meu = acaoSeq;
   api('painelProfessor', {token: sessao.token}).then(function(p){
+    if(meu !== acaoSeq) return;
     document.getElementById('resumoProf').innerHTML =
       '<div class="heroMapa" style="gap:18px">' +
       '<div class="niveis" style="min-width:100%">' +
@@ -653,7 +665,9 @@ function abrirProfessor(){
 }
 
 function verAluno(id){
+  var meu = acaoSeq;
   api('mapaDeAluno', {token: sessao.token, alunoId: id}).then(function(c){
+    if(meu !== acaoSeq) return;
     desenharMapa(c, true);
   }).catch(function(e){ alert(e.message); });
 }
@@ -721,7 +735,9 @@ function classeNota(n){
 var mapaAtual = null, nivelFiltro = 'todos', vendoOutro = false;
 
 function abrirCurriculo(){
+  var meu = acaoSeq;
   api('curriculo', {token: sessao.token}).then(function(c){
+    if(meu !== acaoSeq) return;
     desenharMapa(c, false);
   }).catch(function(e){
     if(/sess/i.test(e.message)){ sairConta(); mostrar('pAuth'); }
@@ -822,7 +838,9 @@ function desenharMapa(c, deOutro, manterPosicao){
 
 function abrirSubtopico(id){
   if(vendoOutro) return;   // no mapa de outro aluno, os cartões não abrem
+  var meu = acaoSeq;
   api('historico', {token: sessao.token, subtopicoId: id}).then(function(h){
+    if(meu !== acaoSeq) return;   // o usuário já saiu daqui
     subtopicoAtual = {id: id, nome: h.subtopico};
     document.getElementById('subTitulo').textContent = h.subtopico;
     var out = '';
@@ -1066,13 +1084,21 @@ function ajustarModoTeclado(){
 }
 
 /* ---------- navegação ---------- */
+/* Cada navegação recebe um número. Respostas do servidor que chegam depois
+   de o usuário já ter ido para outro lugar são descartadas, em vez de puxarem
+   a tela de volta. É isso que causava o salto para o topo e o retorno à tela
+   anterior quando a internet estava lenta. */
+var acaoSeq = 0, telaAtual = 'pInicio';
+
 function mostrar(id, manterPosicao){
+  acaoSeq++;
   ['pInicio','pAuth','pInstituicao','pProfessor','pCurriculo','pSubtopico',
    'pFala','pProcessando','pParcial','pFinal','pLimite'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
   });
-  // manterPosicao: usado pelo filtro de nível, que só redesenha a lista
-  if(!manterPosicao) window.scrollTo({top:0, behavior:'smooth'});
+  // Só rola quando a tela realmente muda; o filtro de nível pede para manter.
+  if(!manterPosicao && id !== telaAtual) window.scrollTo({top:0, behavior:'smooth'});
+  telaAtual = id;
 }
 
 function desenharPassos(){
