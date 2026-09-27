@@ -290,7 +290,27 @@
       <input type="email" id="eEmail" autocomplete="email">
       <label for="eSenha" style="margin-top:12px">Senha</label>
       <input type="password" id="eSenha" autocomplete="current-password">
-      <div class="botoes"><button onclick="entrarConta()">Entrar</button></div>
+      <div class="botoes"><button onclick="entrarConta()">Entrar</button>
+        <button class="link" onclick="abrirRecuperar()">Esqueci minha senha</button></div>
+    </div>
+
+    <div id="formRecuperar" class="oculto" style="margin-top:14px">
+      <h2 style="margin-top:0">Recuperar senha</h2>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5">Enviamos um código de 6 números para o seu e-mail. Com ele você cria uma senha nova e já entra.</p>
+      <label for="rEmail">E-mail</label>
+      <input type="email" id="rEmail" autocomplete="email">
+      <div class="botoes"><button onclick="pedirCodigo()">Enviar código</button>
+        <button class="link" onclick="trocarAba('entrar')">Voltar</button></div>
+      <div id="rPasso2" class="oculto" style="margin-top:14px">
+        <label for="rCodigo">Código recebido</label>
+        <input type="text" id="rCodigo" inputmode="numeric" autocomplete="one-time-code" maxlength="6">
+        <label for="rSenha" style="margin-top:12px">Nova senha (mínimo 8 caracteres)</label>
+        <input type="password" id="rSenha" autocomplete="new-password">
+        <label for="rSenha2" style="margin-top:12px">Repita a nova senha</label>
+        <input type="password" id="rSenha2" autocomplete="new-password">
+        <div class="botoes"><button onclick="redefinirSenha()">Salvar e entrar</button></div>
+      </div>
+      <p id="rMsg" class="aviso"></p>
     </div>
 
     <p class="aviso" style="border-top:1px solid #d7deea;padding-top:12px">
@@ -716,6 +736,49 @@ function abrirArea(){
 function trocarAba(qual){
   document.getElementById('formCriar').classList.toggle('oculto', qual !== 'criar');
   document.getElementById('formEntrar').classList.toggle('oculto', qual !== 'entrar');
+  document.getElementById('formRecuperar').classList.toggle('oculto', qual !== 'recuperar');
+}
+
+/* ---------- recuperar senha por código no e-mail ---------- */
+function msgRec(t, cor){ var m = document.getElementById('rMsg'); m.textContent = t; m.style.color = cor || 'var(--cinza)'; }
+
+function abrirRecuperar(){
+  document.getElementById('rEmail').value = document.getElementById('eEmail').value;
+  document.getElementById('rPasso2').classList.add('oculto');
+  msgRec('');
+  trocarAba('recuperar');
+  document.getElementById('rEmail').focus();
+}
+
+function pedirCodigo(){
+  var email = document.getElementById('rEmail').value.trim();
+  if(!email){ document.getElementById('rEmail').focus(); return; }
+  msgRec('Enviando…');
+  api('pedirCodigo', {email: email}).then(function(t){
+    msgRec(t, 'var(--verde)');
+    document.getElementById('rPasso2').classList.remove('oculto');
+    document.getElementById('rCodigo').focus();
+  }).catch(function(e){
+    msgRec(e.message, 'var(--vermelho)');
+    // se o código já tinha sido enviado, deixa digitar
+    if(/acabou de ser enviado/.test(e.message)) document.getElementById('rPasso2').classList.remove('oculto');
+  });
+}
+
+function redefinirSenha(){
+  var nova = document.getElementById('rSenha').value;
+  if(nova.length < 8){ msgRec('A senha precisa ter pelo menos 8 caracteres.', 'var(--vermelho)'); return; }
+  if(nova !== document.getElementById('rSenha2').value){ msgRec('As duas senhas não são iguais.', 'var(--vermelho)'); return; }
+  msgRec('Salvando…');
+  api('redefinirSenha', {
+    email: document.getElementById('rEmail').value.trim(),
+    codigo: document.getElementById('rCodigo').value.trim(),
+    senhaNova: nova
+  }).then(function(r){
+    ['rCodigo', 'rSenha', 'rSenha2'].forEach(function(id){ document.getElementById(id).value = ''; });
+    trocarAba('entrar');
+    logou(r);
+  }).catch(function(e){ msgRec(e.message, 'var(--vermelho)'); });
 }
 
 function criarConta(){
