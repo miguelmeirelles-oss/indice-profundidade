@@ -670,13 +670,41 @@ function abrirEntregas(provaId){
           '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
           '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
           '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
-      }).join('') + '</tbody></table></div><div id="envioProf"></div><div class="botoes"><button type="button" class="secundario mini" id="btAtualEnt">Atualizar</button></div></div><div id="areaEntrega"></div>';
+      }).join('') + '</tbody></table></div><div id="envioProf"></div><div class="botoes"><button type="button" class="secundario mini" id="btAtualEnt">Atualizar</button>' +
+      (r.alunos.some(function(a){ return a.entrega; }) ? '<button type="button" class="secundario mini" id="btRecorrTodas">Corrigir todas de novo com o gabarito atual</button>' : '') +
+      '</div><div id="msgRecorr"></div></div><div id="areaEntrega"></div>';
     el.innerHTML = h;
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); });
+    var btR = $('btRecorrTodas');
+    if(btR) btR.addEventListener('click', function(){
+      if(btR.dataset.conf !== '1'){
+        btR.dataset.conf = '1';
+        btR.textContent = 'Confirmar: recorrigir todas (os ajustes feitos à mão e as confirmações serão perdidos)';
+        return;
+      }
+      recorrigirTodas(provaId, false);
+    });
     el.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirEntrega(b.dataset.abrir); }); });
     el.querySelectorAll('[data-enviarpor]').forEach(function(b){ b.addEventListener('click', function(){ envioPeloProfessor(r.alunos[Number(b.dataset.enviarpor)], provaId); }); });
     el.scrollIntoView({behavior:'smooth', block:'start'});
   }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+// Recorrige tudo com o gabarito atual; o que não couber de uma vez continua com um clique.
+function recorrigirTodas(provaId, continuar){
+  var msg = $('msgRecorr'), bt = $('btRecorrTodas');
+  if(bt) bt.disabled = true;
+  msg.innerHTML = '<p class="carregando">Corrigindo todas as entregas de novo com a IA… (pode levar alguns minutos)</p>';
+  api('recorrigirTodas', {provaId: provaId, continuar: continuar}).then(function(x){
+    if(x.semQuestoes){ msg.innerHTML = '<div class="erro">A prova ainda não tem questões cadastradas.</div>'; return; }
+    if(x.restantes){
+      msg.innerHTML = '<div class="convite">' + x.feitas + ' corrigida(s) agora; faltam ' + x.restantes + '. <button type="button" class="mini" id="btContRecorr">Continuar</button> (ou deixe: a rotina automática termina sozinha)</div>';
+      $('btContRecorr').addEventListener('click', function(){ recorrigirTodas(provaId, true); });
+    } else {
+      abrirEntregas(provaId);
+      setTimeout(function(){ var m = $('msgRecorr'); if(m) m.innerHTML = '<div class="ok">Todas as ' + x.total + ' entrega(s) foram corrigidas de novo com o gabarito atual. Revise e confirme as notas.</div>'; }, 800);
+    }
+  }).catch(function(e){ if(bt) bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 
 function envioPeloProfessor(aluno, provaId){
