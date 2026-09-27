@@ -394,6 +394,7 @@ function desenharProvasAluno(){
 }
 
 function tagEntrega(e, sit){
+  if(e && e.status === 'recebida') return '<span class="tag t-ok">fotos enviadas</span>';
   if(!e) return sit === 'fechada' ? '<span class="tag t-err">não enviada</span>' : sit === 'aberta' ? '<span class="tag t-warn">aguardando envio</span>' : '<span class="tag t-cinza">agendada</span>';
   if(e.status === 'pendente' || e.status === 'corrigindo') return '<span class="tag t-warn">na fila de correção</span>';
   if(e.status === 'erro') return '<span class="tag t-err">correção com problema</span>';
@@ -403,8 +404,11 @@ function tagEntrega(e, sit){
 
 function correcaoAluno(it, i){
   var e = it.entrega;
+  if(e.recebida){
+    return '<div class="ok">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A nota e a correção aparecem aqui quando o professor liberar os resultados. Você também recebe um e-mail.</div>';
+  }
   if(e.status === 'pendente' || e.status === 'corrigindo'){
-    return '<div class="convite">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A correção está na fila' + (e.erro === 'cota' ? ' (a cota de IA do dia acabou; ela é feita sozinha assim que a cota voltar)' : '') +
+    return '<div class="convite">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A correção está na fila' + (e.erro === 'cota' ? ' (a cota de IA do dia acabou; ela é feita sozinha assim que a cota voltar)' : e.erro === 'sem_questoes' ? ' e começa quando o professor terminar de cadastrar a prova' : '') +
       '. Você recebe um e-mail quando ficar pronta.</div><div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" onclick="abrirAluno()">Atualizar</button></div>';
   }
   if(e.status === 'erro') return '<div class="erro">A correção automática não funcionou. O professor foi avisado e vai corrigir.</div>';
@@ -417,8 +421,7 @@ function correcaoAluno(it, i){
     (e.geral.fortes ? '<p class="fb"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') +
     (e.geral.estudar ? '<p class="fb"><b>O que estudar:</b> ' + esc(e.geral.estudar) + '</p>' : '') + '</div>';
   h += '<h4>Questão por questão</h4>' + e.questoes.map(function(q){
-    return '<div class="questao"><div class="cab"><span>Questão ' + q.ordem + '</span><span class="nota n' + classe10(q.max ? (q.pontos || 0) / q.max * 10 : 0) + '">' + num(q.pontos || 0) + ' / ' + num(q.max) + '</span></div>' +
-      '<p class="aviso" style="margin:4px 0 0">' + esc(q.enunciado) + '</p>' +
+    return '<div class="questao"><div class="cab"><span>Questão ' + esc(q.rotulo || q.ordem) + (q.assunto ? ' · <span style="font-weight:normal">' + esc(q.assunto) + '</span>' : '') + '</span><span class="nota n' + classe10(q.max ? (q.pontos || 0) / q.max * 10 : 0) + '">' + num(q.pontos || 0) + ' / ' + num(q.max) + '</span></div>' +
       (q.acertos ? '<p class="fb"><b>O que você acertou:</b> ' + esc(q.acertos) + '</p>' : '') +
       (q.faltou ? '<p class="fb"><b>O que faltou:</b> ' + esc(q.faltou) + '</p>' : '') +
       (q.melhorar ? '<p class="fb"><b>Como melhorar:</b> ' + esc(q.melhorar) + '</p>' : '') +
@@ -483,9 +486,12 @@ function listarProvas(){
       var sit = r.agora < p.inicio ? '<span class="tag t-cinza">agendada</span>' : r.agora <= p.fimProva ? '<span class="tag t-err">em andamento</span>' : r.agora <= p.fimEnvio ? '<span class="tag t-warn">envio aberto</span>' : '<span class="tag t-ok">encerrada</span>';
       return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
         (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
-        '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos</div>' +
+        (p.resultadosLiberados ? ' <span class="tag t-ok" title="liberados em ' + esc(p.resultadosEm) + '">resultados liberados</span>' : (p.entregas ? ' <span class="tag t-warn">resultados ocultos</span>' : '')) +
+        '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + (p.questoes.length ? p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos' : '<span class="tag t-warn">sem questões ainda</span>') + '</div>' +
         '<div class="aviso">' + p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' confirmada(s)</div></div>' +
         '<div class="botoes" style="margin:0"><button type="button" class="mini" data-entregas="' + i + '">Entregas</button><button type="button" class="secundario mini" data-editar="' + i + '">Editar</button>' +
+        (p.resultadosLiberados ? '<button type="button" class="secundario mini" data-liberar="' + i + '" data-valor="0">Ocultar resultados</button>'
+          : '<button type="button" class="mini" data-liberar="' + i + '" data-valor="1"' + (p.entregas ? '' : ' disabled') + '>Liberar resultados</button>') +
         '<button type="button" class="secundario mini" data-qr="' + i + '">QR code</button><button type="button" class="secundario mini" data-excluir="' + i + '">Excluir</button></div></div>';
     }).join('') : '<p class="aviso">Nenhuma prova cadastrada nesta disciplina.</p>';
     h += '<div class="botoes"><button type="button" id="btNovaProva">+ Nova prova</button></div></div><div id="areaProva"></div>';
@@ -493,6 +499,16 @@ function listarProvas(){
     $('btNovaProva').addEventListener('click', function(){ formProva(null); });
     el.querySelectorAll('[data-editar]').forEach(function(b){ b.addEventListener('click', function(){ formProva(r.provas[Number(b.dataset.editar)]); }); });
     el.querySelectorAll('[data-entregas]').forEach(function(b){ b.addEventListener('click', function(){ abrirEntregas(r.provas[Number(b.dataset.entregas)].id); }); });
+    el.querySelectorAll('[data-liberar]').forEach(function(b){ b.addEventListener('click', function(){
+      var p = r.provas[Number(b.dataset.liberar)], liberar = b.dataset.valor === '1';
+      if(b.dataset.conf !== '1'){
+        b.dataset.conf = '1';
+        b.textContent = liberar ? 'Confirmar: mostrar nota e correção a todos (' + p.corrigidas + ' de ' + p.entregas + ' corrigidas)' : 'Confirmar: esconder dos alunos';
+        return;
+      }
+      b.disabled = true;
+      api('liberarResultados', {provaId: p.id, liberar: liberar}).then(listarProvas).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+    }); });
     el.querySelectorAll('[data-qr]').forEach(function(b){ b.addEventListener('click', function(){
       var p = r.provas[Number(b.dataset.qr)];
       mostrarQR(baseSite() + 'provas.html', 'Envio da prova · ' + p.titulo + ' · ' + d.nome, 'Aponte a câmera do celular, entre com sua conta e envie as fotos até ' + hora(p.fimEnvio) + '.');
@@ -535,7 +551,7 @@ function formProva(p){
   var livre = opcoes.filter(function(x){ return !dadosDisc.provas.some(function(pp){ var y = itemDaProva(etapas, pp); return y && y.item.id === x.item.id; }); })[0] || opcoes[0];
   var v = p || {titulo: livre ? livre.item.nome : 'Prova', item: livre ? livre.item.id : '', inicio: 0, duracao: 120, janela: 120, instrucoes: '', publicada: true, questoes: []};
   var atual = p ? itemDaProva(etapas, p) : livre;
-  qsEdit = (v.questoes.length ? v.questoes : [{enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes}; });
+  qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes}; });
   var el = $('areaProva');
   el.innerHTML = '<div class="caixa"><h2>' + (p ? 'Editar prova' : 'Nova prova') + '</h2><div class="campos">' +
     '<div><label class="rot" for="pTit">Título</label><input type="text" id="pTit" value="' + esc(v.titulo) + '"></div>' +
@@ -549,13 +565,15 @@ function formProva(p){
       '<p class="aviso" style="margin:6px 0 0">A prova é corrigida de 0 a 10; o peso vem da composição da nota.</p></div>' +
     '<div class="campoLargo"><label class="rot" for="pIns">Instruções gerais de correção (opcional)</label><textarea id="pIns" placeholder="ex.: Aceitar respostas com outras palavras se o conceito estiver certo. Cálculo sem unidade perde 25% da questão.">' + esc(v.instrucoes) + '</textarea></div></div>' +
     '<div class="convite">Tem a prova em foto ou PDF? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf" multiple id="pExtrair">Preencher as questões a partir do arquivo</label><div id="msgExtrair"></div></div>' +
-    '<h4>Questões <span class="aviso" id="pTotal"></span></h4><div id="qsBox"></div>' +
+    '<h4>Questões <span class="aviso" id="pTotal"></span></h4>' +
+    '<p class="aviso">Questão com itens a, b, c: se cada item tem valor próprio, cadastre um por um (Nº 2a, 2b…) para ter nota e retorno por item. ' +
+    'Se não, cadastre a questão inteira e separe o gabarito por item (a) …, b) …).</p><div id="qsBox"></div>' +
     '<div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" id="pMaisQ">+ Questão</button></div>' +
-    '<label style="display:flex;gap:8px;align-items:center;margin-top:16px;font-weight:bold"><input type="checkbox" id="pPub"' + (v.publicada ? ' checked' : '') + ' style="width:20px;height:20px"> Publicada (os alunos veem a prova e podem enviar as fotos no horário)</label>' +
+    '<label style="display:flex;gap:8px;align-items:center;margin-top:16px;font-weight:bold"><input type="checkbox" id="pPub"' + (v.publicada ? ' checked' : '') + ' style="width:20px;height:20px"> Publicada (os alunos veem só a data e o horário de envio; as questões nunca aparecem para eles)</label>' +
     '<div id="pErro" class="erro oculto"></div><div class="botoes"><button type="button" id="pSalvar">' + (p ? 'Salvar alterações' : 'Criar prova') + '</button><button type="button" class="secundario" id="pCanc">Cancelar</button></div>' +
     (p && p.entregas ? '<p class="aviso">Esta prova já tem entregas. Se mudar gabarito ou pontos, use "Corrigir de novo com IA" nas entregas para recalcular.</p>' : '') + '</div>';
   desenharQs();
-  $('pMaisQ').addEventListener('click', function(){ lerQs(); qsEdit.push({enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); });
+  $('pMaisQ').addEventListener('click', function(){ lerQs(); qsEdit.push({rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); });
   $('pCanc').addEventListener('click', function(){ el.innerHTML = ''; });
   $('pExtrair').addEventListener('change', function(){
     var arqs = Array.prototype.slice.call(this.files), m = $('msgExtrair');
@@ -566,7 +584,7 @@ function formProva(p){
       if(!qs.length){ m.innerHTML = '<div class="erro">Não encontrei questões no arquivo.</div>'; return; }
       lerQs();
       var vazias = qsEdit.every(function(q){ return !q.enunciado; });
-      var novas = qs.map(function(q){ return {enunciado:q.enunciado, pontos:q.pontos || '', gabarito:'', instrucoes:''}; });
+      var novas = qs.map(function(q){ return {rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos || '', gabarito:'', instrucoes:''}; });
       qsEdit = vazias ? novas : qsEdit.concat(novas);
       desenharQs();
       m.innerHTML = '<div class="ok">' + qs.length + ' questão(ões) preenchida(s). Confira o texto e os pontos, e escreva o gabarito de cada uma.</div>';
@@ -588,17 +606,20 @@ function formProva(p){
 
 function desenharQs(){
   $('qsBox').innerHTML = qsEdit.map(function(q, i){
-    return '<div class="qEdit" data-q="' + i + '"><div class="linha" style="border:0;padding:0 0 8px"><b>Questão ' + (i + 1) + '</b><span class="botoes" style="margin:0">' +
+    return '<div class="qEdit" data-q="' + i + '"><div class="linha" style="border:0;padding:0 0 8px"><b>Questão ' + esc(q.rotulo || (i + 1)) + '</b><span class="botoes" style="margin:0">' +
       (i ? '<button type="button" class="secundario mini" data-subir="' + i + '" aria-label="Subir">↑</button>' : '') +
       '<button type="button" class="secundario mini" data-tirarq="' + i + '">Remover</button></span></div>' +
       '<label class="rot">Enunciado</label><textarea data-c="enunciado">' + esc(q.enunciado) + '</textarea>' +
-      '<div class="campos" style="margin:10px 0 0"><div><label class="rot">Vale (pontos)</label><input type="number" min="0" step="0.25" data-c="pontos" value="' + esc(q.pontos) + '"></div></div>' +
+      '<div class="campos" style="margin:10px 0 0">' +
+        '<div><label class="rot">Nº na prova</label><input type="text" data-c="rotulo" value="' + esc(q.rotulo || (i + 1)) + '" placeholder="ex.: 2a" style="max-width:110px"></div>' +
+        '<div><label class="rot">Vale (pontos)</label><input type="number" min="0" step="0.25" data-c="pontos" value="' + esc(q.pontos) + '"></div>' +
+        '<div class="campoLargo"><label class="rot">Assunto (é só isso que o aluno vê)</label><input type="text" data-c="assunto" value="' + esc(q.assunto) + '" placeholder="ex.: Atividade de água e crescimento microbiano (em branco: a IA escreve)"></div></div>' +
       '<label class="rot" style="margin-top:10px">Gabarito em tópicos</label><textarea data-c="gabarito" placeholder="ex.:\n- cita redução da aw\n- relaciona com crescimento microbiano\n- dá um exemplo industrial">' + esc(q.gabarito) + '</textarea>' +
       '<label class="rot" style="margin-top:10px">Instruções de correção (opcional)</label><textarea data-c="instrucoes" style="min-height:50px" placeholder="ex.: sem exemplo vale no máximo metade">' + esc(q.instrucoes) + '</textarea></div>';
   }).join('');
   var total = qsEdit.reduce(function(t, q){ return t + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0);
   $('pTotal').textContent = '· total ' + num(total) + ' pontos (a nota da prova é convertida para 0 a 10)';
-  $('qsBox').querySelectorAll('[data-tirarq]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); qsEdit.splice(Number(b.dataset.tirarq), 1); if(!qsEdit.length) qsEdit.push({enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); }); });
+  $('qsBox').querySelectorAll('[data-tirarq]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); qsEdit.splice(Number(b.dataset.tirarq), 1); if(!qsEdit.length) qsEdit.push({rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); }); });
   $('qsBox').querySelectorAll('[data-subir]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); var i = Number(b.dataset.subir), t = qsEdit[i]; qsEdit[i] = qsEdit[i - 1]; qsEdit[i - 1] = t; desenharQs(); }); });
   $('qsBox').querySelectorAll('[data-c="pontos"]').forEach(function(inp){ inp.addEventListener('input', function(){ lerQs(); var t = qsEdit.reduce(function(s, q){ return s + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0); $('pTotal').textContent = '· total ' + num(t) + ' pontos (a nota da prova é convertida para 0 a 10)'; }); });
 }
@@ -618,6 +639,8 @@ function abrirEntregas(provaId){
     provaAtual = r.prova;
     var h = '<div class="caixa"><h2>Entregas · ' + esc(r.prova.titulo) + '</h2><p class="aviso">' + dataHora(r.prova.inicio) + ' · envio até ' + dataHora(r.prova.fimEnvio) +
       (r.prova.pastaUrl ? ' · <a class="link" style="font-size:12.5px" target="_blank" rel="noopener" href="' + esc(r.prova.pastaUrl) + '">pasta das fotos no Drive</a>' : '') + '</p>' +
+      (r.prova.resultadosLiberados ? '<div class="ok">Resultados liberados em ' + esc(r.prova.resultadosEm) + ': os alunos veem nota e correção. Entregas corrigidas depois disso aparecem para eles na hora.</div>'
+        : '<div class="convite">Resultados <b>ocultos</b>: os alunos veem só “fotos enviadas”. Revise o que quiser e use “Liberar resultados” na lista de provas quando a prova terminar.</div>') +
       '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
         var e = a.entrega;
@@ -665,7 +688,7 @@ function abrirEntrega(entregaId){
     }).join('') + '</div></details>';
     if(!e.geral.legivel) h += '<div class="erro">A IA marcou as fotos como ilegíveis: ' + esc(e.geral.comentario) + '</div>';
     h += '<h4>Correção <span class="aviso" id="eNota"></span></h4>' + e.questoes.map(function(q){
-      return '<div class="questao" data-qid="' + esc(q.id) + '" data-max="' + q.max + '"><div class="cab"><span>Questão ' + q.ordem + '</span><span class="aviso">vale ' + num(q.max) + '</span></div>' +
+      return '<div class="questao" data-qid="' + esc(q.id) + '" data-max="' + q.max + '"><div class="cab"><span>Questão ' + esc(q.rotulo || q.ordem) + (q.assunto ? ' · <span style="font-weight:normal">' + esc(q.assunto) + '</span>' : '') + '</span><span class="aviso">vale ' + num(q.max) + '</span></div>' +
         '<p class="aviso" style="margin:4px 0 8px">' + esc(q.enunciado) + '</p>' +
         '<details><summary class="link" style="font-size:13px">O que a IA leu</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada</i>') + '</p></details>' +
         (q.acertos ? '<p class="fb"><b>Acertos:</b> ' + esc(q.acertos) + '</p>' : '') + (q.faltou ? '<p class="fb"><b>Faltou:</b> ' + esc(q.faltou) + '</p>' : '') + (q.melhorar ? '<p class="fb"><b>Melhorar:</b> ' + esc(q.melhorar) + '</p>' : '') +
