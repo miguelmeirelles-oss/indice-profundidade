@@ -12,7 +12,7 @@
   }
   *{box-sizing:border-box}
   body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:var(--navy);background:var(--branco);font-size:15px;line-height:1.45}
-  .wrap{max-width:900px;margin:0 auto}
+  .wrap{max-width:960px;margin:0 auto}
   .oculto{display:none!important}
 
   .cabecalho{background:var(--menu);border:2.5px solid var(--navy);border-radius:18px;box-shadow:4px 5px 0 var(--navy);padding:22px 24px;margin-bottom:18px;color:#fff}
@@ -30,14 +30,17 @@
   .caixa{border:2.5px solid var(--navy);border-radius:18px;background:#fff;box-shadow:4px 5px 0 var(--navy);padding:18px;margin-bottom:18px}
   h2{font-size:15px;color:var(--menu);margin:0 0 12px;text-transform:uppercase;letter-spacing:.05em}
   h3{font-size:16px;margin:0 0 6px}
+  h4{font-size:15px;margin:14px 0 6px;color:var(--menu)}
   p{margin:0 0 10px}
   .aviso{font-size:12.5px;color:var(--cinza)}
   button{font-family:inherit;font-size:14.5px;font-weight:bold;cursor:pointer;border:2.5px solid var(--navy);border-radius:14px;padding:10px 18px;background:var(--ambar);color:var(--navy);box-shadow:3px 4px 0 var(--navy)}
   button:hover{transform:translate(1px,1px);box-shadow:2px 3px 0 var(--navy)}
   button:active{transform:translate(3px,4px);box-shadow:0 0 0 var(--navy)}
   button:disabled{opacity:.5;cursor:default;transform:none;box-shadow:3px 4px 0 var(--navy)}
-  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--ambar);outline-offset:2px}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid var(--ambar);outline-offset:2px}
   button.secundario{background:#fff}
+  button.escuro{background:var(--navy);color:#fff}
+  button.vermelho{background:#e23b3b;color:#fff}
   button.mini{padding:5px 11px;font-size:12.5px;border-radius:10px;box-shadow:2px 2px 0 var(--navy)}
   .link{background:none;border:none;box-shadow:none;color:var(--azul);font-size:14px;font-weight:bold;text-decoration:underline;padding:4px 0}
   .link:hover{transform:none;box-shadow:none}
@@ -48,12 +51,13 @@
   .campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:14px}
   .campoLargo{grid-column:1/-1}
   .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:2px solid var(--azul);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:bold;color:var(--azul);background:#fff;box-shadow:none}
+  .chip:hover{background:var(--bloco);transform:none;box-shadow:none}
+  .chip[aria-pressed="true"]{background:var(--azul);color:#fff}
   .abas{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
   .aba{border:2px solid var(--navy);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:bold;color:var(--navy);background:#fff;box-shadow:none}
   .aba:hover{background:var(--bloco);transform:none;box-shadow:none}
   .aba[aria-pressed="true"]{background:var(--navy);color:#fff}
-  .aba:disabled{opacity:.55;box-shadow:none}
-  .aba small{font-weight:normal;font-size:11px}
   .badge{display:inline-block;min-width:18px;height:18px;border-radius:99px;background:#e23b3b;color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:6px;padding:0 5px}
   .tag{display:inline-block;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:2px 9px;border:1.5px solid currentColor;white-space:nowrap}
   .t-ok{color:var(--verde)} .t-warn{color:var(--ocre)} .t-err{color:#c62828} .t-azul{color:var(--azul)} .t-cinza{color:var(--cinza)}
@@ -72,7 +76,72 @@
   .cfg span:nth-child(even){font-weight:bold;text-align:right}
   .mono{font-family:Consolas,"Courier New",monospace}
   .grupoTitulo{font-size:13px;font-weight:bold;color:var(--titulo);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 4px}
-  @media (max-width:520px){body{padding:12px}.cabecalho h1{font-size:23px}.quem{text-align:left}}
+  .nota{display:inline-block;min-width:44px;text-align:center;font-weight:bold;font-size:13px;border:2px solid var(--navy);border-radius:99px;padding:2px 8px;font-variant-numeric:tabular-nums}
+  .n0{background:#fdecec;color:#8a1c1c} .n1{background:#fff4d6;color:#8a6100} .n2{background:#e6f4ea;color:#1a7a3c}
+  .grande{font-size:44px;font-weight:bold;color:var(--menu);line-height:1;font-variant-numeric:tabular-nums}
+  .contagem{font-variant-numeric:tabular-nums;font-weight:bold;color:#c62828}
+  .calc{font-family:Consolas,"Courier New",monospace;font-size:12.5px;background:var(--bloco);border-radius:10px;padding:8px 10px;line-height:1.6;overflow-x:auto}
+  details>summary{cursor:pointer}
+
+  /* gravação */
+  .relogio{font-size:40px;font-weight:bold;color:var(--menu);font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:10px}
+  .ponto{width:14px;height:14px;border-radius:50%;background:#e23b3b;animation:pulsa 1.1s infinite}
+  .ponto.pausado{background:var(--cinza);animation:none}
+  @keyframes pulsa{50%{opacity:.25}}
+  .trilho{display:flex;gap:4px;margin:10px 0}
+  .trilho i{flex:1;height:10px;border-radius:3px;background:var(--bloco);border:1.5px solid var(--navy)}
+  .trilho i.done{background:#4FBF96} .trilho i.sent{background:#E3AE55} .trilho i.rec{background:#e23b3b}
+  .vuH{height:12px;border:2px solid var(--navy);border-radius:99px;overflow:hidden;background:var(--bloco);margin:8px 0}
+  .vuH i{display:block;height:100%;width:0;background:#4FBF96;transition:width 80ms linear}
+  .chamada{display:grid;gap:6px}
+  .chamada label{display:flex;align-items:center;gap:10px;border:2px solid var(--linha);border-radius:12px;padding:8px 12px;cursor:pointer;font-size:14.5px}
+  .chamada input{width:20px;height:20px;accent-color:var(--azul)}
+  .chamada label.on{border-color:var(--azul);background:#f5f8fe}
+  .stepper{display:inline-flex;align-items:center;border:2px solid var(--navy);border-radius:12px;overflow:hidden}
+  .stepper button{border:none;box-shadow:none;border-radius:0;padding:6px 12px;background:var(--bloco)}
+  .stepper button:hover{transform:none}
+  .stepper span{min-width:74px;text-align:center;font-weight:bold;font-variant-numeric:tabular-nums}
+  .questaoRev{border:2.5px solid var(--navy);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .questaoRev.aprovada{border-color:var(--verde);background:#f3faf5}
+  .alts{font-size:13.5px;color:var(--cinza);margin:6px 0 0;padding-left:20px}
+  .alts li.certa{color:var(--verde);font-weight:bold}
+  .opc{display:block;width:100%;text-align:left;border:2px solid var(--linha);border-radius:12px;padding:10px 12px;background:#fff;box-shadow:none;font-weight:normal;font-size:14px;margin-top:8px}
+  .opc:hover{transform:none;box-shadow:none;border-color:var(--azul)}
+  .opc[aria-pressed="true"]{border-color:var(--azul);background:var(--bloco);font-weight:bold}
+  .alerta{background:var(--ambar);border:2.5px solid var(--navy);border-radius:18px;box-shadow:4px 5px 0 var(--navy);padding:16px 18px;margin-bottom:18px}
+
+  /* notas */
+  .tabelaBox{overflow-x:auto;border:2px solid var(--linha);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{padding:8px;border-bottom:1px solid var(--linha);text-align:center;white-space:nowrap}
+  th{background:var(--bloco);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--cinza)}
+  td:first-child,th:first-child{text-align:left;position:sticky;left:0;background:#fff}
+  th:first-child{background:var(--bloco)}
+  tr.linhaAluno{cursor:pointer}
+  tr.linhaAluno:hover td{background:#f7f9fc}
+  tr.abaixo td:first-child{color:#c62828;font-weight:bold}
+  .cel{display:inline-block;min-width:34px;border-radius:6px;padding:2px 4px;font-weight:bold;font-variant-numeric:tabular-nums}
+  .c0{background:#fdecec;color:#8a1c1c} .c1{background:#fff4d6;color:#8a6100} .c2{background:#e6f4ea;color:#1a7a3c}
+  .cF{background:#c62828;color:#fff} .cX{color:var(--cinza)}
+  .barrasAula{display:flex;gap:3px;margin:10px 0 6px;flex-wrap:wrap}
+  .barrasAula i{flex:1;min-width:26px;height:26px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-style:normal;font-size:10.5px;font-weight:bold;border:1.5px solid var(--navy)}
+  .barrasAula .p{background:#e6f4ea;color:var(--verde)} .barrasAula .f{background:#fdecec;color:#8a1c1c} .barrasAula .x{background:#fff;color:var(--cinza);border-style:dashed;border-color:var(--linha)}
+  .detalhe{background:var(--bloco);border:2.5px solid var(--navy);border-radius:14px;padding:14px 16px;margin-top:14px}
+
+  /* histórico e apostila */
+  .timeline{list-style:none;margin:0;padding:0}
+  .timeline li{display:grid;grid-template-columns:78px 1fr;gap:14px;padding:12px 0;border-bottom:1px solid var(--linha)}
+  .timeline li:last-child{border-bottom:none}
+  .timeline .d{font-size:12.5px;color:var(--cinza);font-weight:bold}
+  .leitura p{font-size:15px;line-height:1.65}
+  .compl{border:2px dashed var(--azul);border-radius:12px;padding:10px 12px;background:#f5f8fe;font-size:14px;margin:10px 0}
+  .compl p{font-size:14px;margin:6px 0 0}
+  .capitulo{border-bottom:1px solid var(--linha);padding:10px 0}
+  .capitulo:last-child{border-bottom:none}
+  .capitulo>summary{font-weight:bold;font-size:15px}
+
+  @media (prefers-reduced-motion:reduce){.ponto{animation:none}}
+  @media (max-width:520px){body{padding:12px}.cabecalho h1{font-size:23px}.quem{text-align:left}.relogio{font-size:32px}}
 </style>
 </head>
 <body>
@@ -94,7 +163,6 @@
 
   <div id="erroGeral" class="erro oculto" role="alert"></div>
 
-  <!-- sem login -->
   <section id="tLogin" class="caixa oculto">
     <h2>Entre com sua conta</h2>
     <p>O Aula por IA usa a mesma conta do Índice de Profundidade.</p>
@@ -105,31 +173,45 @@
 
   <!-- ================= ALUNO ================= -->
   <section id="tAluno" class="oculto">
-    <div class="caixa">
-      <h2>Minhas matérias</h2>
-      <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
+    <div id="qAbertas"></div>
+    <div id="alunoLista">
+      <div class="caixa">
+        <h2>Minhas matérias</h2>
+        <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
+      </div>
+      <div class="caixa">
+        <h2>Inscrever-se em uma matéria</h2>
+        <label class="rot" for="selProf">Professor</label>
+        <select id="selProf"><option value="">Carregando professores…</option></select>
+        <div id="listaMaterias" style="margin-top:14px"></div>
+      </div>
     </div>
-    <div class="caixa">
-      <h2>Inscrever-se em uma matéria</h2>
-      <label class="rot" for="selProf">Professor</label>
-      <select id="selProf"><option value="">Carregando professores…</option></select>
-      <div id="listaMaterias" style="margin-top:14px"></div>
-    </div>
+    <div id="alunoDetalhe" class="oculto"></div>
   </section>
 
   <!-- ================= PROFESSOR ================= -->
   <section id="tProf" class="oculto">
     <div class="abas" role="group" aria-label="Seções do professor">
-      <button type="button" class="aba" data-aba="disc" aria-pressed="true">Disciplinas</button>
+      <button type="button" class="aba" data-aba="aula" aria-pressed="true">Dar aula</button>
+      <button type="button" class="aba" data-aba="notas" aria-pressed="false">Notas</button>
+      <button type="button" class="aba" data-aba="hist" aria-pressed="false">Histórico e apostila</button>
+      <button type="button" class="aba" data-aba="disc" aria-pressed="false">Disciplinas</button>
       <button type="button" class="aba" data-aba="insc" aria-pressed="false">Inscrições<span class="badge oculto" id="badgeInsc"></span></button>
       <button type="button" class="aba" data-aba="cfg" aria-pressed="false">Configurações</button>
-      <button type="button" class="aba" disabled>Dar aula <small>(etapa 2)</small></button>
-      <button type="button" class="aba" disabled>Notas <small>(etapa 3)</small></button>
-      <button type="button" class="aba" disabled>Histórico e apostila <small>(etapa 4)</small></button>
     </div>
-    <div id="avisoChave" class="convite oculto">Cadastre sua chave do Gemini em <b>Configurações</b>. Sem ela, as funções de IA (gravação, questões e apostila) ficam bloqueadas.</div>
+    <div id="avisoChave" class="convite oculto">Cadastre sua chave do Gemini em <b>Configurações</b>. Sem ela, gravação, questões e apostila ficam bloqueadas.</div>
 
-    <div id="pDisc">
+    <div id="pAula">
+      <div id="aulaTopo"></div>
+      <div id="areaQ"></div>
+      <div id="aulaLista"></div>
+    </div>
+
+    <div id="pNotas" class="oculto"></div>
+
+    <div id="pHist" class="oculto"></div>
+
+    <div id="pDisc" class="oculto">
       <div id="formDisc" class="caixa oculto"></div>
       <div id="listaDisc"></div>
       <div class="botoes" style="margin-top:0"><button type="button" id="btNovaDisc">+ Nova disciplina</button>
@@ -162,11 +244,11 @@
 
 <script>
 /* ==================================================================
-   Endereço do backend do Aula por IA. Troque pela URL /exec da
-   implantação do projeto novo (não é a do Avaliador).
+   Endereço do backend do Aula por IA (não é o do Avaliador).
    ================================================================== */
 var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
 
+var BLOCO_SEG = 600;          // 10 min por bloco de áudio
 var token = '';
 try{ token = localStorage.getItem('ip_token') || ''; }catch(e){}
 var sessao = null, resumo = null;
@@ -174,6 +256,10 @@ var sessao = null, resumo = null;
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function classe(n){ return n < 45 ? '0' : n < 70 ? '1' : '2'; }
+function mmss(ms){ var s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s / 60), x = s % 60; return (m < 10 ? '0' : '') + m + ':' + (x < 10 ? '0' : '') + x; }
+function hms(seg){ seg = Math.max(0, Math.floor(seg)); var h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
+  return [h, m, s].map(function(v){ return (v < 10 ? '0' : '') + v; }).join(':'); }
 
 function api(acao, dados){
   dados = dados || {}; dados.token = token;
@@ -190,52 +276,56 @@ function api(acao, dados){
     return j.resultado;
   })
   .catch(function(e){
-    if(e instanceof TypeError) throw new Error('Sem conexão com o servidor. Verifique sua internet e tente de novo.');
+    if(e instanceof TypeError){ var x = new Error('Sem conexão com o servidor. Verifique sua internet e tente de novo.'); x.rede = true; throw x; }
     throw e;
   });
 }
 
-function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg; e.classList.toggle('oculto', !msg); }
+function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
 function mostrarLogin(){ $('tCarregando').classList.add('oculto'); $('tLogin').classList.remove('oculto');
   $('tAluno').classList.add('oculto'); $('tProf').classList.add('oculto'); }
 
 /* ---------------- início ---------------- */
 function iniciar(){
-  if(BACKEND_AULAS.indexOf('COLE_AQUI') === 0){
-    $('tCarregando').classList.add('oculto');
-    erroGeral('Falta configurar o endereço do servidor (BACKEND_AULAS) neste arquivo.');
-    return;
-  }
   if(!token){ mostrarLogin(); return; }
   api('sessao').then(function(r){
     $('tCarregando').classList.add('oculto');
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
-    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') +
-      '<a href="index.html">voltar ao Avaliador</a>';
-    if(r.professor){
-      $('visao').classList.remove('oculto');
-      trocarVisao(lerPreferencia() || 'prof');
-    } else trocarVisao('aluno');
+    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') + '<a href="index.html">voltar ao Avaliador</a>';
+    if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao(lerPref() || 'prof'); }
+    else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
 }
-
-function lerPreferencia(){ try{ return localStorage.getItem('aulas_visao'); }catch(e){ return null; } }
+function lerPref(){ try{ return localStorage.getItem('aulas_visao'); }catch(e){ return null; } }
 function trocarVisao(v){
+  if(v === 'aluno' && G.aula && G.fase === 'gravando'){ erroGeral('Há uma aula sendo gravada. Encerre antes de trocar para a visão de aluno.'); return; }
   document.querySelectorAll('[data-visao]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.visao === v)); });
   $('tAluno').classList.toggle('oculto', v !== 'aluno');
   $('tProf').classList.toggle('oculto', v !== 'prof');
   try{ localStorage.setItem('aulas_visao', v); }catch(e){}
   if(v === 'aluno') abrirAluno(); else abrirProf();
 }
-document.querySelectorAll('[data-visao]').forEach(function(b){
-  b.addEventListener('click', function(){ trocarVisao(b.dataset.visao); });
-});
+document.querySelectorAll('[data-visao]').forEach(function(b){ b.addEventListener('click', function(){ trocarVisao(b.dataset.visao); }); });
 
-/* ================= ALUNO ================= */
-var alunoCarregado = false;
+/* ---------------- contagens regressivas ----------------
+   Elementos com data-fim (ms do servidor) e data-desvio (servidor - cliente). */
+setInterval(function(){
+  document.querySelectorAll('[data-fim]').forEach(function(el){
+    var resta = Number(el.dataset.fim) - (Date.now() + Number(el.dataset.desvio || 0));
+    el.textContent = resta > 0 ? mmss(resta) : 'encerrado';
+  });
+}, 1000);
+
+/* =====================================================================
+   ALUNO
+   ===================================================================== */
+var alunoCarregado = false, timerAbertas = null, assinaturaAbertas = '', rascunho = {};
+
 function abrirAluno(){
-  carregarMinhas();
+  voltarListaAluno();
+  carregarMinhas(); carregarAbertas();
+  if(!timerAbertas) timerAbertas = setInterval(function(){ if(!$('tAluno').classList.contains('oculto')) carregarAbertas(); }, 30000);
   if(!alunoCarregado){
     alunoCarregado = true;
     api('professores').then(function(lista){
@@ -247,20 +337,81 @@ function abrirAluno(){
   }
 }
 
+/* ---- questões abertas ---- */
+function carregarAbertas(){
+  api('questoesAbertas').then(function(grupos){
+    var ass = JSON.stringify(grupos.map(function(g){ return [g.aulaId, g.presente, g.fechaEm, g.questoes.map(function(q){ return q.id + q.respondida + q.fechaEm; })]; }));
+    if(ass === assinaturaAbertas) return;   // nada mudou: não redesenha para não apagar o que o aluno digita
+    assinaturaAbertas = ass;
+    desenharAbertas(grupos);
+  }).catch(function(){ /* tenta de novo em 30 s */ });
+}
+
+function desenharAbertas(grupos){
+  var el = $('qAbertas');
+  if(!grupos.length){ el.innerHTML = ''; return; }
+  el.innerHTML = grupos.map(function(g){
+    var desvio = g.agora - Date.now();
+    var h = '<div class="alerta"><div class="linha" style="border:0;padding:0"><b>Questões abertas · ' + esc(g.disciplina) + ' · aula ' + g.aulaNumero +
+      '</b><span>fecha em <span class="contagem" data-fim="' + g.fechaEm + '" data-desvio="' + desvio + '">' + mmss(g.fechaEm - g.agora) + '</span></span></div>';
+    if(!g.presente){
+      return h + '<p style="margin:10px 0 0">Você não está na chamada desta aula. Se você está em sala, peça ao professor para marcar sua presença.</p></div>';
+    }
+    h += '</div>';
+    g.questoes.forEach(function(q, i){
+      h += '<div class="caixa" data-q="' + esc(q.id) + '" data-prof="' + esc(g.professorId) + '"><div class="linha" style="border:0;padding:0 0 6px">' +
+        '<span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' · ' + (i + 1) + ' de ' + g.questoes.length + '</span>' +
+        '<span class="aviso">fecha em <span data-fim="' + q.fechaEm + '" data-desvio="' + desvio + '">' + mmss(q.fechaEm - g.agora) + '</span></span></div>' +
+        '<p style="font-weight:bold;font-size:15.5px">' + esc(q.enunciado) + '</p>';
+      if(q.respondida){ h += '<div class="ok" style="margin-bottom:0">Resposta registrada. O resultado aparece em "Minhas matérias" depois que a questão fechar.</div></div>'; return; }
+      if(q.tipo === 'fechada'){
+        q.alternativas.forEach(function(a, k){
+          h += '<button type="button" class="opc" data-alt="' + a.i + '" aria-pressed="' + (rascunho[q.id] === a.i) + '">' + String.fromCharCode(65 + k) + ') ' + esc(a.texto) + '</button>';
+        });
+      } else h += '<textarea data-txt placeholder="Escreva sua resposta em poucas linhas">' + esc(rascunho[q.id] || '') + '</textarea>';
+      h += '<div class="botoes"><button type="button" data-enviar>Enviar resposta</button></div><div data-msg></div></div>';
+    });
+    return h;
+  }).join('');
+
+  el.querySelectorAll('[data-q]').forEach(function(card){
+    var qid = card.dataset.q, pid = card.dataset.prof;
+    card.querySelectorAll('[data-alt]').forEach(function(b){
+      b.addEventListener('click', function(){
+        rascunho[qid] = Number(b.dataset.alt);
+        card.querySelectorAll('[data-alt]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+      });
+    });
+    var ta = card.querySelector('[data-txt]');
+    if(ta) ta.addEventListener('input', function(){ rascunho[qid] = ta.value; });
+    var bt = card.querySelector('[data-enviar]');
+    if(bt) bt.addEventListener('click', function(){
+      var r = rascunho[qid];
+      if(r === undefined || r === ''){ card.querySelector('[data-msg]').innerHTML = '<div class="erro">Responda antes de enviar.</div>'; return; }
+      bt.disabled = true; bt.textContent = 'Enviando…';
+      api('responder', {professorId: pid, questaoId: qid, resposta: r}).then(function(res){
+        if(res && res.aberta) api('corrigirResposta', {professorId: pid, questaoId: qid}).catch(function(){});
+        delete rascunho[qid]; assinaturaAbertas = ''; carregarAbertas();
+      }).catch(function(e){ bt.disabled = false; bt.textContent = 'Enviar resposta'; card.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    });
+  });
+}
+
+/* ---- matérias ---- */
 function carregarMinhas(){
   api('minhasMaterias').then(function(lista){
     var el = $('listaMinhas');
     if(!lista.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria. Peça inscrição abaixo.</p>'; return; }
-    el.innerHTML = lista.map(function(m){
-      var tag = m.situacao === 'aprovada'
-        ? '<span class="tag t-ok">inscrito</span>'
-        : '<span class="tag t-warn">aguardando aprovação</span>';
+    el.innerHTML = lista.map(function(m, i){
+      var tag = m.situacao === 'aprovada' ? '<span class="tag t-ok">inscrito</span>' : '<span class="tag t-warn">aguardando aprovação</span>';
       return '<div class="cartao"><div class="l1"><span>' + esc(m.nome) + ' · ' + esc(m.semestre) + '</span>' + tag + '</div>' +
-        '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') +
-        (m.situacao === 'aprovada' ? ' · as notas aparecem aqui quando as aulas começarem' : '') + '</div>' +
-        (m.situacao === 'pendente' ? '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" data-cancelar="' +
-          esc(m.inscricaoId) + '" data-prof="' + esc(m.professorId) + '">Cancelar pedido</button></div>' : '') + '</div>';
+        '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') + '</div>' +
+        '<div class="botoes" style="margin-top:8px">' +
+        (m.situacao === 'aprovada' ? '<button type="button" class="mini" data-abrir="' + i + '">Notas e apostila</button>' : '') +
+        (m.situacao === 'pendente' ? '<button type="button" class="secundario mini" data-cancelar="' + esc(m.inscricaoId) + '" data-prof="' + esc(m.professorId) + '">Cancelar pedido</button>' : '') +
+        '</div></div>';
     }).join('');
+    el.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirMateria(lista[Number(b.dataset.abrir)]); }); });
     el.querySelectorAll('[data-cancelar]').forEach(function(b){
       b.addEventListener('click', function(){
         b.disabled = true;
@@ -296,22 +447,112 @@ function carregarMaterias(){
   }).catch(function(e){ el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
 
-/* ================= PROFESSOR ================= */
-var abaAtual = 'disc';
-document.querySelectorAll('[data-aba]').forEach(function(b){
-  b.addEventListener('click', function(){ abrirAba(b.dataset.aba); });
-});
+function voltarListaAluno(){ $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
+
+function abrirMateria(m){
+  var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
+  el.innerHTML = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button><p class="carregando">Carregando notas…</p></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  api('minhasNotas', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
+    var eu = r.eu, h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
+      '<h2 style="margin-top:8px">' + esc(m.nome) + ' · ' + esc(m.semestre) + '</h2>';
+    if(!r.N){
+      h += '<p>Ainda não houve aula com questões nesta matéria.</p>';
+    } else {
+      var presentes = [];
+      h += '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="grande">' + (eu ? eu.media : 0) + '</span><span class="aviso">de 100' +
+        (eu && eu.provisoria ? ' · <span class="tag t-warn">provisória</span>' : '') + '</span></div><div class="barrasAula">';
+      r.aulas.forEach(function(a){
+        var x = a.resultado;
+        if(x.tipo === 'x') h += '<i class="x" title="Aula ' + a.numero + ': sem questões">–</i>';
+        else if(x.tipo === 'falta') h += '<i class="f" title="Aula ' + a.numero + ': falta">F</i>';
+        else { presentes.push(x.nota); h += '<i class="p" title="Aula ' + a.numero + '">' + x.nota + '</i>'; }
+      });
+      h += '</div>';
+      if(eu){
+        h += '<div class="calc">' + r.N + ' aulas com questões · mínimo ' + r.minimo + ' · presente em ' + eu.presencas + '<br>' +
+          (presentes.length ? '(' + presentes.join(' + ') + ') ÷ ' + eu.divisor + ' = ' + eu.soma + ' ÷ ' + eu.divisor + ' = ' + eu.media : 'nenhuma aula com presença ainda') + '</div>';
+        h += eu.abaixo ? '<div class="erro">Você está abaixo da presença mínima: ' + (r.minimo - eu.presencas) + ' falta(s) estão contando como zero. Estar presente nas próximas aulas recupera a nota.</div>'
+          : '<p class="aviso" style="margin-top:8px">Você pode faltar mais ' + (eu.presencas - r.minimo) + ' aula(s) sem perder nota.</p>';
+      }
+      h += explicacaoNota(r.disciplina.presencaMin);
+    }
+    h += '<div class="botoes"><button type="button" data-apostila>Abrir apostila</button></div></div>';
+    h += '<div class="caixa"><h2>Aulas</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
+      var x = a.resultado, dir = x.tipo === 'x' ? '<span class="tag t-cinza">sem questões</span>' : x.tipo === 'falta' ? '<span class="tag t-err">falta</span>'
+        : '<span class="nota n' + classe(x.nota) + '">' + x.nota + (x.provisoria ? '*' : '') + '</span>';
+      var qs = a.questoes.map(function(q){
+        return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:6px"><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></p>' +
+          '<p class="aviso" style="margin:0">Sua resposta: ' + (q.suaResposta === null ? '<b>não respondeu</b>' : esc(q.suaResposta)) + '</p>' +
+          (q.correta ? '<p class="aviso" style="margin:0">Correta: <b>' + esc(q.correta) + '</b></p>' : '') +
+          (q.emCorrecao ? '<p class="aviso" style="margin:0"><span class="tag t-warn">em correção</span></p>' : q.nota !== null ? '<p class="aviso" style="margin:0">Nota: <b>' + q.nota + '</b></p>' : '') +
+          (q.comentario ? '<p class="aviso" style="margin:4px 0 0">' + esc(q.comentario) + '</p>' : '') + '</div>';
+      }).join('');
+      return '<details class="capitulo"><summary><span class="linha" style="display:inline-flex;width:calc(100% - 20px);border:0;padding:0"><span>Aula ' + a.numero +
+        (a.tema ? ' · ' + esc(a.tema) : '') + ' <span class="aviso">' + esc(a.data.split(' ')[0]) + '</span></span>' + dir + '</span></summary>' +
+        (qs || '<p class="aviso" style="margin-top:8px">' + (a.temQuestoes ? 'As questões desta aula ainda estão abertas.' : 'Esta aula não teve questões.') + '</p>') + '</details>';
+    }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + (r.aulas.some(function(a){ return a.resultado.provisoria; }) ? '<p class="aviso">* nota provisória: há questão aberta ou resposta em correção.</p>' : '') + '</div><div id="leituraApostila"></div>';
+    el.innerHTML = h;
+    el.querySelectorAll('[data-voltar]').forEach(function(b){ b.addEventListener('click', voltarListaAluno); });
+    el.querySelector('[data-apostila]').addEventListener('click', function(){ abrirLeitura($('leituraApostila'), m.professorId, m.disciplinaId); });
+  }).catch(function(e){ el.innerHTML = '<div class="caixa"><button type="button" class="link" onclick="voltarListaAluno()">&#8592; voltar</button><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+function explicacaoNota(pct){
+  return '<details style="margin-top:10px"><summary class="link">Como a nota é calculada</summary><p class="aviso" style="margin-top:8px">' +
+    'Você pode faltar até ' + (100 - pct) + '% das aulas com questões sem perder nota: a média usa só as aulas em que você esteve presente. ' +
+    'Cada falta além disso entra como zero. Exemplo com 10 aulas (mínimo 7): presente em 5 aulas com média 80 → 400 ÷ 7 = 57. ' +
+    'A nota de cada aula junta a média das fechadas e a das abertas, com o peso definido pelo professor. Questão não respondida vale zero.</p></details>';
+}
+
+/* ---- leitura da apostila (aluno e professor) ---- */
+function abrirLeitura(el, professorId, disciplinaId){
+  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando apostila…</p></div>';
+  api('apostila', {professorId: professorId || '', disciplinaId: disciplinaId}).then(function(r){
+    if(!r.capitulos.length){ el.innerHTML = '<div class="caixa"><h2>Apostila</h2><p>A apostila ainda não tem capítulos. Eles são escritos no sábado de madrugada, a partir das aulas da semana.</p></div>'; return; }
+    el.innerHTML = '<div class="caixa leitura"><h2>Apostila · ' + esc(r.disciplina) + '</h2><p class="aviso">Gerada por IA a partir das aulas. O que não foi dito em sala aparece marcado como complemento.</p>' +
+      r.capitulos.map(function(c){
+        return '<details class="capitulo"><summary>Capítulo ' + c.numero + ' · ' + esc(c.titulo) + '</summary><p class="aviso" style="margin-top:6px">' + esc(c.origem) + ' · ' + esc(c.gerado) + '</p>' + textoCapitulo(c.texto) + '</details>';
+      }).join('') + '</div>';
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+  }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+function textoCapitulo(t){
+  var h = '', compl = false, buf = '';
+  String(t).split('\n').forEach(function(l){
+    var s = l.trim();
+    if(!s) return;
+    if(s.indexOf('[[COMPLEMENTO]]') === 0){ compl = true; buf = ''; return; }
+    if(s.indexOf('[[/COMPLEMENTO]]') === 0){ compl = false; h += '<div class="compl"><span class="tag t-azul">Complemento</span>' + buf + '</div>'; return; }
+    var parte = s.indexOf('## ') === 0 ? '<h4>' + esc(s.slice(3)) + '</h4>' : '<p>' + esc(s) + '</p>';
+    if(compl) buf += parte; else h += parte;
+  });
+  if(compl && buf) h += '<div class="compl"><span class="tag t-azul">Complemento</span>' + buf + '</div>';
+  return h;
+}
+
+/* =====================================================================
+   PROFESSOR
+   ===================================================================== */
+var abaAtual = 'aula';
+document.querySelectorAll('[data-aba]').forEach(function(b){ b.addEventListener('click', function(){ abrirAba(b.dataset.aba); }); });
 function abrirAba(a){
   abaAtual = a;
   document.querySelectorAll('[data-aba]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.aba === a)); });
-  $('pDisc').classList.toggle('oculto', a !== 'disc');
-  $('pInsc').classList.toggle('oculto', a !== 'insc');
-  $('pCfg').classList.toggle('oculto', a !== 'cfg');
+  ['aula', 'notas', 'hist', 'disc', 'insc', 'cfg'].forEach(function(x){
+    $('p' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('oculto', x !== a);
+  });
+  if(!resumo) return;
+  if(a === 'aula' && G.fase !== 'gravando' && G.fase !== 'encerrada') abrirDarAula();
+  if(a === 'notas') abrirNotas();
+  if(a === 'hist') abrirHistorico();
   if(a === 'insc') carregarInscricoes();
   if(a === 'cfg') carregarChaves();
 }
 
-function abrirProf(){ carregarResumo(); abrirAba(abaAtual); }
+function abrirProf(){ carregarResumo().then(function(){ abrirAba(abaAtual); }); }
 
 function carregarResumo(){
   $('listaDisc').innerHTML = '<p class="carregando">Carregando disciplinas…</p>';
@@ -321,38 +562,771 @@ function carregarResumo(){
     var b = $('badgeInsc'); b.textContent = r.pendentes; b.classList.toggle('oculto', !r.pendentes);
     if(r.planilhaUrl){ $('linkPlanilha').href = r.planilhaUrl; $('linkPlanilha').classList.remove('oculto'); }
     desenharDisciplinas();
-  }).catch(function(e){ $('listaDisc').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+  }).catch(function(e){ $('listaDisc').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; erroGeral(e.message); });
 }
 
+function ativas(){ return resumo ? resumo.disciplinas.filter(function(d){ return d.ativa; }) : []; }
+function discPorId(id){ return (resumo ? resumo.disciplinas : []).filter(function(d){ return d.id === id; })[0]; }
+function chipsDisciplinas(sel, todas){
+  var lista = todas ? resumo.disciplinas : ativas();
+  return '<div class="chips">' + lista.map(function(d){
+    return '<button type="button" class="chip" data-disc="' + esc(d.id) + '" aria-pressed="' + (sel === d.id) + '">' + esc(d.nome) + ' · ' + esc(d.semestre) + '</button>';
+  }).join('') + '</div>';
+}
+
+/* ================= DAR AULA ================= */
+var G = {fase:'inicio', disc:'', tempos:0};
+var IDB = null;
+
+function abrirIDB(){
+  if(IDB) return Promise.resolve(IDB);
+  return new Promise(function(res, rej){
+    var r = indexedDB.open('aulaPorIA', 1);
+    r.onupgradeneeded = function(){ r.result.createObjectStore('blocos', {keyPath:'k'}); };
+    r.onsuccess = function(){ IDB = r.result; res(IDB); };
+    r.onerror = function(){ rej(r.error); };
+  });
+}
+function idbOp(modo, fn){
+  return abrirIDB().then(function(db){ return new Promise(function(res, rej){
+    var tx = db.transaction('blocos', modo), st = tx.objectStore('blocos'), out = fn(st);
+    tx.oncomplete = function(){ res(out && out.result !== undefined ? out.result : undefined); };
+    tx.onerror = function(){ rej(tx.error); };
+  }); });
+}
+function idbTodos(){ return idbOp('readonly', function(st){ return st.getAll(); }).catch(function(){ return []; }); }
+function idbPut(v){ return idbOp('readwrite', function(st){ st.put(v); }); }
+function idbDel(k){ return idbOp('readwrite', function(st){ st.delete(k); }); }
+function blobBase64(b){ return new Promise(function(res, rej){ var f = new FileReader(); f.onload = function(){ res(String(f.result).split(',')[1] || ''); }; f.onerror = rej; f.readAsDataURL(b); }); }
+
+function abrirDarAula(){
+  $('areaQ').innerHTML = '';
+  $('aulaTopo').innerHTML = '<div class="caixa"><p class="carregando">Verificando aula em andamento…</p></div>';
+  Promise.all([api('aulaAtual'), idbTodos()]).then(function(r){
+    var pac = r[0], pend = r[1];
+    if(pac){ desenharRetomar(pac, pend); return; }
+    desenharInicioAula(pend);
+  }).catch(function(e){ $('aulaTopo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+function bannerPendentes(pend){
+  if(!pend.length) return '';
+  return '<div class="convite">Há <b>' + pend.length + ' trecho(s) de áudio</b> guardado(s) neste computador esperando envio. <button type="button" class="mini" id="btEnviarPend">Enviar agora</button> <span id="msgPend" class="aviso"></span></div>';
+}
+function ligarBannerPendentes(){
+  var b = $('btEnviarPend');
+  if(b) b.addEventListener('click', function(){ b.disabled = true; $('msgPend').textContent = 'Enviando…';
+    enviarPendentes().then(function(){ return idbTodos(); }).then(function(p){ $('msgPend').textContent = p.length ? 'Ainda faltam ' + p.length + '. Verifique a internet.' : 'Tudo enviado.'; b.disabled = false; }); });
+}
+
+function desenharRetomar(pac, pend){
+  var a = pac.aula;
+  $('aulaTopo').innerHTML = bannerPendentes(pend) + '<div class="caixa"><h2>Aula em andamento</h2><p><b>' + esc(pac.disciplina.nome) + ' · aula ' + a.numero +
+    '</b>, começou em ' + esc(a.data) + '. ' + a.blocosRecebidos + ' trecho(s) recebido(s).</p><p class="aviso">A página foi fechada ou recarregada durante a gravação. Você pode continuar gravando a mesma aula ou encerrá-la.</p>' +
+    '<div class="botoes"><button type="button" class="vermelho" id="btRetomar">&#9679; Continuar gravação</button><button type="button" class="escuro" id="btEncerrarVelha">Encerrar esta aula</button></div><div id="msgRetomar"></div></div>';
+  ligarBannerPendentes();
+  $('btRetomar').addEventListener('click', function(){ comecarGravacao(pac); });
+  $('btEncerrarVelha').addEventListener('click', function(){
+    var b = this; b.disabled = true;
+    enviarPendentes().then(function(){
+      return api('encerrarAula', {aulaId: a.id, totalBlocos: Math.max(a.blocosRecebidos, maxOrdem(a.id, a.ordens, pend))});
+    }).then(function(){ G.fase = 'inicio'; abrirDarAula(); })
+      .catch(function(e){ b.disabled = false; $('msgRetomar').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+
+function maxOrdem(aulaId, ordens, pend){
+  var m = 0;
+  (ordens || []).forEach(function(o){ m = Math.max(m, o); });
+  (pend || []).forEach(function(p){ if(p.aulaId === aulaId) m = Math.max(m, p.ordem); });
+  return m;
+}
+
+function desenharInicioAula(pend){
+  var ds = ativas();
+  if(!G.disc || !discPorId(G.disc)) G.disc = ds.length ? ds[0].id : '';
+  var d = discPorId(G.disc);
+  if(!G.tempos && d) G.tempos = d.tempos;
+  if(!ds.length){ $('aulaTopo').innerHTML = '<div class="caixa"><h2>Dar aula</h2><p>Crie uma disciplina em <b>Disciplinas</b> para começar.</p></div>'; $('aulaLista').innerHTML = ''; return; }
+  var sem = !resumo.temChave, pip = 'documentPictureInPicture' in window;
+  $('aulaTopo').innerHTML = bannerPendentes(pend) + '<div class="caixa"><h2>Iniciar aula</h2><label class="rot">Disciplina</label>' + chipsDisciplinas(G.disc) +
+    '<label class="rot" style="margin-top:14px">Duração</label><div class="chips">' + [1, 2].map(function(t){
+      return '<button type="button" class="chip" data-tempos="' + t + '" aria-pressed="' + (G.tempos === t) + '">' + t + ' tempo' + (t > 1 ? 's' : '') + ' · ' + (t * 50) + ' min</button>'; }).join('') + '</div>' +
+    '<div class="convite" style="margin-top:16px">O navegador vai pedir permissão para usar o microfone' + (pip ? ' e abrir a <b>janelinha flutuante</b> no canto da tela.' : '. Este navegador não tem a janelinha flutuante: use o Chrome ou o Edge no computador para tê-la.') +
+    ' A aba do app precisa ficar aberta durante a aula (pode ficar minimizada).</div>' +
+    '<div class="botoes"><button type="button" class="vermelho" id="btIniciar"' + (sem ? ' disabled' : '') + '>&#9679; Iniciar aula</button>' +
+    '<button type="button" class="secundario" id="btTeste"' + (sem ? ' disabled' : '') + '>Testar gravação (30 s)</button>' +
+    '<button type="button" class="secundario" id="btNG">Marcar aula não gravada</button></div>' +
+    (sem ? '<p class="aviso" style="margin-top:8px">Cadastre sua chave do Gemini em Configurações para gravar.</p>' : '') +
+    '<div id="caixaTeste"></div><div id="caixaNG"></div><div id="msgIni"></div></div>';
+  ligarBannerPendentes();
+  $('aulaTopo').querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ G.disc = b.dataset.disc; G.tempos = discPorId(G.disc).tempos; desenharInicioAula(pend); }); });
+  $('aulaTopo').querySelectorAll('[data-tempos]').forEach(function(b){ b.addEventListener('click', function(){ G.tempos = Number(b.dataset.tempos); desenharInicioAula(pend); }); });
+  $('btIniciar').addEventListener('click', function(){ comecarGravacao(null); });
+  $('btTeste').addEventListener('click', testarGravacao);
+  $('btNG').addEventListener('click', function(){
+    $('caixaNG').innerHTML = '<div class="convite" style="margin-top:14px"><label class="rot" for="temaNG">Tema da aula não gravada</label><input type="text" id="temaNG" placeholder="ex.: Branqueamento">' +
+      '<p class="aviso" style="margin:8px 0 0">A apostila vai usar as gravações de semestres anteriores com esse tema. Esta aula não tem questões e não conta para a presença.</p>' +
+      '<div class="botoes"><button type="button" class="mini" id="btSalvarNG">Salvar</button></div><div id="msgNG"></div></div>';
+    $('temaNG').focus();
+    $('btSalvarNG').addEventListener('click', function(){
+      var b = this; b.disabled = true;
+      api('marcarNaoGravada', {disciplinaId: G.disc, tema: $('temaNG').value}).then(function(){ $('caixaNG').innerHTML = '<div class="ok">Aula registrada como não gravada.</div>'; listarAulas(); })
+        .catch(function(e){ b.disabled = false; $('msgNG').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    });
+  });
+  listarAulas();
+}
+
+function statusAula(a){
+  if(a.status === 'gravando') return '<span class="tag t-err">gravando</span>';
+  if(a.status === 'nao_gravada') return '<span class="tag t-cinza">não gravada</span>';
+  if(a.ata) return '<span class="tag t-ok">ata pronta</span>';
+  return '<span class="tag t-warn">processando ' + a.blocosFeitos + '/' + Math.max(a.totalBlocos, a.blocosRecebidos) + '</span>';
+}
+
+function listarAulas(){
+  var el = $('aulaLista');
+  if(!G.disc){ el.innerHTML = ''; return; }
+  el.innerHTML = '<div class="caixa"><h2>Aulas desta disciplina</h2><p class="carregando">Carregando…</p></div>';
+  api('aulasDaDisciplina', {disciplinaId: G.disc}).then(function(lista){
+    el.innerHTML = '<div class="caixa"><h2>Aulas desta disciplina</h2>' + (lista.length ? lista.map(function(a){
+      return '<div class="linha"><div><b>Aula ' + a.numero + '</b> ' + (a.tema ? '· ' + esc(a.tema) : '') + ' <span class="aviso">' + esc(a.data) + '</span></div><div class="botoes" style="margin:0">' + statusAula(a) +
+        (a.status === 'encerrada' ? ' <button type="button" class="secundario mini" data-qaula="' + esc(a.id) + '">Questões</button>' : '') + '</div></div>';
+    }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + '<p class="aviso" style="margin-top:8px">Atas completas em "Histórico e apostila".</p></div>';
+    var comRec = lista.filter(function(a){ return a.recomendacoes; })[0];
+    if(comRec) el.insertAdjacentHTML('afterbegin', '<div class="convite">Há <b>recomendações para você</b> sobre a aula ' + comRec.numero + (comRec.tema ? ' (' + esc(comRec.tema) + ')' : '') + '. Veja em <button type="button" class="link" id="irRec">Histórico e apostila</button>.</div>');
+    var ir = $('irRec'); if(ir) ir.addEventListener('click', function(){ histDisc = G.disc; abrirAba('hist'); });
+    el.querySelectorAll('[data-qaula]').forEach(function(b){ b.addEventListener('click', function(){
+      var a = lista.filter(function(x){ return x.id === b.dataset.qaula; })[0];
+      Q.aula = a; abrirCompositor('inteira'); $('areaQ').scrollIntoView({behavior:'smooth'});
+    }); });
+  }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+/* ---- gravação ---- */
+function escolherMime(){
+  var c = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'];
+  for(var i = 0; i < c.length; i++){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; }
+  return '';
+}
+function pedirMicrofone(){
+  return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1}});
+}
+function criarAnalisador(stream){
+  try{
+    var Ctx = window.AudioContext || window.webkitAudioContext, ctx = new Ctx(), an = ctx.createAnalyser();
+    an.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(an);
+    return {ctx: ctx, an: an, buf: new Float32Array(an.fftSize)};
+  }catch(e){ return null; }
+}
+function nivel(A){
+  if(!A) return 0;
+  A.an.getFloatTimeDomainData(A.buf);
+  var s = 0; for(var i = 0; i < A.buf.length; i++) s += A.buf[i] * A.buf[i];
+  var db = 20 * Math.log10(Math.sqrt(s / A.buf.length) || 1e-6);
+  return Math.max(0, Math.min(100, (db + 55) * 100 / 50));   // -55 dB → 0, -5 dB → 100
+}
+function corNivel(n){ return n > 88 ? '#FF6E61' : n > 65 ? '#E3AE55' : '#4FBF96'; }
+
+function ativoSeg(){ return (G.ativoAcum + (G.ativoDesde ? Date.now() - G.ativoDesde : 0)) / 1000; }
+
+function comecarGravacao(pac){
+  erroGeral('');
+  if(!window.MediaRecorder){ erroGeral('Este navegador não grava áudio. Use o Chrome ou o Edge.'); return; }
+  var tempos = G.tempos || 2, discId = G.disc;
+  abrirPip();   // precisa ser chamado direto no clique
+  var msg = $('msgIni') || $('msgRetomar');
+  if(msg) msg.innerHTML = '<p class="carregando">Ligando o microfone…</p>';
+  var stream;
+  pedirMicrofone().then(function(s){
+    stream = s;
+    return pac ? pac : api('iniciarAula', {disciplinaId: discId, tempos: tempos});
+  }).then(function(p){
+    return idbTodos().then(function(pend){
+      G.fase = 'gravando'; G.aula = p.aula; G.discInfo = p.disciplina; G.alunos = p.alunos; G.pres = p.presencas || {};
+      G.stream = stream; G.A = criarAnalisador(stream); G.mime = escolherMime();
+      G.ordem = maxOrdem(p.aula.id, p.aula.ordens, pend);
+      G.ativoAcum = G.ordem * BLOCO_SEG * 1000; G.ativoDesde = Date.now(); G.pausado = false; G.encerrando = false;
+      G.estado = p.aula; G.limiteSeg = ((p.aula.tempos || 2) * 50 + 20) * 60;
+      Q.aula = p.aula;
+      novoGravador();
+      pedirWakeLock();
+      if(G.relogio) clearInterval(G.relogio);
+      G.relogio = setInterval(tique, 500);
+      if(G.poll) clearInterval(G.poll);
+      G.poll = setInterval(function(){ enviarPendentes(); atualizarEstado(); }, 60000);
+      desenharGravando();
+      enviarPendentes();
+    });
+  }).catch(function(e){
+    if(stream) stream.getTracks().forEach(function(t){ t.stop(); });
+    fecharPip();
+    var txt = e && e.name === 'NotAllowedError' ? 'O microfone foi bloqueado. Clique no cadeado ao lado do endereço, libere o microfone e tente de novo.' : (e.message || String(e));
+    if(msg) msg.innerHTML = '<div class="erro">' + esc(txt) + '</div>'; else erroGeral(txt);
+  });
+}
+
+function novoGravador(){
+  var partes = [], ini = ativoSeg(), opc = {audioBitsPerSecond: 24000};
+  if(G.mime) opc.mimeType = G.mime;
+  var r = new MediaRecorder(G.stream, opc);
+  r.ondataavailable = function(e){ if(e.data && e.data.size) partes.push(e.data); };
+  r.onstop = function(){
+    var dur = ativoSeg() - ini;
+    var blob = new Blob(partes, {type: r.mimeType || G.mime || 'audio/webm'});
+    guardarBloco(blob, ini, dur).then(function(){ if(r._aoParar) r._aoParar(); });
+  };
+  r.start(5000);
+  G.rec = r; G.recIni = ini;
+}
+function trocarBloco(){ var velho = G.rec; novoGravador(); try{ velho.stop(); }catch(e){} }
+
+function guardarBloco(blob, ini, dur){
+  if(dur < 5 && blob.size < 30000) return Promise.resolve();   // pedacinho vazio no fim
+  G.ordem++;
+  var item = {k: G.aula.id + '|' + G.ordem, aulaId: G.aula.id, ordem: G.ordem, inicio: Math.round(ini), mime: blob.type, blob: blob};
+  return idbPut(item).catch(function(){ G.memoria = (G.memoria || []).concat([item]); })
+    .then(function(){ atualizarPainel(); enviarPendentes(); });
+}
+
+var enviando = false;
+function enviarPendentes(){
+  if(enviando) return Promise.resolve();
+  enviando = true;
+  return idbTodos().then(function(lista){
+    lista = lista.concat(G.memoria || []).sort(function(a, b){ return a.aulaId < b.aulaId ? -1 : a.aulaId > b.aulaId ? 1 : a.ordem - b.ordem; });
+    var cadeia = Promise.resolve(), parou = false;
+    lista.forEach(function(it){
+      cadeia = cadeia.then(function(){
+        if(parou) return;
+        G.statusEnvio = 'enviando trecho ' + it.ordem + '…'; atualizarPainel();
+        return blobBase64(it.blob).then(function(b64){
+          return api('enviarBloco', {aulaId: it.aulaId, ordem: it.ordem, inicio: it.inicio, mime: it.mime, dados: b64});
+        }).then(function(est){
+          if(G.aula && est.id === G.aula.id) G.estado = est;
+          G.memoria = (G.memoria || []).filter(function(x){ return x.k !== it.k; });
+          G.statusEnvio = '';
+          return idbDel(it.k).catch(function(){});
+        }).catch(function(e){
+          parou = true;
+          G.statusEnvio = e.rede ? 'sem internet: os trechos ficam guardados e são enviados quando a conexão voltar' : 'erro ao enviar: ' + e.message;
+        });
+      });
+    });
+    return cadeia;
+  }).then(function(){ enviando = false; atualizarPainel(); }, function(){ enviando = false; });
+}
+
+function atualizarEstado(){
+  if(!G.aula) return;
+  api('estadoAula', {aulaId: G.aula.id}).then(function(est){ G.estado = est; atualizarPainel(); if(G.fase === 'encerrada') desenharEncerrada(); }).catch(function(){});
+}
+
+function pedirWakeLock(){
+  try{ if(navigator.wakeLock) navigator.wakeLock.request('screen').then(function(l){ G.wake = l; }).catch(function(){}); }catch(e){}
+}
+document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'visible' && G.fase === 'gravando') pedirWakeLock(); });
+window.addEventListener('beforeunload', function(e){ if(G.fase === 'gravando'){ e.preventDefault(); e.returnValue = ''; } });
+
+function tique(){
+  if(G.fase !== 'gravando' || G.encerrando) return;
+  var s = ativoSeg();
+  if(!G.pausado && G.rec && s - G.recIni >= BLOCO_SEG) trocarBloco();
+  if(!G.pausado && s >= G.limiteSeg){ encerrarGravacao(true); return; }
+  atualizarPainel();
+}
+
+function pausar(){
+  if(G.fase !== 'gravando') return;
+  if(!G.pausado){ try{ G.rec.pause(); }catch(e){} G.ativoAcum += Date.now() - G.ativoDesde; G.ativoDesde = 0; G.pausado = true; }
+  else { try{ G.rec.resume(); }catch(e){} G.ativoDesde = Date.now(); G.pausado = false; }
+  atualizarPainel();
+}
+
+function desenharGravando(){
+  var d = G.discInfo;
+  var ch = G.alunos.length ? G.alunos.map(function(a){
+    return '<label class="' + (G.pres[a.id] ? 'on' : '') + '"><input type="checkbox" data-pres="' + esc(a.id) + '"' + (G.pres[a.id] ? ' checked' : '') + '>' + esc(a.nome) + '</label>';
+  }).join('') : '<p class="aviso">Nenhum aluno inscrito nesta disciplina ainda. A gravação funciona mesmo assim.</p>';
+  $('aulaTopo').innerHTML = '<div class="grid2"><div class="caixa" style="margin:0"><h2 id="tituloChamada"></h2><div class="chamada">' + ch + '</div>' +
+    '<p class="aviso" style="margin-top:10px">Só quem está marcado consegue responder as questões desta aula. Dá para marcar quem chegar atrasado a qualquer momento.</p><div id="msgChamada"></div></div>' +
+    '<div class="caixa" style="margin:0"><h2>' + esc(d.nome) + ' · aula ' + G.aula.numero + '</h2>' +
+    '<div class="relogio"><span class="ponto" id="pontoMain"></span><span id="relMain">00:00:00</span></div>' +
+    '<div class="vuH" aria-hidden="true"><i id="vuMain"></i></div><div class="trilho" id="trilhoMain"></div><p class="aviso" id="statusMain"></p>' +
+    '<div class="botoes"><button type="button" id="btLiberar">Liberar questões</button><button type="button" class="secundario" id="btPausa">Pausar</button>' +
+    '<button type="button" class="secundario" id="btPip">Abrir janelinha</button><button type="button" class="escuro" id="btFim">Encerrar aula</button></div></div></div>';
+  atualizarChamadaTitulo();
+  $('aulaTopo').querySelectorAll('[data-pres]').forEach(function(c){
+    c.addEventListener('change', function(){
+      var id = c.dataset.pres, v = c.checked;
+      G.pres[id] = v; c.parentNode.classList.toggle('on', v); atualizarChamadaTitulo();
+      api('marcarPresenca', {aulaId: G.aula.id, alunoId: id, presente: v}).then(function(){ $('msgChamada').innerHTML = ''; })
+        .catch(function(e){ G.pres[id] = !v; c.checked = !v; c.parentNode.classList.toggle('on', !v); atualizarChamadaTitulo(); $('msgChamada').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    });
+  });
+  $('btLiberar').addEventListener('click', function(){ abrirCompositor('recente'); });
+  $('btPausa').addEventListener('click', pausar);
+  $('btPip').addEventListener('click', abrirPip);
+  $('btFim').addEventListener('click', function(){
+    var b = this;
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar encerramento'; setTimeout(function(){ if(b.isConnected){ b.dataset.conf = ''; b.textContent = 'Encerrar aula'; } }, 5000); return; }
+    encerrarGravacao(false);
+  });
+  $('aulaLista').innerHTML = '';
+  atualizarPainel();
+}
+function atualizarChamadaTitulo(){
+  var n = G.alunos.filter(function(a){ return G.pres[a.id]; }).length;
+  var el = $('tituloChamada'); if(el) el.textContent = 'Chamada · ' + n + ' de ' + G.alunos.length + ' presentes';
+}
+
+function trilhoHtml(){
+  var est = G.estado || {blocosFeitos:0}, total = Math.max((G.aula.tempos || 2) * 5, G.ordem + (G.fase === 'gravando' ? 1 : 0));
+  var h = '';
+  for(var i = 0; i < total; i++){
+    var c = i < est.blocosFeitos ? 'done' : i < G.ordem ? 'sent' : (i === G.ordem && G.fase === 'gravando') ? 'rec' : '';
+    h += '<i class="' + c + '"></i>';
+  }
+  return {html: h, total: total, feitos: est.blocosFeitos || 0};
+}
+
+function atualizarPainel(){
+  if(!G.aula) return;
+  var s = ativoSeg(), n = G.fase === 'gravando' && !G.pausado ? nivel(G.A) : 0, t = trilhoHtml();
+  var status = (G.fase === 'gravando' ? (G.pausado ? 'pausado · ' : 'gravando trecho ' + (G.ordem + 1) + ' · ') : '') + t.feitos + ' de ' + Math.max(G.ordem, t.feitos) + ' trecho(s) transcrito(s)' +
+    (G.ordem > t.feitos ? ' · ' + (G.ordem - t.feitos) + ' na fila' : '') + (G.statusEnvio ? ' · ' + G.statusEnvio : '');
+  var set = function(doc, id, fn){ var el = doc && doc.getElementById(id); if(el) fn(el); };
+  set(document, 'relMain', function(el){ el.textContent = hms(s); });
+  set(document, 'vuMain', function(el){ el.style.width = n + '%'; el.style.background = corNivel(n); });
+  set(document, 'trilhoMain', function(el){ el.innerHTML = t.html; });
+  set(document, 'statusMain', function(el){ el.textContent = status; });
+  set(document, 'pontoMain', function(el){ el.classList.toggle('pausado', !!G.pausado); });
+  set(document, 'btPausa', function(el){ el.textContent = G.pausado ? 'Continuar' : 'Pausar'; });
+  set(document, 'btPip', function(el){ el.classList.toggle('oculto', !!G.pip || !('documentPictureInPicture' in window)); });
+  if(G.pip){
+    var d = G.pip.document;
+    set(d, 'pClk', function(el){ el.textContent = hms(s); });
+    set(d, 'pVu', function(el){ el.style.height = Math.max(4, n) + '%'; el.style.background = corNivel(n); });
+    set(d, 'pUp', function(el){ el.textContent = t.feitos + '/' + t.total; el.className = 'up' + (G.ordem > t.feitos || G.statusEnvio ? ' wait' : ''); });
+    set(d, 'pTxt', function(el){ el.textContent = G.discInfo.nome.split(' ')[0] + ' · aula ' + G.aula.numero + ' · ' + status; });
+    set(d, 'pBlk', function(el){ el.innerHTML = t.html; });
+    set(d, 'pDot', function(el){ el.className = 'dot' + (G.pausado ? ' pausado' : ''); });
+    set(d, 'pPausa', function(el){ el.textContent = G.pausado ? 'Continuar' : 'Pausar'; });
+  }
+}
+
+/* ---- janelinha flutuante (Document Picture-in-Picture) ---- */
+var CSS_PIP = 'body{margin:0;background:#121816;color:#EAF0ED;font:12px Consolas,"Courier New",monospace;overflow:hidden}' +
+  '.b1{display:flex;align-items:center;gap:10px;padding:7px 8px 7px 12px;height:42px;box-sizing:border-box}' +
+  '.dot{width:9px;height:9px;border-radius:50%;background:#FF4D40;box-shadow:0 0 0 3px rgba(255,77,64,.25);animation:p 1.4s infinite;flex:none}.dot.pausado{background:#93A39C;animation:none;box-shadow:none}' +
+  '@keyframes p{50%{opacity:.3}}.clk{font-size:15px;font-variant-numeric:tabular-nums}' +
+  '.vu{position:relative;width:8px;height:26px;border-radius:2px;background:#26302C;overflow:hidden;flex:none}.vu b{position:absolute;left:0;right:0;bottom:0;height:4%;background:#4FBF96}' +
+  '.up{font-size:12.5px;color:#4FBF96;padding:2px 6px;border-radius:5px;background:#16221E}.up.wait{color:#E3AE55;background:#2A2414}' +
+  'button{font:bold 11px Arial,sans-serif;border:none;border-radius:5px;padding:4px 8px;background:#1F2926;color:#EAF0ED;cursor:pointer}' +
+  '.tog{width:24px;height:24px;padding:0;color:#93A39C;margin-left:auto}.q{background:#E3AE55;color:#1A1405}' +
+  '.more{padding:0 8px 8px;border-top:1px solid #1F2926;display:none}.more.aberto{display:grid;gap:6px}.s{color:#93A39C;font-size:11px;padding-top:7px}' +
+  '.blk{display:flex;gap:3px;flex-wrap:wrap}.blk i{width:14px;height:6px;border-radius:2px;background:#26302C}.blk i.done{background:#4FBF96}.blk i.sent{background:#E3AE55}.blk i.rec{background:#FF4D40}.bts{display:flex;gap:5px}';
+
+function abrirPip(){
+  if(!('documentPictureInPicture' in window) || G.pip) return;
+  try{
+    documentPictureInPicture.requestWindow({width: 250, height: 42}).then(function(w){
+      G.pip = w;
+      var st = w.document.createElement('style'); st.textContent = CSS_PIP; w.document.head.appendChild(st);
+      w.document.title = 'Aula por IA';
+      w.document.body.innerHTML = '<div class="b1"><span class="dot" id="pDot"></span><span class="clk" id="pClk">00:00:00</span><span class="vu"><b id="pVu"></b></span>' +
+        '<span class="up" id="pUp">0/0</span><button class="tog" id="pTog" aria-expanded="false" aria-label="Mostrar controles">&#9650;</button></div>' +
+        '<div class="more" id="pMore"><div class="s" id="pTxt"></div><div class="blk" id="pBlk"></div>' +
+        '<div class="bts"><button id="pPausa">Pausar</button><button class="q" id="pQ">Liberar questão</button><button id="pFim">Encerrar</button></div></div>';
+      var d = w.document;
+      d.getElementById('pTog').addEventListener('click', function(){
+        var m = d.getElementById('pMore'), abrir = !m.classList.contains('aberto');
+        m.classList.toggle('aberto', abrir); this.setAttribute('aria-expanded', String(abrir)); this.innerHTML = abrir ? '&#9660;' : '&#9650;';
+        try{ w.resizeTo(abrir ? 290 : 250, abrir ? 125 : 42 + (w.outerHeight - w.innerHeight)); }catch(e){}
+      });
+      d.getElementById('pPausa').addEventListener('click', pausar);
+      d.getElementById('pQ').addEventListener('click', function(){ try{ window.focus(); }catch(e){} abrirAba('aula'); abrirCompositor('recente'); });
+      d.getElementById('pFim').addEventListener('click', function(){
+        var b = this;
+        if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar?'; setTimeout(function(){ b.dataset.conf = ''; b.textContent = 'Encerrar'; }, 5000); return; }
+        encerrarGravacao(false);
+      });
+      // a janelinha fica visível: o relógio dela não é atrasado pelo navegador
+      w.setInterval(tique, 250);
+      w.addEventListener('pagehide', function(){ G.pip = null; atualizarPainel(); });
+      atualizarPainel();
+    }).catch(function(){ G.pip = null; atualizarPainel(); });
+  }catch(e){ /* navegador sem suporte */ }
+}
+function fecharPip(){ try{ if(G.pip) G.pip.close(); }catch(e){} G.pip = null; }
+
+function encerrarGravacao(automatico){
+  if(G.encerrando || G.fase !== 'gravando') return;
+  G.encerrando = true;
+  new Promise(function(res){
+    if(G.rec && G.rec.state !== 'inactive'){ G.rec._aoParar = res; if(G.pausado){ G.ativoDesde = Date.now(); G.pausado = false; } try{ G.rec.stop(); }catch(e){ res(); } }
+    else res();
+  }).then(function(){
+    G.ativoAcum = ativoSeg() * 1000; G.ativoDesde = 0;
+    if(G.stream) G.stream.getTracks().forEach(function(t){ t.stop(); });
+    try{ if(G.A) G.A.ctx.close(); }catch(e){}
+    try{ if(G.wake) G.wake.release(); }catch(e){}
+    fecharPip();
+    clearInterval(G.relogio);
+    G.fase = 'encerrada'; G.automatico = automatico;
+    desenharEncerrada();
+    return enviarPendentes();
+  }).then(function(){
+    return api('encerrarAula', {aulaId: G.aula.id, totalBlocos: G.ordem});
+  }).then(function(est){ G.estado = est; G.encerrou = true; desenharEncerrada(); })
+    .catch(function(e){ G.statusEnvio = 'o encerramento será confirmado quando a internet voltar'; desenharEncerrada(); })
+    .then(function(){
+      if(G.poll) clearInterval(G.poll);
+      G.poll = setInterval(function(){
+        if(G.fase !== 'encerrada'){ clearInterval(G.poll); return; }
+        enviarPendentes().then(function(){ if(!G.encerrou) return api('encerrarAula', {aulaId: G.aula.id, totalBlocos: G.ordem}).then(function(){ G.encerrou = true; }); })
+          .then(atualizarEstado).catch(function(){});
+        if(G.estado && G.estado.ata) clearInterval(G.poll);
+      }, 30000);
+    });
+}
+
+function desenharEncerrada(){
+  if(abaAtual !== 'aula' && G.fase !== 'encerrada') return;
+  var est = G.estado || {}, total = Math.max(G.ordem, est.blocosRecebidos || 0);
+  var h = '<div class="caixa"><h2>Aula encerrada · ' + esc(G.discInfo.nome) + ' · aula ' + G.aula.numero + '</h2>' +
+    (G.automatico ? '<p class="aviso">Encerrada automaticamente 20 minutos depois do fim previsto.</p>' : '') +
+    '<p>Tempo gravado: <b>' + hms(ativoSeg()) + '</b> · ' + (est.blocosFeitos || 0) + ' de ' + total + ' trecho(s) transcrito(s)' + (G.statusEnvio ? ' · ' + esc(G.statusEnvio) : '') + '.</p>';
+  if(est.ata){
+    h += '<h3>' + esc(est.tema) + '</h3><p style="white-space:pre-line">' + esc(est.ata) + '</p>' + (est.pendencias ? '<p class="aviso"><b>Pendências:</b> ' + esc(est.pendencias) + '</p>' : '');
+  } else {
+    h += '<div class="convite">A ata aparece aqui quando todos os trechos forem transcritos. O que ficar pendente é processado sozinho 3 horas depois e na varredura das 2h. Pode fechar a página: nada se perde.</div>';
+  }
+  h += '<p class="aviso">À 1h da madrugada, a IA revisa a aula e deixa <b>recomendações só para você</b> em "Histórico e apostila": possíveis erros, o que acrescentar e o que pode ter ficado confuso.</p>';
+  h += '<div class="botoes"><button type="button" id="btRodada">Liberar rodada final</button><button type="button" class="secundario" id="btAtual">Atualizar</button><button type="button" class="secundario" id="btNova">Nova aula</button></div></div>';
+  $('aulaTopo').innerHTML = h;
+  $('btRodada').addEventListener('click', function(){ abrirCompositor('inteira'); });
+  $('btAtual').addEventListener('click', atualizarEstado);
+  $('btNova').addEventListener('click', function(){ G = {fase:'inicio', disc: G.disc, tempos: G.tempos}; $('areaQ').innerHTML = ''; abrirDarAula(); });
+}
+
+/* ---- teste de 30 segundos ---- */
+function testarGravacao(){
+  var cx = $('caixaTeste'), stream, A, rec, partes = [], t0, timer;
+  cx.innerHTML = '<div class="convite" style="margin-top:14px"><p class="carregando">Ligando o microfone…</p></div>';
+  pedirMicrofone().then(function(s){
+    stream = s; A = criarAnalisador(s);
+    var mime = escolherMime(), opc = {audioBitsPerSecond: 24000}; if(mime) opc.mimeType = mime;
+    rec = new MediaRecorder(s, opc);
+    rec.ondataavailable = function(e){ if(e.data.size) partes.push(e.data); };
+    rec.onstop = function(){
+      clearInterval(timer); s.getTracks().forEach(function(t){ t.stop(); }); try{ A.ctx.close(); }catch(e){}
+      cx.innerHTML = '<div class="convite" style="margin-top:14px"><p class="carregando">Transcrevendo com a IA… (uns 20 segundos)</p></div>';
+      var blob = new Blob(partes, {type: rec.mimeType || mime});
+      blobBase64(blob).then(function(b64){ return api('testarTranscricao', {mime: blob.type, dados: b64}); }).then(function(r){
+        cx.innerHTML = '<div class="ok" style="margin-top:14px"><b>Funcionou.</b> A IA entendeu:<p style="margin:8px 0 0;color:var(--navy)">' + esc(r.transcricao || '(nenhuma fala reconhecida)') + '</p></div>';
+      }).catch(function(e){ cx.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    };
+    rec.start(); t0 = Date.now();
+    cx.innerHTML = '<div class="convite" style="margin-top:14px"><p>Fale normalmente, como em aula. Faltam <b id="tRest">30</b> s.</p><div class="vuH"><i id="tVu"></i></div><button type="button" class="mini" id="tParar">Parar agora</button></div>';
+    $('tParar').addEventListener('click', function(){ if(rec.state !== 'inactive') rec.stop(); });
+    timer = setInterval(function(){
+      var r = 30 - Math.floor((Date.now() - t0) / 1000), n = nivel(A);
+      var v = $('tVu'); if(v){ v.style.width = n + '%'; v.style.background = corNivel(n); }
+      var e = $('tRest'); if(e) e.textContent = Math.max(0, r);
+      if(r <= 0 && rec.state !== 'inactive') rec.stop();
+    }, 150);
+  }).catch(function(e){ cx.innerHTML = '<div class="erro">' + esc(e && e.name === 'NotAllowedError' ? 'O microfone foi bloqueado. Libere no cadeado ao lado do endereço.' : e.message) + '</div>'; });
+}
+
+/* ================= QUESTÕES ================= */
+var Q = {aula:null, cfg:null, propostas:[], poll:null};
+
+function abrirCompositor(sobre){
+  var a = Q.aula || G.aula;
+  if(!a){ return; }
+  Q.aula = a;
+  if(Q.poll){ clearInterval(Q.poll); Q.poll = null; }
+  var d = discPorId(a.disciplinaId) || {qtd_fechadas:2, qtd_abertas:1, prazo_padrao:40, peso_fechadas:50};
+  Q.cfg = {fechadas: d.qtd_fechadas, abertas: d.qtd_abertas, prazo: sobre === 'recente' ? Math.min(10, d.prazo_padrao) : d.prazo_padrao, peso: d.peso_fechadas, sobre: sobre, orientacao: ''};
+  desenharCompositor();
+  $('areaQ').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function desenharCompositor(){
+  var c = Q.cfg, a = Q.aula, n = c.fechadas + c.abertas;
+  var linha = function(rot, k, val, passo){ return '<div class="linha"><span>' + rot + '</span><span class="stepper"><button type="button" data-k="' + k + '" data-v="-' + passo + '" aria-label="Menos">−</button><span>' + val + '</span><button type="button" data-k="' + k + '" data-v="' + passo + '" aria-label="Mais">+</button></span></div>'; };
+  $('areaQ').innerHTML = '<div class="caixa"><h2>Liberar questões · aula ' + a.numero + '</h2>' +
+    linha('Fechadas (múltipla escolha)', 'fechadas', c.fechadas, 1) + linha('Abertas (corrigidas pela IA)', 'abertas', c.abertas, 1) +
+    linha('Prazo a partir da liberação', 'prazo', c.prazo + ' min', 5) + linha('Peso fechadas / abertas', 'peso', c.peso + ' / ' + (100 - c.peso), 10) +
+    '<div class="linha"><span>Sobre</span><span class="chips"><button type="button" class="chip" data-sobre="recente" aria-pressed="' + (c.sobre === 'recente') + '">últimos 20 min</button>' +
+    '<button type="button" class="chip" data-sobre="inteira" aria-pressed="' + (c.sobre === 'inteira') + '">aula inteira</button></span></div>' +
+    (n === 1 ? '<div class="convite" style="margin-top:10px">Esta liberação terá <b>1 questão</b>. Se for a única da aula, ela vale a nota inteira da aula.</div>' : '') +
+    (n === 0 ? '<div class="erro">Escolha pelo menos uma questão.</div>' : '') +
+    '<label class="rot" for="qOri" style="margin-top:12px">Orientação (opcional)</label><input type="text" id="qOri" placeholder="ex.: foque no exemplo do doce de leite; nível intermediário" value="' + esc(c.orientacao) + '">' +
+    '<p class="aviso" style="margin-top:6px">As questões usam o que já foi transcrito. O trecho que está sendo gravado agora entra quando fechar o bloco de 10 minutos.</p>' +
+    '<div class="botoes"><button type="button" id="qGerar"' + (n ? '' : ' disabled') + '>Gerar questões para revisar</button><button type="button" class="secundario" id="qCanc">Cancelar</button></div><div id="qMsg"></div></div>';
+  var box = $('areaQ');
+  box.querySelectorAll('[data-k]').forEach(function(b){ b.addEventListener('click', function(){
+    var k = b.dataset.k, lim = {fechadas:[0, 10], abertas:[0, 5], prazo:[5, 240], peso:[0, 100]}[k];
+    c.orientacao = $('qOri').value; c[k] = Math.max(lim[0], Math.min(lim[1], c[k] + Number(b.dataset.v))); desenharCompositor();
+  }); });
+  box.querySelectorAll('[data-sobre]').forEach(function(b){ b.addEventListener('click', function(){ c.orientacao = $('qOri').value; c.sobre = b.dataset.sobre; desenharCompositor(); }); });
+  $('qCanc').addEventListener('click', function(){ box.innerHTML = ''; });
+  $('qGerar').addEventListener('click', function(){
+    c.orientacao = $('qOri').value; this.disabled = true;
+    $('qMsg').innerHTML = '<p class="carregando">Gerando questões… (uns 20 a 40 segundos)</p>';
+    api('gerarQuestoes', {aulaId: a.id, cfg: c}).then(function(r){
+      Q.propostas = r.questoes.map(function(q){ q.ok = false; return q; });
+      desenharRevisao();
+    }).catch(function(e){ $('qGerar').disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+
+function desenharRevisao(){
+  var nOk = Q.propostas.filter(function(q){ return q.ok; }).length;
+  var h = '<div class="caixa"><h2>Revisar antes de liberar</h2>';
+  Q.propostas.forEach(function(q, i){
+    h += '<div class="questaoRev' + (q.ok ? ' aprovada' : '') + '" data-i="' + i + '"><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' ' + (i + 1) + '</span> ' + (q.ok ? '<span class="tag t-ok">aprovada</span>' : '');
+    if(q.editando){
+      h += '<label class="rot" style="margin-top:10px">Enunciado</label><textarea data-e="enun">' + esc(q.enunciado) + '</textarea>';
+      if(q.tipo === 'fechada'){
+        h += '<label class="rot" style="margin-top:10px">Alternativas (marque a correta)</label>' + q.alternativas.map(function(a, k){
+          return '<div style="display:flex;gap:8px;align-items:center;margin-bottom:6px"><input type="radio" name="gab' + i + '" value="' + k + '"' + (k === q.gabarito ? ' checked' : '') + ' aria-label="Correta"><input type="text" data-alt="' + k + '" value="' + esc(a) + '"></div>';
+        }).join('');
+      } else h += '<label class="rot" style="margin-top:10px">O que a resposta deve conter</label><textarea data-e="esp">' + esc(q.gabarito) + '</textarea>';
+      h += '<div class="botoes"><button type="button" class="mini" data-acao="salvar">Salvar</button><button type="button" class="secundario mini" data-acao="cancelarEd">Cancelar</button></div>';
+    } else {
+      h += '<p style="margin:8px 0 0;font-weight:bold">' + esc(q.enunciado) + '</p>';
+      h += q.tipo === 'fechada' ? '<ol class="alts" type="A">' + q.alternativas.map(function(a, k){ return '<li' + (k === q.gabarito ? ' class="certa"' : '') + '>' + esc(a) + (k === q.gabarito ? ' ✓' : '') + '</li>'; }).join('') + '</ol>'
+        : '<p class="aviso" style="margin:6px 0 0"><b>Resposta esperada:</b> ' + esc(q.gabarito) + '</p>';
+      h += '<div class="botoes"><button type="button" class="mini" data-acao="ok">' + (q.ok ? 'Desmarcar' : '✓ Aprovar') + '</button><button type="button" class="secundario mini" data-acao="editar">Editar</button><button type="button" class="secundario mini" data-acao="refazer">Refazer</button></div>';
+    }
+    h += '<div data-msg></div></div>';
+  });
+  h += '<label class="rot" for="qRef">Orientação para refazer</label><input type="text" id="qRef" placeholder="ex.: mais difícil; sem cálculo; pergunte sobre o exemplo do queijo">' +
+    '<div class="botoes"><button type="button" class="secundario" id="qRefTodas">Refazer todas</button><button type="button" id="qLib"' + (nOk ? '' : ' disabled') + '>Liberar ' + nOk + ' questão' + (nOk === 1 ? '' : 'ões') + ' · ' + Q.cfg.prazo + ' min</button>' +
+    '<button type="button" class="secundario" id="qVoltar">Voltar</button></div><div id="qMsg"></div></div>';
+  var box = $('areaQ'); box.innerHTML = h;
+  box.querySelectorAll('[data-i]').forEach(function(card){
+    var i = Number(card.dataset.i), q = Q.propostas[i], msg = card.querySelector('[data-msg]');
+    card.querySelectorAll('[data-acao]').forEach(function(b){ b.addEventListener('click', function(){
+      var ac = b.dataset.acao;
+      if(ac === 'ok'){ q.ok = !q.ok; desenharRevisao(); }
+      else if(ac === 'editar'){ q.editando = true; desenharRevisao(); }
+      else if(ac === 'cancelarEd'){ q.editando = false; desenharRevisao(); }
+      else if(ac === 'salvar'){
+        var campos = {enunciado: card.querySelector('[data-e="enun"]').value};
+        if(q.tipo === 'fechada'){
+          campos.alternativas = Array.prototype.map.call(card.querySelectorAll('[data-alt]'), function(x){ return x.value; });
+          var r = card.querySelector('input[type=radio]:checked'); campos.gabarito = r ? Number(r.value) : 0;
+        } else campos.gabarito = card.querySelector('[data-e="esp"]').value;
+        b.disabled = true;
+        api('editarQuestao', {questaoId: q.id, campos: campos}).then(function(nq){ nq.ok = true; Q.propostas[i] = nq; desenharRevisao(); })
+          .catch(function(e){ b.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+      } else if(ac === 'refazer'){
+        b.disabled = true; msg.innerHTML = '<p class="carregando">Refazendo…</p>';
+        api('refazerQuestao', {questaoId: q.id, orientacao: $('qRef').value}).then(function(nq){ nq.ok = false; Q.propostas[i] = nq; desenharRevisao(); })
+          .catch(function(e){ b.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+      }
+    }); });
+  });
+  $('qVoltar').addEventListener('click', desenharCompositor);
+  $('qRefTodas').addEventListener('click', function(){
+    var b = this, ori = $('qRef').value; b.disabled = true; $('qMsg').innerHTML = '<p class="carregando">Refazendo todas…</p>';
+    var cadeia = Promise.resolve();
+    Q.propostas.forEach(function(q, i){ cadeia = cadeia.then(function(){ return api('refazerQuestao', {questaoId: q.id, orientacao: ori}).then(function(nq){ nq.ok = false; Q.propostas[i] = nq; }); }); });
+    cadeia.then(desenharRevisao).catch(function(e){ desenharRevisao(); $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  $('qLib').addEventListener('click', function(){
+    var b = this; b.disabled = true;
+    var ids = Q.propostas.filter(function(q){ return q.ok; }).map(function(q){ return q.id; });
+    api('liberarQuestoes', {aulaId: Q.aula.id, ids: ids, prazo: Q.cfg.prazo, peso: Q.cfg.peso}).then(function(){ abrirAcompanhamento(); })
+      .catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+
+function abrirAcompanhamento(){
+  if(Q.poll) clearInterval(Q.poll);
+  carregarAcompanhamento();
+  Q.poll = setInterval(function(){ if(abaAtual === 'aula' && $('acomp')) carregarAcompanhamento(); else { clearInterval(Q.poll); Q.poll = null; } }, 15000);
+}
+
+function carregarAcompanhamento(){
+  api('acompanhar', {aulaId: Q.aula.id}).then(function(r){
+    var desvio = r.agora - Date.now(), fim = Math.max.apply(null, [0].concat(r.questoes.map(function(q){ return q.fechaEm; })));
+    var total = r.questoes.length, aberto = fim > r.agora;
+    var h = '<div class="caixa" id="acomp"><h2>Questões liberadas · aula ' + Q.aula.numero + '</h2>' +
+      '<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:baseline"><div><span class="aviso">' + (aberto ? 'Fecha em' : 'Situação') + '</span><div class="grande" style="color:#c62828">' +
+      (aberto ? '<span data-fim="' + fim + '" data-desvio="' + desvio + '">' + mmss(fim - r.agora) + '</span>' : 'fechadas') + '</div></div>' +
+      '<div><span class="aviso">Questões</span><div class="grande">' + total + '</div></div></div>';
+    h += '<h4>Presentes</h4>' + (r.alunos.length ? '<div class="chamada">' + r.alunos.map(function(a){
+      var ok = a.respondidas >= total;
+      return '<label class="' + (ok ? 'on' : '') + '" style="cursor:default"><span style="flex:1">' + esc(a.nome) + '</span>' +
+        (ok ? '<span class="tag t-ok">respondeu tudo</span>' : a.respondidas ? '<span class="tag t-warn">' + a.respondidas + ' de ' + total + '</span>' : aberto ? '<span class="tag t-cinza">aguardando</span>' : '<span class="tag t-err">não respondeu</span>') + '</label>';
+    }).join('') + '</div>' : '<p class="aviso">Ninguém marcado na chamada desta aula.</p>');
+    if(r.abertas.length){
+      h += '<h4>Respostas abertas</h4>' + r.abertas.map(function(x){
+        return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:4px"><b>' + esc(x.aluno) + '</b> <span class="aviso">' + esc(x.enunciado.slice(0, 80)) + (x.enunciado.length > 80 ? '…' : '') + '</span></p>' +
+          '<p style="margin-bottom:6px">' + esc(x.resposta) + '</p>' + (x.comentario ? '<p class="aviso" style="margin-bottom:6px">IA: ' + esc(x.comentario) + '</p>' : '') +
+          '<div class="botoes" style="margin-top:0">' + (x.status === 'corrigida' ? '' : '<span class="tag t-warn">em correção</span>') +
+          '<input type="number" min="0" max="100" style="width:90px" value="' + (x.nota === null ? '' : x.nota) + '" aria-label="Nota" data-nota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">' +
+          '<button type="button" class="secundario mini" data-salvanota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">Salvar nota</button>' + (x.ajustada ? '<span class="tag t-azul">ajustada</span>' : '') + '</div></div>';
+      }).join('');
+    }
+    h += '<div class="botoes"><button type="button" class="secundario mini" data-prazo="estender">Estender +5 min</button><button type="button" class="secundario mini" data-prazo="fechar">Fechar agora</button>' +
+      '<button type="button" class="secundario mini" data-prazo="reabrir">Reabrir por 10 min</button><button type="button" class="mini" id="qMais">Liberar mais questões</button></div><div id="qMsg"></div></div>';
+    var foco = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.nota;
+    if(foco) return;   // professor digitando uma nota: não redesenha agora
+    $('areaQ').innerHTML = h;
+    $('areaQ').querySelectorAll('[data-prazo]').forEach(function(b){ b.addEventListener('click', function(){
+      b.disabled = true;
+      api('ajustarPrazo', {aulaId: Q.aula.id, acao: b.dataset.prazo}).then(carregarAcompanhamento).catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    }); });
+    $('areaQ').querySelectorAll('[data-salvanota]').forEach(function(b){ b.addEventListener('click', function(){
+      var p = b.dataset.salvanota.split('|'), inp = $('areaQ').querySelector('[data-nota="' + b.dataset.salvanota + '"]');
+      b.disabled = true;
+      api('ajustarNota', {questaoId: p[0], alunoId: p[1], nota: inp.value}).then(carregarAcompanhamento).catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    }); });
+    $('qMais').addEventListener('click', function(){ abrirCompositor(G.fase === 'gravando' ? 'recente' : 'inteira'); });
+  }).catch(function(e){ $('areaQ').innerHTML = '<div class="caixa" id="acomp"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+/* ================= NOTAS ================= */
+var notasDisc = '';
+function abrirNotas(){
+  var el = $('pNotas');
+  if(!resumo.disciplinas.length){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
+  if(!notasDisc || !discPorId(notasDisc)) notasDisc = (ativas()[0] || resumo.disciplinas[0]).id;
+  el.innerHTML = '<div class="caixa"><div class="linha" style="border:0;padding:0 0 12px">' + chipsDisciplinas(notasDisc, true) +
+    (resumo.planilhaUrl ? '<a class="link" target="_blank" rel="noopener" href="' + esc(resumo.planilhaUrl) + '">Abrir planilha no Drive</a>' : '') + '</div><div id="notasCorpo"><p class="carregando">Calculando notas…</p></div></div><div id="notasErradas"></div>';
+  el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ notasDisc = b.dataset.disc; abrirNotas(); }); });
+  api('notasDisciplina', {disciplinaId: notasDisc}).then(function(r){
+    var c = $('notasCorpo');
+    if(!r.alunos.length){ c.innerHTML = '<p class="aviso">Nenhum aluno inscrito nesta disciplina.</p>'; return; }
+    var h = '<p class="aviso">' + r.N + ' aula(s) com questões · presença mínima ' + r.minimo + ' (' + r.disciplina.presencaMin + '%) · clique num aluno para ver o cálculo</p>' +
+      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th>' + r.aulas.map(function(a){ return '<th title="' + esc(a.tema) + '">A' + a.numero + '</th>'; }).join('') + '<th>Presença</th><th>Nota</th></tr></thead><tbody>';
+    r.alunos.forEach(function(al, i){
+      h += '<tr class="linhaAluno' + (al.abaixo ? ' abaixo' : '') + '" data-al="' + i + '"><td>' + esc(al.nome) + '</td>' + al.porAula.map(function(x){
+        return '<td>' + (x.tipo === 'x' ? '<span class="cel cX">–</span>' : x.tipo === 'falta' ? '<span class="cel cF">F</span>' : '<span class="cel c' + classe(x.nota) + '">' + x.nota + (x.provisoria ? '*' : '') + '</span>') + '</td>';
+      }).join('') + '<td>' + al.presencas + '/' + r.N + '</td><td><span class="nota n' + classe(al.media) + '">' + al.media + '</span></td></tr>';
+    });
+    h += '</tbody></table></div><p class="aviso" style="margin-top:8px">F = falta · – = aula sem questões · * = provisória (questão aberta ou resposta em correção)</p><div id="detAl"></div>' + explicacaoNota(r.disciplina.presencaMin);
+    c.innerHTML = h;
+    c.querySelectorAll('[data-al]').forEach(function(tr){ tr.addEventListener('click', function(){
+      var al = r.alunos[Number(tr.dataset.al)], notas = al.porAula.filter(function(x){ return x.tipo === 'nota'; }).map(function(x){ return x.nota; });
+      $('detAl').innerHTML = '<div class="detalhe"><h3>' + esc(al.nome) + '</h3><div class="calc">' + r.N + ' aulas · mínimo ' + r.minimo + ' · presente em ' + al.presencas + '<br>' +
+        (notas.length ? '(' + notas.join(' + ') + ') ÷ ' + al.divisor + ' = ' + al.media : 'sem presença em aula com questões') + '</div>' +
+        (al.abaixo ? '<div class="erro" style="margin-bottom:0">Abaixo da presença mínima: ' + (r.minimo - al.presencas) + ' falta(s) contando como zero.</div>' : '<p class="aviso" style="margin:8px 0 0">Pode faltar mais ' + (al.presencas - r.minimo) + ' aula(s) sem perder nota.</p>') + '</div>';
+    }); });
+    $('notasErradas').innerHTML = r.erradas.length ? '<div class="caixa"><h2>Questões que a turma mais errou</h2>' + r.erradas.map(function(e){
+      return '<div class="linha"><span><span class="nota n' + classe(e.acerto) + '">' + e.acerto + '%</span> &nbsp;Aula ' + e.aula + ' · ' + esc(e.enunciado) + '</span><span class="aviso">' + e.respostas + ' respostas</span></div>';
+    }).join('') + '<p class="aviso" style="margin-top:8px">Bom ponto para retomar no início da próxima aula.</p></div>' : '';
+  }).catch(function(e){ $('notasCorpo').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+
+/* ================= HISTÓRICO E APOSTILA ================= */
+var histDisc = '';
+function abrirHistorico(){
+  var el = $('pHist');
+  if(!resumo.disciplinas.length){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
+  if(!histDisc || !discPorId(histDisc)) histDisc = (ativas()[0] || resumo.disciplinas[0]).id;
+  el.innerHTML = '<div class="caixa">' + chipsDisciplinas(histDisc, true) + '</div><div id="histApostila"></div><div id="histRevisao"></div><div id="histLinha"><div class="caixa"><p class="carregando">Carregando aulas…</p></div></div><div id="histLeitura"></div>';
+  el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ histDisc = b.dataset.disc; abrirHistorico(); }); });
+  carregarLinhaTempo();
+  carregarPainelApostila();
+  carregarRevisao(false);
+}
+
+function carregarLinhaTempo(){
+  api('aulasDaDisciplina', {disciplinaId: histDisc}).then(function(lista){
+    var d = discPorId(histDisc);
+    $('histLinha').innerHTML = '<div class="caixa"><h2>Linha do tempo · ' + esc(d.nome) + ' ' + esc(d.semestre) + '</h2>' + (lista.length ? '<ol class="timeline">' + lista.slice().reverse().map(function(a){
+      return '<li><span class="d">Aula ' + a.numero + '<br>' + esc(a.data.split(' ')[0]) + '</span><div><b>' + esc(a.tema || (a.status === 'gravando' ? 'em gravação' : 'aguardando ata')) + '</b> ' + statusAula(a) +
+        (a.ata ? '<details style="margin-top:6px"><summary class="link">Ver ata</summary><p style="white-space:pre-line;margin-top:6px">' + esc(a.ata) + '</p></details>' : '') +
+        (a.pendencias ? '<p class="aviso" style="margin:4px 0 0"><b>Pendências:</b> ' + esc(a.pendencias) + '</p>' : '') +
+        (a.status === 'nao_gravada' ? '<p class="aviso" style="margin:4px 0 0">Aula não gravada: a apostila usa semestres anteriores com esse tema.</p>' : '') +
+        (a.recomendacoes ? '<details style="margin-top:6px"><summary class="link">Recomendações para você</summary><div class="detalhe leitura" style="margin-top:8px"><p class="aviso">Só você vê isto · ' + esc(a.recomendacoesEm) + '</p>' + textoCapitulo(a.recomendacoes) + '</div></details>'
+          : (a.ata && a.gravada ? '<div class="botoes" style="margin-top:6px"><button type="button" class="secundario mini" data-rec="' + esc(a.id) + '"' + (resumo.temChave ? '' : ' disabled') + '>Gerar recomendações agora</button><span class="aviso">ou espere a revisão da 1h</span></div>' : '')) +
+        '</div></li>';
+    }).join('') + '</ol>' : '<p class="aviso">Nenhuma aula ainda.</p>') + '</div>';
+    $('histLinha').querySelectorAll('[data-rec]').forEach(function(b){ b.addEventListener('click', function(){
+      b.disabled = true; b.textContent = 'Revisando a aula… (até 1 minuto)';
+      api('gerarRecomendacoes', {aulaId: b.dataset.rec}).then(carregarLinhaTempo).catch(function(e){ b.disabled = false; b.textContent = 'Gerar recomendações agora'; erroGeral(e.message); });
+    }); });
+  }).catch(function(e){ $('histLinha').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+function carregarRevisao(gerar){
+  var el = $('histRevisao');
+  if(!gerar) el.innerHTML = '<div class="caixa"><h2>Revisão do semestre</h2><p class="carregando">Carregando…</p></div>';
+  api('revisaoSemestre', {disciplinaId: histDisc, gerar: !!gerar}).then(function(r){
+    el.innerHTML = '<div class="caixa"><h2>Revisão do semestre</h2><p class="aviso">Só você vê isto. Junta as atas, as recomendações de cada aula e o desempenho da turma em sugestões para o próximo semestre.</p>' +
+      (r.texto ? '<details><summary class="link">Ver revisão (' + esc(r.em) + ')</summary><div class="leitura" style="margin-top:8px">' + textoCapitulo(r.texto) + '</div></details>' : '') +
+      '<div class="botoes"><button type="button" class="mini" id="btRevisao"' + (resumo.temChave ? '' : ' disabled') + '>' + (r.texto ? 'Refazer revisão do semestre' : 'Gerar revisão do semestre') + '</button><span class="aviso">Use no fim do semestre, ou quando quiser um balanço.</span></div><div id="msgRevisao"></div></div>';
+    $('btRevisao').addEventListener('click', function(){
+      this.disabled = true; $('msgRevisao').innerHTML = '<p class="carregando">Revisando o semestre… (pode levar 1 a 2 minutos)</p>';
+      carregarRevisao(true);
+    });
+  }).catch(function(e){
+    if(gerar && $('msgRevisao')){ $('msgRevisao').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; var b = $('btRevisao'); if(b) b.disabled = false; }
+    else el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>';
+  });
+}
+
+function carregarPainelApostila(){
+  var el = $('histApostila');
+  el.innerHTML = '<div class="caixa"><h2>Apostila</h2><p class="carregando">Carregando…</p></div>';
+  api('apostila', {professorId: '', disciplinaId: histDisc}).then(function(r){
+    el.innerHTML = '<div class="caixa"><h2>Apostila</h2><p><b>' + r.capitulos.length + ' capítulo(s)</b>' + (r.pendentes ? ' · ' + r.pendentes + ' aula(s) esperando capítulo' : '') +
+      ' · atualizada sozinha no sábado de madrugada.</p><div class="botoes" style="margin-top:0"><button type="button" class="mini" id="apGerar"' + (r.pendentes && resumo.temChave ? '' : ' disabled') + '>Escrever capítulos pendentes agora</button>' +
+      (r.capitulos.length ? '<button type="button" class="secundario mini" id="apLer">Ver capítulos</button>' : '') +
+      (r.docUrl ? '<a class="link" target="_blank" rel="noopener" href="' + esc(r.docUrl) + '">Abrir no Google Docs</a>' : '') + '</div>' +
+      (r.capitulos.length ? '<label class="rot" for="apCorr" style="margin-top:16px">Corrigir com IA</label><input type="text" id="apCorr" placeholder="ex.: Na aula 4, a HTST é 72 °C por 15 s, não 75 °C por 50 s.">' +
+        '<div class="botoes"><button type="button" class="mini" id="apAplicar"' + (resumo.temChave ? '' : ' disabled') + '>Aplicar correção</button></div>' : '') + '<div id="apMsg"></div></div>';
+    var g = $('apGerar');
+    if(g) g.addEventListener('click', function(){
+      g.disabled = true; $('apMsg').innerHTML = '<p class="carregando">Escrevendo capítulos… (pode levar alguns minutos)</p>';
+      api('gerarApostila', {disciplinaId: histDisc}).then(function(x){
+        $('apMsg').innerHTML = '<div class="ok">' + x.feitos + ' capítulo(s) escrito(s).' + (x.restantes ? ' Faltam ' + x.restantes + ': clique de novo para continuar.' : '') + '</div>';
+        setTimeout(carregarPainelApostila, 2500);
+      }).catch(function(e){ g.disabled = false; $('apMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    });
+    var l = $('apLer'); if(l) l.addEventListener('click', function(){ abrirLeitura($('histLeitura'), '', histDisc); });
+    var ap = $('apAplicar');
+    if(ap) ap.addEventListener('click', function(){
+      ap.disabled = true; $('apMsg').innerHTML = '<p class="carregando">Aplicando a correção…</p>';
+      api('corrigirApostila', {disciplinaId: histDisc, pedido: $('apCorr').value}).then(function(x){
+        $('apMsg').innerHTML = '<div class="ok">Correção aplicada no capítulo ' + x.capitulo + ' (' + esc(x.titulo) + '), na ata dessa aula e no Google Docs.</div>';
+        $('apCorr').value = ''; ap.disabled = false; carregarLinhaTempo();
+      }).catch(function(e){ ap.disabled = false; $('apMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    });
+  }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+/* ================= DISCIPLINAS ================= */
 function desenharDisciplinas(){
   var el = $('listaDisc'), ds = resumo.disciplinas;
   if(!ds.length){ el.innerHTML = '<div class="caixa"><p>Nenhuma disciplina ainda. Crie a primeira, por exemplo "Conservação de Alimentos".</p></div>'; return; }
-  var ativas = ds.filter(function(d){ return d.ativa; }), arquivadas = ds.filter(function(d){ return !d.ativa; });
-  el.innerHTML = '<div class="grid2">' + ativas.map(cartaoDisc).join('') + '</div>' +
-    (arquivadas.length ? '<p class="grupoTitulo">Arquivadas</p><div class="grid2">' + arquivadas.map(cartaoDisc).join('') + '</div>' : '');
-  el.querySelectorAll('[data-editar]').forEach(function(b){
-    b.addEventListener('click', function(){ abrirForm(ds.filter(function(d){ return d.id === b.dataset.editar; })[0]); });
-  });
+  var at = ds.filter(function(d){ return d.ativa; }), arq = ds.filter(function(d){ return !d.ativa; });
+  el.innerHTML = '<div class="grid2">' + at.map(cartaoDisc).join('') + '</div>' +
+    (arq.length ? '<p class="grupoTitulo">Arquivadas</p><div class="grid2">' + arq.map(cartaoDisc).join('') + '</div>' : '');
+  el.querySelectorAll('[data-editar]').forEach(function(b){ b.addEventListener('click', function(){ abrirForm(discPorId(b.dataset.editar)); }); });
   el.querySelectorAll('[data-ativar]').forEach(function(b){
     b.addEventListener('click', function(){
       b.disabled = true;
-      api('ativarDisciplina', {id: b.dataset.ativar, ativa: b.dataset.valor === '1'})
-        .then(carregarResumo).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+      api('ativarDisciplina', {id: b.dataset.ativar, ativa: b.dataset.valor === '1'}).then(carregarResumo).catch(function(e){ b.disabled = false; erroGeral(e.message); });
     });
   });
 }
 
 function cartaoDisc(d){
   return '<div class="caixa" style="margin-bottom:18px"><h3>' + esc(d.nome) + '</h3>' +
-    '<p class="aviso">' + esc(d.semestre) + ' · ' + d.aprovados + ' aluno(s) inscrito(s)' +
-    (d.pendentes ? ' · <b style="color:#c62828">' + d.pendentes + ' pendente(s)</b>' : '') + '</p>' +
-    '<div class="cfg">' +
-      '<span>Tempos por aula</span><span>' + d.tempos + ' × 50 min</span>' +
-      '<span>Prazo padrão</span><span>' + d.prazo_padrao + ' min</span>' +
-      '<span>Presença mínima</span><span>' + d.presenca_min + '%</span>' +
-      '<span>Questões por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s)</span>' +
-      '<span>Peso fechadas / abertas</span><span>' + d.peso_fechadas + '% / ' + (100 - d.peso_fechadas) + '%</span>' +
-    '</div>' +
+    '<p class="aviso">' + esc(d.semestre) + ' · ' + d.aprovados + ' aluno(s) inscrito(s)' + (d.pendentes ? ' · <b style="color:#c62828">' + d.pendentes + ' pendente(s)</b>' : '') + '</p>' +
+    '<div class="cfg"><span>Tempos por aula</span><span>' + d.tempos + ' × 50 min</span><span>Prazo padrão</span><span>' + d.prazo_padrao + ' min</span>' +
+    '<span>Presença mínima</span><span>' + d.presenca_min + '%</span><span>Questões por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s)</span>' +
+    '<span>Peso fechadas / abertas</span><span>' + d.peso_fechadas + '% / ' + (100 - d.peso_fechadas) + '%</span></div>' +
     (d.orientacoes ? '<p class="aviso" style="margin-top:8px">Orientações: "' + esc(d.orientacoes) + '"</p>' : '') +
     (d.glossario.length ? '<div class="chips" style="margin-top:8px">' + d.glossario.map(function(t){ return '<span class="tag t-azul">' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
@@ -363,25 +1337,18 @@ $('btNovaDisc').addEventListener('click', function(){ abrirForm(null); });
 
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:semestreAtual(), tempos:p.tempos, prazo_padrao:p.prazo_padrao,
-    presenca_min:p.presenca_min, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas,
-    orientacoes:'', glossario:[]};
+    presenca_min:p.presenca_min, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[]};
   var f = $('formDisc');
-  f.innerHTML = '<h2>' + (d ? 'Editar disciplina' : 'Nova disciplina') + '</h2>' +
-    '<div class="campos">' +
-      campo('fNome', 'Nome', 'text', v.nome, 'campoLargo', 'ex.: Conservação de Alimentos') +
-      campo('fSem', 'Semestre', 'text', v.semestre, '', 'ex.: 2026.2') +
-      '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
-      campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) +
-      campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
-      campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) +
-      campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
-      campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
-      '<div class="campoLargo"><label class="rot" for="fOri">Orientações fixas para as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea></div>' +
-      '<div class="campoLargo"><label class="rot" for="fGlo">Glossário (separe por vírgula)</label><textarea id="fGlo" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
-        '<p class="aviso" style="margin:6px 0 0">Termos técnicos que ajudam a IA a transcrever a aula corretamente.</p></div>' +
-    '</div>' +
-    '<p class="aviso" id="fPesoTxt"></p>' +
-    '<div id="fErro" class="erro oculto"></div>' +
+  f.innerHTML = '<h2>' + (d ? 'Editar disciplina' : 'Nova disciplina') + '</h2><div class="campos">' +
+    campo('fNome', 'Nome', 'text', v.nome, 'campoLargo', 'ex.: Conservação de Alimentos') + campo('fSem', 'Semestre', 'text', v.semestre, '', 'ex.: 2026.2') +
+    '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
+    campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
+    campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) + campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
+    campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
+    '<div class="campoLargo"><label class="rot" for="fOri">Orientações fixas para as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea></div>' +
+    '<div class="campoLargo"><label class="rot" for="fGlo">Glossário (separe por vírgula)</label><textarea id="fGlo" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
+    '<p class="aviso" style="margin:6px 0 0">Termos técnicos que ajudam a IA a transcrever a aula corretamente.</p></div></div>' +
+    '<p class="aviso" id="fPesoTxt"></p><div id="fErro" class="erro oculto"></div>' +
     '<div class="botoes"><button type="button" id="fSalvar">' + (d ? 'Salvar alterações' : 'Criar disciplina') + '</button><button type="button" class="secundario" id="fCancelar">Cancelar</button></div>';
   f.classList.remove('oculto');
   var atualizaPeso = function(){ var n = Number($('fPeso').value) || 0; $('fPesoTxt').textContent = 'Nota da aula = ' + n + '% média das fechadas + ' + (100 - n) + '% média das abertas.'; };
@@ -399,53 +1366,44 @@ function abrirForm(d){
   f.scrollIntoView({behavior:'smooth', block:'start'});
   $('fNome').focus();
 }
-
-function campo(id, rotulo, tipo, valor, classe, ph){
-  return '<div class="' + (classe || '') + '"><label class="rot" for="' + id + '">' + rotulo + '</label>' +
-    '<input type="' + tipo + '" id="' + id + '" value="' + esc(valor) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') +
-    (tipo === 'number' ? ' min="0"' : '') + '></div>';
+function campo(id, rotulo, tipo, valor, classe_, ph){
+  return '<div class="' + (classe_ || '') + '"><label class="rot" for="' + id + '">' + rotulo + '</label><input type="' + tipo + '" id="' + id + '" value="' + esc(valor) + '"' +
+    (ph ? ' placeholder="' + esc(ph) + '"' : '') + (tipo === 'number' ? ' min="0"' : '') + '></div>';
 }
 function semestreAtual(){ var d = new Date(); return d.getFullYear() + '.' + (d.getMonth() < 6 ? 1 : 2); }
 
-/* ---- inscrições ---- */
+/* ================= INSCRIÇÕES ================= */
 function carregarInscricoes(){
   $('listaPend').innerHTML = $('listaAprov').innerHTML = '<p class="carregando">Carregando…</p>';
   api('inscricoes').then(function(r){
     var b = $('badgeInsc'); b.textContent = r.pendentes.length; b.classList.toggle('oculto', !r.pendentes.length);
     $('listaPend').innerHTML = r.pendentes.length ? r.pendentes.map(function(i){
-      return '<div class="linha"><div><b>' + esc(i.aluno) + '</b> <span class="aviso">' + esc(i.email) + '</span><div class="aviso">' +
-        esc(i.disciplina) + ' · pediu em ' + esc(i.pedidoEm) + '</div></div><div class="botoes" style="margin:0">' +
-        '<button type="button" class="mini" data-dec="aprovada" data-id="' + esc(i.id) + '">Aprovar</button>' +
-        '<button type="button" class="secundario mini" data-dec="recusada" data-id="' + esc(i.id) + '">Recusar</button></div></div>';
+      return '<div class="linha"><div><b>' + esc(i.aluno) + '</b> <span class="aviso">' + esc(i.email) + '</span><div class="aviso">' + esc(i.disciplina) + ' · pediu em ' + esc(i.pedidoEm) + '</div></div>' +
+        '<div class="botoes" style="margin:0"><button type="button" class="mini" data-dec="aprovada" data-id="' + esc(i.id) + '">Aprovar</button><button type="button" class="secundario mini" data-dec="recusada" data-id="' + esc(i.id) + '">Recusar</button></div></div>';
     }).join('') : '<p class="aviso">Nenhum pedido esperando aprovação.</p>';
-
     var grupos = {};
     r.aprovados.forEach(function(i){ (grupos[i.disciplina] = grupos[i.disciplina] || []).push(i); });
     var nomes = Object.keys(grupos).sort();
     $('listaAprov').innerHTML = nomes.length ? nomes.map(function(n){
       return '<p class="grupoTitulo">' + esc(n) + ' · ' + grupos[n].length + ' aluno(s)</p>' + grupos[n].map(function(i){
-        return '<div class="linha"><span>' + esc(i.aluno) + ' <span class="aviso">' + esc(i.email) + '</span></span>' +
-          '<button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
+        return '<div class="linha"><span>' + esc(i.aluno) + ' <span class="aviso">' + esc(i.email) + '</span></span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
       }).join('');
     }).join('') : '<p class="aviso">Nenhum aluno inscrito ainda.</p>';
-
     document.querySelectorAll('#pInsc [data-dec]').forEach(function(bt){
       bt.addEventListener('click', function(){
         if(bt.dataset.dec === 'removida' && bt.textContent !== 'Confirmar remoção'){ bt.textContent = 'Confirmar remoção'; return; }
         bt.disabled = true;
-        api('decidirInscricao', {id: bt.dataset.id, decisao: bt.dataset.dec})
-          .then(function(){ carregarInscricoes(); carregarResumo(); })
+        api('decidirInscricao', {id: bt.dataset.id, decisao: bt.dataset.dec}).then(function(){ carregarInscricoes(); carregarResumo(); })
           .catch(function(e){ bt.disabled = false; erroGeral(e.message); });
       });
     });
   }).catch(function(e){ $('listaPend').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; $('listaAprov').innerHTML = ''; });
 }
 
-/* ---- chaves ---- */
+/* ================= CHAVES ================= */
 function desenharChaves(lista){
   $('listaChaves').innerHTML = lista.length ? lista.map(function(c, i){
-    return '<div class="linha"><span>Chave ' + (i + 1) + ' <span class="mono">' + esc(c) + '</span></span>' +
-      '<button type="button" class="secundario mini" data-rem="' + i + '">Remover</button></div>';
+    return '<div class="linha"><span>Chave ' + (i + 1) + ' <span class="mono">' + esc(c) + '</span></span><button type="button" class="secundario mini" data-rem="' + i + '">Remover</button></div>';
   }).join('') : '<p class="aviso">Nenhuma chave guardada.</p>';
   $('listaChaves').querySelectorAll('[data-rem]').forEach(function(b){
     b.addEventListener('click', function(){
@@ -459,8 +1417,7 @@ function desenharChaves(lista){
 function atualizarAvisoChave(n){ $('avisoChave').classList.toggle('oculto', n > 0); if(resumo) resumo.temChave = n > 0; }
 function msgChave(t, erro){ $('msgChave').innerHTML = t ? '<div class="' + (erro ? 'erro' : 'ok') + '">' + t + '</div>' : ''; }
 function carregarChaves(){
-  msgChave('');
-  $('listaChaves').innerHTML = '<p class="carregando">Carregando…</p>';
+  msgChave(''); $('listaChaves').innerHTML = '<p class="carregando">Carregando…</p>';
   api('chaves').then(desenharChaves).catch(function(e){ msgChave(esc(e.message), true); });
 }
 $('btGuardarChave').addEventListener('click', function(){
@@ -473,8 +1430,7 @@ $('btGuardarChave').addEventListener('click', function(){
   }).catch(function(e){ b.disabled = false; msgChave(esc(e.message), true); });
 });
 $('btTestar').addEventListener('click', function(){
-  var b = this; b.disabled = true; msgChave('');
-  $('msgChave').innerHTML = '<p class="carregando">Testando…</p>';
+  var b = this; b.disabled = true; $('msgChave').innerHTML = '<p class="carregando">Testando…</p>';
   api('testarChaves').then(function(r){
     b.disabled = false;
     var ruim = r.some(function(x){ return x.resultado.indexOf('funcionando') !== 0; });
