@@ -292,7 +292,14 @@ function iniciar(){
     $('tCarregando').classList.add('oculto');
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
-    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') + '<a href="index.html">voltar ao Avaliador</a>';
+    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') + '<a href="index.html">voltar ao Avaliador</a> · <a href="#" id="linkSair">sair</a>';
+    $('linkSair').addEventListener('click', function(e){
+      e.preventDefault();
+      if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
+      // o login é o mesmo do Avaliador: apagar o token deste navegador desconecta os dois
+      try{ localStorage.removeItem('ip_token'); localStorage.removeItem('aulas_visao'); }catch(x){}
+      location.href = 'index.html';
+    });
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao(lerPref() || 'prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
