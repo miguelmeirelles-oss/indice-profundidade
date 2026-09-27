@@ -324,7 +324,7 @@ function iniciar(){
       try{ localStorage.removeItem('ip_token'); localStorage.removeItem('aulas_visao'); }catch(x){}
       location.href = 'index.html';
     });
-    if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao(lerPref() || 'prof'); }
+    if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
 }
