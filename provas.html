@@ -291,7 +291,7 @@ function seletorFotos(el, aceitaPdf, aoMudar){
       '<div class="miniaturas">' + paginas.map(function(p, i){
         return '<figure>' + (p.previa ? '<img src="' + p.previa + '" alt="Página ' + (i + 1) + '">' : '<div class="pdf">PDF</div>') +
           '<button type="button" class="secundario tirar" data-tirar="' + i + '" aria-label="Tirar página ' + (i + 1) + '">×</button><figcaption>pág. ' + (i + 1) + '</figcaption></figure>';
-      }).join('') + '</div>' + (paginas.length ? '<p class="aviso" style="margin-top:8px">Toque numa página para ver em tamanho grande e conferir se dá para ler.</p>' : '<p class="aviso" style="margin-top:8px">Fotografe cada página inteira, de cima, com boa luz e sem sombra. As páginas vão na ordem em que você adicionar.</p>') +
+      }).join('') + '</div>' + (paginas.length ? '<p class="aviso" style="margin-top:8px">Toque numa página para ver em tamanho grande e conferir se dá para ler.</p>' : '<p class="aviso" style="margin-top:8px">Fotografe só as folhas de resposta, cada página inteira, de cima, com boa luz e sem sombra. Escreva o número da questão antes de cada resposta (1, 2a, 2b…). As páginas vão na ordem em que você adicionar.</p>') +
       '<div data-msg></div>';
     el.querySelectorAll('input[type=file]').forEach(function(inp){ inp.addEventListener('change', function(){ adicionar(Array.prototype.slice.call(inp.files)); }); });
     el.querySelector('[data-realce]').addEventListener('change', function(){ realcar = this.checked; reprocessar(); });
