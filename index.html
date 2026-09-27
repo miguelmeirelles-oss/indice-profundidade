@@ -227,13 +227,13 @@
       </div>
       <div class="acoes">
         <button class="pill" id="btArea" onclick="abrirArea()">
-          <span id="btAreaTexto">Área do aluno</span><span class="seta">&#10230;</span></button>
-        <button class="pill claro oculto" id="btProf" onclick="abrirProfessor()">
-          <span>Área do professor</span><span class="seta">&#10230;</span></button>
+          <span id="btAreaTexto">Estudar com IA</span><span class="seta">&#10230;</span></button>
         <button class="pill claro" onclick="location.href='aulas.html'">
           <span>Aulas</span><span class="seta">&#10230;</span></button>
         <button class="pill claro" onclick="location.href='provas.html'">
           <span>Provas</span><span class="seta">&#10230;</span></button>
+        <button class="pill claro oculto" id="btProf" onclick="abrirProfessor()">
+          <span>Mapa dos alunos</span><span class="seta">&#10230;</span></button>
         <button class="miniLink" onclick="abrirSugestao()">enviar sugestão</button>
       </div>
     </div>
@@ -262,7 +262,7 @@
 
   <!-- login / cadastro -->
   <div class="caixa oculto" id="pAuth">
-    <h2 style="margin-top:0">Área do aluno</h2>
+    <h2 style="margin-top:0">Estudar com IA</h2>
     <p style="margin:0 0 14px;font-size:15px;line-height:1.55">Aqui suas
       avaliações ficam guardadas por assunto, com nota e gargalos, para você
       acompanhar o que já domina do curso e o que precisa revisar.</p>
@@ -343,7 +343,7 @@
   <!-- painel do professor -->
   <div class="caixa oculto" id="pProfessor">
     <div class="topo" style="justify-content:space-between;margin-bottom:14px">
-      <h2 style="margin:0">Área do professor</h2>
+      <h2 style="margin:0">Mapa dos alunos (Estudar com IA)</h2>
       <div class="topo">
         <button class="link" onclick="abrirCurriculo()">Meu mapa</button>
         <button class="link" onclick="sairConta()">Sair</button>
@@ -606,7 +606,7 @@ if(sessao.token){
     if(r.logado){
       sessao.nome = r.nome; sessao.professor = r.professor;
       sessao.instituicao = r.instituicao || '';
-      document.getElementById('btAreaTexto').textContent = 'Meu mapa';
+      document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
       document.getElementById('btProf').classList.toggle('oculto', !r.professor);
     }
     else {
@@ -646,7 +646,7 @@ function logou(r){
   sessao.professor = !!r.professor; sessao.instituicao = r.instituicao || '';
   localStorage.setItem('ip_token', r.token);
   if(voltarParaAulas){ location.href = destinoVolta + '.html'; return; }
-  document.getElementById('btAreaTexto').textContent = 'Meu mapa';
+  document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
   document.getElementById('erroAuth').classList.add('oculto');
   if(!sessao.instituicao && !localStorage.getItem('ip_inst')) mostrar('pInstituicao');
@@ -842,7 +842,7 @@ function sairConta(){
   api('sair', {token: sessao.token}).catch(function(){});
   sessao = {token:'', nome:''};
   localStorage.removeItem('ip_token');
-  document.getElementById('btAreaTexto').textContent = 'Área do aluno';
+  document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
   document.getElementById('btProf').classList.add('oculto');
   mostrar('pInicio');
 }
@@ -853,7 +853,7 @@ function apagarConta(){
   api('apagarConta', {token: sessao.token}).then(function(m){
     alert(m); sessao = {token:'', nome:'', professor:false, instituicao:''};
     localStorage.removeItem('ip_token');
-    document.getElementById('btAreaTexto').textContent = 'Área do aluno';
+    document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
     document.getElementById('btProf').classList.add('oculto');
     mostrar('pInicio');
   }).catch(function(e){ alert(e.message); });
@@ -937,7 +937,7 @@ function desenharMapa(c, deOutro, manterPosicao){
         '. O domínio conta o que ainda não foi falado como zero.</p>' +
     '</div>' +
     (deOutro ? '<div class="botoes" style="margin-top:0;margin-bottom:12px">' +
-      '<button class="link" onclick="abrirProfessor()">← voltar à área do professor</button></div>' : '');
+      '<button class="link" onclick="abrirProfessor()">← voltar ao mapa dos alunos</button></div>' : '');
 
   var h = '';
   c.areas.forEach(function(a){
