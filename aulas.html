@@ -229,7 +229,7 @@
         <p>Todas as tarefas de IA das suas matérias usam só as suas chaves. Elas ficam guardadas no servidor; aqui aparece só o final de cada uma.</p>
         <div id="listaChaves"></div>
         <label class="rot" for="novaChave" style="margin-top:14px">Acrescentar chave</label>
-        <input type="password" id="novaChave" placeholder="Cole a chave aqui (começa com AIza)" autocomplete="off">
+        <input type="password" id="novaChave" placeholder="Cole a chave aqui (começa com AIza ou AQ.)" autocomplete="off">
         <div class="botoes">
           <button type="button" id="btGuardarChave">Guardar chave</button>
           <button type="button" class="secundario" id="btTestar">Testar chaves</button>
@@ -706,7 +706,12 @@ function listarAulas(){
     var ir = $('irRec'); if(ir) ir.addEventListener('click', function(){ histDisc = G.disc; abrirAba('hist'); });
     el.querySelectorAll('[data-qaula]').forEach(function(b){ b.addEventListener('click', function(){
       var a = lista.filter(function(x){ return x.id === b.dataset.qaula; })[0];
-      Q.aula = a; abrirCompositor('inteira'); $('areaQ').scrollIntoView({behavior:'smooth'});
+      Q.aula = a;
+      // aula que já tem questões liberadas abre no acompanhamento (onde dá para excluir)
+      api('acompanhar', {aulaId: a.id}).then(function(r){
+        if(r.questoes.length) abrirAcompanhamento(); else abrirCompositor('inteira');
+        $('areaQ').scrollIntoView({behavior:'smooth'});
+      }).catch(function(){ abrirCompositor('inteira'); });
     }); });
   }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
@@ -1168,6 +1173,10 @@ function carregarAcompanhamento(){
       '<div style="display:flex;gap:28px;flex-wrap:wrap;align-items:baseline"><div><span class="aviso">' + (aberto ? 'Fecha em' : 'Situação') + '</span><div class="grande" style="color:#c62828">' +
       (aberto ? '<span data-fim="' + fim + '" data-desvio="' + desvio + '">' + mmss(fim - r.agora) + '</span>' : 'fechadas') + '</div></div>' +
       '<div><span class="aviso">Questões</span><div class="grande">' + total + '</div></div></div>';
+    h += '<h4>Questões liberadas</h4>' + (r.questoes.length ? r.questoes.map(function(q, i){
+      return '<div class="linha"><span><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + '</span> ' + esc(q.enunciado) + '</span>' +
+        '<button type="button" class="secundario mini" data-excluirq="' + esc(q.id) + '">Excluir</button></div>';
+    }).join('') + '<p class="aviso" style="margin-top:6px">Excluir tira a questão da nota da aula; as notas dos alunos são recalculadas.</p>' : '<p class="aviso">Nenhuma questão liberada.</p>');
     h += '<h4>Presentes</h4>' + (r.alunos.length ? '<div class="chamada">' + r.alunos.map(function(a){
       var ok = a.respondidas >= total;
       return '<label class="' + (ok ? 'on' : '') + '" style="cursor:default"><span style="flex:1">' + esc(a.nome) + '</span>' +
@@ -1197,6 +1206,12 @@ function carregarAcompanhamento(){
       api('ajustarNota', {questaoId: p[0], alunoId: p[1], nota: inp.value}).then(carregarAcompanhamento).catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     }); });
     $('qMais').addEventListener('click', function(){ abrirCompositor(G.fase === 'gravando' ? 'recente' : 'inteira'); });
+    $('areaQ').querySelectorAll('[data-excluirq]').forEach(function(b){ b.addEventListener('click', function(){
+      if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar exclusão'; return; }
+      b.disabled = true;
+      api('excluirQuestao', {questaoId: b.dataset.excluirq}).then(carregarAcompanhamento)
+        .catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    }); });
   }).catch(function(e){ $('areaQ').innerHTML = '<div class="caixa" id="acomp"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
@@ -1256,8 +1271,19 @@ function carregarLinhaTempo(){
         (a.status === 'nao_gravada' ? '<p class="aviso" style="margin:4px 0 0">Aula não gravada: a apostila usa semestres anteriores com esse tema.</p>' : '') +
         (a.recomendacoes ? '<details style="margin-top:6px"><summary class="link">Recomendações para você</summary><div class="detalhe leitura" style="margin-top:8px"><p class="aviso">Só você vê isto · ' + esc(a.recomendacoesEm) + '</p>' + textoCapitulo(a.recomendacoes) + '</div></details>'
           : (a.ata && a.gravada ? '<div class="botoes" style="margin-top:6px"><button type="button" class="secundario mini" data-rec="' + esc(a.id) + '"' + (resumo.temChave ? '' : ' disabled') + '>Gerar recomendações agora</button><span class="aviso">ou espere a revisão da 1h</span></div>' : '')) +
+        (a.status !== 'gravando' ? '<div class="botoes" style="margin-top:6px"><button type="button" class="link" style="color:#8a1c1c;font-size:13px" data-excluiraula="' + esc(a.id) + '" data-num="' + a.numero + '">Excluir aula</button></div>' : '') +
         '</div></li>';
     }).join('') + '</ol>' : '<p class="aviso">Nenhuma aula ainda.</p>') + '</div>';
+    $('histLinha').querySelectorAll('[data-excluiraula]').forEach(function(b){ b.addEventListener('click', function(){
+      if(b.dataset.conf !== '1'){
+        b.dataset.conf = '1';
+        b.textContent = 'Confirmar: apagar a aula ' + b.dataset.num + ' com chamada, transcrição, questões, respostas e capítulo da apostila';
+        return;
+      }
+      b.disabled = true; b.textContent = 'Excluindo…';
+      api('excluirAula', {aulaId: b.dataset.excluiraula}).then(function(){ carregarLinhaTempo(); carregarPainelApostila(); })
+        .catch(function(e){ b.disabled = false; b.textContent = 'Excluir aula'; b.dataset.conf = ''; erroGeral(e.message); });
+    }); });
     $('histLinha').querySelectorAll('[data-rec]').forEach(function(b){ b.addEventListener('click', function(){
       b.disabled = true; b.textContent = 'Revisando a aula… (até 1 minuto)';
       api('gerarRecomendacoes', {aulaId: b.dataset.rec}).then(carregarLinhaTempo).catch(function(e){ b.disabled = false; b.textContent = 'Gerar recomendações agora'; erroGeral(e.message); });
