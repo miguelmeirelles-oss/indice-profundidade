@@ -189,7 +189,7 @@ function iniciar(){
     sessao = r;
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b><a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">sair</a>';
     $('linkSair').addEventListener('click', function(e){ e.preventDefault(); try{ localStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
-    if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao(lerPref() || 'prof'); }
+    if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
 }
