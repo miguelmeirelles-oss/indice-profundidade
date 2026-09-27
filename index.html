@@ -232,6 +232,8 @@
           <span>Área do professor</span><span class="seta">&#10230;</span></button>
         <button class="pill claro" onclick="location.href='aulas.html'">
           <span>Aulas</span><span class="seta">&#10230;</span></button>
+        <button class="pill claro" onclick="location.href='provas.html'">
+          <span>Provas</span><span class="seta">&#10230;</span></button>
         <button class="miniLink" onclick="abrirSugestao()">enviar sugestão</button>
       </div>
     </div>
@@ -594,12 +596,13 @@ api('config').then(function(c){
 
 // Vindo do aulas.html sem login: abre a tela de entrar e, depois de logar,
 // devolve o aluno para lá.
-var voltarParaAulas = /[?&]voltar=aulas\b/.test(location.search);
+var destinoVolta = (location.search.match(/[?&]voltar=(aulas|provas)\b/) || [])[1] || '';
+var voltarParaAulas = !!destinoVolta;
 if(voltarParaAulas && !sessao.token) setTimeout(abrirArea, 0);
 
 if(sessao.token){
   api('sessao', {token: sessao.token}).then(function(r){
-    if(r.logado && voltarParaAulas){ location.href = 'aulas.html'; return; }
+    if(r.logado && voltarParaAulas){ location.href = destinoVolta + '.html'; return; }
     if(r.logado){
       sessao.nome = r.nome; sessao.professor = r.professor;
       sessao.instituicao = r.instituicao || '';
@@ -642,7 +645,7 @@ function logou(r){
   sessao.token = r.token; sessao.nome = r.nome;
   sessao.professor = !!r.professor; sessao.instituicao = r.instituicao || '';
   localStorage.setItem('ip_token', r.token);
-  if(voltarParaAulas){ location.href = 'aulas.html'; return; }
+  if(voltarParaAulas){ location.href = destinoVolta + '.html'; return; }
   document.getElementById('btAreaTexto').textContent = 'Meu mapa';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
   document.getElementById('erroAuth').classList.add('oculto');
