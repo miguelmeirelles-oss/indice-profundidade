@@ -337,8 +337,26 @@
       <h2 style="margin:0">Meu mapa do curso</h2>
       <div class="topo">
         <button class="link" onclick="mostrar('pInicio')">Modo livre</button>
+        <button class="link" onclick="abrirSenha()">Senha</button>
         <button class="link" onclick="sairConta()">Sair</button>
       </div>
+    </div>
+    <div class="convite oculto" id="caixaSenha" style="margin-bottom:18px">
+      <div class="eyebrow" id="senhaTitulo">Criar senha</div>
+      <p id="senhaTexto" style="font-size:14px;margin:0 0 12px"></p>
+      <div id="campoSenhaAtual" class="oculto">
+        <label for="senhaAtual">Senha atual</label>
+        <input type="password" id="senhaAtual" autocomplete="current-password">
+      </div>
+      <label for="senhaNova" style="margin-top:10px">Nova senha (mínimo 8 caracteres)</label>
+      <input type="password" id="senhaNova" autocomplete="new-password">
+      <label for="senhaConf" style="margin-top:10px">Repita a nova senha</label>
+      <input type="password" id="senhaConf" autocomplete="new-password">
+      <div class="botoes">
+        <button onclick="salvarSenha()">Salvar senha</button>
+        <button class="secundario" onclick="document.getElementById('caixaSenha').classList.add('oculto')">Fechar</button>
+      </div>
+      <p id="senhaMsg" class="aviso"></p>
     </div>
     <div id="resumoMapa"></div>
     <div class="chips" id="filtroNivel" style="margin-bottom:14px">
@@ -713,6 +731,45 @@ function entrarConta(){
     email: document.getElementById('eEmail').value,
     senha: document.getElementById('eSenha').value
   }).then(logou).catch(erroAuth);
+}
+
+/* ---------- senha ----------
+   Quem entrou pelo Google pode criar uma senha para entrar com e-mail e senha
+   em computador compartilhado, sem logar o Gmail nele. */
+var temSenha = false;
+
+function abrirSenha(){
+  var caixa = document.getElementById('caixaSenha');
+  var msg = document.getElementById('senhaMsg');
+  ['senhaAtual', 'senhaNova', 'senhaConf'].forEach(function(id){ document.getElementById(id).value = ''; });
+  msg.textContent = 'Carregando…'; msg.style.color = 'var(--cinza)';
+  caixa.classList.remove('oculto');
+  api('sessao', {token: sessao.token}).then(function(r){
+    temSenha = !!r.temSenha;
+    document.getElementById('senhaTitulo').textContent = temSenha ? 'Trocar senha' : 'Criar senha';
+    document.getElementById('senhaTexto').textContent = temSenha
+      ? 'Para trocar, informe a senha atual e a nova.'
+      : 'Sua conta entra pelo botão do Google. Com uma senha, você também pode entrar com ' +
+        r.email + ' e senha, sem precisar logar o Gmail no computador. O botão do Google continua funcionando.';
+    document.getElementById('campoSenhaAtual').classList.toggle('oculto', !temSenha);
+    msg.textContent = '';
+    document.getElementById(temSenha ? 'senhaAtual' : 'senhaNova').focus();
+  }).catch(function(e){ msg.textContent = e.message; msg.style.color = 'var(--vermelho)'; });
+}
+
+function salvarSenha(){
+  var msg = document.getElementById('senhaMsg');
+  var nova = document.getElementById('senhaNova').value;
+  if(nova.length < 8){ msg.textContent = 'A senha precisa ter pelo menos 8 caracteres.'; msg.style.color = 'var(--vermelho)'; return; }
+  if(nova !== document.getElementById('senhaConf').value){ msg.textContent = 'As duas senhas não são iguais.'; msg.style.color = 'var(--vermelho)'; return; }
+  msg.textContent = 'Salvando…'; msg.style.color = 'var(--cinza)';
+  api('definirSenha', {token: sessao.token, senhaAtual: document.getElementById('senhaAtual').value, senhaNova: nova})
+    .then(function(t){
+      msg.textContent = t + ' Em computador compartilhado, lembre de clicar em "Sair" no fim.';
+      msg.style.color = 'var(--verde)';
+      ['senhaAtual', 'senhaNova', 'senhaConf'].forEach(function(id){ document.getElementById(id).value = ''; });
+    })
+    .catch(function(e){ msg.textContent = e.message; msg.style.color = 'var(--vermelho)'; });
 }
 
 function sairConta(){
