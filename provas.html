@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prova por IA — Engenharia de Alimentos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --menu:#17389C; --azul:#2E62C6; --titulo:#3E76C4; --navy:#0E2A5C;
+    --bloco:#EFF1F5; --ambar:#F5C518; --branco:#fff; --cinza:#5b6b86;
+    --verde:#1a7a3c; --vermelho:#8a1c1c; --ocre:#8a6100; --linha:#d7deea;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:var(--navy);background:var(--branco);font-size:15px;line-height:1.45}
+  .wrap{max-width:960px;margin:0 auto}
+  .oculto{display:none!important}
+  .cabecalho{background:var(--menu);border:2.5px solid var(--navy);border-radius:18px;box-shadow:4px 5px 0 var(--navy);padding:22px 24px;margin-bottom:18px;color:#fff}
+  .cabecalho h1{margin:0;font-size:28px;line-height:1.15;color:#fff}
+  .cabecalho p{margin:6px 0 0;font-size:14px;color:#cddaf5;max-width:560px}
+  .topoFlex{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+  .quem{font-size:13px;color:#cddaf5;text-align:right}
+  .quem b{color:#fff;display:block;font-size:14px}
+  .quem a{color:#cddaf5}
+  .visao{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .visao button{background:rgba(255,255,255,.12);color:#fff;border:2px solid rgba(255,255,255,.45);box-shadow:none;border-radius:999px;padding:7px 15px;font-size:13px}
+  .visao button[aria-pressed="true"]{background:var(--ambar);color:var(--navy);border-color:var(--navy);box-shadow:3px 4px 0 rgba(0,0,0,.35)}
+  .visao button:hover{transform:none}
+  .caixa{border:2.5px solid var(--navy);border-radius:18px;background:#fff;box-shadow:4px 5px 0 var(--navy);padding:18px;margin-bottom:18px}
+  h2{font-size:15px;color:var(--menu);margin:0 0 12px;text-transform:uppercase;letter-spacing:.05em}
+  h3{font-size:16px;margin:0 0 6px}
+  h4{font-size:15px;margin:14px 0 6px;color:var(--menu)}
+  p{margin:0 0 10px}
+  .aviso{font-size:12.5px;color:var(--cinza)}
+  button{font-family:inherit;font-size:14.5px;font-weight:bold;cursor:pointer;border:2.5px solid var(--navy);border-radius:14px;padding:10px 18px;background:var(--ambar);color:var(--navy);box-shadow:3px 4px 0 var(--navy)}
+  button:hover{transform:translate(1px,1px);box-shadow:2px 3px 0 var(--navy)}
+  button:active{transform:translate(3px,4px);box-shadow:0 0 0 var(--navy)}
+  button:disabled{opacity:.5;cursor:default;transform:none;box-shadow:3px 4px 0 var(--navy)}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible,summary:focus-visible,label.arquivo:focus-within{outline:3px solid var(--ambar);outline-offset:2px}
+  button.secundario{background:#fff}
+  button.mini{padding:5px 11px;font-size:12.5px;border-radius:10px;box-shadow:2px 2px 0 var(--navy)}
+  .link{background:none;border:none;box-shadow:none;color:var(--azul);font-size:14px;font-weight:bold;text-decoration:underline;padding:4px 0}
+  .link:hover{transform:none;box-shadow:none}
+  .botoes{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  label.rot{display:block;font-size:12px;font-weight:bold;color:var(--titulo);margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em}
+  input[type=text],input[type=number],input[type=date],input[type=time],select,textarea{width:100%;padding:10px 12px;font-family:inherit;font-size:14.5px;color:var(--navy);border:2px solid var(--azul);border-radius:12px;background:#fff}
+  textarea{min-height:70px;resize:vertical}
+  .campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:14px}
+  .campoLargo{grid-column:1/-1}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{border:2px solid var(--azul);border-radius:999px;padding:6px 13px;font-size:13px;font-weight:bold;color:var(--azul);background:#fff;box-shadow:none}
+  .chip:hover{background:var(--bloco);transform:none;box-shadow:none}
+  .chip[aria-pressed="true"]{background:var(--azul);color:#fff}
+  .tag{display:inline-block;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:2px 9px;border:1.5px solid currentColor;white-space:nowrap}
+  .t-ok{color:var(--verde)} .t-warn{color:var(--ocre)} .t-err{color:#c62828} .t-azul{color:var(--azul)} .t-cinza{color:var(--cinza)}
+  .badge{display:inline-block;min-width:18px;height:18px;border-radius:99px;background:#e23b3b;color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:6px;padding:0 5px}
+  .linha{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--linha);flex-wrap:wrap}
+  .linha:last-child{border-bottom:none}
+  .convite{background:var(--bloco);border-left:8px solid var(--ambar);border-radius:0 14px 14px 0;padding:12px 16px;margin:0 0 14px}
+  .erro{background:#fdecec;border:2px solid #e23b3b;border-radius:12px;padding:10px 14px;color:var(--vermelho);font-size:14px;margin:12px 0}
+  .ok{background:#e6f4ea;border:2px solid var(--verde);border-radius:12px;padding:10px 14px;color:var(--verde);font-size:14px;margin:12px 0}
+  .carregando{color:var(--cinza);font-size:14px;padding:8px 0}
+  .grande{font-size:44px;font-weight:bold;color:var(--menu);line-height:1;font-variant-numeric:tabular-nums}
+  .contagem{font-variant-numeric:tabular-nums;font-weight:bold;color:#c62828}
+  .cfg{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13.5px;margin-top:8px}
+  .cfg span:nth-child(odd){color:var(--cinza)}
+  .cfg span:nth-child(even){font-weight:bold;text-align:right}
+  .nota{display:inline-block;min-width:44px;text-align:center;font-weight:bold;font-size:13px;border:2px solid var(--navy);border-radius:99px;padding:2px 8px;font-variant-numeric:tabular-nums}
+  .n0{background:#fdecec;color:#8a1c1c} .n1{background:#fff4d6;color:#8a6100} .n2{background:#e6f4ea;color:#1a7a3c}
+  .detalhe{background:var(--bloco);border:2px solid var(--navy);border-radius:14px;padding:12px 14px;margin-top:10px}
+  .questao{border:2px solid var(--linha);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+  .questao .cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font-weight:bold}
+  .fb{font-size:14px;margin:6px 0 0}
+  .fb b{color:var(--menu)}
+  .miniaturas{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .miniaturas figure{margin:0;position:relative;width:110px}
+  .miniaturas img{width:110px;height:140px;object-fit:cover;border:2px solid var(--navy);border-radius:10px;display:block;cursor:zoom-in;background:var(--bloco)}
+  .miniaturas figcaption{font-size:11.5px;color:var(--cinza);text-align:center}
+  .miniaturas .tirar{position:absolute;top:-8px;right:-8px;padding:0 7px;border-radius:99px;font-size:13px;box-shadow:none}
+  .pdf{width:110px;height:140px;border:2px dashed var(--navy);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:bold}
+  label.arquivo{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-weight:bold;font-size:14.5px;border:2.5px solid var(--navy);border-radius:14px;padding:10px 18px;background:#fff;box-shadow:3px 4px 0 var(--navy)}
+  label.arquivo input{position:absolute;opacity:0;width:1px;height:1px}
+  .fotosGrandes{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:10px}
+  .fotosGrandes img{width:100%;border:2px solid var(--navy);border-radius:10px;cursor:zoom-in;display:block}
+  .tabelaBox{overflow-x:auto;border:2px solid var(--linha);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th,td{padding:8px;border-bottom:1px solid var(--linha);text-align:left;white-space:nowrap}
+  th{background:var(--bloco);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--cinza)}
+  .qEdit{border:2px solid var(--linha);border-radius:14px;padding:12px 14px;margin-bottom:12px;background:#fbfcfe}
+  .qrTela,.zoom{position:fixed;inset:0;background:#fff;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+  .zoom{background:rgba(14,42,92,.92);cursor:zoom-out}
+  .zoom img{max-width:100%;max-height:100%;border-radius:8px}
+  .qrCaixa{text-align:center;max-width:900px}
+  .qrCaixa h2{font-size:clamp(20px,3.2vw,36px);text-transform:none;letter-spacing:0;margin-bottom:16px}
+  .qrDesenho{display:inline-block;padding:16px;border:3px solid var(--navy);border-radius:18px;background:#fff}
+  .qrDesenho img,.qrDesenho canvas{display:block}
+  .qrUrl{font-family:Consolas,monospace;font-size:clamp(13px,1.6vw,20px);word-break:break-all;margin:16px 0 6px}
+  .qrInstr{font-size:clamp(15px,2vw,24px);color:var(--cinza)}
+  @media (max-width:520px){body{padding:12px}.cabecalho h1{font-size:23px}.quem{text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="cabecalho">
+    <div class="topoFlex">
+      <div>
+        <h1>Prova por IA</h1>
+        <p>Envie as fotos da prova e receba a correção questão por questão: o que acertou, o que faltou e como melhorar.</p>
+      </div>
+      <div class="quem" id="quem"></div>
+    </div>
+    <div class="visao oculto" id="visao" role="group" aria-label="Escolher visão">
+      <button type="button" data-visao="prof" aria-pressed="true">Professor</button>
+      <button type="button" data-visao="aluno" aria-pressed="false">Aluno</button>
+    </div>
+  </div>
+
+  <div id="erroGeral" class="erro oculto" role="alert"></div>
+
+  <section id="tLogin" class="caixa oculto">
+    <h2>Entre com sua conta</h2>
+    <p>O Prova por IA usa a mesma conta do Índice de Profundidade.</p>
+    <div class="botoes"><button type="button" onclick="location.href='index.html?voltar=provas'">Entrar ou criar conta</button></div>
+  </section>
+
+  <p id="tCarregando" class="carregando">Carregando…</p>
+
+  <section id="tAluno" class="oculto"><div id="listaProvasAluno"></div></section>
+
+  <section id="tProf" class="oculto">
+    <div id="profTopo"></div>
+    <div id="profCorpo"></div>
+  </section>
+</div>
+
+<script>
+/* Mesmo servidor do Aula por IA. */
+var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
+
+var token = '';
+try{ token = localStorage.getItem('ip_token') || ''; }catch(e){}
+var sessao = null, resumo = null;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function nota10(n){ return n === null || n === undefined || n === '' ? '—' : Number(n).toFixed(1).replace('.', ','); }
+function num(n){ return String(Math.round(Number(n) * 100) / 100).replace('.', ','); }
+function classe10(n){ return n < 4.5 ? '0' : n < 7 ? '1' : '2'; }
+function dataHora(ms){ var d = new Date(ms); return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}); }
+function hora(ms){ return new Date(ms).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}); }
+function mmss(ms){ var s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+  return (h ? h + 'h ' : '') + (m < 10 && h ? '0' : '') + m + 'min ' + (x < 10 ? '0' : '') + x + 's'; }
+
+function api(acao, dados){
+  dados = dados || {}; dados.token = token;
+  return fetch(BACKEND_AULAS, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({acao:acao, dados:dados})})
+  .then(function(r){ if(!r.ok) throw new Error('O servidor respondeu ' + r.status + '.'); return r.json(); })
+  .then(function(j){
+    if(!j.ok){
+      if(j.erro === 'SESSAO'){ mostrarLogin(); throw new Error('Sua sessão expirou. Entre de novo.'); }
+      throw new Error(j.erro || 'Não deu para concluir.');
+    }
+    return j.resultado;
+  })
+  .catch(function(e){ if(e instanceof TypeError){ var x = new Error('Sem conexão com o servidor. Verifique sua internet e tente de novo.'); x.rede = true; throw x; } throw e; });
+}
+
+function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
+function mostrarLogin(){ $('tCarregando').classList.add('oculto'); $('tLogin').classList.remove('oculto'); $('tAluno').classList.add('oculto'); $('tProf').classList.add('oculto'); }
+
+// contagens regressivas: data-fim (ms do servidor) e data-desvio (servidor - cliente)
+setInterval(function(){
+  document.querySelectorAll('[data-fim]').forEach(function(el){
+    var resta = Number(el.dataset.fim) - (Date.now() + Number(el.dataset.desvio || 0));
+    el.textContent = resta > 0 ? mmss(resta) : 'encerrado';
+  });
+}, 1000);
+
+/* ---------------- início ---------------- */
+function iniciar(){
+  if(!token){ mostrarLogin(); return; }
+  api('sessao').then(function(r){
+    $('tCarregando').classList.add('oculto');
+    if(!r.logado){ mostrarLogin(); return; }
+    sessao = r;
+    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b><a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">sair</a>';
+    $('linkSair').addEventListener('click', function(e){ e.preventDefault(); try{ localStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
+    if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao(lerPref() || 'prof'); }
+    else trocarVisao('aluno');
+  }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
+}
+function lerPref(){ try{ return localStorage.getItem('provas_visao'); }catch(e){ return null; } }
+function trocarVisao(v){
+  document.querySelectorAll('[data-visao]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.visao === v)); });
+  $('tAluno').classList.toggle('oculto', v !== 'aluno');
+  $('tProf').classList.toggle('oculto', v !== 'prof');
+  try{ localStorage.setItem('provas_visao', v); }catch(e){}
+  if(v === 'aluno') abrirAluno(); else abrirProf();
+}
+document.querySelectorAll('[data-visao]').forEach(function(b){ b.addEventListener('click', function(){ trocarVisao(b.dataset.visao); }); });
+
+/* ---------------- fotos: câmera, galeria, compressão e realce ---------------- */
+// Reduz cada foto para no máximo 1800 px e JPEG: sobe rápido e continua legível.
+// Com "realçar", trata a imagem como um escâner faria, no próprio aparelho (sem IA).
+function prepararArquivo(f, realcar){
+  if(f.type === 'application/pdf'){
+    if(f.size > 12 * 1024 * 1024) return Promise.reject(new Error('PDF grande demais (máximo 12 MB).'));
+    return new Promise(function(res, rej){ var r = new FileReader(); r.onload = function(){ res({mime:'application/pdf', dados:String(r.result).split(',')[1], nome:f.name, arquivo:f}); }; r.onerror = rej; r.readAsDataURL(f); });
+  }
+  return new Promise(function(res, rej){
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function(){
+      var max = 1800, w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, max / Math.max(w, h));
+      var c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      if(realcar){ try{ realcarEscrita(c); }catch(e){ /* se falhar, segue com a foto original */ } }
+      var d = c.toDataURL('image/jpeg', realcar ? 0.85 : 0.82);
+      res({mime:'image/jpeg', dados:d.split(',')[1], previa:d, nome:f.name, arquivo:f});
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); rej(new Error('Não deu para abrir "' + f.name + '". Envie uma foto em JPG ou PNG.')); };
+    img.src = url;
+  });
+}
+
+/* Modo documento, em três passos:
+   1. estima o fundo do papel (versão bem desfocada da foto) e divide a foto por ele:
+      some a sombra e a luz desigual, e o papel fica branco por igual;
+   2. estica os tons (níveis automáticos) para a tinta ficar escura;
+   3. curva que escurece os tons médios, para traço fraco de lápis ou caneta clara. */
+function realcarEscrita(c){
+  var w = c.width, h = c.height, ctx = c.getContext('2d');
+  var dados = ctx.getImageData(0, 0, w, h), px = dados.data, n = w * h;
+
+  // fundo: reduz muito e amplia de volta (desfoque grande e rápido)
+  var pw = Math.max(8, Math.round(w / 24)), ph = Math.max(8, Math.round(h / 24));
+  var peq = document.createElement('canvas'); peq.width = pw; peq.height = ph;
+  var pctx = peq.getContext('2d'); pctx.imageSmoothingEnabled = true; pctx.imageSmoothingQuality = 'high';
+  pctx.drawImage(c, 0, 0, pw, ph);
+  // o desfoque também pega a tinta; um "máximo" local puxa o fundo para o tom do papel
+  var pd = pctx.getImageData(0, 0, pw, ph), pp = pd.data, cinzaP = new Float32Array(pw * ph), maxP = new Float32Array(pw * ph);
+  for(var i = 0; i < pw * ph; i++) cinzaP[i] = 0.299 * pp[i * 4] + 0.587 * pp[i * 4 + 1] + 0.114 * pp[i * 4 + 2];
+  for(var y = 0; y < ph; y++) for(var x = 0; x < pw; x++){
+    var m = 0;
+    for(var dy = -1; dy <= 1; dy++) for(var dx = -1; dx <= 1; dx++){
+      var yy = Math.min(ph - 1, Math.max(0, y + dy)), xx = Math.min(pw - 1, Math.max(0, x + dx));
+      if(cinzaP[yy * pw + xx] > m) m = cinzaP[yy * pw + xx];
+    }
+    maxP[y * pw + x] = m;
+  }
+  for(i = 0; i < pw * ph; i++){ pp[i * 4] = pp[i * 4 + 1] = pp[i * 4 + 2] = maxP[i]; pp[i * 4 + 3] = 255; }
+  pctx.putImageData(pd, 0, 0);
+  var fundoC = document.createElement('canvas'); fundoC.width = w; fundoC.height = h;
+  var fctx = fundoC.getContext('2d'); fctx.imageSmoothingEnabled = true; fctx.imageSmoothingQuality = 'high';
+  fctx.drawImage(peq, 0, 0, w, h);
+  var fundo = fctx.getImageData(0, 0, w, h).data;
+
+  // passo 1: cinza normalizado pelo fundo
+  var v = new Uint8ClampedArray(n), hist = new Uint32Array(256);
+  for(i = 0; i < n; i++){
+    var g = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
+    var b = Math.max(40, fundo[i * 4]);
+    var t = Math.min(255, g / b * 255);
+    v[i] = t; hist[v[i]]++;
+  }
+  // passo 2: níveis automáticos (0,5% mais escuro vira preto; o papel vira branco)
+  function percentil(p){ var alvo = n * p, s = 0; for(var k = 0; k < 256; k++){ s += hist[k]; if(s >= alvo) return k; } return 255; }
+  var baixo = percentil(0.005), alto = Math.max(baixo + 30, Math.min(250, percentil(0.6)));
+  // passo 3: curva gama que escurece os tons médios (traço fraco)
+  var tabela = new Uint8ClampedArray(256), gama = 1.8;
+  for(var k = 0; k < 256; k++){
+    var z = (k - baixo) / (alto - baixo); z = Math.max(0, Math.min(1, z));
+    tabela[k] = Math.round(255 * Math.pow(z, gama));
+  }
+  for(i = 0; i < n; i++){ var o = tabela[v[i]]; px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = o; px[i * 4 + 3] = 255; }
+  ctx.putImageData(dados, 0, 0);
+}
+
+// Seletor de páginas reaproveitado pelo aluno e pelo professor.
+function seletorFotos(el, aceitaPdf, aoMudar){
+  var paginas = [], realcar = true;
+  function desenhar(){
+    el.innerHTML = '<div class="botoes" style="margin-top:0">' +
+      '<label class="arquivo"><input type="file" accept="image/*" capture="environment" data-cam>Tirar foto</label>' +
+      '<label class="arquivo"><input type="file" accept="image/*' + (aceitaPdf ? ',application/pdf' : '') + '" multiple data-gal>Escolher ' + (aceitaPdf ? 'arquivos' : 'da galeria') + '</label></div>' +
+      '<label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:14px"><input type="checkbox" data-realce' + (realcar ? ' checked' : '') + ' style="width:20px;height:20px"> Realçar a escrita (tira sombra e escurece letra fraca)</label>' +
+      '<div class="miniaturas">' + paginas.map(function(p, i){
+        return '<figure>' + (p.previa ? '<img src="' + p.previa + '" alt="Página ' + (i + 1) + '">' : '<div class="pdf">PDF</div>') +
+          '<button type="button" class="secundario tirar" data-tirar="' + i + '" aria-label="Tirar página ' + (i + 1) + '">×</button><figcaption>pág. ' + (i + 1) + '</figcaption></figure>';
+      }).join('') + '</div>' + (paginas.length ? '<p class="aviso" style="margin-top:8px">Toque numa página para ver em tamanho grande e conferir se dá para ler.</p>' : '<p class="aviso" style="margin-top:8px">Fotografe cada página inteira, de cima, com boa luz e sem sombra. As páginas vão na ordem em que você adicionar.</p>') +
+      '<div data-msg></div>';
+    el.querySelectorAll('input[type=file]').forEach(function(inp){ inp.addEventListener('change', function(){ adicionar(Array.prototype.slice.call(inp.files)); }); });
+    el.querySelector('[data-realce]').addEventListener('change', function(){ realcar = this.checked; reprocessar(); });
+    el.querySelectorAll('[data-tirar]').forEach(function(b){ b.addEventListener('click', function(){ paginas.splice(Number(b.dataset.tirar), 1); desenhar(); aoMudar(paginas); }); });
+    el.querySelectorAll('.miniaturas img').forEach(function(img){ img.addEventListener('click', function(){ ampliar(img.src); }); });
+  }
+  function processar(arqs){ return Promise.all(arqs.map(function(f){ return prepararArquivo(f, realcar); })); }
+  function adicionar(arqs){
+    var msg = el.querySelector('[data-msg]'); msg.innerHTML = '<p class="carregando">Preparando as fotos…</p>';
+    processar(arqs).then(function(ps){
+      paginas = paginas.concat(ps).slice(0, 15); desenhar(); aoMudar(paginas);
+    }).catch(function(e){ desenhar(); el.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  }
+  // ligar ou desligar o realce refaz as páginas a partir das fotos originais
+  function reprocessar(){
+    if(!paginas.length) return;
+    var msg = el.querySelector('[data-msg]'); msg.innerHTML = '<p class="carregando">Refazendo as fotos…</p>';
+    processar(paginas.map(function(p){ return p.arquivo; })).then(function(ps){ paginas = ps; desenhar(); aoMudar(paginas); })
+      .catch(function(e){ el.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  }
+  desenhar();
+  return { paginas: function(){ return paginas; }, limpar: function(){ paginas = []; desenhar(); aoMudar(paginas); } };
+}
+
+function ampliar(src){
+  var z = document.createElement('div'); z.className = 'zoom'; z.setAttribute('role', 'dialog'); z.setAttribute('aria-label', 'Foto ampliada');
+  z.innerHTML = '<img src="' + src + '" alt="Página da prova">';
+  function fechar(){ document.removeEventListener('keydown', tecla); z.remove(); }
+  function tecla(e){ if(e.key === 'Escape') fechar(); }
+  z.addEventListener('click', fechar); document.addEventListener('keydown', tecla);
+  document.body.appendChild(z);
+}
+
+/* ---------------- QR code (datashow) ---------------- */
+function baseSite(){ return location.href.split('#')[0].split('?')[0].replace(/[^\/]*$/, ''); }
+function mostrarQR(url, titulo, instrucao){
+  var ov = document.createElement('div');
+  ov.className = 'qrTela'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'QR code');
+  ov.innerHTML = '<div class="qrCaixa"><h2>' + esc(titulo) + '</h2><div class="qrDesenho"></div><p class="qrUrl">' + esc(url) + '</p><p class="qrInstr">' + esc(instrucao) + '</p>' +
+    '<div class="botoes" style="justify-content:center"><button type="button" class="secundario">Fechar (Esc)</button></div></div>';
+  document.body.appendChild(ov);
+  var lado = Math.floor(Math.max(220, Math.min(window.innerHeight * 0.58, window.innerWidth * 0.8, 620)));
+  var alvo = ov.querySelector('.qrDesenho');
+  if(window.QRCode) new QRCode(alvo, {text: url, width: lado, height: lado, correctLevel: QRCode.CorrectLevel.M});
+  else alvo.textContent = 'Não deu para gerar o QR code agora. Use o endereço abaixo.';
+  function fechar(){ document.removeEventListener('keydown', tecla); try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){} ov.remove(); }
+  function tecla(e){ if(e.key === 'Escape') fechar(); }
+  document.addEventListener('keydown', tecla);
+  ov.querySelector('button').addEventListener('click', fechar);
+  try{ if(ov.requestFullscreen) ov.requestFullscreen().catch(function(){}); }catch(e){}
+}
+
+/* =====================================================================
+   ALUNO
+   ===================================================================== */
+var provasAluno = [], envioAberto = {};
+
+function abrirAluno(){
+  $('listaProvasAluno').innerHTML = '<div class="caixa"><p class="carregando">Carregando suas provas…</p></div>';
+  api('minhasProvas').then(function(lista){ provasAluno = lista; desenharProvasAluno(); })
+    .catch(function(e){ $('listaProvasAluno').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+function situacaoProva(it){
+  var p = it.prova, agora = it.agora;
+  if(agora < p.inicio) return 'antes';
+  if(agora <= p.fimEnvio) return 'aberta';
+  return 'fechada';
+}
+
+function desenharProvasAluno(){
+  var el = $('listaProvasAluno');
+  if(!provasAluno.length){ el.innerHTML = '<div class="caixa"><h2>Minhas provas</h2><p>Nenhuma prova agendada nas suas matérias. As provas aparecem aqui quando o professor publicar.</p></div>'; return; }
+  el.innerHTML = provasAluno.map(function(it, i){
+    var p = it.prova, e = it.entrega, sit = situacaoProva(it), desvio = it.agora - Date.now();
+    var h = '<div class="caixa" id="prova' + i + '"><div class="linha" style="border:0;padding:0 0 8px"><div><h3 style="margin:0">' + esc(p.titulo) + ' · ' + esc(it.disciplina) + '</h3>' +
+      '<span class="aviso">Prof. ' + esc(it.professor) + ' · ' + dataHora(p.inicio) + ' · vale ' + nota10(p.valor) + ' na média</span></div>' + tagEntrega(e, sit) + '</div>';
+    if(sit === 'antes') h += '<p>O envio das fotos abre no início da prova, <b>' + dataHora(p.inicio) + '</b>.</p>';
+    if(sit === 'aberta' && !(e && e.confirmada)) h += '<p>Envio aberto até <b>' + hora(p.fimEnvio) + '</b> · faltam <span class="contagem" data-fim="' + p.fimEnvio + '" data-desvio="' + desvio + '">' + mmss(p.fimEnvio - it.agora) + '</span></p>';
+    if(e) h += correcaoAluno(it, i);
+    if(sit === 'aberta' && !(e && e.confirmada)){
+      h += '<div data-envio="' + i + '" class="' + (e && !envioAberto[i] ? 'oculto' : '') + '"><h4>' + (e ? 'Enviar fotos novas (substituem as anteriores)' : 'Enviar as fotos da prova') + '</h4><div data-seletor></div>' +
+        '<div class="botoes"><button type="button" data-enviar="' + i + '" disabled>Enviar prova</button></div><div data-msg></div></div>';
+      if(e && !envioAberto[i]) h += '<div class="botoes"><button type="button" class="secundario mini" data-reenviar="' + i + '">Enviar fotos novas</button></div>';
+    }
+    if(sit === 'fechada' && !e) h += '<p class="aviso">O prazo de envio terminou e nenhuma foto foi enviada. Fale com o professor.</p>';
+    return h + '</div>';
+  }).join('');
+  el.querySelectorAll('[data-envio]').forEach(function(box){
+    var i = Number(box.dataset.envio), bt = box.querySelector('[data-enviar]');
+    var sel = seletorFotos(box.querySelector('[data-seletor]'), false, function(pg){ bt.disabled = !pg.length; });
+    bt.addEventListener('click', function(){ enviarAluno(i, sel, box); });
+  });
+  el.querySelectorAll('[data-reenviar]').forEach(function(b){ b.addEventListener('click', function(){ envioAberto[Number(b.dataset.reenviar)] = true; desenharProvasAluno(); }); });
+  el.querySelectorAll('[data-revisao]').forEach(function(b){ b.addEventListener('click', function(){
+    var i = Number(b.dataset.revisao), it = provasAluno[i], ta = $('rev' + i);
+    b.disabled = true;
+    api('pedirRevisaoProva', {professorId: it.professorId, entregaId: it.entrega.id, texto: ta.value}).then(function(t){
+      it.entrega.revisaoPedida = ta.value; desenharProvasAluno();
+    }).catch(function(e){ b.disabled = false; $('msgRev' + i).innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  }); });
+}
+
+function tagEntrega(e, sit){
+  if(!e) return sit === 'fechada' ? '<span class="tag t-err">não enviada</span>' : sit === 'aberta' ? '<span class="tag t-warn">aguardando envio</span>' : '<span class="tag t-cinza">agendada</span>';
+  if(e.status === 'pendente' || e.status === 'corrigindo') return '<span class="tag t-warn">na fila de correção</span>';
+  if(e.status === 'erro') return '<span class="tag t-err">correção com problema</span>';
+  if(e.status === 'ilegivel') return '<span class="tag t-err">fotos ilegíveis</span>';
+  return e.confirmada ? '<span class="tag t-ok">nota confirmada</span>' : '<span class="tag t-warn">nota provisória</span>';
+}
+
+function correcaoAluno(it, i){
+  var e = it.entrega;
+  if(e.status === 'pendente' || e.status === 'corrigindo'){
+    return '<div class="convite">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A correção está na fila' + (e.erro === 'cota' ? ' (a cota de IA do dia acabou; ela é feita sozinha assim que a cota voltar)' : '') +
+      '. Você recebe um e-mail quando ficar pronta.</div><div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" onclick="abrirAluno()">Atualizar</button></div>';
+  }
+  if(e.status === 'erro') return '<div class="erro">A correção automática não funcionou. O professor foi avisado e vai corrigir.</div>';
+  if(e.status === 'ilegivel') return '<div class="erro">A IA não conseguiu ler as fotos: ' + esc(e.geral.comentario) + '<br>Se o prazo ainda estiver aberto, envie fotos novas. Se não, fale com o professor.</div>';
+  var total = e.questoes.reduce(function(t, q){ return t + q.max; }, 0), obt = e.questoes.reduce(function(t, q){ return t + (q.pontos || 0); }, 0);
+  var h = '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 10px"><span class="grande">' + nota10(e.notaFinal) + '</span><span class="aviso">de 10 · ' + num(obt) + ' de ' + num(total) + ' pontos · ' +
+    (e.confirmada ? 'nota confirmada pelo professor' : 'nota provisória, até o professor confirmar') + '</span></div>';
+  if(e.geral.professor) h += '<div class="detalhe"><b>Comentário do professor:</b> ' + esc(e.geral.professor) + '</div>';
+  h += '<div class="detalhe"><p class="fb" style="margin-top:0"><b>Visão geral:</b> ' + esc(e.geral.comentario) + '</p>' +
+    (e.geral.fortes ? '<p class="fb"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') +
+    (e.geral.estudar ? '<p class="fb"><b>O que estudar:</b> ' + esc(e.geral.estudar) + '</p>' : '') + '</div>';
+  h += '<h4>Questão por questão</h4>' + e.questoes.map(function(q){
+    return '<div class="questao"><div class="cab"><span>Questão ' + q.ordem + '</span><span class="nota n' + classe10(q.max ? (q.pontos || 0) / q.max * 10 : 0) + '">' + num(q.pontos || 0) + ' / ' + num(q.max) + '</span></div>' +
+      '<p class="aviso" style="margin:4px 0 0">' + esc(q.enunciado) + '</p>' +
+      (q.acertos ? '<p class="fb"><b>O que você acertou:</b> ' + esc(q.acertos) + '</p>' : '') +
+      (q.faltou ? '<p class="fb"><b>O que faltou:</b> ' + esc(q.faltou) + '</p>' : '') +
+      (q.melhorar ? '<p class="fb"><b>Como melhorar:</b> ' + esc(q.melhorar) + '</p>' : '') +
+      (q.professor ? '<p class="fb"><b>Professor:</b> ' + esc(q.professor) + '</p>' : '') +
+      '<details style="margin-top:6px"><summary class="link" style="font-size:13px">O que a IA leu da sua resposta</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada: em branco ou não encontrada</i>') + '</p></details></div>';
+  }).join('');
+  if(!e.confirmada){
+    h += e.revisaoPedida
+      ? '<div class="ok">Pedido de revisão enviado: "' + esc(e.revisaoPedida) + '". O professor vai olhar.</div>'
+      : '<details><summary class="link">A IA leu ou corrigiu algo errado? Pedir revisão ao professor</summary><textarea id="rev' + i + '" style="margin-top:8px" placeholder="ex.: Na questão 2 eu escrevi 72 °C, não 12 °C."></textarea>' +
+        '<div class="botoes"><button type="button" class="mini" data-revisao="' + i + '">Enviar pedido</button></div><div id="msgRev' + i + '"></div></details>';
+  }
+  return h;
+}
+
+function enviarAluno(i, sel, box){
+  var it = provasAluno[i], pags = sel.paginas(), bt = box.querySelector('[data-enviar]'), msg = box.querySelector('[data-msg]');
+  if(!pags.length) return;
+  bt.disabled = true;
+  msg.innerHTML = '<p class="carregando">Enviando ' + pags.length + ' página(s)…</p>';
+  api('enviarProva', {professorId: it.professorId, provaId: it.prova.id, fotos: pags.map(function(p){ return {mime:p.mime, dados:p.dados}; })})
+    .then(function(entregaId){
+      msg.innerHTML = '<div class="ok">Fotos recebidas. A IA está corrigindo sua prova… (até 2 minutos; pode sair da página, você recebe um e-mail)</div>';
+      return api('corrigirMinhaProva', {professorId: it.professorId, entregaId: entregaId});
+    })
+    .then(function(){ envioAberto[i] = false; abrirAluno(); })
+    .catch(function(e){ bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+}
+
+/* =====================================================================
+   PROFESSOR
+   ===================================================================== */
+var discSel = '', dadosDisc = null;
+
+function abrirProf(){
+  $('profTopo').innerHTML = '<div class="caixa"><p class="carregando">Carregando disciplinas…</p></div>';
+  api('profResumo').then(function(r){
+    resumo = r;
+    var ds = r.disciplinas.filter(function(d){ return d.ativa; });
+    if(!ds.length){ $('profTopo').innerHTML = '<div class="caixa"><p>Crie uma disciplina no <a href="aulas.html">Aula por IA</a> para cadastrar provas.</p></div>'; $('profCorpo').innerHTML = ''; return; }
+    if(!discSel || !ds.some(function(d){ return d.id === discSel; })) discSel = ds[0].id;
+    $('profTopo').innerHTML = '<div class="caixa"><div class="chips">' + ds.map(function(d){
+      return '<button type="button" class="chip" data-disc="' + esc(d.id) + '" aria-pressed="' + (d.id === discSel) + '">' + esc(d.nome) + ' · ' + esc(d.semestre) + '</button>'; }).join('') + '</div>' +
+      (r.temChave ? '' : '<div class="convite" style="margin:12px 0 0">Cadastre sua chave do Gemini em Aula por IA → Configurações para a IA corrigir as provas.</div>') + '</div>';
+    $('profTopo').querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ discSel = b.dataset.disc; abrirProf(); }); });
+    listarProvas();
+  }).catch(function(e){ $('profTopo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+function listarProvas(){
+  var el = $('profCorpo');
+  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando provas…</p></div>';
+  api('provasDisciplina', {disciplinaId: discSel}).then(function(r){
+    dadosDisc = r;
+    var d = r.disciplina, soma = d.valor_aulas + r.provas.reduce(function(t, p){ return t + p.valor; }, 0);
+    var h = '<div class="caixa"><h2>Provas · ' + esc(d.nome) + '</h2>' +
+      '<p class="aviso">Composição da nota (0 a 10): questões em aula valem <b>' + nota10(d.valor_aulas) + '</b>' + r.provas.map(function(p){ return ' · ' + esc(p.titulo) + ' vale <b>' + nota10(p.valor) + '</b>'; }).join('') +
+      ' · total <b>' + nota10(soma) + '</b>' + (Math.abs(soma - 10) > 0.01 ? ' <span class="tag t-warn">a soma não dá 10</span>' : '') + '. O valor das questões em aula e o número de provas previstas (' + d.provas_previstas + ') ficam em Aula por IA → Disciplinas.</p>';
+    h += r.provas.length ? r.provas.map(function(p, i){
+      var sit = r.agora < p.inicio ? '<span class="tag t-cinza">agendada</span>' : r.agora <= p.fimProva ? '<span class="tag t-err">em andamento</span>' : r.agora <= p.fimEnvio ? '<span class="tag t-warn">envio aberto</span>' : '<span class="tag t-ok">encerrada</span>';
+      return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
+        (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
+        '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale ' + nota10(p.valor) + ' · ' + p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos</div>' +
+        '<div class="aviso">' + p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' confirmada(s)</div></div>' +
+        '<div class="botoes" style="margin:0"><button type="button" class="mini" data-entregas="' + i + '">Entregas</button><button type="button" class="secundario mini" data-editar="' + i + '">Editar</button>' +
+        '<button type="button" class="secundario mini" data-qr="' + i + '">QR code</button><button type="button" class="secundario mini" data-excluir="' + i + '">Excluir</button></div></div>';
+    }).join('') : '<p class="aviso">Nenhuma prova cadastrada nesta disciplina.</p>';
+    h += '<div class="botoes"><button type="button" id="btNovaProva">+ Nova prova</button></div></div><div id="areaProva"></div>';
+    el.innerHTML = h;
+    $('btNovaProva').addEventListener('click', function(){ formProva(null); });
+    el.querySelectorAll('[data-editar]').forEach(function(b){ b.addEventListener('click', function(){ formProva(r.provas[Number(b.dataset.editar)]); }); });
+    el.querySelectorAll('[data-entregas]').forEach(function(b){ b.addEventListener('click', function(){ abrirEntregas(r.provas[Number(b.dataset.entregas)].id); }); });
+    el.querySelectorAll('[data-qr]').forEach(function(b){ b.addEventListener('click', function(){
+      var p = r.provas[Number(b.dataset.qr)];
+      mostrarQR(baseSite() + 'provas.html', 'Envio da prova · ' + p.titulo + ' · ' + d.nome, 'Aponte a câmera do celular, entre com sua conta e envie as fotos até ' + hora(p.fimEnvio) + '.');
+    }); });
+    el.querySelectorAll('[data-excluir]').forEach(function(b){ b.addEventListener('click', function(){
+      var p = r.provas[Number(b.dataset.excluir)];
+      if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: apagar prova, entregas e fotos'; return; }
+      b.disabled = true;
+      api('excluirProva', {provaId: p.id}).then(listarProvas).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+    }); });
+  }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+/* ---- cadastrar ou editar prova ---- */
+var qsEdit = [];
+function dataInput(ms){ var d = new Date(ms); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+function horaInput(ms){ var d = new Date(ms); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+
+function formProva(p){
+  var d = dadosDisc.disciplina;
+  var valorPadrao = d.provas_previstas ? Math.round((10 - d.valor_aulas) / d.provas_previstas * 100) / 100 : 4;
+  var v = p || {titulo: 'P' + (dadosDisc.provas.length + 1), inicio: 0, duracao: 120, janela: 120, valor: valorPadrao, instrucoes: '', publicada: true, questoes: []};
+  qsEdit = (v.questoes.length ? v.questoes : [{enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes}; });
+  var el = $('areaProva');
+  el.innerHTML = '<div class="caixa"><h2>' + (p ? 'Editar prova' : 'Nova prova') + '</h2><div class="campos">' +
+    '<div><label class="rot" for="pTit">Título</label><input type="text" id="pTit" value="' + esc(v.titulo) + '"></div>' +
+    '<div><label class="rot" for="pData">Data</label><input type="date" id="pData" value="' + (v.inicio ? dataInput(v.inicio) : '') + '"></div>' +
+    '<div><label class="rot" for="pHora">Hora de início</label><input type="time" id="pHora" value="' + (v.inicio ? horaInput(v.inicio) : '') + '"></div>' +
+    '<div><label class="rot" for="pDur">Duração (min)</label><input type="number" id="pDur" min="10" value="' + v.duracao + '"></div>' +
+    '<div><label class="rot" for="pJan">Envio das fotos até (min após o fim)</label><input type="number" id="pJan" min="0" value="' + v.janela + '"></div>' +
+    '<div><label class="rot" for="pVal">Vale na média (de 10)</label><input type="number" id="pVal" min="0" max="10" step="0.5" value="' + v.valor + '"></div>' +
+    '<div class="campoLargo"><label class="rot" for="pIns">Instruções gerais de correção (opcional)</label><textarea id="pIns" placeholder="ex.: Aceitar respostas com outras palavras se o conceito estiver certo. Cálculo sem unidade perde 25% da questão.">' + esc(v.instrucoes) + '</textarea></div></div>' +
+    '<div class="convite">Tem a prova em foto ou PDF? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf" multiple id="pExtrair">Preencher as questões a partir do arquivo</label><div id="msgExtrair"></div></div>' +
+    '<h4>Questões <span class="aviso" id="pTotal"></span></h4><div id="qsBox"></div>' +
+    '<div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" id="pMaisQ">+ Questão</button></div>' +
+    '<label style="display:flex;gap:8px;align-items:center;margin-top:16px;font-weight:bold"><input type="checkbox" id="pPub"' + (v.publicada ? ' checked' : '') + ' style="width:20px;height:20px"> Publicada (os alunos veem a prova e podem enviar as fotos no horário)</label>' +
+    '<div id="pErro" class="erro oculto"></div><div class="botoes"><button type="button" id="pSalvar">' + (p ? 'Salvar alterações' : 'Criar prova') + '</button><button type="button" class="secundario" id="pCanc">Cancelar</button></div>' +
+    (p && p.entregas ? '<p class="aviso">Esta prova já tem entregas. Se mudar gabarito ou pontos, use "Corrigir de novo com IA" nas entregas para recalcular.</p>' : '') + '</div>';
+  desenharQs();
+  $('pMaisQ').addEventListener('click', function(){ lerQs(); qsEdit.push({enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); });
+  $('pCanc').addEventListener('click', function(){ el.innerHTML = ''; });
+  $('pExtrair').addEventListener('change', function(){
+    var arqs = Array.prototype.slice.call(this.files), m = $('msgExtrair');
+    m.innerHTML = '<p class="carregando">Lendo a prova… (uns 30 segundos)</p>';
+    Promise.all(arqs.map(function(f){ return prepararArquivo(f, false); })).then(function(ps){
+      return api('extrairQuestoes', {fotos: ps.map(function(x){ return {mime:x.mime, dados:x.dados}; })});
+    }).then(function(qs){
+      if(!qs.length){ m.innerHTML = '<div class="erro">Não encontrei questões no arquivo.</div>'; return; }
+      lerQs();
+      var vazias = qsEdit.every(function(q){ return !q.enunciado; });
+      var novas = qs.map(function(q){ return {enunciado:q.enunciado, pontos:q.pontos || '', gabarito:'', instrucoes:''}; });
+      qsEdit = vazias ? novas : qsEdit.concat(novas);
+      desenharQs();
+      m.innerHTML = '<div class="ok">' + qs.length + ' questão(ões) preenchida(s). Confira o texto e os pontos, e escreva o gabarito de cada uma.</div>';
+    }).catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  $('pSalvar').addEventListener('click', function(){
+    lerQs();
+    var bt = this, dt = $('pData').value, hr = $('pHora').value;
+    $('pErro').classList.add('oculto');
+    if(!dt || !hr){ $('pErro').textContent = 'Informe a data e a hora da prova.'; $('pErro').classList.remove('oculto'); return; }
+    bt.disabled = true;
+    api('salvarProva', {prova: {id: p ? p.id : '', disciplinaId: discSel, titulo: $('pTit').value, inicio: new Date(dt + 'T' + hr).getTime(),
+      duracao: $('pDur').value, janela: $('pJan').value, valor: String($('pVal').value).replace(',', '.'), instrucoes: $('pIns').value,
+      publicada: $('pPub').checked, questoes: qsEdit.map(function(q){ q.pontos = String(q.pontos).replace(',', '.'); return q; })}})
+      .then(listarProvas).catch(function(e){ bt.disabled = false; $('pErro').textContent = e.message; $('pErro').classList.remove('oculto'); });
+  });
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function desenharQs(){
+  $('qsBox').innerHTML = qsEdit.map(function(q, i){
+    return '<div class="qEdit" data-q="' + i + '"><div class="linha" style="border:0;padding:0 0 8px"><b>Questão ' + (i + 1) + '</b><span class="botoes" style="margin:0">' +
+      (i ? '<button type="button" class="secundario mini" data-subir="' + i + '" aria-label="Subir">↑</button>' : '') +
+      '<button type="button" class="secundario mini" data-tirarq="' + i + '">Remover</button></span></div>' +
+      '<label class="rot">Enunciado</label><textarea data-c="enunciado">' + esc(q.enunciado) + '</textarea>' +
+      '<div class="campos" style="margin:10px 0 0"><div><label class="rot">Vale (pontos)</label><input type="number" min="0" step="0.25" data-c="pontos" value="' + esc(q.pontos) + '"></div></div>' +
+      '<label class="rot" style="margin-top:10px">Gabarito em tópicos</label><textarea data-c="gabarito" placeholder="ex.:\n- cita redução da aw\n- relaciona com crescimento microbiano\n- dá um exemplo industrial">' + esc(q.gabarito) + '</textarea>' +
+      '<label class="rot" style="margin-top:10px">Instruções de correção (opcional)</label><textarea data-c="instrucoes" style="min-height:50px" placeholder="ex.: sem exemplo vale no máximo metade">' + esc(q.instrucoes) + '</textarea></div>';
+  }).join('');
+  var total = qsEdit.reduce(function(t, q){ return t + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0);
+  $('pTotal').textContent = '· total ' + num(total) + ' pontos (a nota da prova é convertida para 0 a 10)';
+  $('qsBox').querySelectorAll('[data-tirarq]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); qsEdit.splice(Number(b.dataset.tirarq), 1); if(!qsEdit.length) qsEdit.push({enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); }); });
+  $('qsBox').querySelectorAll('[data-subir]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); var i = Number(b.dataset.subir), t = qsEdit[i]; qsEdit[i] = qsEdit[i - 1]; qsEdit[i - 1] = t; desenharQs(); }); });
+  $('qsBox').querySelectorAll('[data-c="pontos"]').forEach(function(inp){ inp.addEventListener('input', function(){ lerQs(); var t = qsEdit.reduce(function(s, q){ return s + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0); $('pTotal').textContent = '· total ' + num(t) + ' pontos (a nota da prova é convertida para 0 a 10)'; }); });
+}
+function lerQs(){
+  $('qsBox').querySelectorAll('[data-q]').forEach(function(box){
+    var q = qsEdit[Number(box.dataset.q)];
+    box.querySelectorAll('[data-c]').forEach(function(inp){ q[inp.dataset.c] = inp.value; });
+  });
+}
+
+/* ---- entregas ---- */
+var provaAtual = null;
+function abrirEntregas(provaId){
+  var el = $('areaProva');
+  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando entregas…</p></div>';
+  api('entregasProva', {provaId: provaId}).then(function(r){
+    provaAtual = r.prova;
+    var h = '<div class="caixa"><h2>Entregas · ' + esc(r.prova.titulo) + '</h2><p class="aviso">' + dataHora(r.prova.inicio) + ' · envio até ' + dataHora(r.prova.fimEnvio) +
+      (r.prova.pastaUrl ? ' · <a class="link" style="font-size:12.5px" target="_blank" rel="noopener" href="' + esc(r.prova.pastaUrl) + '">pasta das fotos no Drive</a>' : '') + '</p>' +
+      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
+      r.alunos.map(function(a, i){
+        var e = a.entrega;
+        return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + (e.enviadoPor === 'professor' ? ' <span class="aviso">(enviada por você)</span>' : '') : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
+          '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
+          '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
+          '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
+      }).join('') + '</tbody></table></div><div id="envioProf"></div><div class="botoes"><button type="button" class="secundario mini" id="btAtualEnt">Atualizar</button></div></div><div id="areaEntrega"></div>';
+    el.innerHTML = h;
+    $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); });
+    el.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirEntrega(b.dataset.abrir); }); });
+    el.querySelectorAll('[data-enviarpor]').forEach(function(b){ b.addEventListener('click', function(){ envioPeloProfessor(r.alunos[Number(b.dataset.enviarpor)], provaId); }); });
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+  }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+function envioPeloProfessor(aluno, provaId){
+  var box = $('envioProf');
+  box.innerHTML = '<div class="detalhe"><h3>Enviar fotos por ' + esc(aluno.nome) + '</h3>' + (aluno.entrega ? '<p class="aviso">As fotos novas substituem as que já foram enviadas, e a prova é corrigida de novo.</p>' : '') +
+    '<div data-sel></div><div class="botoes"><button type="button" data-ok disabled>Enviar e corrigir</button><button type="button" class="secundario" data-canc>Cancelar</button></div><div data-msg></div></div>';
+  var bt = box.querySelector('[data-ok]'), msg = box.querySelector('[data-msg]');
+  var sel = seletorFotos(box.querySelector('[data-sel]'), true, function(pg){ bt.disabled = !pg.length; });
+  box.querySelector('[data-canc]').addEventListener('click', function(){ box.innerHTML = ''; });
+  bt.addEventListener('click', function(){
+    bt.disabled = true; msg.innerHTML = '<p class="carregando">Enviando…</p>';
+    api('enviarProvaProfessor', {provaId: provaId, alunoId: aluno.alunoId, fotos: sel.paginas().map(function(p){ return {mime:p.mime, dados:p.dados}; })})
+      .then(function(id){
+        msg.innerHTML = '<p class="carregando">Fotos salvas. Corrigindo com a IA… (até 2 minutos)</p>';
+        return api('corrigirEntregaProf', {entregaId: id}).then(function(){ return id; }, function(e){ msg.innerHTML = '<div class="erro">Fotos salvas, mas a correção falhou agora: ' + esc(e.message) + ' Ela fica na fila e é feita sozinha depois.</div>'; return id; });
+      })
+      .then(function(id){ abrirEntregas(provaId); setTimeout(function(){ abrirEntrega(id); }, 600); })
+      .catch(function(e){ bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+
+function abrirEntrega(entregaId){
+  var el = $('areaEntrega');
+  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando a prova e as fotos…</p></div>';
+  api('verEntrega', {entregaId: entregaId}).then(function(e){
+    var h = '<div class="caixa"><h2>' + esc(e.alunoNome) + ' · ' + esc(e.prova.titulo) + '</h2>' +
+      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + (e.enviadoPor === 'professor' ? ' por você' : ' pelo aluno') + ' · ' + tagEntrega(e, 'fechada') + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
+    if(e.revisaoPedida) h += '<div class="convite"><b>O aluno pediu revisão:</b> ' + esc(e.revisaoPedida) + '</div>';
+    h += '<details open><summary class="link">Fotos (' + e.fotos.length + ')</summary><div class="fotosGrandes">' + e.fotos.map(function(f, i){
+      return f.mime === 'application/pdf' ? '<a class="link" download="prova.pdf" href="data:application/pdf;base64,' + f.dados + '">Abrir PDF ' + (i + 1) + '</a>' : '<img src="data:' + f.mime + ';base64,' + f.dados + '" alt="Página ' + (i + 1) + '">';
+    }).join('') + '</div></details>';
+    if(!e.geral.legivel) h += '<div class="erro">A IA marcou as fotos como ilegíveis: ' + esc(e.geral.comentario) + '</div>';
+    h += '<h4>Correção <span class="aviso" id="eNota"></span></h4>' + e.questoes.map(function(q){
+      return '<div class="questao" data-qid="' + esc(q.id) + '" data-max="' + q.max + '"><div class="cab"><span>Questão ' + q.ordem + '</span><span class="aviso">vale ' + num(q.max) + '</span></div>' +
+        '<p class="aviso" style="margin:4px 0 8px">' + esc(q.enunciado) + '</p>' +
+        '<details><summary class="link" style="font-size:13px">O que a IA leu</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada</i>') + '</p></details>' +
+        (q.acertos ? '<p class="fb"><b>Acertos:</b> ' + esc(q.acertos) + '</p>' : '') + (q.faltou ? '<p class="fb"><b>Faltou:</b> ' + esc(q.faltou) + '</p>' : '') + (q.melhorar ? '<p class="fb"><b>Melhorar:</b> ' + esc(q.melhorar) + '</p>' : '') +
+        '<div class="campos" style="margin:10px 0 0"><div><label class="rot">Pontos</label><input type="number" min="0" max="' + q.max + '" step="0.25" data-pts value="' + (q.pontos === null ? '' : q.pontos) + '"></div>' +
+        '<div class="campoLargo"><label class="rot">Seu comentário para o aluno (opcional)</label><textarea data-com style="min-height:50px">' + esc(q.professor) + '</textarea></div></div></div>';
+    }).join('');
+    h += '<div class="detalhe"><p class="fb" style="margin-top:0"><b>Visão geral da IA:</b> ' + esc(e.geral.comentario) + '</p>' + (e.geral.fortes ? '<p class="fb"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') + (e.geral.estudar ? '<p class="fb"><b>O que estudar:</b> ' + esc(e.geral.estudar) + '</p>' : '') + '</div>' +
+      '<label class="rot" style="margin-top:12px" for="eGeral">Seu comentário geral para o aluno (opcional)</label><textarea id="eGeral">' + esc(e.geral.professor) + '</textarea>' +
+      '<div class="botoes"><button type="button" id="eConf">Salvar e confirmar nota</button><button type="button" class="secundario" id="eSalvar">Salvar sem confirmar</button><button type="button" class="secundario" id="eRecorr">Corrigir de novo com IA</button></div>' +
+      '<div id="eMsg"></div><p class="aviso">Ao confirmar, o aluno vê "nota confirmada" e recebe um e-mail.</p></div>';
+    el.innerHTML = h;
+    el.querySelectorAll('.fotosGrandes img').forEach(function(img){ img.addEventListener('click', function(){ ampliar(img.src); }); });
+    function soma(){
+      var t = 0, m = 0;
+      el.querySelectorAll('[data-qid]').forEach(function(box){ m += Number(box.dataset.max); t += Number(String(box.querySelector('[data-pts]').value).replace(',', '.')) || 0; });
+      $('eNota').textContent = '· ' + num(t) + ' de ' + num(m) + ' pontos = nota ' + nota10(m ? Math.round(t / m * 100) / 10 : 0);
+    }
+    el.querySelectorAll('[data-pts]').forEach(function(i){ i.addEventListener('input', soma); }); soma();
+    function salvar(confirmar, bt){
+      bt.disabled = true;
+      var qs = Array.prototype.map.call(el.querySelectorAll('[data-qid]'), function(box){
+        return {id: box.dataset.qid, pontos: String(box.querySelector('[data-pts]').value).replace(',', '.'), professor: box.querySelector('[data-com]').value};
+      });
+      api('revisarEntrega', {entregaId: entregaId, questoes: qs, comentario: $('eGeral').value, confirmar: confirmar}).then(function(r){
+        bt.disabled = false;
+        $('eMsg').innerHTML = '<div class="ok">Salvo. Nota final: ' + nota10(r.notaFinal) + (r.confirmada ? ' (confirmada; o aluno foi avisado por e-mail).' : ' (provisória).') + ' Clique em Atualizar na lista para ver a tabela nova.</div>';
+      }).catch(function(x){ bt.disabled = false; $('eMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
+    }
+    $('eConf').addEventListener('click', function(){ salvar(true, this); });
+    $('eSalvar').addEventListener('click', function(){ salvar(false, this); });
+    $('eRecorr').addEventListener('click', function(){
+      var b = this;
+      if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: refazer a correção (apaga os ajustes)'; return; }
+      b.disabled = true; $('eMsg').innerHTML = '<p class="carregando">Corrigindo com a IA… (até 2 minutos)</p>';
+      api('corrigirEntregaProf', {entregaId: entregaId}).then(function(){ abrirEntrega(entregaId); })
+        .catch(function(x){ b.disabled = false; $('eMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
+    });
+    el.scrollIntoView({behavior:'smooth', block:'start'});
+  }).catch(function(x){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(x.message) + '</p></div>'; });
+}
+
+iniciar();
+</script>
+</body>
+</html>
