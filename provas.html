@@ -87,6 +87,8 @@
   th,td{padding:8px;border-bottom:1px solid var(--linha);text-align:left;white-space:nowrap}
   th{background:var(--bloco);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--cinza)}
   .qEdit{border:2px solid var(--linha);border-radius:14px;padding:12px 14px;margin-bottom:12px;background:#fbfcfe}
+  .sugIA{display:inline-block;color:#fff;background:#c62828;font-size:11.5px;font-weight:bold;border-radius:6px;padding:2px 8px;margin:0 0 6px;letter-spacing:.02em}
+  .comSug{border-color:#c62828!important;background:#fff6f6!important}
   .qrTela,.zoom{position:fixed;inset:0;background:#fff;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
   .zoom{background:rgba(14,42,92,.92);cursor:zoom-out}
   .zoom img{max-width:100%;max-height:100%;border-radius:8px}
@@ -487,7 +489,9 @@ function listarProvas(){
       return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
         (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
         (p.resultadosLiberados ? ' <span class="tag t-ok" title="liberados em ' + esc(p.resultadosEm) + '">resultados liberados</span>' : (p.entregas ? ' <span class="tag t-warn">resultados ocultos</span>' : '')) +
-        '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + (p.questoes.length ? p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos' : '<span class="tag t-warn">sem questões ainda</span>') + '</div>' +
+        '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + (p.questoes.length ? p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos' : '<span class="tag t-warn">sem questões ainda</span>') +
+          (function(){ var n = p.questoes.reduce(function(t, q){ return t + ((q.sugestoes || []).length ? 1 : 0); }, 0);
+            return n ? ' <span class="tag t-err">' + n + ' questão(ões) com sugestão da IA a revisar</span>' : ''; })() + '</div>' +
         '<div class="aviso">' + p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' confirmada(s)</div></div>' +
         '<div class="botoes" style="margin:0"><button type="button" class="mini" data-entregas="' + i + '">Entregas</button><button type="button" class="secundario mini" data-editar="' + i + '">Editar</button>' +
         (p.resultadosLiberados ? '<button type="button" class="secundario mini" data-liberar="' + i + '" data-valor="0">Ocultar resultados</button>'
@@ -551,7 +555,7 @@ function formProva(p){
   var livre = opcoes.filter(function(x){ return !dadosDisc.provas.some(function(pp){ var y = itemDaProva(etapas, pp); return y && y.item.id === x.item.id; }); })[0] || opcoes[0];
   var v = p || {titulo: livre ? livre.item.nome : 'Prova', item: livre ? livre.item.id : '', inicio: 0, duracao: 120, janela: 120, instrucoes: '', publicada: true, questoes: []};
   var atual = p ? itemDaProva(etapas, p) : livre;
-  qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes}; });
+  qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes, sugestoes:(q.sugestoes || []).slice()}; });
   var el = $('areaProva');
   el.innerHTML = '<div class="caixa"><h2>' + (p ? 'Editar prova' : 'Nova prova') + '</h2><div class="campos">' +
     '<div><label class="rot" for="pTit">Título</label><input type="text" id="pTit" value="' + esc(v.titulo) + '"></div>' +
@@ -584,10 +588,12 @@ function formProva(p){
       if(!qs.length){ m.innerHTML = '<div class="erro">Não encontrei questões no arquivo.</div>'; return; }
       lerQs();
       var vazias = qsEdit.every(function(q){ return !q.enunciado; });
-      var novas = qs.map(function(q){ return {rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos || '', gabarito:'', instrucoes:''}; });
+      var novas = qs.map(function(q){ return {rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos || '', gabarito:q.gabarito || '', instrucoes:q.instrucoes || '', sugestoes:q.sugestoes || []}; });
       qsEdit = vazias ? novas : qsEdit.concat(novas);
       desenharQs();
-      m.innerHTML = '<div class="ok">' + qs.length + ' questão(ões) preenchida(s). Confira o texto e os pontos, e escreva o gabarito de cada uma.</div>';
+      var nSug = novas.reduce(function(t, q){ return t + q.sugestoes.length; }, 0);
+      m.innerHTML = '<div class="ok">' + qs.length + ' questão(ões) preenchida(s). O que estava no arquivo foi transcrito.</div>' +
+        (nSug ? '<div class="erro"><b>' + nSug + ' campo(s) foram sugeridos pela IA</b> porque não estavam no arquivo (valor, gabarito ou critérios). Eles estão marcados em vermelho: revise cada um antes da prova.</div>' : '');
     }).catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
   $('pSalvar').addEventListener('click', function(){
@@ -612,17 +618,33 @@ function desenharQs(){
       '<label class="rot">Enunciado</label><textarea data-c="enunciado">' + esc(q.enunciado) + '</textarea>' +
       '<div class="campos" style="margin:10px 0 0">' +
         '<div><label class="rot">Nº na prova</label><input type="text" data-c="rotulo" value="' + esc(q.rotulo || (i + 1)) + '" placeholder="ex.: 2a" style="max-width:110px"></div>' +
-        '<div><label class="rot">Vale (pontos)</label><input type="number" min="0" step="0.25" data-c="pontos" value="' + esc(q.pontos) + '"></div>' +
+        '<div><label class="rot">Vale (pontos)</label>' + aviso(q, 'pontos') + '<input type="number" min="0" step="0.25" data-c="pontos" value="' + esc(q.pontos) + '"' + marca(q, 'pontos') + '></div>' +
         '<div class="campoLargo"><label class="rot">Assunto (é só isso que o aluno vê)</label><input type="text" data-c="assunto" value="' + esc(q.assunto) + '" placeholder="ex.: Atividade de água e crescimento microbiano (em branco: a IA escreve)"></div></div>' +
-      '<label class="rot" style="margin-top:10px">Gabarito em tópicos</label><textarea data-c="gabarito" placeholder="ex.:\n- cita redução da aw\n- relaciona com crescimento microbiano\n- dá um exemplo industrial">' + esc(q.gabarito) + '</textarea>' +
-      '<label class="rot" style="margin-top:10px">Instruções de correção (opcional)</label><textarea data-c="instrucoes" style="min-height:50px" placeholder="ex.: sem exemplo vale no máximo metade">' + esc(q.instrucoes) + '</textarea></div>';
+      '<label class="rot" style="margin-top:10px">Gabarito em tópicos</label>' + aviso(q, 'gabarito') + '<textarea data-c="gabarito"' + marca(q, 'gabarito') + ' placeholder="ex.:\n- cita redução da aw\n- relaciona com crescimento microbiano\n- dá um exemplo industrial">' + esc(q.gabarito) + '</textarea>' +
+      '<label class="rot" style="margin-top:10px">Instruções de correção (opcional)</label>' + aviso(q, 'instrucoes') + '<textarea data-c="instrucoes"' + marca(q, 'instrucoes') + ' style="min-height:50px" placeholder="ex.: sem exemplo vale no máximo metade">' + esc(q.instrucoes) + '</textarea></div>';
   }).join('');
   var total = qsEdit.reduce(function(t, q){ return t + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0);
   $('pTotal').textContent = '· total ' + num(total) + ' pontos (a nota da prova é convertida para 0 a 10)';
   $('qsBox').querySelectorAll('[data-tirarq]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); qsEdit.splice(Number(b.dataset.tirarq), 1); if(!qsEdit.length) qsEdit.push({rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); }); });
   $('qsBox').querySelectorAll('[data-subir]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); var i = Number(b.dataset.subir), t = qsEdit[i]; qsEdit[i] = qsEdit[i - 1]; qsEdit[i - 1] = t; desenharQs(); }); });
+  $('qsBox').querySelectorAll('[data-aceitar]').forEach(function(b){ b.addEventListener('click', function(){
+    lerQs();
+    var q = qsEdit[Number(b.closest('[data-q]').dataset.q)];
+    q.sugestoes = (q.sugestoes || []).filter(function(c){ return c !== b.dataset.aceitar; });
+    desenharQs();
+  }); });
+  $('qsBox').querySelectorAll('[data-c="pontos"], [data-c="gabarito"], [data-c="instrucoes"]').forEach(function(inp){ inp.addEventListener('input', function(){
+    var q = qsEdit[Number(inp.closest('[data-q]').dataset.q)], c = inp.dataset.c;
+    if(q.sugestoes && q.sugestoes.indexOf(c) !== -1){
+      q.sugestoes.splice(q.sugestoes.indexOf(c), 1);
+      inp.classList.remove('comSug');
+      var av = inp.previousElementSibling; if(av && av.classList.contains('sugBox')) av.remove();
+    }
+  }); });
   $('qsBox').querySelectorAll('[data-c="pontos"]').forEach(function(inp){ inp.addEventListener('input', function(){ lerQs(); var t = qsEdit.reduce(function(s, q){ return s + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0); $('pTotal').textContent = '· total ' + num(t) + ' pontos (a nota da prova é convertida para 0 a 10)'; }); });
 }
+function aviso(q, campo){ return q.sugestoes && q.sugestoes.indexOf(campo) !== -1 ? '<div class="sugBox"><span class="sugIA">Sugestão gerada por IA. REVISE!</span> <button type="button" class="secundario mini" data-aceitar="' + campo + '">OK, aceito a sugestão</button></div>' : ''; }
+function marca(q, campo){ return q.sugestoes && q.sugestoes.indexOf(campo) !== -1 ? ' class="comSug"' : ''; }
 function lerQs(){
   $('qsBox').querySelectorAll('[data-q]').forEach(function(box){
     var q = qsEdit[Number(box.dataset.q)];
