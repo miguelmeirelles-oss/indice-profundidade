@@ -474,26 +474,15 @@ function abrirMateria(m){
     var eu = r.eu, h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
       '<h2 style="margin-top:8px">' + esc(m.nome) + ' · ' + esc(m.semestre) + '</h2>';
     h += composicaoAluno(r);
-    if(!r.N){
-      h += '<p>Ainda não houve aula com questões nesta matéria.</p>';
-    } else {
-      var presentes = [];
-      h += '<h4>Questões em aula</h4><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="grande" style="font-size:32px">' + dez(eu ? eu.media : 0) + '</span><span class="aviso">de 10' +
-        (eu && eu.provisoria ? ' · <span class="tag t-warn">provisória</span>' : '') + '</span></div><div class="barrasAula">';
+    if(r.N){
+      h += '<h4>Questões em aula, aula por aula</h4><div class="barrasAula">';
       r.aulas.forEach(function(a){
         var x = a.resultado;
         if(x.tipo === 'x') h += '<i class="x" title="Aula ' + a.numero + ': sem questões">–</i>';
         else if(x.tipo === 'falta') h += '<i class="f" title="Aula ' + a.numero + ': falta">F</i>';
-        else { presentes.push(dez(x.nota)); h += '<i class="p" title="Aula ' + a.numero + '">' + dez(x.nota) + '</i>'; }
+        else h += '<i class="p" title="Aula ' + a.numero + '">' + dez(x.nota) + '</i>';
       });
-      h += '</div>';
-      if(eu){
-        h += '<div class="calc">' + r.N + ' aulas com questões · mínimo ' + r.minimo + ' · presente em ' + eu.presencas + '<br>' +
-          (presentes.length ? '(' + presentes.join(' + ') + ') ÷ ' + eu.divisor + ' = ' + dez(eu.soma) + ' ÷ ' + eu.divisor + ' = ' + dez(eu.media) : 'nenhuma aula com presença ainda') + '</div>';
-        h += eu.abaixo ? '<div class="erro">Você está abaixo da presença mínima: ' + (r.minimo - eu.presencas) + ' falta(s) estão contando como zero. Estar presente nas próximas aulas recupera a nota.</div>'
-          : '<p class="aviso" style="margin-top:8px">Você pode faltar mais ' + (eu.presencas - r.minimo) + ' aula(s) sem perder nota.</p>';
-      }
-      h += explicacaoNota(r.disciplina.presencaMin);
+      h += '</div>' + explicacaoNota(r.disciplina.presencaMin);
     }
     h += '<div class="botoes"><button type="button" data-apostila>Abrir apostila</button></div></div>';
     h += '<div class="caixa"><h2>Aulas</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
@@ -544,21 +533,16 @@ function nota10(n){ return n === null || n === undefined ? '—' : Number(n).toF
 // Composição da nota final (aulas + provas), para o aluno.
 function composicaoAluno(r){
   var c = r.composicao; if(!c || !c.meu) return '';
-  var m = c.meu, partes = ['<span>Questões em aula (vale ' + nota10(c.valorAulas) + ')</span><span>' + nota10(m.aulas10) + '</span>'];
-  c.provas.forEach(function(p, i){
-    var n = m.provas[i];
-    partes.push('<span>' + esc(p.titulo) + ' · ' + esc(p.data) + ' (vale ' + nota10(p.valor) + ')</span><span>' +
-      (n.nota === null ? (n.situacao || '—') : nota10(n.nota) + (n.provisoria ? '*' : '')) + '</span>');
-  });
-  return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:8px"><span class="grande">' + nota10(m.final) + '</span><span class="aviso">nota final de 10' +
-    (m.finalProvisoria ? ' · <span class="tag t-warn">parcial</span>' : '') + '</span></div>' +
-    '<div class="cfg" style="max-width:520px">' + partes.join('') + '</div>' +
-    '<p class="aviso" style="margin-top:6px">Nota final = aulas × valor ÷ 10 + cada prova × valor ÷ 10.' + (m.finalProvisoria ? ' Fica parcial enquanto houver prova sem nota ou provisória (*).' : '') + '</p>';
+  return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:8px"><span class="grande">' + nota10(c.meu.final) + '</span><span class="aviso">média final de 10' +
+    (c.meu.parcial ? ' · <span class="tag t-warn">parcial</span>' : '') + '</span></div>' +
+    c.etapas.map(function(et, k){ return linhasEtapa(et, c.meu.etapas[k], false); }).join('') +
+    '<div class="calc" style="margin-top:10px">Média final = ' + formulaFinal(c, c.meu) + '</div>' +
+    '<p class="aviso" style="margin-top:6px">Em cada item: nota de 0 a 10 → pontos que ela vale na etapa. * = provisória. A média fica parcial enquanto faltar alguma nota.</p>';
 }
 
 function explicacaoNota(pct){
   return '<details style="margin-top:10px"><summary class="link">Como a nota é calculada</summary><p class="aviso" style="margin-top:8px">' +
-    'Você pode faltar até ' + (100 - pct) + '% das aulas com questões sem perder nota: a média usa só as aulas em que você esteve presente. ' +
+    'Em cada etapa (P1, P2…), você pode faltar até ' + (100 - pct) + '% das aulas com questões sem perder nota: a média usa só as aulas em que você esteve presente. ' +
     'Cada falta além disso entra como zero. Exemplo com 10 aulas (mínimo 7): presente em 5 aulas com média 8,0 → 40 ÷ 7 = 5,7. ' +
     'A nota de cada aula junta a média das fechadas e a das abertas, com o peso definido pelo professor. Questão não respondida vale zero.</p></details>';
 }
@@ -1275,43 +1259,165 @@ function abrirNotas(){
   if(!resumo.disciplinas.length){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
   if(!notasDisc || !discPorId(notasDisc)) notasDisc = (ativas()[0] || resumo.disciplinas[0]).id;
   el.innerHTML = '<div class="caixa"><div class="linha" style="border:0;padding:0 0 12px">' + chipsDisciplinas(notasDisc, true) +
-    (resumo.planilhaUrl ? '<a class="link" target="_blank" rel="noopener" href="' + esc(resumo.planilhaUrl) + '">Abrir planilha no Drive</a>' : '') + '</div><div id="notasCorpo"><p class="carregando">Calculando notas…</p></div></div><div id="notasErradas"></div>';
+    (resumo.planilhaUrl ? '<a class="link" target="_blank" rel="noopener" href="' + esc(resumo.planilhaUrl) + '">Abrir planilha no Drive</a>' : '') + '</div><div id="notasCorpo"><p class="carregando">Calculando notas…</p></div></div>' +
+    '<div id="notasTrabalhos"></div><div id="notasAulas"></div><div id="notasErradas"></div>';
   el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ notasDisc = b.dataset.disc; abrirNotas(); }); });
   api('notasDisciplina', {disciplinaId: notasDisc}).then(function(r){
-    var c = $('notasCorpo');
+    var c = $('notasCorpo'), cp = r.composicao;
+    desenharTrabalhos(r);
     if(!r.alunos.length){ c.innerHTML = '<p class="aviso">Nenhum aluno inscrito nesta disciplina.</p>'; return; }
-    var cp = r.composicao;
-    var h = '<p class="aviso">' + r.N + ' aula(s) com questões · presença mínima ' + r.minimo + ' (' + r.disciplina.presencaMin + '%) · clique num aluno para ver o cálculo e as respostas</p>' +
-      '<p class="aviso">Composição da nota: questões em aula valem <b>' + nota10(cp.valorAulas) + '</b>' + cp.provas.map(function(p){ return ' · ' + esc(p.titulo) + ' vale <b>' + nota10(p.valor) + '</b>'; }).join('') +
-      ' · total <b>' + nota10(cp.somaValores) + '</b>' + (Math.abs(cp.somaValores - 10) > 0.01 ? ' <span class="tag t-warn">a soma não dá 10' + (cp.provas.length < cp.provasPrevistas ? ': faltam provas a cadastrar' : '') + '</span>' : '') + '</p>' +
-      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th>' + r.aulas.map(function(a){ return '<th title="' + esc(a.tema) + '">A' + a.numero + '</th>'; }).join('') +
-      '<th>Presença</th><th>Aulas</th>' + cp.provas.map(function(p){ return '<th>' + esc(p.titulo) + '</th>'; }).join('') + '<th>Final</th></tr></thead><tbody>';
+
+    // cabeçalho: uma coluna por item de cada etapa, a nota da etapa e a final
+    var cab1 = '<th rowspan="2">Aluno</th>', cab2 = '';
+    cp.etapas.forEach(function(et){
+      var itens = 1 + et.provas.length + et.trabalhos.length + 1;
+      cab1 += '<th colspan="' + itens + '" style="text-align:center;border-left:2px solid var(--navy)">' + esc(et.nome) + (cp.etapas.length > 1 && !pesosIguais(cp.etapas) ? ' · peso ' + nota10(et.peso) : '') +
+        (Math.abs(et.soma - 10) > 0.01 ? ' <span class="tag t-warn" title="Os valores desta etapa somam ' + nota10(et.soma) + '">soma ' + nota10(et.soma) + '</span>' : '') + '</th>';
+      cab2 += '<th style="border-left:2px solid var(--navy)" title="Aulas ' + esc(et.aulasNumeros.join(', ')) + '">Aulas (' + nota10(et.aulasValor) + ')</th>' +
+        et.provas.map(function(p){ return '<th>' + esc(p.titulo) + ' (' + nota10(p.valor) + ')</th>'; }).join('') +
+        et.trabalhos.map(function(t){ return '<th>' + esc(t.nome) + ' (' + nota10(t.valor) + ')</th>'; }).join('') + '<th>' + esc(et.nome) + '</th>';
+    });
+    cab1 += '<th rowspan="2" style="border-left:2px solid var(--navy)">Média final</th>';
+    var h = '<p class="aviso">Cada célula mostra os <b>pontos obtidos</b> no item (nota × valor ÷ 10). Clique num aluno para ver o cálculo e as respostas.</p>' +
+      '<div class="tabelaBox"><table><thead><tr>' + cab1 + '</tr><tr>' + cab2 + '</tr></thead><tbody>';
     r.alunos.forEach(function(al, i){
       var f = cp.porAluno[al.id];
-      h += '<tr class="linhaAluno' + (al.abaixo ? ' abaixo' : '') + '" data-al="' + i + '"><td>' + esc(al.nome) + '</td>' + al.porAula.map(function(x){
-        return '<td>' + (x.tipo === 'x' ? '<span class="cel cX">–</span>' : x.tipo === 'falta' ? '<span class="cel cF">F</span>' : '<span class="cel c' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>') + '</td>';
-      }).join('') + '<td>' + al.presencas + '/' + r.N + '</td><td><span class="nota n' + classe(al.media) + '">' + dez(al.media) + '</span></td>' +
-        f.provas.map(function(n){ return '<td>' + (n.nota === null ? '<span class="cel cX" title="' + esc(n.situacao) + '">—</span>' : '<span class="cel c' + classe(n.nota * 10) + '">' + nota10(n.nota) + (n.provisoria ? '*' : '') + '</span>') + '</td>'; }).join('') +
-        '<td><span class="nota n' + classe(f.final * 10) + '">' + nota10(f.final) + '</span></td></tr>';
+      h += '<tr class="linhaAluno" data-al="' + i + '"><td>' + esc(al.nome) + '</td>';
+      cp.etapas.forEach(function(et, k){
+        var n = f.etapas[k];
+        h += '<td style="border-left:2px solid var(--navy)">' + celPontos(n.aulas.nota, et.aulasValor, n.aulas.provisoria, n.aulas.abaixo ? 'abaixo da presença mínima' : '') + '</td>' +
+          et.provas.map(function(p, j){ var x = n.provas[j]; return '<td>' + celPontos(x.nota, p.valor, x.provisoria, x.situacao) + '</td>'; }).join('') +
+          et.trabalhos.map(function(t, j){ var x = n.trabalhos[j]; return '<td>' + celPontos(x.nota, t.valor, false, x.nota === null ? 'sem nota lançada' : '') + '</td>'; }).join('') +
+          '<td><span class="nota n' + classe(n.nota * 10) + '">' + nota10(n.nota) + (n.parcial ? '*' : '') + '</span></td>';
+      });
+      h += '<td style="border-left:2px solid var(--navy)"><span class="nota n' + classe(f.final * 10) + '">' + nota10(f.final) + (f.parcial ? '*' : '') + '</span></td></tr>';
     });
-    h += '</tbody></table></div><p class="aviso" style="margin-top:8px">Notas de 0 a 10 · F = falta · – = aula sem questões · — = prova sem nota · * = provisória</p><div id="detAl"></div>' + explicacaoNota(r.disciplina.presencaMin);
+    h += '</tbody></table></div><p class="aviso" style="margin-top:8px">* parcial: ainda falta nota (prova, trabalho ou questão em correção) ou há nota provisória. — = sem nota.</p><div id="detAl"></div>';
     c.innerHTML = h;
-    c.querySelectorAll('[data-al]').forEach(function(tr){ tr.addEventListener('click', function(){
-      var al = r.alunos[Number(tr.dataset.al)], notas = al.porAula.filter(function(x){ return x.tipo === 'nota'; }).map(function(x){ return dez(x.nota); });
-      var f = cp.porAluno[al.id], partes = ['aulas ' + nota10(f.aulas10) + ' × ' + nota10(cp.valorAulas) + ' ÷ 10'];
-      cp.provas.forEach(function(p, k){ partes.push(esc(p.titulo) + ' ' + nota10(f.provas[k].nota) + ' × ' + nota10(p.valor) + ' ÷ 10'); });
-      $('detAl').innerHTML = '<div class="detalhe"><h3>' + esc(al.nome) + '</h3><div class="calc">Questões em aula: ' + r.N + ' aulas · mínimo ' + r.minimo + ' · presente em ' + al.presencas + '<br>' +
-        (notas.length ? '(' + notas.join(' + ') + ') ÷ ' + al.divisor + ' = ' + dez(al.media) : 'sem presença em aula com questões') +
-        '<br>Nota final: ' + partes.join(' + ') + ' = ' + nota10(f.final) + '</div>' +
-        (al.abaixo ? '<div class="erro" style="margin-bottom:0">Abaixo da presença mínima: ' + (r.minimo - al.presencas) + ' falta(s) contando como zero.</div>' : '<p class="aviso" style="margin:8px 0 0">Pode faltar mais ' + (al.presencas - r.minimo) + ' aula(s) sem perder nota.</p>') +
-        '<div class="botoes"><button type="button" class="mini" id="btRespostas">Ver respostas e revisar notas</button></div><div id="respAluno"></div></div>';
-      $('btRespostas').addEventListener('click', function(){ abrirRespostasAluno(al); });
-      $('detAl').scrollIntoView({behavior:'smooth', block:'nearest'});
-    }); });
+    c.querySelectorAll('[data-al]').forEach(function(tr){ tr.addEventListener('click', function(){ detalheAluno(r, r.alunos[Number(tr.dataset.al)]); }); });
+
+    // questões em aula, aula por aula
+    $('notasAulas').innerHTML = '<div class="caixa"><details><summary class="link">Questões em aula, aula por aula (notas de 0 a 10)</summary>' +
+      '<div class="tabelaBox" style="margin-top:10px"><table><thead><tr><th>Aluno</th>' + r.aulas.map(function(a){ return '<th title="' + esc(a.tema) + '">A' + a.numero + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      r.alunos.map(function(al){
+        return '<tr><td>' + esc(al.nome) + '</td>' + al.porAula.map(function(x){
+          return '<td>' + (x.tipo === 'x' ? '<span class="cel cX">–</span>' : x.tipo === 'falta' ? '<span class="cel cF">F</span>' : '<span class="cel c' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>') + '</td>';
+        }).join('') + '</tr>';
+      }).join('') + '</tbody></table></div><p class="aviso" style="margin-top:8px">F = falta · – = aula sem questões · a presença mínima (' + r.disciplina.presencaMin + '%) vale dentro de cada etapa.</p>' +
+      explicacaoNota(r.disciplina.presencaMin) + '</details></div>';
+
     $('notasErradas').innerHTML = r.erradas.length ? '<div class="caixa"><h2>Questões que a turma mais errou</h2>' + r.erradas.map(function(e){
       return '<div class="linha"><span><span class="nota n' + classe(e.acerto) + '">' + e.acerto + '%</span> &nbsp;Aula ' + e.aula + ' · ' + esc(e.enunciado) + '</span><span class="aviso">' + e.respostas + ' respostas</span></div>';
     }).join('') + '<p class="aviso" style="margin-top:8px">Bom ponto para retomar no início da próxima aula.</p></div>' : '';
   }).catch(function(e){ $('notasCorpo').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+
+// pontos obtidos no item: nota (0 a 10) × valor ÷ 10
+function celPontos(nota, valor, provisoria, dica){
+  if(nota === null || nota === undefined) return '<span class="cel cX" title="' + esc(dica || 'sem nota') + '">—</span>';
+  return '<span class="cel c' + classe(nota * 10) + '" title="nota ' + nota10(nota) + (dica ? ' · ' + esc(dica) : '') + '">' + nota10(nota * valor / 10) + (provisoria ? '*' : '') + '</span>';
+}
+
+function detalheAluno(r, al){
+  var cp = r.composicao, f = cp.porAluno[al.id];
+  var h = '<div class="detalhe"><h3>' + esc(al.nome) + '</h3>' + cp.etapas.map(function(et, k){ return linhasEtapa(et, f.etapas[k], true); }).join('') +
+    '<div class="calc" style="margin-top:10px">Média final = ' + formulaFinal(cp, f) + '</div>' +
+    '<div class="botoes"><button type="button" class="mini" id="btRespostas">Ver respostas das aulas e revisar notas</button></div><div id="respAluno"></div></div>';
+  $('detAl').innerHTML = h;
+  $('btRespostas').addEventListener('click', function(){ abrirRespostasAluno(al); });
+  $('detAl').scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+
+// Uma etapa com seus itens: nota do item e pontos obtidos
+function linhasEtapa(et, n, prof){
+  var linhas = [];
+  var a = n.aulas;
+  linhas.push('<span>Questões em aula <span class="aviso">(vale ' + nota10(et.aulasValor) + (et.nAulas ? ' · presença ' + a.presencas + ' de ' + et.nAulas + ', mínimo ' + a.minimo : ' · nenhuma aula com questões ainda') + ')</span>' +
+    (a.abaixo ? ' <span class="tag t-err">abaixo da presença mínima</span>' : '') + '</span><span>' + (a.nota === null ? '—' : 'nota ' + nota10(a.nota) + ' → ' + nota10(a.nota * et.aulasValor / 10) + (a.provisoria ? '*' : '')) + '</span>');
+  et.provas.forEach(function(p, j){
+    var x = n.provas[j];
+    linhas.push('<span>' + esc(p.titulo) + ' <span class="aviso">(' + esc(p.data) + ' · vale ' + nota10(p.valor) + ')</span></span><span>' +
+      (x.nota === null ? esc(x.situacao || '—') : 'nota ' + nota10(x.nota) + ' → ' + nota10(x.nota * p.valor / 10) + (x.provisoria ? '*' : '')) + '</span>');
+  });
+  et.trabalhos.forEach(function(t, j){
+    var x = n.trabalhos[j];
+    linhas.push('<span>' + esc(t.nome) + ' <span class="aviso">(vale ' + nota10(t.valor) + ')</span>' + (x.comentario ? '<br><span class="aviso">' + esc(x.comentario) + '</span>' : '') + '</span><span>' +
+      (x.nota === null ? 'sem nota ainda' : 'nota ' + nota10(x.nota) + ' → ' + nota10(x.nota * t.valor / 10)) + '</span>');
+  });
+  return '<h4 style="margin-bottom:4px">' + esc(et.nome) + ' · <span class="nota n' + classe(n.nota * 10) + '">' + nota10(n.nota) + '</span> <span class="aviso">de 10' + (n.parcial ? ' · parcial' : '') + '</span></h4>' +
+    '<div class="cfg" style="max-width:640px">' + linhas.join('') + '</div>' +
+    (Math.abs(et.soma - 10) > 0.01 && prof ? '<p class="aviso">Os valores desta etapa somam ' + nota10(et.soma) + ', não 10. Ajuste em Disciplinas, na prova ou no trabalho.</p>' : '');
+}
+
+function formulaFinal(cp, f){
+  var iguais = pesosIguais(cp.etapas);
+  var partes = cp.etapas.map(function(et, k){ return et.nome + ' ' + nota10(f.etapas[k].nota) + (iguais ? '' : ' × ' + nota10(et.peso)); });
+  return '(' + partes.join(' + ') + ') ÷ ' + (iguais ? cp.etapas.length : nota10(cp.somaPesos)) + ' = <b>' + nota10(f.final) + '</b>' + (f.parcial ? ' (parcial)' : '');
+}
+
+/* ---- trabalhos: criar e lançar notas ---- */
+function desenharTrabalhos(r){
+  var cp = r.composicao, el = $('notasTrabalhos');
+  var todos = [];
+  cp.etapas.forEach(function(et){ et.trabalhos.forEach(function(t){ todos.push({t: t, et: et}); }); });
+  el.innerHTML = '<div class="caixa"><h2>Trabalhos</h2>' +
+    (todos.length ? todos.map(function(x){
+      return '<div class="linha"><span><b>' + esc(x.t.nome) + '</b> <span class="aviso">' + esc(x.et.nome) + ' · vale ' + nota10(x.t.valor) + '</span></span>' +
+        '<span class="botoes" style="margin:0"><button type="button" class="mini" data-lancar="' + esc(x.t.id) + '">Lançar notas</button>' +
+        '<button type="button" class="secundario mini" data-editart="' + esc(x.t.id) + '">Editar</button>' +
+        '<button type="button" class="secundario mini" data-excluirt="' + esc(x.t.id) + '">Excluir</button></span></div>';
+    }).join('') : '<p class="aviso">Nenhum trabalho. Crie um se quiser somar um trabalho, relatório ou seminário na nota de uma etapa.</p>') +
+    '<div class="botoes"><button type="button" class="secundario mini" id="btNovoTrab">+ Novo trabalho</button></div><div id="trabForm"></div></div>';
+  $('btNovoTrab').addEventListener('click', function(){ formTrabalho(cp, null); });
+  el.querySelectorAll('[data-editart]').forEach(function(b){ b.addEventListener('click', function(){
+    var x = todos.filter(function(y){ return y.t.id === b.dataset.editart; })[0];
+    formTrabalho(cp, {id: x.t.id, nome: x.t.nome, valor: x.t.valor, etapa: x.et.id});
+  }); });
+  el.querySelectorAll('[data-excluirt]').forEach(function(b){ b.addEventListener('click', function(){
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: apagar trabalho e notas'; return; }
+    b.disabled = true;
+    api('excluirTrabalho', {trabalhoId: b.dataset.excluirt}).then(abrirNotas).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+  }); });
+  el.querySelectorAll('[data-lancar]').forEach(function(b){ b.addEventListener('click', function(){ lancarNotas(b.dataset.lancar); }); });
+}
+
+function formTrabalho(cp, t){
+  var v = t || {id:'', nome:'', valor:2, etapa: cp.etapas[0].id};
+  $('trabForm').innerHTML = '<div class="detalhe"><div class="campos" style="margin-bottom:0">' +
+    '<div class="campoLargo"><label class="rot" for="tNome">Nome</label><input type="text" id="tNome" value="' + esc(v.nome) + '" placeholder="ex.: Relatório da prática de pasteurização"></div>' +
+    '<div><label class="rot" for="tEtapa">Etapa</label><select id="tEtapa">' + cp.etapas.map(function(e){ return '<option value="' + esc(e.id) + '"' + (e.id === v.etapa ? ' selected' : '') + '>' + esc(e.nome) + '</option>'; }).join('') + '</select></div>' +
+    '<div><label class="rot" for="tValor">Vale na etapa (de 10)</label><input type="number" id="tValor" min="0" max="10" step="0.5" value="' + esc(v.valor) + '"></div></div>' +
+    '<div class="botoes"><button type="button" class="mini" id="tSalvar">' + (t ? 'Salvar' : 'Criar trabalho') + '</button><button type="button" class="secundario mini" id="tCanc">Cancelar</button></div><div id="tMsg"></div></div>';
+  $('tCanc').addEventListener('click', function(){ $('trabForm').innerHTML = ''; });
+  $('tSalvar').addEventListener('click', function(){
+    var b = this; b.disabled = true;
+    api('salvarTrabalho', {trabalho: {id: v.id, disciplinaId: notasDisc, nome: $('tNome').value, etapa: $('tEtapa').value, valor: String($('tValor').value).replace(',', '.')}})
+      .then(abrirNotas).catch(function(e){ b.disabled = false; $('tMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  $('tNome').focus();
+}
+
+function lancarNotas(trabalhoId){
+  var box = $('trabForm');
+  box.innerHTML = '<p class="carregando">Carregando…</p>';
+  api('notasDoTrabalho', {trabalhoId: trabalhoId}).then(function(t){
+    box.innerHTML = '<div class="detalhe"><h3>' + esc(t.nome) + ' <span class="aviso">vale ' + nota10(t.valor) + ' · notas de 0 a 10</span></h3>' +
+      (t.alunos.length ? '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Nota</th><th>Comentário para o aluno (opcional)</th></tr></thead><tbody>' +
+      t.alunos.map(function(a){
+        return '<tr data-aluno="' + esc(a.alunoId) + '"><td>' + esc(a.nome) + '</td><td><input type="number" min="0" max="10" step="0.1" data-n value="' + (a.nota === null ? '' : a.nota) + '" style="width:90px"></td>' +
+          '<td><input type="text" data-c value="' + esc(a.comentario) + '" style="min-width:220px"></td></tr>';
+      }).join('') + '</tbody></table></div>' : '<p class="aviso">Nenhum aluno inscrito.</p>') +
+      '<div class="botoes"><button type="button" class="mini" id="nSalvar">Salvar notas</button><button type="button" class="secundario mini" id="nCanc">Fechar</button></div><div id="nMsg"></div></div>';
+    $('nCanc').addEventListener('click', function(){ box.innerHTML = ''; });
+    $('nSalvar').addEventListener('click', function(){
+      var b = this; b.disabled = true;
+      var notas = Array.prototype.map.call(box.querySelectorAll('[data-aluno]'), function(tr){
+        return {alunoId: tr.dataset.aluno, nota: String(tr.querySelector('[data-n]').value).replace(',', '.'), comentario: tr.querySelector('[data-c]').value};
+      });
+      api('lancarNotasTrabalho', {trabalhoId: trabalhoId, notas: notas}).then(abrirNotas)
+        .catch(function(e){ b.disabled = false; $('nMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    });
+  }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 
 /* ---- respostas de um aluno, com revisão de nota ---- */
@@ -1455,54 +1561,88 @@ function desenharDisciplinas(){
 }
 
 function cartaoDisc(d){
+  var etapas = (d.composicao && d.composicao.etapas) || [];
+  var gl = d.glossario || [];
   return '<div class="caixa" style="margin-bottom:18px"><h3>' + esc(d.nome) + '</h3>' +
     '<p class="aviso">' + esc(d.semestre) + ' · ' + d.aprovados + ' aluno(s) inscrito(s)' + (d.pendentes ? ' · <b style="color:#c62828">' + d.pendentes + ' pendente(s)</b>' : '') + '</p>' +
-    '<div class="cfg"><span>Tempos por aula</span><span>' + d.tempos + ' × 50 min</span><span>Prazo padrão</span><span>' + d.prazo_padrao + ' min</span>' +
-    '<span>Presença mínima</span><span>' + d.presenca_min + '%</span><span>Questões por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s)</span>' +
-    '<span>Peso fechadas / abertas</span><span>' + d.peso_fechadas + '% / ' + (100 - d.peso_fechadas) + '%</span>' +
-    '<span>Questões em aula valem</span><span>' + nota10(d.valor_aulas) + ' de 10</span><span>Provas previstas</span><span>' + d.provas_previstas + '</span></div>' +
-    (d.orientacoes ? '<p class="aviso" style="margin-top:8px">Orientações: "' + esc(d.orientacoes) + '"</p>' : '') +
-    (d.glossario.length ? '<div class="chips" style="margin-top:8px">' + d.glossario.map(function(t){ return '<span class="tag t-azul">' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
+    '<div class="cfg"><span>Aula</span><span>' + d.tempos + ' × 50 min · prazo ' + d.prazo_padrao + ' min</span>' +
+    '<span>Questões por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s) · peso ' + d.peso_fechadas + '/' + (100 - d.peso_fechadas) + '</span>' +
+    '<span>Presença mínima</span><span>' + d.presenca_min + '%</span>' +
+    '<span>Nota</span><span>' + etapas.map(function(e){ return esc(e.nome) + (etapas.length > 1 && !pesosIguais(etapas) ? ' (peso ' + nota10(e.peso) + ')' : ''); }).join(' + ') + (etapas.length > 1 ? (pesosIguais(etapas) ? ' · média simples' : ' · média ponderada') : '') + '</span></div>' +
+    '<p class="aviso" style="margin-top:8px">' +
+      (d.orientacoes ? '<span title="' + esc(d.orientacoes) + '">Orientações para as questões: definidas</span>' : 'Sem orientações fixas para as questões') + ' · ' +
+      (gl.length ? 'Glossário: ' + gl.length + ' termo(s) (' + esc(gl.slice(0, 4).join(', ')) + (gl.length > 4 ? '…' : '') + ')' : 'Sem glossário') + '</p>' +
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
     '<button type="button" class="secundario mini" data-ativar="' + esc(d.id) + '" data-valor="' + (d.ativa ? '0' : '1') + '">' + (d.ativa ? 'Arquivar' : 'Reativar') + '</button></div></div>';
 }
+function pesosIguais(etapas){ return etapas.every(function(e){ return Number(e.peso) === Number(etapas[0].peso); }); }
 
 $('btNovaDisc').addEventListener('click', function(){ abrirForm(null); });
 
+var etapasEdit = [];
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:semestreAtual(), tempos:p.tempos, prazo_padrao:p.prazo_padrao,
     presenca_min:p.presenca_min, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
-    valor_aulas:p.valor_aulas, provas_previstas:p.provas_previstas};
+    composicao:{etapas:[{id:'E1', nome:'P1', peso:1, fim:'', aulas:2}, {id:'E2', nome:'P2', peso:1, fim:'', aulas:2}]}};
+  etapasEdit = (v.composicao && v.composicao.etapas ? v.composicao.etapas : []).map(function(e){ return {id:e.id, nome:e.nome, peso:e.peso, fim:e.fim, aulas:e.aulas}; });
   var f = $('formDisc');
   f.innerHTML = '<h2>' + (d ? 'Editar disciplina' : 'Nova disciplina') + '</h2><div class="campos">' +
     campo('fNome', 'Nome', 'text', v.nome, 'campoLargo', 'ex.: Conservação de Alimentos') + campo('fSem', 'Semestre', 'text', v.semestre, '', 'ex.: 2026.2') +
     '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
     campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
     campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) + campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
-    campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
-    campo('fValAulas', 'Questões em aula valem (de 10)', 'number', v.valor_aulas === undefined ? 2 : v.valor_aulas) +
-    campo('fProvas', 'Provas previstas', 'number', v.provas_previstas === undefined ? 2 : v.provas_previstas) +
-    '<div class="campoLargo"><label class="rot" for="fOri">Orientações fixas para as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea></div>' +
-    '<div class="campoLargo"><label class="rot" for="fGlo">Glossário (separe por vírgula)</label><textarea id="fGlo" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
-    '<p class="aviso" style="margin:6px 0 0">Termos técnicos que ajudam a IA a transcrever a aula corretamente.</p></div></div>' +
-    '<p class="aviso" id="fPesoTxt"></p><div id="fErro" class="erro oculto"></div>' +
+    campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) + '</div>' +
+    '<p class="aviso" id="fPesoTxt" style="margin-top:-6px"></p>' +
+    '<h4>Composição da nota</h4><p class="aviso">Cada etapa vale de 0 a 10 e soma: questões em aula + provas + trabalhos. As provas entram pela tela Prova por IA e os trabalhos pela tela Notas, cada um com o seu valor dentro da etapa. ' +
+    'As aulas entram na etapa pela data: até a data de corte (ou, se ficar em branco, até a data da prova dessa etapa).</p>' +
+    '<div id="etapasBox"></div><div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" id="fMaisEtapa">+ Etapa</button></div>' +
+    '<h4>Questões geradas pela IA</h4>' +
+    '<label class="rot" for="fOri">Orientações fixas</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea>' +
+    '<details style="margin-top:12px"' + (v.glossario.length ? '' : ' open') + '><summary class="link">Glossário · ' + v.glossario.length + ' termo(s)</summary>' +
+    '<textarea id="fGlo" style="margin-top:8px;min-height:120px" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
+    '<p class="aviso" style="margin:6px 0 0">Termos técnicos separados por vírgula. Ajudam a IA a transcrever a aula corretamente.</p></details>' +
+    '<div id="fErro" class="erro oculto"></div>' +
     '<div class="botoes"><button type="button" id="fSalvar">' + (d ? 'Salvar alterações' : 'Criar disciplina') + '</button><button type="button" class="secundario" id="fCancelar">Cancelar</button></div>';
   f.classList.remove('oculto');
-  var atualizaPeso = function(){ var n = Number($('fPeso').value) || 0; $('fPesoTxt').textContent = 'Nota da aula = ' + n + '% média das fechadas + ' + (100 - n) + '% média das abertas.'; };
+  desenharEtapas();
+  var atualizaPeso = function(){ var n = Number($('fPeso').value) || 0; $('fPesoTxt').textContent = 'Nota de cada aula = ' + n + '% média das fechadas + ' + (100 - n) + '% média das abertas.'; };
   $('fPeso').addEventListener('input', atualizaPeso); atualizaPeso();
+  $('fMaisEtapa').addEventListener('click', function(){ lerEtapas(); etapasEdit.push({id:'', nome:'P' + (etapasEdit.length + 1), peso:1, fim:'', aulas:2}); desenharEtapas(); });
   $('fCancelar').addEventListener('click', function(){ f.classList.add('oculto'); });
   $('fSalvar').addEventListener('click', function(){
+    lerEtapas();
     var bt = $('fSalvar'); bt.disabled = true; $('fErro').classList.add('oculto');
     api('salvarDisciplina', {disciplina:{
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSem').value, tempos: $('fTempos').value,
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
       qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, orientacoes: $('fOri').value, glossario: $('fGlo').value,
-      valor_aulas: String($('fValAulas').value).replace(',', '.'), provas_previstas: $('fProvas').value
+      composicao: {etapas: etapasEdit}
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
       .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
   });
   f.scrollIntoView({behavior:'smooth', block:'start'});
   $('fNome').focus();
+}
+
+function desenharEtapas(){
+  $('etapasBox').innerHTML = '<div class="tabelaBox"><table><thead><tr><th>Etapa</th><th>Peso na média</th><th>Questões em aula valem</th><th>Data de corte (opcional)</th><th></th></tr></thead><tbody>' +
+    etapasEdit.map(function(e, i){
+      return '<tr data-et="' + i + '"><td><input type="text" data-c="nome" value="' + esc(e.nome) + '" style="width:90px"></td>' +
+        '<td><input type="number" min="0" step="0.5" data-c="peso" value="' + esc(e.peso) + '" style="width:80px"></td>' +
+        '<td><input type="number" min="0" max="10" step="0.5" data-c="aulas" value="' + esc(e.aulas) + '" style="width:80px"> <span class="aviso">de 10</span></td>' +
+        '<td><input type="date" data-c="fim" value="' + esc(e.fim) + '" style="width:160px"></td>' +
+        '<td>' + (etapasEdit.length > 1 ? '<button type="button" class="secundario mini" data-tirarEt="' + i + '">Remover</button>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table></div>' +
+    '<p class="aviso" style="margin-top:6px">Média final = ' + (pesosIguais(etapasEdit) ? '(' + etapasEdit.map(function(e){ return esc(e.nome); }).join(' + ') + ') ÷ ' + etapasEdit.length
+      : '(' + etapasEdit.map(function(e){ return esc(e.nome) + ' × ' + nota10(e.peso); }).join(' + ') + ') ÷ soma dos pesos') + '. Se uma etapa for removida, as provas e trabalhos dela passam para a primeira etapa.</p>';
+  $('etapasBox').querySelectorAll('[data-tirarEt]').forEach(function(b){ b.addEventListener('click', function(){ lerEtapas(); etapasEdit.splice(Number(b.getAttribute('data-tirarEt')), 1); desenharEtapas(); }); });
+  $('etapasBox').querySelectorAll('input[data-c="peso"], input[data-c="nome"]').forEach(function(inp){ inp.addEventListener('change', function(){ lerEtapas(); desenharEtapas(); }); });
+}
+function lerEtapas(){
+  $('etapasBox').querySelectorAll('[data-et]').forEach(function(tr){
+    var e = etapasEdit[Number(tr.dataset.et)];
+    tr.querySelectorAll('[data-c]').forEach(function(inp){ e[inp.dataset.c] = inp.dataset.c === 'nome' || inp.dataset.c === 'fim' ? inp.value : String(inp.value).replace(',', '.'); });
+  });
 }
 function campo(id, rotulo, tipo, valor, classe_, ph){
   return '<div class="' + (classe_ || '') + '"><label class="rot" for="' + id + '">' + rotulo + '</label><input type="' + tipo + '" id="' + id + '" value="' + esc(valor) + '"' +
