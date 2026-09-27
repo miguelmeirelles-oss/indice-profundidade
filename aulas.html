@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aula por IA — Engenharia de Alimentos</title>
+<style>
+  :root{
+    --menu:#17389C; --azul:#2E62C6; --titulo:#3E76C4; --navy:#0E2A5C;
+    --bloco:#EFF1F5; --ambar:#F5C518; --branco:#fff; --cinza:#5b6b86;
+    --verde:#1a7a3c; --vermelho:#8a1c1c; --ocre:#8a6100; --linha:#d7deea;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:var(--navy);background:var(--branco);font-size:15px;line-height:1.45}
+  .wrap{max-width:900px;margin:0 auto}
+  .oculto{display:none!important}
+
+  .cabecalho{background:var(--menu);border:2.5px solid var(--navy);border-radius:18px;box-shadow:4px 5px 0 var(--navy);padding:22px 24px;margin-bottom:18px;color:#fff}
+  .cabecalho h1{margin:0;font-size:28px;line-height:1.15;color:#fff}
+  .cabecalho p{margin:6px 0 0;font-size:14px;color:#cddaf5;max-width:560px}
+  .topoFlex{display:flex;gap:16px;justify-content:space-between;align-items:flex-start;flex-wrap:wrap}
+  .quem{font-size:13px;color:#cddaf5;text-align:right}
+  .quem b{color:#fff;display:block;font-size:14px}
+  .quem a{color:#cddaf5}
+  .visao{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .visao button{background:rgba(255,255,255,.12);color:#fff;border:2px solid rgba(255,255,255,.45);box-shadow:none;border-radius:999px;padding:7px 15px;font-size:13px}
+  .visao button[aria-pressed="true"]{background:var(--ambar);color:var(--navy);border-color:var(--navy);box-shadow:3px 4px 0 rgba(0,0,0,.35)}
+  .visao button:hover{transform:none}
+
+  .caixa{border:2.5px solid var(--navy);border-radius:18px;background:#fff;box-shadow:4px 5px 0 var(--navy);padding:18px;margin-bottom:18px}
+  h2{font-size:15px;color:var(--menu);margin:0 0 12px;text-transform:uppercase;letter-spacing:.05em}
+  h3{font-size:16px;margin:0 0 6px}
+  p{margin:0 0 10px}
+  .aviso{font-size:12.5px;color:var(--cinza)}
+  button{font-family:inherit;font-size:14.5px;font-weight:bold;cursor:pointer;border:2.5px solid var(--navy);border-radius:14px;padding:10px 18px;background:var(--ambar);color:var(--navy);box-shadow:3px 4px 0 var(--navy)}
+  button:hover{transform:translate(1px,1px);box-shadow:2px 3px 0 var(--navy)}
+  button:active{transform:translate(3px,4px);box-shadow:0 0 0 var(--navy)}
+  button:disabled{opacity:.5;cursor:default;transform:none;box-shadow:3px 4px 0 var(--navy)}
+  button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--ambar);outline-offset:2px}
+  button.secundario{background:#fff}
+  button.mini{padding:5px 11px;font-size:12.5px;border-radius:10px;box-shadow:2px 2px 0 var(--navy)}
+  .link{background:none;border:none;box-shadow:none;color:var(--azul);font-size:14px;font-weight:bold;text-decoration:underline;padding:4px 0}
+  .link:hover{transform:none;box-shadow:none}
+  .botoes{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px}
+  label.rot{display:block;font-size:12px;font-weight:bold;color:var(--titulo);margin:0 0 6px;text-transform:uppercase;letter-spacing:.05em}
+  input[type=text],input[type=number],input[type=password],select,textarea{width:100%;padding:10px 12px;font-family:inherit;font-size:14.5px;color:var(--navy);border:2px solid var(--azul);border-radius:12px;background:#fff}
+  textarea{min-height:70px;resize:vertical}
+  .campos{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:14px}
+  .campoLargo{grid-column:1/-1}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .abas{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .aba{border:2px solid var(--navy);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:bold;color:var(--navy);background:#fff;box-shadow:none}
+  .aba:hover{background:var(--bloco);transform:none;box-shadow:none}
+  .aba[aria-pressed="true"]{background:var(--navy);color:#fff}
+  .aba:disabled{opacity:.55;box-shadow:none}
+  .aba small{font-weight:normal;font-size:11px}
+  .badge{display:inline-block;min-width:18px;height:18px;border-radius:99px;background:#e23b3b;color:#fff;font-size:11px;line-height:18px;text-align:center;margin-left:6px;padding:0 5px}
+  .tag{display:inline-block;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:2px 9px;border:1.5px solid currentColor;white-space:nowrap}
+  .t-ok{color:var(--verde)} .t-warn{color:var(--ocre)} .t-err{color:#c62828} .t-azul{color:var(--azul)} .t-cinza{color:var(--cinza)}
+  .cartao{border:2.5px solid var(--navy);border-radius:14px;padding:12px 14px;background:#fff;margin-bottom:12px}
+  .cartao .l1{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-weight:bold}
+  .cartao .l2{font-size:13px;color:var(--cinza);margin-top:4px}
+  .linha{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--linha);flex-wrap:wrap}
+  .linha:last-child{border-bottom:none}
+  .convite{background:var(--bloco);border-left:8px solid var(--ambar);border-radius:0 14px 14px 0;padding:12px 16px;margin:0 0 14px}
+  .erro{background:#fdecec;border:2px solid #e23b3b;border-radius:12px;padding:10px 14px;color:var(--vermelho);font-size:14px;margin:12px 0}
+  .ok{background:#e6f4ea;border:2px solid var(--verde);border-radius:12px;padding:10px 14px;color:var(--verde);font-size:14px;margin:12px 0}
+  .carregando{color:var(--cinza);font-size:14px;padding:8px 0}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+  .cfg{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13.5px;margin-top:8px}
+  .cfg span:nth-child(odd){color:var(--cinza)}
+  .cfg span:nth-child(even){font-weight:bold;text-align:right}
+  .mono{font-family:Consolas,"Courier New",monospace}
+  .grupoTitulo{font-size:13px;font-weight:bold;color:var(--titulo);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 4px}
+  @media (max-width:520px){body{padding:12px}.cabecalho h1{font-size:23px}.quem{text-align:left}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="cabecalho">
+    <div class="topoFlex">
+      <div>
+        <h1>Aula por IA</h1>
+        <p>Questões sobre o que foi dito em sala, nota por aula, histórico e apostila de cada disciplina.</p>
+      </div>
+      <div class="quem" id="quem"></div>
+    </div>
+    <div class="visao oculto" id="visao" role="group" aria-label="Escolher visão">
+      <button type="button" data-visao="prof" aria-pressed="true">Professor</button>
+      <button type="button" data-visao="aluno" aria-pressed="false">Aluno</button>
+    </div>
+  </div>
+
+  <div id="erroGeral" class="erro oculto" role="alert"></div>
+
+  <!-- sem login -->
+  <section id="tLogin" class="caixa oculto">
+    <h2>Entre com sua conta</h2>
+    <p>O Aula por IA usa a mesma conta do Índice de Profundidade.</p>
+    <div class="botoes"><button type="button" onclick="location.href='index.html?voltar=aulas'">Entrar ou criar conta</button></div>
+  </section>
+
+  <p id="tCarregando" class="carregando">Carregando…</p>
+
+  <!-- ================= ALUNO ================= -->
+  <section id="tAluno" class="oculto">
+    <div class="caixa">
+      <h2>Minhas matérias</h2>
+      <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
+    </div>
+    <div class="caixa">
+      <h2>Inscrever-se em uma matéria</h2>
+      <label class="rot" for="selProf">Professor</label>
+      <select id="selProf"><option value="">Carregando professores…</option></select>
+      <div id="listaMaterias" style="margin-top:14px"></div>
+    </div>
+  </section>
+
+  <!-- ================= PROFESSOR ================= -->
+  <section id="tProf" class="oculto">
+    <div class="abas" role="group" aria-label="Seções do professor">
+      <button type="button" class="aba" data-aba="disc" aria-pressed="true">Disciplinas</button>
+      <button type="button" class="aba" data-aba="insc" aria-pressed="false">Inscrições<span class="badge oculto" id="badgeInsc"></span></button>
+      <button type="button" class="aba" data-aba="cfg" aria-pressed="false">Configurações</button>
+      <button type="button" class="aba" disabled>Dar aula <small>(etapa 2)</small></button>
+      <button type="button" class="aba" disabled>Notas <small>(etapa 3)</small></button>
+      <button type="button" class="aba" disabled>Histórico e apostila <small>(etapa 4)</small></button>
+    </div>
+    <div id="avisoChave" class="convite oculto">Cadastre sua chave do Gemini em <b>Configurações</b>. Sem ela, as funções de IA (gravação, questões e apostila) ficam bloqueadas.</div>
+
+    <div id="pDisc">
+      <div id="formDisc" class="caixa oculto"></div>
+      <div id="listaDisc"></div>
+      <div class="botoes" style="margin-top:0"><button type="button" id="btNovaDisc">+ Nova disciplina</button>
+        <a id="linkPlanilha" class="link oculto" target="_blank" rel="noopener">Abrir minha planilha no Drive</a></div>
+    </div>
+
+    <div id="pInsc" class="oculto">
+      <div class="caixa"><h2>Pedidos pendentes</h2><div id="listaPend"></div></div>
+      <div class="caixa"><h2>Alunos inscritos</h2><div id="listaAprov"></div></div>
+    </div>
+
+    <div id="pCfg" class="oculto">
+      <div class="caixa">
+        <h2>Chave do Gemini</h2>
+        <p>Todas as tarefas de IA das suas matérias usam só as suas chaves. Elas ficam guardadas no servidor; aqui aparece só o final de cada uma.</p>
+        <div id="listaChaves"></div>
+        <label class="rot" for="novaChave" style="margin-top:14px">Acrescentar chave</label>
+        <input type="password" id="novaChave" placeholder="Cole a chave aqui (começa com AIza)" autocomplete="off">
+        <div class="botoes">
+          <button type="button" id="btGuardarChave">Guardar chave</button>
+          <button type="button" class="secundario" id="btTestar">Testar chaves</button>
+        </div>
+        <div id="msgChave"></div>
+        <p class="aviso" style="margin-top:12px">A chave é gratuita e sai em aistudio.google.com, em "Get API key". Com mais de uma chave, quando a cota de uma acaba o sistema passa para a próxima.</p>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+/* ==================================================================
+   Endereço do backend do Aula por IA. Troque pela URL /exec da
+   implantação do projeto novo (não é a do Avaliador).
+   ================================================================== */
+var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
+
+var token = '';
+try{ token = localStorage.getItem('ip_token') || ''; }catch(e){}
+var sessao = null, resumo = null;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+  return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+function api(acao, dados){
+  dados = dados || {}; dados.token = token;
+  return fetch(BACKEND_AULAS, {
+    method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
+    body: JSON.stringify({acao:acao, dados:dados})
+  })
+  .then(function(r){ if(!r.ok) throw new Error('O servidor respondeu ' + r.status + '.'); return r.json(); })
+  .then(function(j){
+    if(!j.ok){
+      if(j.erro === 'SESSAO'){ mostrarLogin(); throw new Error('Sua sessão expirou. Entre de novo.'); }
+      throw new Error(j.erro || 'Não deu para concluir.');
+    }
+    return j.resultado;
+  })
+  .catch(function(e){
+    if(e instanceof TypeError) throw new Error('Sem conexão com o servidor. Verifique sua internet e tente de novo.');
+    throw e;
+  });
+}
+
+function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg; e.classList.toggle('oculto', !msg); }
+function mostrarLogin(){ $('tCarregando').classList.add('oculto'); $('tLogin').classList.remove('oculto');
+  $('tAluno').classList.add('oculto'); $('tProf').classList.add('oculto'); }
+
+/* ---------------- início ---------------- */
+function iniciar(){
+  if(BACKEND_AULAS.indexOf('COLE_AQUI') === 0){
+    $('tCarregando').classList.add('oculto');
+    erroGeral('Falta configurar o endereço do servidor (BACKEND_AULAS) neste arquivo.');
+    return;
+  }
+  if(!token){ mostrarLogin(); return; }
+  api('sessao').then(function(r){
+    $('tCarregando').classList.add('oculto');
+    if(!r.logado){ mostrarLogin(); return; }
+    sessao = r;
+    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') +
+      '<a href="index.html">voltar ao Avaliador</a>';
+    if(r.professor){
+      $('visao').classList.remove('oculto');
+      trocarVisao(lerPreferencia() || 'prof');
+    } else trocarVisao('aluno');
+  }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
+}
+
+function lerPreferencia(){ try{ return localStorage.getItem('aulas_visao'); }catch(e){ return null; } }
+function trocarVisao(v){
+  document.querySelectorAll('[data-visao]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.visao === v)); });
+  $('tAluno').classList.toggle('oculto', v !== 'aluno');
+  $('tProf').classList.toggle('oculto', v !== 'prof');
+  try{ localStorage.setItem('aulas_visao', v); }catch(e){}
+  if(v === 'aluno') abrirAluno(); else abrirProf();
+}
+document.querySelectorAll('[data-visao]').forEach(function(b){
+  b.addEventListener('click', function(){ trocarVisao(b.dataset.visao); });
+});
+
+/* ================= ALUNO ================= */
+var alunoCarregado = false;
+function abrirAluno(){
+  carregarMinhas();
+  if(!alunoCarregado){
+    alunoCarregado = true;
+    api('professores').then(function(lista){
+      var s = $('selProf');
+      s.innerHTML = '<option value="">Escolha o professor</option>' + lista.map(function(p){
+        return '<option value="' + esc(p.id) + '">' + esc(p.nome) + '</option>'; }).join('');
+      if(lista.length === 1){ s.value = lista[0].id; carregarMaterias(); }
+    }).catch(function(e){ $('selProf').innerHTML = '<option value="">' + esc(e.message) + '</option>'; });
+  }
+}
+
+function carregarMinhas(){
+  api('minhasMaterias').then(function(lista){
+    var el = $('listaMinhas');
+    if(!lista.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria. Peça inscrição abaixo.</p>'; return; }
+    el.innerHTML = lista.map(function(m){
+      var tag = m.situacao === 'aprovada'
+        ? '<span class="tag t-ok">inscrito</span>'
+        : '<span class="tag t-warn">aguardando aprovação</span>';
+      return '<div class="cartao"><div class="l1"><span>' + esc(m.nome) + ' · ' + esc(m.semestre) + '</span>' + tag + '</div>' +
+        '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') +
+        (m.situacao === 'aprovada' ? ' · as notas aparecem aqui quando as aulas começarem' : '') + '</div>' +
+        (m.situacao === 'pendente' ? '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" data-cancelar="' +
+          esc(m.inscricaoId) + '" data-prof="' + esc(m.professorId) + '">Cancelar pedido</button></div>' : '') + '</div>';
+    }).join('');
+    el.querySelectorAll('[data-cancelar]').forEach(function(b){
+      b.addEventListener('click', function(){
+        b.disabled = true;
+        api('cancelarPedido', {professorId: b.dataset.prof, inscricaoId: b.dataset.cancelar})
+          .then(function(){ carregarMinhas(); carregarMaterias(); })
+          .catch(function(e){ b.disabled = false; erroGeral(e.message); });
+      });
+    });
+  }).catch(function(e){ $('listaMinhas').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+
+$('selProf').addEventListener('change', carregarMaterias);
+function carregarMaterias(){
+  var pid = $('selProf').value, el = $('listaMaterias');
+  if(!pid){ el.innerHTML = ''; return; }
+  el.innerHTML = '<p class="carregando">Carregando matérias…</p>';
+  api('materias', {professorId: pid}).then(function(lista){
+    if(!lista.length){ el.innerHTML = '<p class="aviso">Esse professor ainda não abriu matérias.</p>'; return; }
+    el.innerHTML = lista.map(function(m){
+      var direita = m.situacao === 'aprovada' ? '<span class="tag t-ok">inscrito</span>'
+        : m.situacao === 'pendente' ? '<span class="tag t-warn">pedido enviado</span>'
+        : '<button type="button" class="mini" data-pedir="' + esc(m.id) + '">Pedir inscrição</button>';
+      return '<div class="linha"><span><b>' + esc(m.nome) + '</b> · ' + esc(m.semestre) + '</span>' + direita + '</div>';
+    }).join('');
+    el.querySelectorAll('[data-pedir]').forEach(function(b){
+      b.addEventListener('click', function(){
+        b.disabled = true; b.textContent = 'Enviando…';
+        api('pedirInscricao', {professorId: pid, disciplinaId: b.dataset.pedir})
+          .then(function(){ carregarMaterias(); carregarMinhas(); })
+          .catch(function(e){ b.disabled = false; b.textContent = 'Pedir inscrição'; erroGeral(e.message); });
+      });
+    });
+  }).catch(function(e){ el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+
+/* ================= PROFESSOR ================= */
+var abaAtual = 'disc';
+document.querySelectorAll('[data-aba]').forEach(function(b){
+  b.addEventListener('click', function(){ abrirAba(b.dataset.aba); });
+});
+function abrirAba(a){
+  abaAtual = a;
+  document.querySelectorAll('[data-aba]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.aba === a)); });
+  $('pDisc').classList.toggle('oculto', a !== 'disc');
+  $('pInsc').classList.toggle('oculto', a !== 'insc');
+  $('pCfg').classList.toggle('oculto', a !== 'cfg');
+  if(a === 'insc') carregarInscricoes();
+  if(a === 'cfg') carregarChaves();
+}
+
+function abrirProf(){ carregarResumo(); abrirAba(abaAtual); }
+
+function carregarResumo(){
+  $('listaDisc').innerHTML = '<p class="carregando">Carregando disciplinas…</p>';
+  return api('profResumo').then(function(r){
+    resumo = r;
+    $('avisoChave').classList.toggle('oculto', r.temChave);
+    var b = $('badgeInsc'); b.textContent = r.pendentes; b.classList.toggle('oculto', !r.pendentes);
+    if(r.planilhaUrl){ $('linkPlanilha').href = r.planilhaUrl; $('linkPlanilha').classList.remove('oculto'); }
+    desenharDisciplinas();
+  }).catch(function(e){ $('listaDisc').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+
+function desenharDisciplinas(){
+  var el = $('listaDisc'), ds = resumo.disciplinas;
+  if(!ds.length){ el.innerHTML = '<div class="caixa"><p>Nenhuma disciplina ainda. Crie a primeira, por exemplo "Conservação de Alimentos".</p></div>'; return; }
+  var ativas = ds.filter(function(d){ return d.ativa; }), arquivadas = ds.filter(function(d){ return !d.ativa; });
+  el.innerHTML = '<div class="grid2">' + ativas.map(cartaoDisc).join('') + '</div>' +
+    (arquivadas.length ? '<p class="grupoTitulo">Arquivadas</p><div class="grid2">' + arquivadas.map(cartaoDisc).join('') + '</div>' : '');
+  el.querySelectorAll('[data-editar]').forEach(function(b){
+    b.addEventListener('click', function(){ abrirForm(ds.filter(function(d){ return d.id === b.dataset.editar; })[0]); });
+  });
+  el.querySelectorAll('[data-ativar]').forEach(function(b){
+    b.addEventListener('click', function(){
+      b.disabled = true;
+      api('ativarDisciplina', {id: b.dataset.ativar, ativa: b.dataset.valor === '1'})
+        .then(carregarResumo).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+    });
+  });
+}
+
+function cartaoDisc(d){
+  return '<div class="caixa" style="margin-bottom:18px"><h3>' + esc(d.nome) + '</h3>' +
+    '<p class="aviso">' + esc(d.semestre) + ' · ' + d.aprovados + ' aluno(s) inscrito(s)' +
+    (d.pendentes ? ' · <b style="color:#c62828">' + d.pendentes + ' pendente(s)</b>' : '') + '</p>' +
+    '<div class="cfg">' +
+      '<span>Tempos por aula</span><span>' + d.tempos + ' × 50 min</span>' +
+      '<span>Prazo padrão</span><span>' + d.prazo_padrao + ' min</span>' +
+      '<span>Presença mínima</span><span>' + d.presenca_min + '%</span>' +
+      '<span>Questões por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s)</span>' +
+      '<span>Peso fechadas / abertas</span><span>' + d.peso_fechadas + '% / ' + (100 - d.peso_fechadas) + '%</span>' +
+    '</div>' +
+    (d.orientacoes ? '<p class="aviso" style="margin-top:8px">Orientações: "' + esc(d.orientacoes) + '"</p>' : '') +
+    (d.glossario.length ? '<div class="chips" style="margin-top:8px">' + d.glossario.map(function(t){ return '<span class="tag t-azul">' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
+    '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
+    '<button type="button" class="secundario mini" data-ativar="' + esc(d.id) + '" data-valor="' + (d.ativa ? '0' : '1') + '">' + (d.ativa ? 'Arquivar' : 'Reativar') + '</button></div></div>';
+}
+
+$('btNovaDisc').addEventListener('click', function(){ abrirForm(null); });
+
+function abrirForm(d){
+  var p = resumo.padrao, v = d || {nome:'', semestre:semestreAtual(), tempos:p.tempos, prazo_padrao:p.prazo_padrao,
+    presenca_min:p.presenca_min, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas,
+    orientacoes:'', glossario:[]};
+  var f = $('formDisc');
+  f.innerHTML = '<h2>' + (d ? 'Editar disciplina' : 'Nova disciplina') + '</h2>' +
+    '<div class="campos">' +
+      campo('fNome', 'Nome', 'text', v.nome, 'campoLargo', 'ex.: Conservação de Alimentos') +
+      campo('fSem', 'Semestre', 'text', v.semestre, '', 'ex.: 2026.2') +
+      '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
+      campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) +
+      campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
+      campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) +
+      campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
+      campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
+      '<div class="campoLargo"><label class="rot" for="fOri">Orientações fixas para as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea></div>' +
+      '<div class="campoLargo"><label class="rot" for="fGlo">Glossário (separe por vírgula)</label><textarea id="fGlo" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
+        '<p class="aviso" style="margin:6px 0 0">Termos técnicos que ajudam a IA a transcrever a aula corretamente.</p></div>' +
+    '</div>' +
+    '<p class="aviso" id="fPesoTxt"></p>' +
+    '<div id="fErro" class="erro oculto"></div>' +
+    '<div class="botoes"><button type="button" id="fSalvar">' + (d ? 'Salvar alterações' : 'Criar disciplina') + '</button><button type="button" class="secundario" id="fCancelar">Cancelar</button></div>';
+  f.classList.remove('oculto');
+  var atualizaPeso = function(){ var n = Number($('fPeso').value) || 0; $('fPesoTxt').textContent = 'Nota da aula = ' + n + '% média das fechadas + ' + (100 - n) + '% média das abertas.'; };
+  $('fPeso').addEventListener('input', atualizaPeso); atualizaPeso();
+  $('fCancelar').addEventListener('click', function(){ f.classList.add('oculto'); });
+  $('fSalvar').addEventListener('click', function(){
+    var bt = $('fSalvar'); bt.disabled = true; $('fErro').classList.add('oculto');
+    api('salvarDisciplina', {disciplina:{
+      id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSem').value, tempos: $('fTempos').value,
+      prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
+      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, orientacoes: $('fOri').value, glossario: $('fGlo').value
+    }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
+      .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
+  });
+  f.scrollIntoView({behavior:'smooth', block:'start'});
+  $('fNome').focus();
+}
+
+function campo(id, rotulo, tipo, valor, classe, ph){
+  return '<div class="' + (classe || '') + '"><label class="rot" for="' + id + '">' + rotulo + '</label>' +
+    '<input type="' + tipo + '" id="' + id + '" value="' + esc(valor) + '"' + (ph ? ' placeholder="' + esc(ph) + '"' : '') +
+    (tipo === 'number' ? ' min="0"' : '') + '></div>';
+}
+function semestreAtual(){ var d = new Date(); return d.getFullYear() + '.' + (d.getMonth() < 6 ? 1 : 2); }
+
+/* ---- inscrições ---- */
+function carregarInscricoes(){
+  $('listaPend').innerHTML = $('listaAprov').innerHTML = '<p class="carregando">Carregando…</p>';
+  api('inscricoes').then(function(r){
+    var b = $('badgeInsc'); b.textContent = r.pendentes.length; b.classList.toggle('oculto', !r.pendentes.length);
+    $('listaPend').innerHTML = r.pendentes.length ? r.pendentes.map(function(i){
+      return '<div class="linha"><div><b>' + esc(i.aluno) + '</b> <span class="aviso">' + esc(i.email) + '</span><div class="aviso">' +
+        esc(i.disciplina) + ' · pediu em ' + esc(i.pedidoEm) + '</div></div><div class="botoes" style="margin:0">' +
+        '<button type="button" class="mini" data-dec="aprovada" data-id="' + esc(i.id) + '">Aprovar</button>' +
+        '<button type="button" class="secundario mini" data-dec="recusada" data-id="' + esc(i.id) + '">Recusar</button></div></div>';
+    }).join('') : '<p class="aviso">Nenhum pedido esperando aprovação.</p>';
+
+    var grupos = {};
+    r.aprovados.forEach(function(i){ (grupos[i.disciplina] = grupos[i.disciplina] || []).push(i); });
+    var nomes = Object.keys(grupos).sort();
+    $('listaAprov').innerHTML = nomes.length ? nomes.map(function(n){
+      return '<p class="grupoTitulo">' + esc(n) + ' · ' + grupos[n].length + ' aluno(s)</p>' + grupos[n].map(function(i){
+        return '<div class="linha"><span>' + esc(i.aluno) + ' <span class="aviso">' + esc(i.email) + '</span></span>' +
+          '<button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
+      }).join('');
+    }).join('') : '<p class="aviso">Nenhum aluno inscrito ainda.</p>';
+
+    document.querySelectorAll('#pInsc [data-dec]').forEach(function(bt){
+      bt.addEventListener('click', function(){
+        if(bt.dataset.dec === 'removida' && bt.textContent !== 'Confirmar remoção'){ bt.textContent = 'Confirmar remoção'; return; }
+        bt.disabled = true;
+        api('decidirInscricao', {id: bt.dataset.id, decisao: bt.dataset.dec})
+          .then(function(){ carregarInscricoes(); carregarResumo(); })
+          .catch(function(e){ bt.disabled = false; erroGeral(e.message); });
+      });
+    });
+  }).catch(function(e){ $('listaPend').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; $('listaAprov').innerHTML = ''; });
+}
+
+/* ---- chaves ---- */
+function desenharChaves(lista){
+  $('listaChaves').innerHTML = lista.length ? lista.map(function(c, i){
+    return '<div class="linha"><span>Chave ' + (i + 1) + ' <span class="mono">' + esc(c) + '</span></span>' +
+      '<button type="button" class="secundario mini" data-rem="' + i + '">Remover</button></div>';
+  }).join('') : '<p class="aviso">Nenhuma chave guardada.</p>';
+  $('listaChaves').querySelectorAll('[data-rem]').forEach(function(b){
+    b.addEventListener('click', function(){
+      if(b.textContent !== 'Confirmar'){ b.textContent = 'Confirmar'; return; }
+      b.disabled = true;
+      api('removerChave', {indice: Number(b.dataset.rem)}).then(function(l){ desenharChaves(l); atualizarAvisoChave(l.length); })
+        .catch(function(e){ b.disabled = false; msgChave(e.message, true); });
+    });
+  });
+}
+function atualizarAvisoChave(n){ $('avisoChave').classList.toggle('oculto', n > 0); if(resumo) resumo.temChave = n > 0; }
+function msgChave(t, erro){ $('msgChave').innerHTML = t ? '<div class="' + (erro ? 'erro' : 'ok') + '">' + t + '</div>' : ''; }
+function carregarChaves(){
+  msgChave('');
+  $('listaChaves').innerHTML = '<p class="carregando">Carregando…</p>';
+  api('chaves').then(desenharChaves).catch(function(e){ msgChave(esc(e.message), true); });
+}
+$('btGuardarChave').addEventListener('click', function(){
+  var b = this, v = $('novaChave').value.trim();
+  if(!v){ $('novaChave').focus(); return; }
+  b.disabled = true; msgChave('');
+  api('guardarChave', {chave: v}).then(function(l){
+    b.disabled = false; $('novaChave').value = ''; desenharChaves(l); atualizarAvisoChave(l.length);
+    msgChave('Chave guardada. Use "Testar chaves" para conferir se ela funciona.');
+  }).catch(function(e){ b.disabled = false; msgChave(esc(e.message), true); });
+});
+$('btTestar').addEventListener('click', function(){
+  var b = this; b.disabled = true; msgChave('');
+  $('msgChave').innerHTML = '<p class="carregando">Testando…</p>';
+  api('testarChaves').then(function(r){
+    b.disabled = false;
+    var ruim = r.some(function(x){ return x.resultado.indexOf('funcionando') !== 0; });
+    msgChave(r.map(function(x){ return esc(x.chave) + ': ' + esc(x.resultado); }).join('<br>'), ruim);
+  }).catch(function(e){ b.disabled = false; msgChave(esc(e.message), true); });
+});
+
+iniciar();
+</script>
+</body>
+</html>
