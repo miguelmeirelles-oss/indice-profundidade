@@ -230,6 +230,8 @@
           <span id="btAreaTexto">Área do aluno</span><span class="seta">&#10230;</span></button>
         <button class="pill claro oculto" id="btProf" onclick="abrirProfessor()">
           <span>Área do professor</span><span class="seta">&#10230;</span></button>
+        <button class="pill claro" onclick="location.href='aulas.html'">
+          <span>Aulas</span><span class="seta">&#10230;</span></button>
         <button class="miniLink" onclick="abrirSugestao()">enviar sugestão</button>
       </div>
     </div>
@@ -552,15 +554,24 @@ api('config').then(function(c){
   if(clientIdGoogle) carregarGoogle();
 }).catch(function(){});
 
+// Vindo do aulas.html sem login: abre a tela de entrar e, depois de logar,
+// devolve o aluno para lá.
+var voltarParaAulas = /[?&]voltar=aulas\b/.test(location.search);
+if(voltarParaAulas && !sessao.token) setTimeout(abrirArea, 0);
+
 if(sessao.token){
   api('sessao', {token: sessao.token}).then(function(r){
+    if(r.logado && voltarParaAulas){ location.href = 'aulas.html'; return; }
     if(r.logado){
       sessao.nome = r.nome; sessao.professor = r.professor;
       sessao.instituicao = r.instituicao || '';
       document.getElementById('btAreaTexto').textContent = 'Meu mapa';
       document.getElementById('btProf').classList.toggle('oculto', !r.professor);
     }
-    else { sessao.token = ''; localStorage.removeItem('ip_token'); }
+    else {
+      sessao.token = ''; localStorage.removeItem('ip_token');
+      if(voltarParaAulas) abrirArea();
+    }
   }).catch(function(){});
 }
 
@@ -593,6 +604,7 @@ function logou(r){
   sessao.token = r.token; sessao.nome = r.nome;
   sessao.professor = !!r.professor; sessao.instituicao = r.instituicao || '';
   localStorage.setItem('ip_token', r.token);
+  if(voltarParaAulas){ location.href = 'aulas.html'; return; }
   document.getElementById('btAreaTexto').textContent = 'Meu mapa';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
   document.getElementById('erroAuth').classList.add('oculto');
