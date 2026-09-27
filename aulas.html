@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aula por IA — Engenharia de Alimentos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
     --menu:#17389C; --azul:#2E62C6; --titulo:#3E76C4; --navy:#0E2A5C;
@@ -140,6 +141,14 @@
   .capitulo:last-child{border-bottom:none}
   .capitulo>summary{font-weight:bold;font-size:15px}
 
+  /* QR code em tela cheia para o datashow */
+  .qrTela{position:fixed;inset:0;background:#fff;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+  .qrCaixa{text-align:center;max-width:900px}
+  .qrCaixa h2{font-size:clamp(20px,3.2vw,36px);text-transform:none;letter-spacing:0;margin-bottom:16px}
+  .qrDesenho{display:inline-block;padding:16px;border:3px solid var(--navy);border-radius:18px;background:#fff}
+  .qrDesenho img,.qrDesenho canvas{display:block}
+  .qrUrl{font-family:Consolas,monospace;font-size:clamp(13px,1.6vw,20px);word-break:break-all;margin:16px 0 6px}
+  .qrInstr{font-size:clamp(15px,2vw,24px);color:var(--cinza)}
   @media (prefers-reduced-motion:reduce){.ponto{animation:none}}
   @media (max-width:520px){body{padding:12px}.cabecalho h1{font-size:23px}.quem{text-align:left}.relogio{font-size:32px}}
 </style>
@@ -292,7 +301,7 @@ function iniciar(){
     $('tCarregando').classList.add('oculto');
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
-    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') + '<a href="index.html">voltar ao Avaliador</a> · <a href="#" id="linkSair">sair</a>';
+    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') + '<a href="provas.html">Prova por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">sair</a>';
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
@@ -464,22 +473,23 @@ function abrirMateria(m){
   api('minhasNotas', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
     var eu = r.eu, h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
       '<h2 style="margin-top:8px">' + esc(m.nome) + ' · ' + esc(m.semestre) + '</h2>';
+    h += composicaoAluno(r);
     if(!r.N){
       h += '<p>Ainda não houve aula com questões nesta matéria.</p>';
     } else {
       var presentes = [];
-      h += '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="grande">' + (eu ? eu.media : 0) + '</span><span class="aviso">de 100' +
+      h += '<h4>Questões em aula</h4><div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap"><span class="grande" style="font-size:32px">' + dez(eu ? eu.media : 0) + '</span><span class="aviso">de 10' +
         (eu && eu.provisoria ? ' · <span class="tag t-warn">provisória</span>' : '') + '</span></div><div class="barrasAula">';
       r.aulas.forEach(function(a){
         var x = a.resultado;
         if(x.tipo === 'x') h += '<i class="x" title="Aula ' + a.numero + ': sem questões">–</i>';
         else if(x.tipo === 'falta') h += '<i class="f" title="Aula ' + a.numero + ': falta">F</i>';
-        else { presentes.push(x.nota); h += '<i class="p" title="Aula ' + a.numero + '">' + x.nota + '</i>'; }
+        else { presentes.push(dez(x.nota)); h += '<i class="p" title="Aula ' + a.numero + '">' + dez(x.nota) + '</i>'; }
       });
       h += '</div>';
       if(eu){
         h += '<div class="calc">' + r.N + ' aulas com questões · mínimo ' + r.minimo + ' · presente em ' + eu.presencas + '<br>' +
-          (presentes.length ? '(' + presentes.join(' + ') + ') ÷ ' + eu.divisor + ' = ' + eu.soma + ' ÷ ' + eu.divisor + ' = ' + eu.media : 'nenhuma aula com presença ainda') + '</div>';
+          (presentes.length ? '(' + presentes.join(' + ') + ') ÷ ' + eu.divisor + ' = ' + dez(eu.soma) + ' ÷ ' + eu.divisor + ' = ' + dez(eu.media) : 'nenhuma aula com presença ainda') + '</div>';
         h += eu.abaixo ? '<div class="erro">Você está abaixo da presença mínima: ' + (r.minimo - eu.presencas) + ' falta(s) estão contando como zero. Estar presente nas próximas aulas recupera a nota.</div>'
           : '<p class="aviso" style="margin-top:8px">Você pode faltar mais ' + (eu.presencas - r.minimo) + ' aula(s) sem perder nota.</p>';
       }
@@ -488,12 +498,12 @@ function abrirMateria(m){
     h += '<div class="botoes"><button type="button" data-apostila>Abrir apostila</button></div></div>';
     h += '<div class="caixa"><h2>Aulas</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
       var x = a.resultado, dir = x.tipo === 'x' ? '<span class="tag t-cinza">sem questões</span>' : x.tipo === 'falta' ? '<span class="tag t-err">falta</span>'
-        : '<span class="nota n' + classe(x.nota) + '">' + x.nota + (x.provisoria ? '*' : '') + '</span>';
+        : '<span class="nota n' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>';
       var qs = a.questoes.map(function(q){
         return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:6px"><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></p>' +
           '<p class="aviso" style="margin:0">Sua resposta: ' + (q.suaResposta === null ? '<b>não respondeu</b>' : esc(q.suaResposta)) + '</p>' +
           (q.correta ? '<p class="aviso" style="margin:0">Correta: <b>' + esc(q.correta) + '</b></p>' : '') +
-          (q.emCorrecao ? '<p class="aviso" style="margin:0"><span class="tag t-warn">em correção</span></p>' : q.nota !== null ? '<p class="aviso" style="margin:0">Nota: <b>' + q.nota + '</b></p>' : '') +
+          (q.emCorrecao ? '<p class="aviso" style="margin:0"><span class="tag t-warn">em correção</span></p>' : q.nota !== null ? '<p class="aviso" style="margin:0">Nota: <b>' + dez(q.nota) + '</b> de 10</p>' : '') +
           (q.comentario ? '<p class="aviso" style="margin:4px 0 0">' + esc(q.comentario) + '</p>' : '') + '</div>';
       }).join('');
       return '<details class="capitulo"><summary><span class="linha" style="display:inline-flex;width:calc(100% - 20px);border:0;padding:0"><span>Aula ' + a.numero +
@@ -506,10 +516,50 @@ function abrirMateria(m){
   }).catch(function(e){ el.innerHTML = '<div class="caixa"><button type="button" class="link" onclick="voltarListaAluno()">&#8592; voltar</button><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
+/* ---- QR code em tela cheia (datashow) ---- */
+function baseSite(){ return location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, ''); }
+function mostrarQR(url, titulo, instrucao){
+  var ov = document.createElement('div');
+  ov.className = 'qrTela'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-label', 'QR code');
+  ov.innerHTML = '<div class="qrCaixa"><h2>' + esc(titulo) + '</h2><div class="qrDesenho"></div><p class="qrUrl">' + esc(url) + '</p><p class="qrInstr">' + esc(instrucao) + '</p>' +
+    '<div class="botoes" style="justify-content:center"><button type="button" class="secundario">Fechar (Esc)</button></div></div>';
+  document.body.appendChild(ov);
+  var lado = Math.floor(Math.max(220, Math.min(window.innerHeight * 0.58, window.innerWidth * 0.8, 620)));
+  var alvo = ov.querySelector('.qrDesenho');
+  if(window.QRCode) new QRCode(alvo, {text: url, width: lado, height: lado, correctLevel: QRCode.CorrectLevel.M});
+  else alvo.textContent = 'Não deu para gerar o QR code agora. Use o endereço abaixo.';
+  function fechar(){ document.removeEventListener('keydown', tecla); try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){} ov.remove(); }
+  function tecla(e){ if(e.key === 'Escape') fechar(); }
+  document.addEventListener('keydown', tecla);
+  ov.querySelector('button').addEventListener('click', fechar);
+  try{ if(ov.requestFullscreen) ov.requestFullscreen().catch(function(){}); }catch(e){}
+}
+function qrAulas(titulo){ mostrarQR(baseSite() + 'aulas.html', titulo, 'Aponte a câmera do celular, entre com sua conta e responda as questões.'); }
+
+/* Notas guardadas de 0 a 100, mostradas de 0 a 10 com uma casa. */
+function dez(n){ return n === null || n === undefined || n === '' ? '—' : (Math.round(Number(n)) / 10).toFixed(1).replace('.', ','); }
+function paraCem(v){ var n = Number(String(v).replace(',', '.')); return isNaN(n) ? 0 : Math.round(Math.max(0, Math.min(10, n)) * 10); }
+function nota10(n){ return n === null || n === undefined ? '—' : Number(n).toFixed(1).replace('.', ','); }
+
+// Composição da nota final (aulas + provas), para o aluno.
+function composicaoAluno(r){
+  var c = r.composicao; if(!c || !c.meu) return '';
+  var m = c.meu, partes = ['<span>Questões em aula (vale ' + nota10(c.valorAulas) + ')</span><span>' + nota10(m.aulas10) + '</span>'];
+  c.provas.forEach(function(p, i){
+    var n = m.provas[i];
+    partes.push('<span>' + esc(p.titulo) + ' · ' + esc(p.data) + ' (vale ' + nota10(p.valor) + ')</span><span>' +
+      (n.nota === null ? (n.situacao || '—') : nota10(n.nota) + (n.provisoria ? '*' : '')) + '</span>');
+  });
+  return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:8px"><span class="grande">' + nota10(m.final) + '</span><span class="aviso">nota final de 10' +
+    (m.finalProvisoria ? ' · <span class="tag t-warn">parcial</span>' : '') + '</span></div>' +
+    '<div class="cfg" style="max-width:520px">' + partes.join('') + '</div>' +
+    '<p class="aviso" style="margin-top:6px">Nota final = aulas × valor ÷ 10 + cada prova × valor ÷ 10.' + (m.finalProvisoria ? ' Fica parcial enquanto houver prova sem nota ou provisória (*).' : '') + '</p>';
+}
+
 function explicacaoNota(pct){
   return '<details style="margin-top:10px"><summary class="link">Como a nota é calculada</summary><p class="aviso" style="margin-top:8px">' +
     'Você pode faltar até ' + (100 - pct) + '% das aulas com questões sem perder nota: a média usa só as aulas em que você esteve presente. ' +
-    'Cada falta além disso entra como zero. Exemplo com 10 aulas (mínimo 7): presente em 5 aulas com média 80 → 400 ÷ 7 = 57. ' +
+    'Cada falta além disso entra como zero. Exemplo com 10 aulas (mínimo 7): presente em 5 aulas com média 8,0 → 40 ÷ 7 = 5,7. ' +
     'A nota de cada aula junta a média das fechadas e a das abertas, com o peso definido pelo professor. Questão não respondida vale zero.</p></details>';
 }
 
@@ -867,7 +917,7 @@ function desenharGravando(){
     '<div class="relogio"><span class="ponto" id="pontoMain"></span><span id="relMain">00:00:00</span></div>' +
     '<div class="vuH" aria-hidden="true"><i id="vuMain"></i></div><div class="trilho" id="trilhoMain"></div><p class="aviso" id="statusMain"></p>' +
     '<div class="botoes"><button type="button" id="btLiberar">Liberar questões</button><button type="button" class="secundario" id="btPausa">Pausar</button>' +
-    '<button type="button" class="secundario" id="btPip">Abrir janelinha</button><button type="button" class="escuro" id="btFim">Encerrar aula</button></div></div></div>';
+    '<button type="button" class="secundario" id="btPip">Abrir janelinha</button><button type="button" class="secundario" id="btQR">QR code para os alunos</button><button type="button" class="escuro" id="btFim">Encerrar aula</button></div></div></div>';
   atualizarChamadaTitulo();
   $('aulaTopo').querySelectorAll('[data-pres]').forEach(function(c){
     c.addEventListener('change', function(){
@@ -880,6 +930,7 @@ function desenharGravando(){
   $('btLiberar').addEventListener('click', function(){ abrirCompositor('recente'); });
   $('btPausa').addEventListener('click', pausar);
   $('btPip').addEventListener('click', abrirPip);
+  $('btQR').addEventListener('click', function(){ qrAulas(G.discInfo.nome + ' · aula ' + G.aula.numero); });
   $('btFim').addEventListener('click', function(){
     var b = this;
     if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar encerramento'; setTimeout(function(){ if(b.isConnected){ b.dataset.conf = ''; b.textContent = 'Encerrar aula'; } }, 5000); return; }
@@ -1016,10 +1067,11 @@ function desenharEncerrada(){
     h += '<div class="convite">A ata aparece aqui quando todos os trechos forem transcritos. O que ficar pendente é processado sozinho 3 horas depois e na varredura das 2h. Pode fechar a página: nada se perde.</div>';
   }
   h += '<p class="aviso">À 1h da madrugada, a IA revisa a aula e deixa <b>recomendações só para você</b> em "Histórico e apostila": possíveis erros, o que acrescentar e o que pode ter ficado confuso.</p>';
-  h += '<div class="botoes"><button type="button" id="btRodada">Liberar rodada final</button><button type="button" class="secundario" id="btAtual">Atualizar</button><button type="button" class="secundario" id="btNova">Nova aula</button></div></div>';
+  h += '<div class="botoes"><button type="button" id="btRodada">Liberar rodada final</button><button type="button" class="secundario" id="btQREnc">QR code</button><button type="button" class="secundario" id="btAtual">Atualizar</button><button type="button" class="secundario" id="btNova">Nova aula</button></div></div>';
   $('aulaTopo').innerHTML = h;
   $('btRodada').addEventListener('click', function(){ abrirCompositor('inteira'); });
   $('btAtual').addEventListener('click', atualizarEstado);
+  $('btQREnc').addEventListener('click', function(){ qrAulas(G.discInfo.nome + ' · aula ' + G.aula.numero); });
   $('btNova').addEventListener('click', function(){ G = {fase:'inicio', disc: G.disc, tempos: G.tempos}; $('areaQ').innerHTML = ''; abrirDarAula(); });
 }
 
@@ -1187,12 +1239,12 @@ function carregarAcompanhamento(){
         return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:4px"><b>' + esc(x.aluno) + '</b> <span class="aviso">' + esc(x.enunciado.slice(0, 80)) + (x.enunciado.length > 80 ? '…' : '') + '</span></p>' +
           '<p style="margin-bottom:6px">' + esc(x.resposta) + '</p>' + (x.comentario ? '<p class="aviso" style="margin-bottom:6px">IA: ' + esc(x.comentario) + '</p>' : '') +
           '<div class="botoes" style="margin-top:0">' + (x.status === 'corrigida' ? '' : '<span class="tag t-warn">em correção</span>') +
-          '<input type="number" min="0" max="100" style="width:90px" value="' + (x.nota === null ? '' : x.nota) + '" aria-label="Nota" data-nota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">' +
+          '<input type="number" min="0" max="10" step="0.1" style="width:90px" value="' + (x.nota === null ? '' : x.nota / 10) + '" aria-label="Nota" data-nota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">' +
           '<button type="button" class="secundario mini" data-salvanota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">Salvar nota</button>' + (x.ajustada ? '<span class="tag t-azul">ajustada</span>' : '') + '</div></div>';
       }).join('');
     }
     h += '<div class="botoes"><button type="button" class="secundario mini" data-prazo="estender">Estender +5 min</button><button type="button" class="secundario mini" data-prazo="fechar">Fechar agora</button>' +
-      '<button type="button" class="secundario mini" data-prazo="reabrir">Reabrir por 10 min</button><button type="button" class="mini" id="qMais">Liberar mais questões</button></div><div id="qMsg"></div></div>';
+      '<button type="button" class="secundario mini" data-prazo="reabrir">Reabrir por 10 min</button><button type="button" class="mini" id="qMais">Liberar mais questões</button><button type="button" class="secundario mini" id="qQR">QR code</button></div><div id="qMsg"></div></div>';
     var foco = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.nota;
     if(foco) return;   // professor digitando uma nota: não redesenha agora
     $('areaQ').innerHTML = h;
@@ -1203,9 +1255,10 @@ function carregarAcompanhamento(){
     $('areaQ').querySelectorAll('[data-salvanota]').forEach(function(b){ b.addEventListener('click', function(){
       var p = b.dataset.salvanota.split('|'), inp = $('areaQ').querySelector('[data-nota="' + b.dataset.salvanota + '"]');
       b.disabled = true;
-      api('ajustarNota', {questaoId: p[0], alunoId: p[1], nota: inp.value}).then(carregarAcompanhamento).catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+      api('ajustarNota', {questaoId: p[0], alunoId: p[1], nota: paraCem(inp.value)}).then(carregarAcompanhamento).catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     }); });
     $('qMais').addEventListener('click', function(){ abrirCompositor(G.fase === 'gravando' ? 'recente' : 'inteira'); });
+    $('qQR').addEventListener('click', function(){ qrAulas('Aula ' + Q.aula.numero + ' · responda as questões'); });
     $('areaQ').querySelectorAll('[data-excluirq]').forEach(function(b){ b.addEventListener('click', function(){
       if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar exclusão'; return; }
       b.disabled = true;
@@ -1227,25 +1280,72 @@ function abrirNotas(){
   api('notasDisciplina', {disciplinaId: notasDisc}).then(function(r){
     var c = $('notasCorpo');
     if(!r.alunos.length){ c.innerHTML = '<p class="aviso">Nenhum aluno inscrito nesta disciplina.</p>'; return; }
-    var h = '<p class="aviso">' + r.N + ' aula(s) com questões · presença mínima ' + r.minimo + ' (' + r.disciplina.presencaMin + '%) · clique num aluno para ver o cálculo</p>' +
-      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th>' + r.aulas.map(function(a){ return '<th title="' + esc(a.tema) + '">A' + a.numero + '</th>'; }).join('') + '<th>Presença</th><th>Nota</th></tr></thead><tbody>';
+    var cp = r.composicao;
+    var h = '<p class="aviso">' + r.N + ' aula(s) com questões · presença mínima ' + r.minimo + ' (' + r.disciplina.presencaMin + '%) · clique num aluno para ver o cálculo e as respostas</p>' +
+      '<p class="aviso">Composição da nota: questões em aula valem <b>' + nota10(cp.valorAulas) + '</b>' + cp.provas.map(function(p){ return ' · ' + esc(p.titulo) + ' vale <b>' + nota10(p.valor) + '</b>'; }).join('') +
+      ' · total <b>' + nota10(cp.somaValores) + '</b>' + (Math.abs(cp.somaValores - 10) > 0.01 ? ' <span class="tag t-warn">a soma não dá 10' + (cp.provas.length < cp.provasPrevistas ? ': faltam provas a cadastrar' : '') + '</span>' : '') + '</p>' +
+      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th>' + r.aulas.map(function(a){ return '<th title="' + esc(a.tema) + '">A' + a.numero + '</th>'; }).join('') +
+      '<th>Presença</th><th>Aulas</th>' + cp.provas.map(function(p){ return '<th>' + esc(p.titulo) + '</th>'; }).join('') + '<th>Final</th></tr></thead><tbody>';
     r.alunos.forEach(function(al, i){
+      var f = cp.porAluno[al.id];
       h += '<tr class="linhaAluno' + (al.abaixo ? ' abaixo' : '') + '" data-al="' + i + '"><td>' + esc(al.nome) + '</td>' + al.porAula.map(function(x){
-        return '<td>' + (x.tipo === 'x' ? '<span class="cel cX">–</span>' : x.tipo === 'falta' ? '<span class="cel cF">F</span>' : '<span class="cel c' + classe(x.nota) + '">' + x.nota + (x.provisoria ? '*' : '') + '</span>') + '</td>';
-      }).join('') + '<td>' + al.presencas + '/' + r.N + '</td><td><span class="nota n' + classe(al.media) + '">' + al.media + '</span></td></tr>';
+        return '<td>' + (x.tipo === 'x' ? '<span class="cel cX">–</span>' : x.tipo === 'falta' ? '<span class="cel cF">F</span>' : '<span class="cel c' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>') + '</td>';
+      }).join('') + '<td>' + al.presencas + '/' + r.N + '</td><td><span class="nota n' + classe(al.media) + '">' + dez(al.media) + '</span></td>' +
+        f.provas.map(function(n){ return '<td>' + (n.nota === null ? '<span class="cel cX" title="' + esc(n.situacao) + '">—</span>' : '<span class="cel c' + classe(n.nota * 10) + '">' + nota10(n.nota) + (n.provisoria ? '*' : '') + '</span>') + '</td>'; }).join('') +
+        '<td><span class="nota n' + classe(f.final * 10) + '">' + nota10(f.final) + '</span></td></tr>';
     });
-    h += '</tbody></table></div><p class="aviso" style="margin-top:8px">F = falta · – = aula sem questões · * = provisória (questão aberta ou resposta em correção)</p><div id="detAl"></div>' + explicacaoNota(r.disciplina.presencaMin);
+    h += '</tbody></table></div><p class="aviso" style="margin-top:8px">Notas de 0 a 10 · F = falta · – = aula sem questões · — = prova sem nota · * = provisória</p><div id="detAl"></div>' + explicacaoNota(r.disciplina.presencaMin);
     c.innerHTML = h;
     c.querySelectorAll('[data-al]').forEach(function(tr){ tr.addEventListener('click', function(){
-      var al = r.alunos[Number(tr.dataset.al)], notas = al.porAula.filter(function(x){ return x.tipo === 'nota'; }).map(function(x){ return x.nota; });
-      $('detAl').innerHTML = '<div class="detalhe"><h3>' + esc(al.nome) + '</h3><div class="calc">' + r.N + ' aulas · mínimo ' + r.minimo + ' · presente em ' + al.presencas + '<br>' +
-        (notas.length ? '(' + notas.join(' + ') + ') ÷ ' + al.divisor + ' = ' + al.media : 'sem presença em aula com questões') + '</div>' +
-        (al.abaixo ? '<div class="erro" style="margin-bottom:0">Abaixo da presença mínima: ' + (r.minimo - al.presencas) + ' falta(s) contando como zero.</div>' : '<p class="aviso" style="margin:8px 0 0">Pode faltar mais ' + (al.presencas - r.minimo) + ' aula(s) sem perder nota.</p>') + '</div>';
+      var al = r.alunos[Number(tr.dataset.al)], notas = al.porAula.filter(function(x){ return x.tipo === 'nota'; }).map(function(x){ return dez(x.nota); });
+      var f = cp.porAluno[al.id], partes = ['aulas ' + nota10(f.aulas10) + ' × ' + nota10(cp.valorAulas) + ' ÷ 10'];
+      cp.provas.forEach(function(p, k){ partes.push(esc(p.titulo) + ' ' + nota10(f.provas[k].nota) + ' × ' + nota10(p.valor) + ' ÷ 10'); });
+      $('detAl').innerHTML = '<div class="detalhe"><h3>' + esc(al.nome) + '</h3><div class="calc">Questões em aula: ' + r.N + ' aulas · mínimo ' + r.minimo + ' · presente em ' + al.presencas + '<br>' +
+        (notas.length ? '(' + notas.join(' + ') + ') ÷ ' + al.divisor + ' = ' + dez(al.media) : 'sem presença em aula com questões') +
+        '<br>Nota final: ' + partes.join(' + ') + ' = ' + nota10(f.final) + '</div>' +
+        (al.abaixo ? '<div class="erro" style="margin-bottom:0">Abaixo da presença mínima: ' + (r.minimo - al.presencas) + ' falta(s) contando como zero.</div>' : '<p class="aviso" style="margin:8px 0 0">Pode faltar mais ' + (al.presencas - r.minimo) + ' aula(s) sem perder nota.</p>') +
+        '<div class="botoes"><button type="button" class="mini" id="btRespostas">Ver respostas e revisar notas</button></div><div id="respAluno"></div></div>';
+      $('btRespostas').addEventListener('click', function(){ abrirRespostasAluno(al); });
+      $('detAl').scrollIntoView({behavior:'smooth', block:'nearest'});
     }); });
     $('notasErradas').innerHTML = r.erradas.length ? '<div class="caixa"><h2>Questões que a turma mais errou</h2>' + r.erradas.map(function(e){
       return '<div class="linha"><span><span class="nota n' + classe(e.acerto) + '">' + e.acerto + '%</span> &nbsp;Aula ' + e.aula + ' · ' + esc(e.enunciado) + '</span><span class="aviso">' + e.respostas + ' respostas</span></div>';
     }).join('') + '<p class="aviso" style="margin-top:8px">Bom ponto para retomar no início da próxima aula.</p></div>' : '';
   }).catch(function(e){ $('notasCorpo').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+
+/* ---- respostas de um aluno, com revisão de nota ---- */
+function abrirRespostasAluno(al){
+  var el = $('respAluno');
+  el.innerHTML = '<p class="carregando">Carregando respostas…</p>';
+  api('respostasDoAluno', {disciplinaId: notasDisc, alunoId: al.id}).then(function(aulas){
+    if(!aulas.length){ el.innerHTML = '<p class="aviso">Nenhuma aula com questões ainda.</p>'; return; }
+    el.innerHTML = aulas.slice().reverse().map(function(a){
+      var h = '<h4>Aula ' + a.numero + (a.tema ? ' · ' + esc(a.tema) : '') + (a.presente ? '' : ' <span class="tag t-err">falta</span>') + '</h4>';
+      if(!a.presente) return h + '<p class="aviso">Ausente na chamada: esta aula conta como falta, não como nota.</p>';
+      return h + a.questoes.map(function(q){
+        var chave = q.id + '|' + al.id;
+        return '<div class="caixa" style="margin:8px 0;padding:12px 14px;box-shadow:none;border-width:2px"><p style="margin-bottom:6px"><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></p>' +
+          '<p style="margin-bottom:6px"><span class="aviso">Resposta do aluno:</span><br>' + (q.resposta === null ? '<i>não respondeu</i>' : esc(q.resposta) || '<i>em branco</i>') + '</p>' +
+          '<p class="aviso" style="margin-bottom:6px"><b>' + (q.tipo === 'fechada' ? 'Correta:' : 'Esperado:') + '</b> ' + esc(q.esperado) + '</p>' +
+          (q.status === 'pendente' ? '<p class="aviso" style="margin-bottom:6px"><span class="tag t-warn">em correção pela IA</span></p>' : '') +
+          '<label class="rot" style="margin-top:8px">Comentário para o aluno</label><textarea data-com="' + esc(chave) + '" style="min-height:54px">' + esc(q.comentario) + '</textarea>' +
+          '<div class="botoes" style="margin-top:8px"><label class="rot" style="margin:0">Nota</label><input type="number" min="0" max="10" step="0.1" style="width:90px" data-nt="' + esc(chave) + '" value="' + (q.nota === null ? '' : q.nota / 10) + '"><span class="aviso">de 10</span>' +
+          '<button type="button" class="mini" data-salvar="' + esc(chave) + '">Salvar</button>' + (q.ajustada ? '<span class="tag t-azul">revisada por você</span>' : '') + '<span data-ok="' + esc(chave) + '" class="aviso"></span></div></div>';
+      }).join('');
+    }).join('');
+    el.querySelectorAll('[data-salvar]').forEach(function(b){ b.addEventListener('click', function(){
+      var k = b.dataset.salvar, p = k.split('|');
+      var nota = el.querySelector('[data-nt="' + k + '"]').value, com = el.querySelector('[data-com="' + k + '"]').value;
+      if(nota === ''){ el.querySelector('[data-ok="' + k + '"]').textContent = 'Informe a nota.'; return; }
+      b.disabled = true;
+      api('ajustarNota', {questaoId: p[0], alunoId: p[1], nota: paraCem(nota), comentario: com}).then(function(){
+        b.disabled = false; el.querySelector('[data-ok="' + k + '"]').textContent = 'Salvo. A média é recalculada ao atualizar a tabela.';
+      }).catch(function(e){ b.disabled = false; el.querySelector('[data-ok="' + k + '"]').textContent = e.message; });
+    }); });
+    el.insertAdjacentHTML('beforeend', '<div class="botoes"><button type="button" class="secundario mini" id="btAtualNotas">Atualizar tabela de notas</button></div>');
+    $('btAtualNotas').addEventListener('click', abrirNotas);
+  }).catch(function(e){ el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
 
 /* ================= HISTÓRICO E APOSTILA ================= */
@@ -1359,7 +1459,8 @@ function cartaoDisc(d){
     '<p class="aviso">' + esc(d.semestre) + ' · ' + d.aprovados + ' aluno(s) inscrito(s)' + (d.pendentes ? ' · <b style="color:#c62828">' + d.pendentes + ' pendente(s)</b>' : '') + '</p>' +
     '<div class="cfg"><span>Tempos por aula</span><span>' + d.tempos + ' × 50 min</span><span>Prazo padrão</span><span>' + d.prazo_padrao + ' min</span>' +
     '<span>Presença mínima</span><span>' + d.presenca_min + '%</span><span>Questões por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s)</span>' +
-    '<span>Peso fechadas / abertas</span><span>' + d.peso_fechadas + '% / ' + (100 - d.peso_fechadas) + '%</span></div>' +
+    '<span>Peso fechadas / abertas</span><span>' + d.peso_fechadas + '% / ' + (100 - d.peso_fechadas) + '%</span>' +
+    '<span>Questões em aula valem</span><span>' + nota10(d.valor_aulas) + ' de 10</span><span>Provas previstas</span><span>' + d.provas_previstas + '</span></div>' +
     (d.orientacoes ? '<p class="aviso" style="margin-top:8px">Orientações: "' + esc(d.orientacoes) + '"</p>' : '') +
     (d.glossario.length ? '<div class="chips" style="margin-top:8px">' + d.glossario.map(function(t){ return '<span class="tag t-azul">' + esc(t) + '</span>'; }).join('') + '</div>' : '') +
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
@@ -1370,7 +1471,8 @@ $('btNovaDisc').addEventListener('click', function(){ abrirForm(null); });
 
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:semestreAtual(), tempos:p.tempos, prazo_padrao:p.prazo_padrao,
-    presenca_min:p.presenca_min, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[]};
+    presenca_min:p.presenca_min, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
+    valor_aulas:p.valor_aulas, provas_previstas:p.provas_previstas};
   var f = $('formDisc');
   f.innerHTML = '<h2>' + (d ? 'Editar disciplina' : 'Nova disciplina') + '</h2><div class="campos">' +
     campo('fNome', 'Nome', 'text', v.nome, 'campoLargo', 'ex.: Conservação de Alimentos') + campo('fSem', 'Semestre', 'text', v.semestre, '', 'ex.: 2026.2') +
@@ -1378,6 +1480,8 @@ function abrirForm(d){
     campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
     campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) + campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
     campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
+    campo('fValAulas', 'Questões em aula valem (de 10)', 'number', v.valor_aulas === undefined ? 2 : v.valor_aulas) +
+    campo('fProvas', 'Provas previstas', 'number', v.provas_previstas === undefined ? 2 : v.provas_previstas) +
     '<div class="campoLargo"><label class="rot" for="fOri">Orientações fixas para as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea></div>' +
     '<div class="campoLargo"><label class="rot" for="fGlo">Glossário (separe por vírgula)</label><textarea id="fGlo" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
     '<p class="aviso" style="margin:6px 0 0">Termos técnicos que ajudam a IA a transcrever a aula corretamente.</p></div></div>' +
@@ -1392,7 +1496,8 @@ function abrirForm(d){
     api('salvarDisciplina', {disciplina:{
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSem').value, tempos: $('fTempos').value,
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
-      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, orientacoes: $('fOri').value, glossario: $('fGlo').value
+      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, orientacoes: $('fOri').value, glossario: $('fGlo').value,
+      valor_aulas: String($('fValAulas').value).replace(',', '.'), provas_previstas: $('fProvas').value
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
       .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
   });
