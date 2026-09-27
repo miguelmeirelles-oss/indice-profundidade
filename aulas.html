@@ -1530,6 +1530,16 @@ function desenharDisciplinas(){
   el.innerHTML = '<div class="grid2">' + at.map(cartaoDisc).join('') + '</div>' +
     (arq.length ? '<p class="grupoTitulo">Arquivadas</p><div class="grid2">' + arq.map(cartaoDisc).join('') + '</div>' : '');
   el.querySelectorAll('[data-editar]').forEach(function(b){ b.addEventListener('click', function(){ abrirForm(discPorId(b.dataset.editar)); }); });
+  el.querySelectorAll('[data-copiar]').forEach(function(b){ b.addEventListener('click', function(){
+    var d = discPorId(b.dataset.copiar);
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: criar ' + d.nome + ' no próximo semestre com as mesmas configurações'; return; }
+    b.disabled = true;
+    api('copiarDisciplina', {id: d.id}).then(function(x){
+      return carregarResumo().then(function(){
+        $('listaDisc').insertAdjacentHTML('afterbegin', '<div class="ok">Criada <b>' + esc(d.nome) + ' · ' + esc(x.semestre) + '</b> com as mesmas configurações, glossário, composição da nota e pasta de material. Os alunos precisam se inscrever de novo. Se quiser, arquive a do semestre anterior.</div>');
+      });
+    }).catch(function(e){ b.disabled = false; b.dataset.conf = ''; b.textContent = 'Copiar para o próximo semestre'; erroGeral(e.message); });
+  }); });
   el.querySelectorAll('[data-ativar]').forEach(function(b){
     b.addEventListener('click', function(){
       b.disabled = true;
@@ -1561,6 +1571,7 @@ function cartaoDisc(d){
     '<p style="font-size:13.5px;margin:0">' + etapas.map(resumoEtapa).join('<br>') + '</p>' +
     (etapas.length > 1 ? '<p class="aviso" style="margin-top:4px">Média final: ' + (pesosIguais(etapas) ? 'média simples das etapas' : 'média ponderada (' + etapas.map(function(e){ return esc(e.nome) + ' peso ' + nota10(e.peso); }).join(', ') + ')') + '</p>' : '') +
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
+    '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
     '<button type="button" class="secundario mini" data-ativar="' + esc(d.id) + '" data-valor="' + (d.ativa ? '0' : '1') + '">' + (d.ativa ? 'Arquivar' : 'Reativar') + '</button></div></div>';
 }
 
