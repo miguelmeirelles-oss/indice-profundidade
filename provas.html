@@ -366,7 +366,7 @@ function desenharProvasAluno(){
   el.innerHTML = provasAluno.map(function(it, i){
     var p = it.prova, e = it.entrega, sit = situacaoProva(it), desvio = it.agora - Date.now();
     var h = '<div class="caixa" id="prova' + i + '"><div class="linha" style="border:0;padding:0 0 8px"><div><h3 style="margin:0">' + esc(p.titulo) + ' · ' + esc(it.disciplina) + '</h3>' +
-      '<span class="aviso">Prof. ' + esc(it.professor) + ' · ' + dataHora(p.inicio) + ' · vale ' + nota10(p.valor) + ' na média</span></div>' + tagEntrega(e, sit) + '</div>';
+      '<span class="aviso">Prof. ' + esc(it.professor) + ' · ' + dataHora(p.inicio) + ' · vale ' + nota10(p.valor) + ' de 10 na etapa</span></div>' + tagEntrega(e, sit) + '</div>';
     if(sit === 'antes') h += '<p>O envio das fotos abre no início da prova, <b>' + dataHora(p.inicio) + '</b>.</p>';
     if(sit === 'aberta' && !(e && e.confirmada)) h += '<p>Envio aberto até <b>' + hora(p.fimEnvio) + '</b> · faltam <span class="contagem" data-fim="' + p.fimEnvio + '" data-desvio="' + desvio + '">' + mmss(p.fimEnvio - it.agora) + '</span></p>';
     if(e) h += correcaoAluno(it, i);
@@ -473,15 +473,17 @@ function listarProvas(){
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando provas…</p></div>';
   api('provasDisciplina', {disciplinaId: discSel}).then(function(r){
     dadosDisc = r;
-    var d = r.disciplina, soma = d.valor_aulas + r.provas.reduce(function(t, p){ return t + p.valor; }, 0);
+    var d = r.disciplina, etapas = (d.composicao && d.composicao.etapas) || [];
     var h = '<div class="caixa"><h2>Provas · ' + esc(d.nome) + '</h2>' +
-      '<p class="aviso">Composição da nota (0 a 10): questões em aula valem <b>' + nota10(d.valor_aulas) + '</b>' + r.provas.map(function(p){ return ' · ' + esc(p.titulo) + ' vale <b>' + nota10(p.valor) + '</b>'; }).join('') +
-      ' · total <b>' + nota10(soma) + '</b>' + (Math.abs(soma - 10) > 0.01 ? ' <span class="tag t-warn">a soma não dá 10</span>' : '') + '. O valor das questões em aula e o número de provas previstas (' + d.provas_previstas + ') ficam em Aula por IA → Disciplinas.</p>';
+      '<p class="aviso">Cada etapa vale 10: ' + etapas.map(function(et, k){
+        var ps = r.provas.filter(function(p){ return etapaIdx(etapas, p.etapa) === k; });
+        return '<b>' + esc(et.nome) + '</b> = aulas ' + nota10(et.aulas) + ps.map(function(p){ return ' + ' + esc(p.titulo) + ' ' + nota10(p.valor); }).join('');
+      }).join(' · ') + ' (+ trabalhos, se houver). A composição fica em Aula por IA → Disciplinas, e os trabalhos em Aula por IA → Notas.</p>';
     h += r.provas.length ? r.provas.map(function(p, i){
       var sit = r.agora < p.inicio ? '<span class="tag t-cinza">agendada</span>' : r.agora <= p.fimProva ? '<span class="tag t-err">em andamento</span>' : r.agora <= p.fimEnvio ? '<span class="tag t-warn">envio aberto</span>' : '<span class="tag t-ok">encerrada</span>';
       return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
         (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
-        '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale ' + nota10(p.valor) + ' · ' + p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos</div>' +
+        '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · <b>' + esc(nomeEtapa(etapas, p.etapa)) + '</b>, vale ' + nota10(p.valor) + ' · ' + p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos</div>' +
         '<div class="aviso">' + p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' confirmada(s)</div></div>' +
         '<div class="botoes" style="margin:0"><button type="button" class="mini" data-entregas="' + i + '">Entregas</button><button type="button" class="secundario mini" data-editar="' + i + '">Editar</button>' +
         '<button type="button" class="secundario mini" data-qr="' + i + '">QR code</button><button type="button" class="secundario mini" data-excluir="' + i + '">Excluir</button></div></div>';
@@ -504,6 +506,10 @@ function listarProvas(){
   }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
+// prova sem etapa (ou de etapa removida) conta na primeira
+function etapaIdx(etapas, id){ for(var k = 0; k < etapas.length; k++){ if(etapas[k].id === id) return k; } return 0; }
+function nomeEtapa(etapas, id){ return etapas.length ? etapas[etapaIdx(etapas, id)].nome : ''; }
+
 /* ---- cadastrar ou editar prova ---- */
 var qsEdit = [];
 function dataInput(ms){ var d = new Date(ms); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -511,8 +517,10 @@ function horaInput(ms){ var d = new Date(ms); return ('0' + d.getHours()).slice(
 
 function formProva(p){
   var d = dadosDisc.disciplina;
-  var valorPadrao = d.provas_previstas ? Math.round((10 - d.valor_aulas) / d.provas_previstas * 100) / 100 : 4;
-  var v = p || {titulo: 'P' + (dadosDisc.provas.length + 1), inicio: 0, duracao: 120, janela: 120, valor: valorPadrao, instrucoes: '', publicada: true, questoes: []};
+  var etapas = (d.composicao && d.composicao.etapas) || [{id:'', nome:'P1', aulas:2}];
+  // sugere a próxima etapa sem prova e o valor que falta para fechar 10 (sem contar trabalhos)
+  var livre = etapas.filter(function(et, k){ return !dadosDisc.provas.some(function(x){ return etapaIdx(etapas, x.etapa) === k; }); })[0] || etapas[0];
+  var v = p || {titulo: livre.nome, etapa: livre.id, inicio: 0, duracao: 120, janela: 120, valor: Math.max(0, 10 - Number(livre.aulas || 0)), instrucoes: '', publicada: true, questoes: []};
   qsEdit = (v.questoes.length ? v.questoes : [{enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes}; });
   var el = $('areaProva');
   el.innerHTML = '<div class="caixa"><h2>' + (p ? 'Editar prova' : 'Nova prova') + '</h2><div class="campos">' +
@@ -521,7 +529,8 @@ function formProva(p){
     '<div><label class="rot" for="pHora">Hora de início</label><input type="time" id="pHora" value="' + (v.inicio ? horaInput(v.inicio) : '') + '"></div>' +
     '<div><label class="rot" for="pDur">Duração (min)</label><input type="number" id="pDur" min="10" value="' + v.duracao + '"></div>' +
     '<div><label class="rot" for="pJan">Envio das fotos até (min após o fim)</label><input type="number" id="pJan" min="0" value="' + v.janela + '"></div>' +
-    '<div><label class="rot" for="pVal">Vale na média (de 10)</label><input type="number" id="pVal" min="0" max="10" step="0.5" value="' + v.valor + '"></div>' +
+    '<div><label class="rot" for="pEtapa">Etapa</label><select id="pEtapa">' + etapas.map(function(et, k){ return '<option value="' + esc(et.id) + '"' + (etapaIdx(etapas, v.etapa) === k ? ' selected' : '') + '>' + esc(et.nome) + '</option>'; }).join('') + '</select></div>' +
+    '<div><label class="rot" for="pVal">Vale na etapa (de 10)</label><input type="number" id="pVal" min="0" max="10" step="0.5" value="' + v.valor + '"></div>' +
     '<div class="campoLargo"><label class="rot" for="pIns">Instruções gerais de correção (opcional)</label><textarea id="pIns" placeholder="ex.: Aceitar respostas com outras palavras se o conceito estiver certo. Cálculo sem unidade perde 25% da questão.">' + esc(v.instrucoes) + '</textarea></div></div>' +
     '<div class="convite">Tem a prova em foto ou PDF? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf" multiple id="pExtrair">Preencher as questões a partir do arquivo</label><div id="msgExtrair"></div></div>' +
     '<h4>Questões <span class="aviso" id="pTotal"></span></h4><div id="qsBox"></div>' +
@@ -554,7 +563,7 @@ function formProva(p){
     if(!dt || !hr){ $('pErro').textContent = 'Informe a data e a hora da prova.'; $('pErro').classList.remove('oculto'); return; }
     bt.disabled = true;
     api('salvarProva', {prova: {id: p ? p.id : '', disciplinaId: discSel, titulo: $('pTit').value, inicio: new Date(dt + 'T' + hr).getTime(),
-      duracao: $('pDur').value, janela: $('pJan').value, valor: String($('pVal').value).replace(',', '.'), instrucoes: $('pIns').value,
+      duracao: $('pDur').value, janela: $('pJan').value, valor: String($('pVal').value).replace(',', '.'), etapa: $('pEtapa').value, instrucoes: $('pIns').value,
       publicada: $('pPub').checked, questoes: qsEdit.map(function(q){ q.pontos = String(q.pontos).replace(',', '.'); return q; })}})
       .then(listarProvas).catch(function(e){ bt.disabled = false; $('pErro').textContent = e.message; $('pErro').classList.remove('oculto'); });
   });
