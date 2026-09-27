@@ -141,6 +141,9 @@
   .capitulo:last-child{border-bottom:none}
   .capitulo>summary{font-weight:bold;font-size:15px}
 
+  a.botaoLink{display:inline-flex;align-items:center;gap:6px;font-weight:bold;font-size:12.5px;color:var(--navy);text-decoration:none;border:2.5px solid var(--navy);border-radius:10px;padding:5px 11px;background:#fff;box-shadow:2px 2px 0 var(--navy)}
+  a.botaoLink.maior{font-size:14.5px;padding:10px 18px;border-radius:14px;box-shadow:3px 4px 0 var(--navy)}
+  a.botaoLink:hover{transform:translate(1px,1px)}
   /* formulário da disciplina e notas editáveis */
   .bloco{border:2px solid var(--linha);border-radius:14px;padding:14px 16px;margin-bottom:16px;background:#fbfcfe}
   .etapaEd{border:2px solid var(--navy);border-radius:12px;padding:10px 12px;margin-bottom:12px;background:#fff}
@@ -435,11 +438,14 @@ function carregarMinhas(){
       return '<div class="cartao"><div class="l1"><span>' + esc(m.nome) + ' · ' + esc(m.semestre) + '</span>' + tag + '</div>' +
         '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') + '</div>' +
         '<div class="botoes" style="margin-top:8px">' +
-        (m.situacao === 'aprovada' ? '<button type="button" class="mini" data-abrir="' + i + '">Notas e apostila</button>' : '') +
+        (m.situacao === 'aprovada' ? '<button type="button" class="mini" data-abrir="' + i + '">Notas</button>' +
+          '<button type="button" class="secundario mini" data-apost="' + i + '">Apostila</button>' : '') +
+        (m.material ? '<a class="botaoLink" href="' + esc(m.material) + '" target="_blank" rel="noopener">📁 Material no Drive</a>' : '') +
         (m.situacao === 'pendente' ? '<button type="button" class="secundario mini" data-cancelar="' + esc(m.inscricaoId) + '" data-prof="' + esc(m.professorId) + '">Cancelar pedido</button>' : '') +
         '</div></div>';
     }).join('');
     el.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirMateria(lista[Number(b.dataset.abrir)]); }); });
+    el.querySelectorAll('[data-apost]').forEach(function(b){ b.addEventListener('click', function(){ abrirApostilaAluno(lista[Number(b.dataset.apost)]); }); });
     el.querySelectorAll('[data-cancelar]').forEach(function(b){
       b.addEventListener('click', function(){
         b.disabled = true;
@@ -477,6 +483,15 @@ function carregarMaterias(){
 
 function voltarListaAluno(){ $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
 
+function abrirApostilaAluno(m){
+  var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
+  el.innerHTML = '<div class="caixa" style="margin-bottom:0"><button type="button" class="link" data-voltar>&#8592; voltar</button> ' +
+    (m.material ? '<a class="botaoLink" style="margin-left:10px" href="' + esc(m.material) + '" target="_blank" rel="noopener">📁 Material no Drive</a>' : '') + '</div><div id="leituraApostila" style="margin-top:18px"></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  abrirLeitura($('leituraApostila'), m.professorId, m.disciplinaId);
+}
+
 function abrirMateria(m){
   var el = $('alunoDetalhe');
   $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
@@ -496,7 +511,7 @@ function abrirMateria(m){
       });
       h += '</div>' + explicacaoNota(r.disciplina.presencaMin);
     }
-    h += '<div class="botoes"><button type="button" data-apostila>Abrir apostila</button></div></div>';
+    h += '</div>';
     h += '<div class="caixa"><h2>Aulas</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
       var x = a.resultado, dir = x.tipo === 'x' ? '<span class="tag t-cinza">sem questões</span>' : x.tipo === 'falta' ? '<span class="tag t-err">falta</span>'
         : '<span class="nota n' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>';
@@ -510,10 +525,9 @@ function abrirMateria(m){
       return '<details class="capitulo"><summary><span class="linha" style="display:inline-flex;width:calc(100% - 20px);border:0;padding:0"><span>Aula ' + a.numero +
         (a.tema ? ' · ' + esc(a.tema) : '') + ' <span class="aviso">' + esc(a.data.split(' ')[0]) + '</span></span>' + dir + '</span></summary>' +
         (qs || '<p class="aviso" style="margin-top:8px">' + (a.temQuestoes ? 'As questões desta aula ainda estão abertas.' : 'Esta aula não teve questões.') + '</p>') + '</details>';
-    }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + (r.aulas.some(function(a){ return a.resultado.provisoria; }) ? '<p class="aviso">* nota provisória: há questão aberta ou resposta em correção.</p>' : '') + '</div><div id="leituraApostila"></div>';
+    }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + (r.aulas.some(function(a){ return a.resultado.provisoria; }) ? '<p class="aviso">* nota provisória: há questão aberta ou resposta em correção.</p>' : '') + '</div>';
     el.innerHTML = h;
     el.querySelectorAll('[data-voltar]').forEach(function(b){ b.addEventListener('click', voltarListaAluno); });
-    el.querySelector('[data-apostila]').addEventListener('click', function(){ abrirLeitura($('leituraApostila'), m.professorId, m.disciplinaId); });
   }).catch(function(e){ el.innerHTML = '<div class="caixa"><button type="button" class="link" onclick="voltarListaAluno()">&#8592; voltar</button><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
@@ -1535,7 +1549,8 @@ function cartaoDisc(d){
   var etapas = (d.composicao && d.composicao.etapas) || [];
   var gl = d.glossario || [];
   return '<div class="caixa" style="margin-bottom:18px"><h3>' + esc(d.nome) + '</h3>' +
-    '<p class="aviso">' + esc(d.semestre) + ' · ' + d.aprovados + ' aluno(s) inscrito(s)' + (d.pendentes ? ' · <b style="color:#c62828">' + d.pendentes + ' pendente(s)</b>' : '') + '</p>' +
+    '<p class="aviso">' + esc(d.semestre) + ' · ' + d.aprovados + ' aluno(s) inscrito(s)' + (d.pendentes ? ' · <b style="color:#c62828">' + d.pendentes + ' pendente(s)</b>' : '') +
+      (d.material_url ? ' · <a class="link" style="font-size:12.5px" href="' + esc(d.material_url) + '" target="_blank" rel="noopener">📁 pasta de material</a>' : ' · sem pasta de material') + '</p>' +
     '<p class="grupoTitulo" style="margin-top:10px">Questões em aula</p>' +
     '<div class="cfg"><span>Aula</span><span>' + d.tempos + ' × 50 min · prazo ' + d.prazo_padrao + ' min</span>' +
     '<span>Por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s) · peso ' + d.peso_fechadas + '/' + (100 - d.peso_fechadas) + '</span>' +
@@ -1573,7 +1588,9 @@ function abrirForm(d){
     '<div class="bloco"><p class="grupoTitulo" style="margin-top:0">1. Dados da disciplina</p><div class="campos">' +
       campo('fNome', 'Nome', 'text', v.nome, 'campoLargo', 'ex.: Conservação de Alimentos') +
       '<div><label class="rot" for="fSemN">Semestre</label><select id="fSemN"><option value="1"' + (sem.n === '1' ? ' selected' : '') + '>1º semestre</option><option value="2"' + (sem.n === '2' ? ' selected' : '') + '>2º semestre</option></select></div>' +
-      campo('fSemAno', 'Ano', 'number', sem.ano) + '</div>' +
+      campo('fSemAno', 'Ano', 'number', sem.ano) +
+      campo('fMaterial', 'Pasta de material para os alunos (link do Google Drive, opcional)', 'text', v.material_url || '', 'campoLargo', 'https://drive.google.com/drive/folders/...') + '</div>' +
+      '<p class="aviso" style="margin-top:-6px">Os alunos inscritos veem o botão "Material da disciplina". No Drive, compartilhe a pasta como "Qualquer pessoa com o link: leitor" (ou com os e-mails dos alunos).</p>' +
       (v.semestre && !/^\s*[12]\s*-\s*\d{4}\s*$/.test(v.semestre) ? '<p class="aviso">O semestre estava gravado como "' + esc(v.semestre) + '". Ao salvar, fica no formato "' + sem.n + ' - ' + sem.ano + '".</p>' : '') + '</div>' +
     // 2. questões em aula
     '<div class="bloco"><p class="grupoTitulo" style="margin-top:0">2. Questões em aula</p><div class="campos">' +
@@ -1606,7 +1623,7 @@ function abrirForm(d){
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSemN').value + ' - ' + $('fSemAno').value, tempos: $('fTempos').value,
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
       qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, orientacoes: $('fOri').value, glossario: $('fGlo').value,
-      composicao: {etapas: etapasEdit}
+      composicao: {etapas: etapasEdit}, material_url: $('fMaterial').value
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
       .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
   });
