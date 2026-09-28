@@ -202,7 +202,7 @@
 var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
 
 var token = '';
-try{ token = localStorage.getItem('ip_token') || ''; }catch(e){}
+try{ token = localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){}
 var sessao = null, resumo = null;
 
 function $(id){ return document.getElementById(id); }
@@ -248,8 +248,9 @@ function iniciar(){
     $('tCarregando').classList.add('oculto');
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
-    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b><a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">sair</a>';
-    $('linkSair').addEventListener('click', function(e){ e.preventDefault(); try{ localStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
+    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : '') +
+      '<a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+    $('linkSair').addEventListener('click', function(e){ e.preventDefault(); try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
