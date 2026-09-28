@@ -99,6 +99,67 @@
   .qrUrl{font-family:Consolas,monospace;font-size:clamp(13px,1.6vw,20px);word-break:break-all;margin:16px 0 6px}
   .qrInstr{font-size:clamp(15px,2vw,24px);color:var(--cinza)}
   @media (max-width:520px){body{padding:12px}.cabecalho h1{font-size:23px}.quem{text-align:left}}
+
+  /* ===== Identidade visual engalimentos — só aparência; apagar este bloco volta ao visual anterior ===== */
+  :root{--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Courier New",monospace;--tinta-fraca:#4A5C74;--sombra:4px 5px 0 rgba(14,42,92,.13);--linha:#D7DEE8}
+  body{font-size:14.5px;line-height:1.55}
+  /* cabeçalho: faixa clara com filete azul, título fino */
+  .cabecalho{background:var(--bloco);color:var(--navy);border:0;border-top:4px solid var(--menu);border-radius:0;box-shadow:none;padding:20px 24px}
+  .cabecalho h1{color:var(--titulo);font-weight:400;font-size:31px;letter-spacing:-.01em;line-height:1.2}
+  .cabecalho p{color:var(--tinta-fraca);font-size:14.5px}
+  .cabecalho .quem{color:var(--tinta-fraca)}
+  .cabecalho .quem b{color:var(--navy)}
+  .cabecalho .quem a{color:var(--azul)}
+  .visao button{background:#fff;color:#41546C;border:1.5px solid var(--linha);border-radius:4px;box-shadow:none;font-weight:normal}
+  .visao button[aria-pressed="true"]{background:var(--menu);color:#fff;border-color:var(--menu);box-shadow:none}
+  /* cartões: borda escura, sombra leve, filete azul no topo */
+  .caixa{box-shadow:inset 0 5px 0 var(--menu),var(--sombra);padding-top:22px}
+  .caixa>h2:first-child{padding-bottom:10px;border-bottom:1px dashed var(--linha)}
+  h2{color:var(--navy);font-weight:bold;letter-spacing:.03em}
+  h4{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--menu);font-weight:bold;padding-bottom:6px;border-bottom:1px solid var(--linha);margin:18px 0 8px}
+  .aviso{color:var(--cinza)}
+  /* botões */
+  button{border-width:2px;border-radius:6px;box-shadow:none}
+  button:hover{transform:none;box-shadow:none;filter:brightness(.96)}
+  button:active{transform:none;box-shadow:none;filter:brightness(.9)}
+  button:disabled{box-shadow:none;filter:none}
+  button.secundario:hover{background:#EEF2F8;filter:none}
+  button.mini{border-radius:6px;box-shadow:none;padding:6px 12px}
+  .link:hover{filter:none}
+  a.botaoLink{border-width:2px;border-radius:6px;box-shadow:none}
+  a.botaoLink.maior{border-radius:6px;box-shadow:none}
+  a.botaoLink:hover{transform:none;background:#EEF2F8}
+  /* chips e abas */
+  .chip,.aba{border:1.5px solid var(--linha);border-radius:4px;color:#41546C;font-weight:normal;background:#fff}
+  .chip:hover,.aba:hover{border-color:var(--azul);color:var(--menu);background:#fff}
+  .chip[aria-pressed="true"],.chip.ativo,.aba[aria-pressed="true"]{background:var(--menu);border-color:var(--menu);color:#fff}
+  /* campos */
+  label.rot,.grupoTitulo{font-family:var(--mono);font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--menu);font-weight:bold}
+  input[type=text],input[type=number],input[type=password],input[type=email],input[type=date],input[type=time],select,textarea{border:1.5px solid var(--linha);border-radius:6px}
+  input[type=text]:hover,input[type=number]:hover,input[type=password]:hover,input[type=email]:hover,input[type=date]:hover,input[type=time]:hover,select:hover,textarea:hover{border-color:var(--azul)}
+  input:focus,select:focus,textarea:focus{border-color:var(--azul)}
+  /* etiquetas e números */
+  .tag{font-family:var(--mono);font-size:10.5px;border-radius:4px;border-width:1px;padding:2px 7px}
+  .badge{font-family:var(--mono)}
+  .nota{font-family:var(--mono)}
+  .grande{font-family:var(--mono);font-weight:600;letter-spacing:-.02em}
+  .contagem{font-family:var(--mono)}
+  .stepper{border:1.5px solid var(--linha);border-radius:6px}
+  .stepper button{filter:none}
+  .stepper span{font-family:var(--mono);font-weight:600}
+  th{font-family:var(--mono);font-size:10.5px;letter-spacing:.09em;color:var(--menu);font-weight:bold}
+  .cfg span:nth-child(even){font-family:var(--mono)}
+  /* avisos */
+  .convite{border:1px solid var(--linha);border-left:3px solid var(--ambar);border-radius:0 6px 6px 0}
+  .erro{background:#FDF1F0;border:1px solid #EFC6C2;border-left:3px solid #B3261E;border-radius:0 8px 8px 0;color:#8F1E18}
+  .ok{background:#F1F8F5;border:1px solid #C9E2D8;border-left:3px solid #1B7A57;border-radius:0 8px 8px 0;color:#146144}
+  .detalhe{border-width:1.5px;border-color:var(--linha);border-left:3px solid var(--menu);border-radius:0 8px 8px 0}
+
+  .questao,.qEdit,.cartao{border-radius:12px}
+  label.arquivo{border-width:2px;border-radius:6px;box-shadow:none}
+  .tabelaBox{border-width:1.5px;border-radius:8px}
+  .sugIA{font-family:var(--mono);border-radius:4px}
+  .miniaturas figcaption{font-family:var(--mono)}
 </style>
 </head>
 <body>
