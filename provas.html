@@ -249,7 +249,7 @@ function iniciar(){
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : '') +
-      '<a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      '<a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){ e.preventDefault(); try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
