@@ -854,12 +854,14 @@ function maxOrdem(aulaId, ordens, pend){
 
 function desenharInicioAula(pend){
   var ds = ativas();
-  if(!G.disc || !discPorId(G.disc)) G.disc = ds.length ? ds[0].id : '';
-  var d = discPorId(G.disc);
+  // nenhuma disciplina vem marcada: o professor escolhe antes de gravar (evita gravar na disciplina errada)
+  if(G.disc && !discPorId(G.disc)) G.disc = '';
+  var d = G.disc ? discPorId(G.disc) : null;
   if(!G.tempos && d) G.tempos = d.tempos;
   if(!ds.length){ $('aulaTopo').innerHTML = '<div class="caixa"><h2>Dar aula</h2><p>Crie uma disciplina em <b>Disciplinas</b> para começar.</p></div>'; $('aulaLista').innerHTML = ''; return; }
   var sem = !resumo.temChave, pip = 'documentPictureInPicture' in window;
   $('aulaTopo').innerHTML = bannerPendentes(pend) + '<div class="caixa"><h2>Iniciar aula</h2><label class="rot">Disciplina</label>' + chipsDisciplinas(G.disc) +
+    (G.disc ? '' : '<p class="aviso" style="margin:6px 0 0">Escolha a disciplina desta aula antes de iniciar a gravação.</p>') +
     '<label class="rot" style="margin-top:14px">Duração</label><div class="chips">' + [1, 2].map(function(t){
       return '<button type="button" class="chip" data-tempos="' + t + '" aria-pressed="' + (G.tempos === t) + '">' + t + ' tempo' + (t > 1 ? 's' : '') + ' · ' + (t * 50) + ' min</button>'; }).join('') + '</div>' +
     '<div class="convite" style="margin-top:16px">O navegador vai pedir permissão para usar o microfone' + (pip ? ' e abrir a <b>janelinha flutuante</b> no canto da tela.' : '. Este navegador não tem a janelinha flutuante: use o Chrome ou o Edge no computador para tê-la.') +
@@ -872,9 +874,13 @@ function desenharInicioAula(pend){
   ligarBannerPendentes();
   $('aulaTopo').querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ G.disc = b.dataset.disc; G.tempos = discPorId(G.disc).tempos; desenharInicioAula(pend); }); });
   $('aulaTopo').querySelectorAll('[data-tempos]').forEach(function(b){ b.addEventListener('click', function(){ G.tempos = Number(b.dataset.tempos); desenharInicioAula(pend); }); });
-  $('btIniciar').addEventListener('click', function(){ comecarGravacao(null); });
+  $('btIniciar').addEventListener('click', function(){
+    if(!G.disc){ $('msgIni').innerHTML = '<div class="erro">Selecione a disciplina antes de iniciar a gravação.</div>'; return; }
+    comecarGravacao(null);
+  });
   $('btTeste').addEventListener('click', testarGravacao);
   $('btNG').addEventListener('click', function(){
+    if(!G.disc){ $('msgIni').innerHTML = '<div class="erro">Selecione a disciplina antes de marcar a aula como não gravada.</div>'; return; }
     $('caixaNG').innerHTML = '<div class="convite" style="margin-top:14px"><label class="rot" for="temaNG">Tema da aula não gravada</label><input type="text" id="temaNG" placeholder="ex.: Branqueamento">' +
       '<p class="aviso" style="margin:8px 0 0">A apostila vai usar as gravações de semestres anteriores com esse tema. Esta aula não tem questões e não conta para a presença.</p>' +
       '<div class="botoes"><button type="button" class="mini" id="btSalvarNG">Salvar</button></div><div id="msgNG"></div></div>';
@@ -1308,7 +1314,7 @@ function desenharEncerrada(){
   $('btRodada').addEventListener('click', function(){ abrirCompositor('inteira'); });
   $('btAtual').addEventListener('click', atualizarEstado);
   $('btQREnc').addEventListener('click', function(){ qrAulas(G.discInfo.nome + ' · aula ' + G.aula.numero); });
-  $('btNova').addEventListener('click', function(){ G = {fase:'inicio', disc: G.disc, tempos: G.tempos}; $('areaQ').innerHTML = ''; abrirDarAula(); });
+  $('btNova').addEventListener('click', function(){ G = {fase:'inicio', disc: '', tempos: 0}; $('areaQ').innerHTML = ''; abrirDarAula(); });
 }
 
 /* ---- teste de 30 segundos ---- */
