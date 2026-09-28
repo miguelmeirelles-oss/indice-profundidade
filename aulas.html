@@ -109,6 +109,9 @@
   .opc{display:block;width:100%;text-align:left;border:2px solid var(--linha);border-radius:12px;padding:10px 12px;background:#fff;box-shadow:none;font-weight:normal;font-size:14px;margin-top:8px}
   .opc:hover{transform:none;box-shadow:none;border-color:var(--azul)}
   .opc[aria-pressed="true"]{border-color:var(--azul);background:var(--bloco);font-weight:bold}
+  .antifraude{display:flex;gap:10px;align-items:center;background:#fff4f4;border:2.5px solid #c62828;border-radius:14px;padding:10px 14px;margin:0 0 14px;color:#8e1b1b;font-size:14px;line-height:1.45}
+  .antifraude .ic{font-size:22px;line-height:1}
+  .suspeita{display:inline-block;background:#fff4f4;color:#8e1b1b;border:2px solid #c62828;border-radius:8px;padding:2px 8px;font-size:12.5px;font-weight:bold;margin:0 0 6px}
   .alerta{background:var(--ambar);border:2.5px solid var(--navy);border-radius:18px;box-shadow:4px 5px 0 var(--navy);padding:16px 18px;margin-bottom:18px}
 
   /* notas */
@@ -352,6 +355,27 @@ setInterval(function(){
    ALUNO
    ===================================================================== */
 var alunoCarregado = false, timerAbertas = null, assinaturaAbertas = '', rascunho = {};
+// anti-fraude: sinais por questão aberta, enviados junto com a resposta (só o professor vê)
+var sinais = {}, foraDesde = 0;
+function sinaisDe(qid){ return sinais[qid] || (sinais[qid] = {colagens:0, saidas:0, foraSeg:0, maiorSalto:0, eventos:0, inicio:0, ultimoTam:0}); }
+function abertasNaTela(){ return Array.prototype.map.call(document.querySelectorAll('#qAbertas [data-q] [data-txt]'), function(t){ return t.closest('[data-q]'); }); }
+function saiuDaTela(){
+  if(foraDesde) return;
+  var cards = abertasNaTela(); if(!cards.length) return;
+  foraDesde = Date.now();
+  cards.forEach(function(c){ sinaisDe(c.dataset.q).saidas++; });
+}
+function voltouATela(){
+  if(!foraDesde) return;
+  var seg = Math.round((Date.now() - foraDesde) / 1000); foraDesde = 0;
+  abertasNaTela().forEach(function(c){
+    sinaisDe(c.dataset.q).foraSeg += seg;
+    c.querySelector('[data-msg]').innerHTML = '<div class="erro">Você saiu da tela. Fique nesta tela até enviar sua resposta.</div>';
+  });
+}
+document.addEventListener('visibilitychange', function(){ if(document.hidden) saiuDaTela(); else voltouATela(); });
+window.addEventListener('blur', saiuDaTela);
+window.addEventListener('focus', voltouATela);
 
 function abrirAluno(){
   voltarListaAluno();
@@ -389,6 +413,8 @@ function desenharAbertas(grupos){
       return h + '<p style="margin:10px 0 0">Você não está na chamada desta aula. Se você está em sala, peça ao professor para marcar sua presença.</p></div>';
     }
     h += '</div>';
+    if(g.questoes.some(function(q){ return q.tipo !== 'fechada' && !q.respondida; }))
+      h += '<div class="antifraude" role="note"><span class="ic" aria-hidden="true">🛡️</span><span><b>Anti-fraude por IA ativo.</b> Não saia desta tela enquanto responde.</span></div>';
     g.questoes.forEach(function(q, i){
       h += '<div class="caixa" data-q="' + esc(q.id) + '" data-prof="' + esc(g.professorId) + '"><div class="linha" style="border:0;padding:0 0 6px">' +
         '<span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' · ' + (i + 1) + ' de ' + g.questoes.length + '</span>' +
@@ -414,15 +440,33 @@ function desenharAbertas(grupos){
       });
     });
     var ta = card.querySelector('[data-txt]');
-    if(ta) ta.addEventListener('input', function(){ rascunho[qid] = ta.value; });
+    if(ta){
+      var s = sinaisDe(qid); s.ultimoTam = ta.value.length;
+      var barrar = function(e){
+        e.preventDefault(); s.colagens++;
+        card.querySelector('[data-msg]').innerHTML = '<div class="erro">Escreva a resposta com suas palavras.</div>';
+      };
+      ta.addEventListener('paste', barrar);
+      ta.addEventListener('drop', barrar);
+      ta.addEventListener('beforeinput', function(e){ if(/^insertFrom(Paste|Drop)/.test(e.inputType || '')) barrar(e); });
+      ta.addEventListener('input', function(){
+        rascunho[qid] = ta.value;
+        if(!s.inicio) s.inicio = Date.now();
+        s.eventos++;
+        s.maiorSalto = Math.max(s.maiorSalto, ta.value.length - s.ultimoTam);
+        s.ultimoTam = ta.value.length;
+      });
+    }
     var bt = card.querySelector('[data-enviar]');
     if(bt) bt.addEventListener('click', function(){
       var r = rascunho[qid];
       if(r === undefined || r === ''){ card.querySelector('[data-msg]').innerHTML = '<div class="erro">Responda antes de enviar.</div>'; return; }
       bt.disabled = true; bt.textContent = 'Enviando…';
-      api('responder', {professorId: pid, questaoId: qid, resposta: r}).then(function(res){
+      var s = sinais[qid], env = s ? {colagens:s.colagens, saidas:s.saidas, foraSeg:s.foraSeg, maiorSalto:s.maiorSalto, eventos:s.eventos,
+        segundos: s.inicio ? Math.round((Date.now() - s.inicio) / 1000) : 0} : null;
+      api('responder', {professorId: pid, questaoId: qid, resposta: r, sinais: env}).then(function(res){
         if(res && res.aberta) api('corrigirResposta', {professorId: pid, questaoId: qid}).catch(function(){});
-        delete rascunho[qid]; assinaturaAbertas = ''; carregarAbertas();
+        delete rascunho[qid]; delete sinais[qid]; assinaturaAbertas = ''; carregarAbertas();
       }).catch(function(e){ bt.disabled = false; bt.textContent = 'Enviar resposta'; card.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });
   });
@@ -1247,7 +1291,7 @@ function carregarAcompanhamento(){
     if(r.abertas.length){
       h += '<h4>Respostas abertas</h4>' + r.abertas.map(function(x){
         return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:4px"><b>' + esc(x.aluno) + '</b> <span class="aviso">' + esc(x.enunciado.slice(0, 80)) + (x.enunciado.length > 80 ? '…' : '') + '</span></p>' +
-          '<p style="margin-bottom:6px">' + esc(x.resposta) + '</p>' + (x.comentario ? '<p class="aviso" style="margin-bottom:6px">IA: ' + esc(x.comentario) + '</p>' : '') +
+          alertaSuspeita(x.alertas) + '<p style="margin-bottom:6px">' + esc(x.resposta) + '</p>' + (x.comentario ? '<p class="aviso" style="margin-bottom:6px">IA: ' + esc(x.comentario) + '</p>' : '') +
           '<div class="botoes" style="margin-top:0">' + (x.status === 'corrigida' ? '' : '<span class="tag t-warn">em correção</span>') +
           '<input type="number" min="0" max="10" step="0.1" style="width:90px" value="' + (x.nota === null ? '' : x.nota / 10) + '" aria-label="Nota" data-nota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">' +
           '<button type="button" class="secundario mini" data-salvanota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">Salvar nota</button>' + (x.ajustada ? '<span class="tag t-azul">ajustada</span>' : '') + '</div></div>';
@@ -1398,6 +1442,11 @@ function formulaFinal(cp, f){
   return '(' + partes.join(' + ') + ') ÷ ' + (iguais ? cp.etapas.length : nota10(cp.somaPesos)) + ' = <b>' + nota10(f.final) + '</b>' + (f.parcial ? ' (parcial)' : '');
 }
 
+function alertaSuspeita(m){
+  if(!m || !m.length) return '';
+  return '<div class="suspeita" title="Sinais registrados enquanto o aluno escrevia. Não mudam a nota: é só para você avaliar.">⚠ Possível resposta de IA: ' + esc(m.join(' · ')) + '</div>';
+}
+
 /* ---- respostas de um aluno, com revisão de nota ---- */
 function abrirRespostasAluno(al){
   var el = $('respAluno');
@@ -1410,7 +1459,7 @@ function abrirRespostasAluno(al){
       return h + a.questoes.map(function(q){
         var chave = q.id + '|' + al.id;
         return '<div class="caixa" style="margin:8px 0;padding:12px 14px;box-shadow:none;border-width:2px"><p style="margin-bottom:6px"><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></p>' +
-          '<p style="margin-bottom:6px"><span class="aviso">Resposta do aluno:</span><br>' + (q.resposta === null ? '<i>não respondeu</i>' : esc(q.resposta) || '<i>em branco</i>') + '</p>' +
+          alertaSuspeita(q.alertas) + '<p style="margin-bottom:6px"><span class="aviso">Resposta do aluno:</span><br>' + (q.resposta === null ? '<i>não respondeu</i>' : esc(q.resposta) || '<i>em branco</i>') + '</p>' +
           '<p class="aviso" style="margin-bottom:6px"><b>' + (q.tipo === 'fechada' ? 'Correta:' : 'Esperado:') + '</b> ' + esc(q.esperado) + '</p>' +
           (q.status === 'pendente' ? '<p class="aviso" style="margin-bottom:6px"><span class="tag t-warn">em correção pela IA</span></p>' : '') +
           '<label class="rot" style="margin-top:8px">Comentário para o aluno</label><textarea data-com="' + esc(chave) + '" style="min-height:54px">' + esc(q.comentario) + '</textarea>' +
