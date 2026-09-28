@@ -395,7 +395,7 @@ function iniciar(){
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      '<a href="provas.html">Prova por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      '<a href="provas.html">Prova por IA</a> · <a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
