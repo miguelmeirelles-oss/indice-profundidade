@@ -352,7 +352,7 @@ var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPM
 
 var BLOCO_SEG = 600;          // 10 min por bloco de áudio
 var token = '';
-try{ token = localStorage.getItem('ip_token') || ''; }catch(e){}
+try{ token = localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){}
 var sessao = null, resumo = null;
 
 function $(id){ return document.getElementById(id); }
@@ -394,12 +394,13 @@ function iniciar(){
     $('tCarregando').classList.add('oculto');
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
-    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.professor ? 'professor · ' : '') + '<a href="provas.html">Prova por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">sair</a>';
+    $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
+      '<a href="provas.html">Prova por IA</a> · <a href="index.html">Avaliador</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
       // o login é o mesmo do Avaliador: apagar o token deste navegador desconecta os dois
-      try{ localStorage.removeItem('ip_token'); localStorage.removeItem('aulas_visao'); }catch(x){}
+      try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); localStorage.removeItem('aulas_visao'); }catch(x){}
       location.href = 'index.html';
     });
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
