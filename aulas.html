@@ -921,13 +921,53 @@ function escolherMime(){
   for(var i = 0; i < c.length; i++){ if(window.MediaRecorder && MediaRecorder.isTypeSupported(c[i])) return c[i]; }
   return '';
 }
+// Usa o microfone escolhido na lista (guardado neste computador); se ele sumiu, volta ao padrão.
+function micEscolhido(){ try{ return localStorage.getItem('aulas_mic') || ''; }catch(e){ return ''; } }
 function pedirMicrofone(){
-  return navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1}});
+  var base = {echoCancellation:true, noiseSuppression:true, autoGainControl:true, channelCount:1}, id = micEscolhido();
+  if(!id) return navigator.mediaDevices.getUserMedia({audio: base});
+  var com = {}; for(var k in base) com[k] = base[k]; com.deviceId = {exact: id};
+  return navigator.mediaDevices.getUserMedia({audio: com}).catch(function(e){
+    if(e && (e.name === 'OverconstrainedError' || e.name === 'NotFoundError')){
+      try{ localStorage.removeItem('aulas_mic'); }catch(x){}
+      return navigator.mediaDevices.getUserMedia({audio: base});
+    }
+    throw e;
+  });
+}
+// Lista das entradas de áudio, para o professor escolher a certa
+function preencherMics(sel){
+  if(!sel || !navigator.mediaDevices.enumerateDevices) return;
+  var atual = G.stream && G.stream.getAudioTracks()[0] ? (G.stream.getAudioTracks()[0].getSettings ? G.stream.getAudioTracks()[0].getSettings().deviceId : '') : '';
+  navigator.mediaDevices.enumerateDevices().then(function(lista){
+    var mics = lista.filter(function(d){ return d.kind === 'audioinput'; });
+    sel.innerHTML = mics.map(function(d, i){
+      return '<option value="' + esc(d.deviceId) + '"' + (d.deviceId === atual ? ' selected' : '') + '>' + esc(d.label || ('Microfone ' + (i + 1))) + '</option>';
+    }).join('');
+  }).catch(function(){});
+}
+// Troca de microfone no meio da aula: fecha o trecho atual e segue gravando com a entrada nova
+function trocarMicrofone(id){
+  try{ localStorage.setItem('aulas_mic', id); }catch(e){}
+  if(G.fase !== 'gravando') return;
+  pedirMicrofone().then(function(s){
+    var velho = G.stream;
+    try{ if(G.A) G.A.ctx.close(); }catch(e){}
+    G.stream = s; G.A = criarAnalisador(s);
+    var faixa = s.getAudioTracks()[0];
+    G.micNome = faixa && faixa.label ? faixa.label : ''; G.somEm = Date.now(); G.micCaiu = false;
+    if(faixa) faixa.addEventListener('ended', function(){ G.micCaiu = true; atualizarPainel(); });
+    if(!G.pausado) trocarBloco(); else { var r = G.rec; novoGravador(); try{ G.rec.pause(); r.stop(); }catch(e){} }
+    setTimeout(function(){ velho.getTracks().forEach(function(t){ t.stop(); }); }, 2000);
+    var nome = $('micNome'); if(nome) nome.textContent = G.micNome;
+  }).catch(function(e){ erroGeral('Não deu para usar esse microfone: ' + (e.message || e.name)); });
 }
 function criarAnalisador(stream){
   try{
     var Ctx = window.AudioContext || window.webkitAudioContext, ctx = new Ctx(), an = ctx.createAnalyser();
     an.fftSize = 1024; ctx.createMediaStreamSource(stream).connect(an);
+    // o Chrome pode criar o contexto "suspenso" (fora do clique): o medidor ficaria parado
+    if(ctx.state === 'suspended' && ctx.resume) ctx.resume().catch(function(){});
     return {ctx: ctx, an: an, buf: new Float32Array(an.fftSize)};
   }catch(e){ return null; }
 }
@@ -957,6 +997,10 @@ function comecarGravacao(pac){
     return idbTodos().then(function(pend){
       G.fase = 'gravando'; G.aula = p.aula; G.discInfo = p.disciplina; G.alunos = p.alunos; G.pres = p.presencas || {};
       G.stream = stream; G.A = criarAnalisador(stream); G.mime = escolherMime();
+      // diagnóstico do microfone: nome da entrada e aviso se ficar mudo ou for desligado
+      var faixa = stream.getAudioTracks()[0];
+      G.micNome = faixa && faixa.label ? faixa.label : ''; G.somEm = Date.now(); G.micCaiu = false;
+      if(faixa) faixa.addEventListener('ended', function(){ G.micCaiu = true; atualizarPainel(); });
       G.ordem = maxOrdem(p.aula.id, p.aula.ordens, pend);
       G.ativoAcum = G.ordem * BLOCO_SEG * 1000; G.ativoDesde = Date.now(); G.pausado = false; G.encerrando = false;
       G.estado = p.aula; G.limiteSeg = ((p.aula.tempos || 2) * 50 + 20) * 60;
@@ -1088,6 +1132,9 @@ function desenharGravando(){
     '<div class="caixa" style="margin:0"><h2>' + esc(d.nome) + ' · aula ' + G.aula.numero + '</h2>' +
     '<div class="relogio"><span class="ponto" id="pontoMain"></span><span id="relMain">00:00:00</span></div>' +
     '<div class="vuH" aria-hidden="true"><i id="vuMain"></i></div><div class="trilho" id="trilhoMain"></div><p class="aviso" id="statusMain"></p>' +
+    '<div class="erro oculto" id="avisoMic" role="alert"></div>' +
+    '<label class="rot" for="selMic" style="margin-top:8px">Microfone <span id="micNome" class="oculto">' + esc(G.micNome || '') + '</span></label><select id="selMic"><option>' + esc(G.micNome || 'carregando…') + '</option></select>' +
+    '<p class="aviso" style="margin:4px 0 0">Fale e veja se a barra se mexe. Se não mexer, escolha outra entrada nesta lista.</p>' +
     '<div class="botoes"><button type="button" id="btLiberar">Liberar questões</button><button type="button" class="secundario" id="btPausa">Pausar</button>' +
     '<button type="button" class="secundario" id="btPip">Abrir janelinha</button><button type="button" class="secundario" id="btQR">QR code para os alunos</button><button type="button" class="escuro" id="btFim">Encerrar aula</button></div></div></div>';
   atualizarChamadaTitulo();
@@ -1102,6 +1149,8 @@ function desenharGravando(){
   $('btLiberar').addEventListener('click', function(){ abrirCompositor('recente'); });
   $('btPausa').addEventListener('click', pausar);
   $('btPip').addEventListener('click', abrirPip);
+  preencherMics($('selMic'));
+  $('selMic').addEventListener('change', function(){ trocarMicrofone(this.value); });
   $('btQR').addEventListener('click', function(){ qrAulas(G.discInfo.nome + ' · aula ' + G.aula.numero); });
   $('btFim').addEventListener('click', function(){
     var b = this;
@@ -1131,7 +1180,17 @@ function atualizarPainel(){
   var s = ativoSeg(), n = G.fase === 'gravando' && !G.pausado ? nivel(G.A) : 0, t = trilhoHtml();
   var status = (G.fase === 'gravando' ? (G.pausado ? 'pausado · ' : 'gravando trecho ' + (G.ordem + 1) + ' · ') : '') + t.feitos + ' de ' + Math.max(G.ordem, t.feitos) + ' trecho(s) transcrito(s)' +
     (G.ordem > t.feitos ? ' · ' + (G.ordem - t.feitos) + ' na fila' : '') + (G.statusEnvio ? ' · ' + G.statusEnvio : '');
+  // microfone mudo há mais de 20 s, ou desligado: avisa com o nome da entrada que o Chrome está usando
+  var avisoMic = '';
+  if(G.fase === 'gravando' && !G.pausado){
+    if(n > 3 || !G.somEm) G.somEm = Date.now();
+    var mudo = Math.round((Date.now() - G.somEm) / 1000);
+    if(G.micCaiu) avisoMic = 'O microfone foi desconectado. Encerre e comece de novo depois de ligá-lo.';
+    else if(mudo >= 20) avisoMic = 'Nenhum som no microfone há ' + mudo + ' s' + (G.micNome ? ' (entrada: ' + G.micNome + ')' : '') +
+      '. Confira se o microfone está ligado e sem mudo, e qual entrada o Chrome usa: cadeado ao lado do endereço → Microfone.';
+  }
   var set = function(doc, id, fn){ var el = doc && doc.getElementById(id); if(el) fn(el); };
+  set(document, 'avisoMic', function(el){ el.textContent = avisoMic; el.classList.toggle('oculto', !avisoMic); });
   set(document, 'relMain', function(el){ el.textContent = hms(s); });
   set(document, 'vuMain', function(el){ el.style.width = n + '%'; el.style.background = corNivel(n); });
   set(document, 'trilhoMain', function(el){ el.innerHTML = t.html; });
@@ -1266,7 +1325,17 @@ function testarGravacao(){
       }).catch(function(e){ cx.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     };
     rec.start(); t0 = Date.now();
-    cx.innerHTML = '<div class="convite" style="margin-top:14px"><p>Fale normalmente, como em aula. Faltam <b id="tRest">30</b> s.</p><div class="vuH"><i id="tVu"></i></div><button type="button" class="mini" id="tParar">Parar agora</button></div>';
+    cx.innerHTML = '<div class="convite" style="margin-top:14px"><p>Fale normalmente, como em aula. Faltam <b id="tRest">30</b> s.</p><div class="vuH"><i id="tVu"></i></div>' +
+      '<label class="rot" for="tMic" style="margin-top:8px">Microfone</label><select id="tMic"></select>' +
+      '<p class="aviso" style="margin:4px 0 8px">Se a barra não se mexer quando você fala, escolha outra entrada: o teste recomeça com ela.</p>' +
+      '<button type="button" class="mini" id="tParar">Parar agora</button></div>';
+    var selT = $('tMic'), G0 = G.stream; G.stream = s; preencherMics(selT); G.stream = G0;
+    selT.addEventListener('change', function(){
+      try{ localStorage.setItem('aulas_mic', this.value); }catch(e){}
+      rec.onstop = null; clearInterval(timer); try{ rec.stop(); }catch(e){}
+      s.getTracks().forEach(function(t){ t.stop(); }); try{ A.ctx.close(); }catch(e){}
+      testarGravacao();
+    });
     $('tParar').addEventListener('click', function(){ if(rec.state !== 'inactive') rec.stop(); });
     timer = setInterval(function(){
       var r = 30 - Math.floor((Date.now() - t0) / 1000), n = nivel(A);
