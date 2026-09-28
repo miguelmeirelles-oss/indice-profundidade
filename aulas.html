@@ -646,12 +646,12 @@ function abrirMateria(m){
         var x = a.resultado;
         if(x.tipo === 'x') h += '<i class="x" title="Aula ' + a.numero + ': sem questões">–</i>';
         else if(x.tipo === 'falta') h += '<i class="f" title="Aula ' + a.numero + ': falta">F</i>';
-        else h += '<i class="p" title="Aula ' + a.numero + '">' + dez(x.nota) + '</i>';
+        else h += '<i class="p" title="Aula ' + a.numero + ': ver a correção" data-iraula="' + a.numero + '" style="cursor:pointer">' + dez(x.nota) + '</i>';
       });
-      h += '</div>' + explicacaoNota(r.disciplina.presencaMin);
+      h += '</div><p class="aviso" style="margin:0 0 8px">Toque na nota de uma aula para ver cada questão: sua resposta, a correta e o comentário da IA.</p>' + explicacaoNota(r.disciplina.presencaMin);
     }
     h += '</div>';
-    h += '<div class="caixa"><h2>Aulas</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
+    h += '<div class="caixa"><h2>Aulas · correção de cada questão</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
       var x = a.resultado, dir = x.tipo === 'x' ? '<span class="tag t-cinza">sem questões</span>' : x.tipo === 'falta' ? '<span class="tag t-err">falta</span>'
         : '<span class="nota n' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>';
       var qs = a.questoes.map(function(q){
@@ -661,12 +661,16 @@ function abrirMateria(m){
           (q.emCorrecao ? '<p class="aviso" style="margin:0"><span class="tag t-warn">em correção</span></p>' : q.nota !== null ? '<p class="aviso" style="margin:0">Nota: <b>' + dez(q.nota) + '</b> de 10</p>' : '') +
           (q.comentario ? '<p class="aviso" style="margin:4px 0 0">' + esc(q.comentario) + '</p>' : '') + '</div>';
       }).join('');
-      return '<details class="capitulo"><summary><span class="linha" style="display:inline-flex;width:calc(100% - 20px);border:0;padding:0"><span>Aula ' + a.numero +
+      return '<details class="capitulo" id="aulaAluno' + a.numero + '"><summary><span class="linha" style="display:inline-flex;width:calc(100% - 20px);border:0;padding:0"><span>Aula ' + a.numero +
         (a.tema ? ' · ' + esc(a.tema) : '') + ' <span class="aviso">' + esc(a.data.split(' ')[0]) + '</span></span>' + dir + '</span></summary>' +
         (qs || '<p class="aviso" style="margin-top:8px">' + (a.temQuestoes ? 'As questões desta aula ainda estão abertas.' : 'Esta aula não teve questões.') + '</p>') + '</details>';
     }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + (r.aulas.some(function(a){ return a.resultado.provisoria; }) ? '<p class="aviso">* nota provisória: há questão aberta ou resposta em correção.</p>' : '') + '</div>';
     el.innerHTML = h;
     el.querySelectorAll('[data-voltar]').forEach(function(b){ b.addEventListener('click', voltarListaAluno); });
+    el.querySelectorAll('[data-iraula]').forEach(function(b){ b.addEventListener('click', function(){
+      var d = $('aulaAluno' + b.dataset.iraula); if(!d) return;
+      d.open = true; d.scrollIntoView({behavior:'smooth', block:'start'});
+    }); });
   }).catch(function(e){ el.innerHTML = '<div class="caixa"><button type="button" class="link" onclick="voltarListaAluno()">&#8592; voltar</button><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
