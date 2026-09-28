@@ -1015,6 +1015,7 @@ function enviarPendentes(){
           return api('enviarBloco', {aulaId: it.aulaId, ordem: it.ordem, inicio: it.inicio, mime: it.mime, dados: b64});
         }).then(function(est){
           if(G.aula && est.id === G.aula.id) G.estado = est;
+          pedirTranscricao(it.aulaId, [it.ordem].concat(est.pendentes || []));   // sem esperar: segue enviando
           G.memoria = (G.memoria || []).filter(function(x){ return x.k !== it.k; });
           G.statusEnvio = '';
           return idbDel(it.k).catch(function(){});
@@ -1030,7 +1031,29 @@ function enviarPendentes(){
 
 function atualizarEstado(){
   if(!G.aula) return;
-  api('estadoAula', {aulaId: G.aula.id}).then(function(est){ G.estado = est; atualizarPainel(); if(G.fase === 'encerrada') desenharEncerrada(); }).catch(function(){});
+  api('estadoAula', {aulaId: G.aula.id}).then(function(est){
+    G.estado = est; atualizarPainel(); if(G.fase === 'encerrada') desenharEncerrada();
+    pedirTranscricao(est.id, est.pendentes || []);
+  }).catch(function(){});
+}
+
+/* Transcrição em paralelo, separada do envio: cada trecho é pedido logo depois de
+   chegar ao servidor, até 3 ao mesmo tempo. O envio dos próximos trechos não espera.
+   Cada trecho é pedido no máximo 3 vezes por aqui; o que sobrar fica para a varredura. */
+var transcrevendo = {}, pedidosTrecho = {};
+function pedirTranscricao(aulaId, ordens){
+  ordens.forEach(function(o){
+    var k = aulaId + '|' + o;
+    if(transcrevendo[k] || (pedidosTrecho[k] || 0) >= 3) return;
+    if(Object.keys(transcrevendo).length >= 3) return;   // entra na próxima rodada
+    transcrevendo[k] = true; pedidosTrecho[k] = (pedidosTrecho[k] || 0) + 1;
+    api('transcreverBloco', {aulaId: aulaId, ordem: o}).then(function(est){
+      if(G.aula && est.id === G.aula.id){ G.estado = est; atualizarPainel(); if(G.fase === 'encerrada') desenharEncerrada(); }
+    }).catch(function(){}).then(function(){
+      delete transcrevendo[k];
+      if(G.aula && G.aula.id === aulaId && G.estado && G.estado.pendentes) pedirTranscricao(aulaId, G.estado.pendentes);
+    });
+  });
 }
 
 function pedirWakeLock(){
@@ -1190,7 +1213,7 @@ function encerrarGravacao(automatico){
     return enviarPendentes();
   }).then(function(){
     return api('encerrarAula', {aulaId: G.aula.id, totalBlocos: G.ordem});
-  }).then(function(est){ G.estado = est; G.encerrou = true; desenharEncerrada(); })
+  }).then(function(est){ G.estado = est; G.encerrou = true; desenharEncerrada(); pedirTranscricao(est.id, est.pendentes || []); })
     .catch(function(e){ G.statusEnvio = 'o encerramento será confirmado quando a internet voltar'; desenharEncerrada(); })
     .then(function(){
       if(G.poll) clearInterval(G.poll);
@@ -1208,7 +1231,8 @@ function desenharEncerrada(){
   var est = G.estado || {}, total = Math.max(G.ordem, est.blocosRecebidos || 0);
   var h = '<div class="caixa"><h2>Aula encerrada · ' + esc(G.discInfo.nome) + ' · aula ' + G.aula.numero + '</h2>' +
     (G.automatico ? '<p class="aviso">Encerrada automaticamente 20 minutos depois do fim previsto.</p>' : '') +
-    '<p>Tempo gravado: <b>' + hms(ativoSeg()) + '</b> · ' + (est.blocosFeitos || 0) + ' de ' + total + ' trecho(s) transcrito(s)' + (G.statusEnvio ? ' · ' + esc(G.statusEnvio) : '') + '.</p>';
+    '<p>Tempo gravado: <b>' + hms(ativoSeg()) + '</b> · ' + (est.blocosFeitos || 0) + ' de ' + total + ' trecho(s) transcrito(s)' + (G.statusEnvio ? ' · ' + esc(G.statusEnvio) : '') + '.</p>' +
+    (est.ultimoErro && !est.ata ? '<p class="aviso">Último erro da IA — ' + esc(est.ultimoErro) + '</p>' : '');
   if(est.ata){
     h += '<h3>' + esc(est.tema) + '</h3><p style="white-space:pre-line">' + esc(est.ata) + '</p>' + (est.pendencias ? '<p class="aviso"><b>Pendências:</b> ' + esc(est.pendencias) + '</p>' : '');
   } else {
@@ -1281,6 +1305,13 @@ function desenharCompositor(){
     (n === 0 ? '<div class="erro">Escolha pelo menos uma questão.</div>' : '') +
     '<label class="rot" for="qOri" style="margin-top:12px">Orientação (opcional)</label><input type="text" id="qOri" placeholder="ex.: foque no exemplo do doce de leite; nível intermediário" value="' + esc(c.orientacao) + '">' +
     '<p class="aviso" style="margin-top:6px">As questões usam o que já foi transcrito. O trecho que está sendo gravado agora entra quando fechar o bloco de 10 minutos.</p>' +
+    (function(){
+      var est = G.estado && G.aula && G.estado.id === a.id ? G.estado : null;
+      if(!est) return '';
+      var falta = Math.max(est.blocosRecebidos || 0, G.ordem || 0) - (est.blocosFeitos || 0);
+      return falta > 0 ? '<div class="convite" style="margin-top:8px"><b>' + est.blocosFeitos + ' trecho(s) prontos, ' + falta + ' ainda sendo transcrito(s).</b> Cada um leva por volta de 1 minuto. Se gerar agora, as questões usam só os prontos.</div>'
+        : '<div class="ok" style="margin-top:8px">Todos os ' + est.blocosFeitos + ' trechos estão transcritos.</div>';
+    })() +
     '<div class="botoes"><button type="button" id="qGerar"' + (n ? '' : ' disabled') + '>Gerar questões para revisar</button><button type="button" class="secundario" id="qCanc">Cancelar</button></div><div id="qMsg"></div></div>';
   var box = $('areaQ');
   box.querySelectorAll('[data-k]').forEach(function(b){ b.addEventListener('click', function(){
