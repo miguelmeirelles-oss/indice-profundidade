@@ -310,6 +310,8 @@
           <span>Provas</span><span class="seta">&#10230;</span></button>
         <button class="pill claro oculto" id="btProf" onclick="abrirProfessor()">
           <span>Mapa dos alunos</span><span class="seta">&#10230;</span></button>
+        <button class="pill claro oculto" id="btConta" onclick="abrirConta()">
+          <span>Minha conta</span><span class="seta">&#10230;</span></button>
         <button class="miniLink" onclick="abrirSugestao()">enviar sugestão</button>
       </div>
     </div>
@@ -440,11 +442,31 @@
       <h2 style="margin:0">Meu mapa do curso</h2>
       <div class="topo">
         <button class="link" onclick="mostrar('pInicio')">Modo livre</button>
-        <button class="link" onclick="abrirSenha()">Senha</button>
+        <button class="link" onclick="abrirConta()">Minha conta</button>
         <button class="link" onclick="sairConta()">Sair</button>
       </div>
     </div>
-    <div class="convite oculto" id="caixaSenha" style="margin-bottom:18px">
+    <div id="resumoMapa"></div>
+    <div class="chips" id="filtroNivel" style="margin-bottom:14px">
+      <button class="chip ativo" onclick="filtrar('todos', this)">Todos</button>
+      <button class="chip" onclick="filtrar('basico', this)">Básico</button>
+      <button class="chip" onclick="filtrar('intermediario', this)">Intermediário</button>
+      <button class="chip" onclick="filtrar('avancado', this)">Avançado</button>
+    </div>
+    <div id="listaAreas"></div>
+    <p class="aviso">A nota mostrada é a sua melhor tentativa em cada assunto.
+      Clique em um assunto para ver o histórico ou refazer.</p>
+  </div>
+
+  <!-- minha conta: vale para os três apps (Estudar com IA, Aulas e Provas) -->
+  <div class="caixa oculto" id="pConta">
+    <div class="topo" style="justify-content:space-between;margin-bottom:6px">
+      <h2 style="margin:0">Minha conta</h2>
+      <button class="link" onclick="abrirArea()">&#8592; Meu mapa do curso</button>
+    </div>
+    <p class="aviso" style="margin:0 0 14px">A mesma conta vale para o Estudar com IA, o Aula por IA e o Prova por IA.</p>
+    <div id="contaDados" style="font-size:15px;line-height:1.6;margin-bottom:16px"></div>
+    <div class="convite" id="caixaSenha" style="margin-bottom:18px">
       <div class="eyebrow" id="senhaTitulo">Criar senha</div>
       <p id="senhaTexto" style="font-size:14px;margin:0 0 12px"></p>
       <div id="campoSenhaAtual" class="oculto">
@@ -457,21 +479,11 @@
       <input type="password" id="senhaConf" autocomplete="new-password">
       <div class="botoes">
         <button onclick="salvarSenha()">Salvar senha</button>
-        <button class="secundario" onclick="document.getElementById('caixaSenha').classList.add('oculto')">Fechar</button>
       </div>
       <p id="senhaMsg" class="aviso"></p>
     </div>
-    <div id="resumoMapa"></div>
-    <div class="chips" id="filtroNivel" style="margin-bottom:14px">
-      <button class="chip ativo" onclick="filtrar('todos', this)">Todos</button>
-      <button class="chip" onclick="filtrar('basico', this)">Básico</button>
-      <button class="chip" onclick="filtrar('intermediario', this)">Intermediário</button>
-      <button class="chip" onclick="filtrar('avancado', this)">Avançado</button>
-    </div>
-    <div id="listaAreas"></div>
-    <p class="aviso">A nota mostrada é a sua melhor tentativa em cada assunto.
-      Clique em um assunto para ver o histórico ou refazer.</p>
     <div class="botoes">
+      <button class="secundario" onclick="sairConta()">Sair desta conta</button>
       <button class="link" style="color:#8a1c1c" onclick="apagarConta()">Apagar minha conta e todo o histórico</button>
     </div>
   </div>
@@ -699,7 +711,9 @@ api('config').then(function(c){
 // devolve o aluno para lá.
 var destinoVolta = (location.search.match(/[?&]voltar=(aulas|provas)\b/) || [])[1] || '';
 var voltarParaAulas = !!destinoVolta;
-if(voltarParaAulas && !sessao.token) setTimeout(abrirArea, 0);
+// index.html?conta=1 (link "minha conta" do Aula por IA e do Prova por IA): abre direto a página da conta
+var querConta = /[?&]conta=1\b/.test(location.search);
+if((voltarParaAulas || querConta) && !sessao.token) setTimeout(abrirArea, 0);
 
 if(sessao.token){
   api('sessao', {token: sessao.token}).then(function(r){
@@ -709,10 +723,12 @@ if(sessao.token){
       sessao.instituicao = r.instituicao || '';
       document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
       document.getElementById('btProf').classList.toggle('oculto', !r.professor);
+      document.getElementById('btConta').classList.remove('oculto');
+      if(querConta){ querConta = false; abrirConta(); }
     }
     else {
       sessao.token = ''; apagarToken();
-      if(voltarParaAulas) abrirArea();
+      if(voltarParaAulas || querConta) abrirArea();
     }
   }).catch(function(){});
 }
@@ -749,7 +765,9 @@ function logou(r){
   if(voltarParaAulas){ location.href = destinoVolta + '.html'; return; }
   document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
+  document.getElementById('btConta').classList.remove('oculto');
   document.getElementById('erroAuth').classList.add('oculto');
+  if(querConta){ querConta = false; abrirConta(); return; }
   if(!sessao.instituicao && !localStorage.getItem('ip_inst')) mostrar('pInstituicao');
   else abrirCurriculo();
 }
@@ -905,6 +923,23 @@ function entrarConta(){
    em computador compartilhado, sem logar o Gmail nele. */
 var temSenha = false;
 
+/* ---------- minha conta ---------- */
+function abrirConta(){
+  if(!sessao.token){ abrirArea(); return; }
+  mostrar('pConta');
+  var el = document.getElementById('contaDados');
+  el.innerHTML = '<span class="aviso">Carregando…</span>';
+  var manter = false; try{ manter = !!localStorage.getItem('ip_token'); }catch(e){}
+  api('sessao', {token: sessao.token}).then(function(r){
+    if(!r.logado){ sairConta(); return; }
+    el.innerHTML = '<b>' + esc(r.nome || '') + '</b><br>' + esc(r.email || '') +
+      '<br><span class="aviso">' + (r.professor ? 'Conta de professor' : 'Conta de aluno') +
+      (r.instituicao ? ' · ' + esc(r.instituicao) : '') + '</span>' +
+      '<br><span class="aviso">Neste computador: ' + (manter ? 'conectado até você clicar em sair.' : 'o login termina quando o navegador fechar.') + '</span>';
+  }).catch(function(e){ el.innerHTML = '<span class="aviso">' + esc(e.message) + '</span>'; });
+  abrirSenha();
+}
+
 function abrirSenha(){
   var caixa = document.getElementById('caixaSenha');
   var msg = document.getElementById('senhaMsg');
@@ -944,7 +979,7 @@ function sairConta(){
   sessao = {token:'', nome:''};
   apagarToken();
   document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
-  document.getElementById('btProf').classList.add('oculto');
+  document.getElementById('btProf').classList.add('oculto'); document.getElementById('btConta').classList.add('oculto');
   mostrar('pInicio');
 }
 
@@ -955,7 +990,7 @@ function apagarConta(){
     alert(m); sessao = {token:'', nome:'', professor:false, instituicao:''};
     apagarToken();
     document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
-    document.getElementById('btProf').classList.add('oculto');
+    document.getElementById('btProf').classList.add('oculto'); document.getElementById('btConta').classList.add('oculto');
     mostrar('pInicio');
   }).catch(function(e){ alert(e.message); });
 }
@@ -1328,7 +1363,7 @@ var acaoSeq = 0, telaAtual = 'pInicio';
 
 function mostrar(id, manterPosicao){
   acaoSeq++;
-  ['pInicio','pAuth','pInstituicao','pProfessor','pCurriculo','pSubtopico',
+  ['pInicio','pAuth','pInstituicao','pProfessor','pCurriculo','pConta','pSubtopico',
    'pFala','pProcessando','pParcial','pFinal','pLimite'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
   });
@@ -1599,7 +1634,8 @@ function enviarSug(){
     texto: document.getElementById('sTexto').value
   })
   .then(function(t){
-    msg.textContent = t; msg.style.color = 'var(--verde)';    document.getElementById('sTexto').value = '';
+    msg.textContent = t; msg.style.color = 'var(--verde)';
+    document.getElementById('sTexto').value = '';
   })
   .catch(function(e){ msg.textContent = e.message; msg.style.color = 'var(--vermelho)'; });
 }
