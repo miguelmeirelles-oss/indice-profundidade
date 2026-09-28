@@ -343,6 +343,11 @@
       avaliações ficam guardadas por assunto, com nota e gargalos, para você
       acompanhar o que já domina do curso e o que precisa revisar.</p>
 
+    <label for="manterConectado" style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:0 0 14px;font-family:inherit;font-size:13.5px;letter-spacing:0;text-transform:none;font-weight:normal;color:var(--navy);line-height:1.4">
+      <input type="checkbox" id="manterConectado" style="width:18px;height:18px;margin:1px 0 0;flex:none;accent-color:var(--menu)">
+      <span><b>Manter conectado neste computador</b><br><span class="aviso" style="margin:0">Deixe desmarcado em computador da faculdade ou de outra pessoa: o login termina quando o navegador fecha.</span></span>
+    </label>
+
     <div id="caixaGoogle" style="margin-bottom:16px"></div>
 
     <div class="botoes" style="margin-top:0">
@@ -653,7 +658,27 @@ function api(acao, dados){
   });
 }
 
-var sessao = {token: localStorage.getItem('ip_token') || '', nome:'',
+/* Onde o login fica guardado: "manter conectado" → localStorage (dura até sair);
+   desmarcado → sessionStorage (acaba quando o navegador fecha). O aulas.html e o
+   provas.html leem dos dois lugares. */
+function lerToken(){
+  try{ return localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){ return ''; }
+}
+function guardarToken(t){
+  var manter = document.getElementById('manterConectado');
+  manter = !!(manter && manter.checked);
+  try{
+    localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token');
+    (manter ? localStorage : sessionStorage).setItem('ip_token', t);
+    if(manter) localStorage.setItem('ip_manter', '1'); else localStorage.removeItem('ip_manter');
+  }catch(e){}
+}
+function apagarToken(){
+  try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(e){}
+}
+try{ if(localStorage.getItem('ip_manter') === '1') document.getElementById('manterConectado').checked = true; }catch(e){}
+
+var sessao = {token: lerToken(), nome:'',
               professor:false, instituicao:''};
 var subtopicoAtual = null;   // {id, nome} quando a avaliação vem do currículo
 
@@ -686,7 +711,7 @@ if(sessao.token){
       document.getElementById('btProf').classList.toggle('oculto', !r.professor);
     }
     else {
-      sessao.token = ''; localStorage.removeItem('ip_token');
+      sessao.token = ''; apagarToken();
       if(voltarParaAulas) abrirArea();
     }
   }).catch(function(){});
@@ -720,7 +745,7 @@ function erroAuth(e){
 function logou(r){
   sessao.token = r.token; sessao.nome = r.nome;
   sessao.professor = !!r.professor; sessao.instituicao = r.instituicao || '';
-  localStorage.setItem('ip_token', r.token);
+  guardarToken(r.token);
   if(voltarParaAulas){ location.href = destinoVolta + '.html'; return; }
   document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
@@ -917,7 +942,7 @@ function salvarSenha(){
 function sairConta(){
   api('sair', {token: sessao.token}).catch(function(){});
   sessao = {token:'', nome:''};
-  localStorage.removeItem('ip_token');
+  apagarToken();
   document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
   document.getElementById('btProf').classList.add('oculto');
   mostrar('pInicio');
@@ -928,7 +953,7 @@ function apagarConta(){
               'Não tem como desfazer. Continuar?')) return;
   api('apagarConta', {token: sessao.token}).then(function(m){
     alert(m); sessao = {token:'', nome:'', professor:false, instituicao:''};
-    localStorage.removeItem('ip_token');
+    apagarToken();
     document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
     document.getElementById('btProf').classList.add('oculto');
     mostrar('pInicio');
@@ -1574,8 +1599,7 @@ function enviarSug(){
     texto: document.getElementById('sTexto').value
   })
   .then(function(t){
-    msg.textContent = t; msg.style.color = 'var(--verde)';
-    document.getElementById('sTexto').value = '';
+    msg.textContent = t; msg.style.color = 'var(--verde)';    document.getElementById('sTexto').value = '';
   })
   .catch(function(e){ msg.textContent = e.message; msg.style.color = 'var(--vermelho)'; });
 }
