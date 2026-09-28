@@ -109,6 +109,8 @@
   .opc{display:block;width:100%;text-align:left;border:2px solid var(--linha);border-radius:12px;padding:10px 12px;background:#fff;box-shadow:none;font-weight:normal;font-size:14px;margin-top:8px}
   .opc:hover{transform:none;box-shadow:none;border-color:var(--azul)}
   .opc[aria-pressed="true"]{border-color:var(--azul);background:var(--bloco);font-weight:bold}
+  .tempoResp{font-weight:bold;font-size:15px;color:var(--navy);background:#eef3ff;border:2px solid var(--azul);border-radius:999px;padding:2px 10px;font-variant-numeric:tabular-nums}
+  .tempoResp.pouco{color:#fff;background:#c62828;border-color:#c62828}
   .antifraude{display:flex;gap:10px;align-items:center;background:#fff4f4;border:2.5px solid #c62828;border-radius:14px;padding:10px 14px;margin:0 0 14px;color:#8e1b1b;font-size:14px;line-height:1.45}
   .antifraude .ic{font-size:22px;line-height:1}
   .suspeita{display:inline-block;background:#fff4f4;color:#8e1b1b;border:2px solid #c62828;border-radius:8px;padding:2px 8px;font-size:12.5px;font-weight:bold;margin:0 0 6px}
@@ -348,6 +350,10 @@ setInterval(function(){
   document.querySelectorAll('[data-fim]').forEach(function(el){
     var resta = Number(el.dataset.fim) - (Date.now() + Number(el.dataset.desvio || 0));
     el.textContent = resta > 0 ? mmss(resta) : 'encerrado';
+    if(el.hasAttribute('data-recarregar')){
+      el.parentNode.classList.toggle('pouco', resta > 0 && resta <= 60000);
+      if(resta <= 0 && !el.dataset.feito){ el.dataset.feito = '1'; setTimeout(function(){ assinaturaAbertas = ''; carregarAbertas(); }, 2500); }
+    }
   });
 }, 1000);
 
@@ -395,7 +401,7 @@ function abrirAluno(){
 /* ---- questões abertas ---- */
 function carregarAbertas(){
   api('questoesAbertas').then(function(grupos){
-    var ass = JSON.stringify(grupos.map(function(g){ return [g.aulaId, g.presente, g.fechaEm, g.questoes.map(function(q){ return q.id + q.respondida + q.fechaEm; })]; }));
+    var ass = JSON.stringify(grupos.map(function(g){ return [g.aulaId, g.presente, g.fechaEm, g.questoes.map(function(q){ return q.id + q.respondida + q.fechaEm + q.aguardando + q.esgotada; })]; }));
     if(ass === assinaturaAbertas) return;   // nada mudou: não redesenha para não apagar o que o aluno digita
     assinaturaAbertas = ass;
     desenharAbertas(grupos);
@@ -413,13 +419,22 @@ function desenharAbertas(grupos){
       return h + '<p style="margin:10px 0 0">Você não está na chamada desta aula. Se você está em sala, peça ao professor para marcar sua presença.</p></div>';
     }
     h += '</div>';
-    if(g.questoes.some(function(q){ return q.tipo !== 'fechada' && !q.respondida; }))
+    if(g.questoes.some(function(q){ return q.tipo !== 'fechada' && !q.respondida && !q.esgotada; }))
       h += '<div class="antifraude" role="note"><span class="ic" aria-hidden="true">🛡️</span><span><b>Anti-fraude por IA ativo.</b> Não saia desta tela enquanto responde.</span></div>';
     g.questoes.forEach(function(q, i){
       h += '<div class="caixa" data-q="' + esc(q.id) + '" data-prof="' + esc(g.professorId) + '"><div class="linha" style="border:0;padding:0 0 6px">' +
         '<span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' · ' + (i + 1) + ' de ' + g.questoes.length + '</span>' +
-        '<span class="aviso">fecha em <span data-fim="' + q.fechaEm + '" data-desvio="' + desvio + '">' + mmss(q.fechaEm - g.agora) + '</span></span></div>' +
-        '<p style="font-weight:bold;font-size:15.5px">' + esc(q.enunciado) + '</p>';
+        (q.aguardando ? '<span class="aviso">⏱ ' + q.tempoMin + ' min para responder</span>'
+          : q.respondida || q.esgotada ? ''
+          : q.tempoMin ? '<span class="tempoResp">⏱ <span data-fim="' + q.fechaEm + '" data-desvio="' + desvio + '" data-recarregar>' + mmss(q.fechaEm - g.agora) + '</span></span>'
+          : '<span class="aviso">fecha em <span data-fim="' + q.fechaEm + '" data-desvio="' + desvio + '">' + mmss(q.fechaEm - g.agora) + '</span></span>') + '</div>';
+      if(q.aguardando){
+        h += '<p style="margin:4px 0 0">Quando você abrir, terá <b>' + q.tempoMin + ' minuto' + (q.tempoMin === 1 ? '' : 's') + '</b> para responder esta questão. Abra só quando estiver pronto.</p>' +
+          '<div class="botoes"><button type="button" data-abrirq>Abrir questão</button></div><div data-msg></div></div>';
+        return;
+      }
+      h += '<p style="font-weight:bold;font-size:15.5px">' + esc(q.enunciado) + '</p>';
+      if(q.esgotada && !q.respondida){ h += '<div class="erro" style="margin-bottom:0">Seu tempo para esta questão acabou.</div></div>'; return; }
       if(q.respondida){ h += '<div class="ok" style="margin-bottom:0">Resposta registrada. O resultado aparece em "Minhas matérias" depois que a questão fechar.</div></div>'; return; }
       if(q.tipo === 'fechada'){
         q.alternativas.forEach(function(a, k){
@@ -438,6 +453,12 @@ function desenharAbertas(grupos){
         rascunho[qid] = Number(b.dataset.alt);
         card.querySelectorAll('[data-alt]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
       });
+    });
+    var ab = card.querySelector('[data-abrirq]');
+    if(ab) ab.addEventListener('click', function(){
+      ab.disabled = true; ab.textContent = 'Abrindo…';
+      api('abrirQuestao', {professorId: pid, questaoId: qid}).then(function(){ assinaturaAbertas = ''; carregarAbertas(); })
+        .catch(function(e){ ab.disabled = false; ab.textContent = 'Abrir questão'; card.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });
     var ta = card.querySelector('[data-txt]');
     if(ta){
@@ -1167,6 +1188,7 @@ function abrirCompositor(sobre){
   Q.aula = a;
   if(Q.poll){ clearInterval(Q.poll); Q.poll = null; }
   var d = discPorId(a.disciplinaId) || {qtd_fechadas:2, qtd_abertas:1, prazo_padrao:40, peso_fechadas:50};
+  Q.tempoPadrao = d.tempo_resposta === undefined ? 5 : Number(d.tempo_resposta) || 0; Q.tempos = {};
   Q.cfg = {fechadas: d.qtd_fechadas, abertas: d.qtd_abertas, prazo: sobre === 'recente' ? Math.min(10, d.prazo_padrao) : d.prazo_padrao, peso: d.peso_fechadas, sobre: sobre, orientacao: ''};
   desenharCompositor();
   $('areaQ').scrollIntoView({behavior:'smooth', block:'start'});
@@ -1202,6 +1224,9 @@ function desenharCompositor(){
   });
 }
 
+// tempo para responder de cada questão proposta (pelo id, sobrevive a editar e refazer)
+function tempoDe(q){ return Q.tempos[q.id] || (Q.tempos[q.id] = {on: Q.tempoPadrao > 0, min: Q.tempoPadrao || 5}); }
+
 function desenharRevisao(){
   var nOk = Q.propostas.filter(function(q){ return q.ok; }).length;
   var h = '<div class="caixa"><h2>Revisar antes de liberar</h2>';
@@ -1219,16 +1244,24 @@ function desenharRevisao(){
       h += '<p style="margin:8px 0 0;font-weight:bold">' + esc(q.enunciado) + '</p>';
       h += q.tipo === 'fechada' ? '<ol class="alts" type="A">' + q.alternativas.map(function(a, k){ return '<li' + (k === q.gabarito ? ' class="certa"' : '') + '>' + esc(a) + (k === q.gabarito ? ' ✓' : '') + '</li>'; }).join('') + '</ol>'
         : '<p class="aviso" style="margin:6px 0 0"><b>Resposta esperada:</b> ' + esc(q.gabarito) + '</p>';
+      var t = tempoDe(q);
+      h += '<div class="linha" style="border:0;padding:8px 0 0"><label style="display:flex;gap:8px;align-items:center;cursor:pointer"><input type="checkbox" data-tempo-on' + (t.on ? ' checked' : '') + '> ⏱ Tempo para responder</label>' +
+        (t.on ? '<span class="stepper"><button type="button" data-tempo="-1" aria-label="Menos">−</button><span>' + t.min + ' min</span><button type="button" data-tempo="1" aria-label="Mais">+</button></span>' : '<span class="aviso">só o prazo geral</span>') + '</div>';
       h += '<div class="botoes"><button type="button" class="mini" data-acao="ok">' + (q.ok ? 'Desmarcar' : '✓ Aprovar') + '</button><button type="button" class="secundario mini" data-acao="editar">Editar</button><button type="button" class="secundario mini" data-acao="refazer">Refazer</button></div>';
     }
     h += '<div data-msg></div></div>';
   });
   h += '<label class="rot" for="qRef">Orientação para refazer</label><input type="text" id="qRef" placeholder="ex.: mais difícil; sem cálculo; pergunte sobre o exemplo do queijo">' +
-    '<div class="botoes"><button type="button" class="secundario" id="qRefTodas">Refazer todas</button><button type="button" id="qLib"' + (nOk ? '' : ' disabled') + '>Liberar ' + nOk + ' questão' + (nOk === 1 ? '' : 'ões') + ' · ' + Q.cfg.prazo + ' min</button>' +
+    '<div class="botoes"><button type="button" class="secundario" id="qRefTodas">Refazer todas</button><button type="button" id="qLib"' + (nOk ? '' : ' disabled') + '>Liberar ' + nOk + (nOk === 1 ? ' questão' : ' questões') + ' · ' + 'abrir em até ' + Q.cfg.prazo + ' min</button>' +
     '<button type="button" class="secundario" id="qVoltar">Voltar</button></div><div id="qMsg"></div></div>';
   var box = $('areaQ'); box.innerHTML = h;
   box.querySelectorAll('[data-i]').forEach(function(card){
     var i = Number(card.dataset.i), q = Q.propostas[i], msg = card.querySelector('[data-msg]');
+    var ck = card.querySelector('[data-tempo-on]');
+    if(ck) ck.addEventListener('change', function(){ tempoDe(q).on = ck.checked; desenharRevisao(); });
+    card.querySelectorAll('[data-tempo]').forEach(function(b){ b.addEventListener('click', function(){
+      var t = tempoDe(q); t.min = Math.max(1, Math.min(60, t.min + Number(b.dataset.tempo))); desenharRevisao();
+    }); });
     card.querySelectorAll('[data-acao]').forEach(function(b){ b.addEventListener('click', function(){
       var ac = b.dataset.acao;
       if(ac === 'ok'){ q.ok = !q.ok; desenharRevisao(); }
@@ -1260,7 +1293,8 @@ function desenharRevisao(){
   $('qLib').addEventListener('click', function(){
     var b = this; b.disabled = true;
     var ids = Q.propostas.filter(function(q){ return q.ok; }).map(function(q){ return q.id; });
-    api('liberarQuestoes', {aulaId: Q.aula.id, ids: ids, prazo: Q.cfg.prazo, peso: Q.cfg.peso}).then(function(){ abrirAcompanhamento(); })
+    var tempos = {}; ids.forEach(function(id){ var t = Q.tempos[id]; tempos[id] = t && t.on ? t.min : 0; });
+    api('liberarQuestoes', {aulaId: Q.aula.id, ids: ids, prazo: Q.cfg.prazo, peso: Q.cfg.peso, tempos: tempos}).then(function(){ abrirAcompanhamento(); })
       .catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
 }
@@ -1280,7 +1314,7 @@ function carregarAcompanhamento(){
       (aberto ? '<span data-fim="' + fim + '" data-desvio="' + desvio + '">' + mmss(fim - r.agora) + '</span>' : 'fechadas') + '</div></div>' +
       '<div><span class="aviso">Questões</span><div class="grande">' + total + '</div></div></div>';
     h += '<h4>Questões liberadas</h4>' + (r.questoes.length ? r.questoes.map(function(q, i){
-      return '<div class="linha"><span><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + '</span> ' + esc(q.enunciado) + '</span>' +
+      return '<div class="linha"><span><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + '</span> ' + (q.tempoResp ? '<span class="tag t-warn">⏱ ' + q.tempoResp + ' min</span> ' : '') + esc(q.enunciado) + '</span>' +
         '<button type="button" class="secundario mini" data-excluirq="' + esc(q.id) + '">Excluir</button></div>';
     }).join('') + '<p class="aviso" style="margin-top:6px">Excluir tira a questão da nota da aula; as notas dos alunos são recalculadas.</p>' : '<p class="aviso">Nenhuma questão liberada.</p>');
     h += '<h4>Presentes</h4>' + (r.alunos.length ? '<div class="chamada">' + r.alunos.map(function(a){
@@ -1613,7 +1647,8 @@ function cartaoDisc(d){
     '<p class="grupoTitulo" style="margin-top:10px">Questões em aula</p>' +
     '<div class="cfg"><span>Aula</span><span>' + d.tempos + ' × 50 min · prazo ' + d.prazo_padrao + ' min</span>' +
     '<span>Por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s) · peso ' + d.peso_fechadas + '/' + (100 - d.peso_fechadas) + '</span>' +
-    '<span>Presença mínima</span><span>' + d.presenca_min + '%</span></div>' +
+    '<span>Presença mínima</span><span>' + d.presenca_min + '%</span>' +
+    '<span>Tempo para responder</span><span>' + (d.tempo_resposta ? d.tempo_resposta + ' min por questão, depois de abrir' : 'sem tempo por questão') + '</span></div>' +
     '<p class="aviso" style="margin-top:6px">' + (d.orientacoes ? '<span title="' + esc(d.orientacoes) + '">Orientações: definidas</span>' : 'Sem orientações fixas') + ' · ' +
       (gl.length ? 'Glossário: ' + gl.length + ' termo(s)' : 'Sem glossário') + '</p>' +
     '<p class="grupoTitulo" style="margin-top:10px">Composição da nota</p>' +
@@ -1638,7 +1673,7 @@ function lerSemestre(s){
 var etapasEdit = [];
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:'', tempos:p.tempos, prazo_padrao:p.prazo_padrao,
-    presenca_min:p.presenca_min, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
+    presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
     composicao:{etapas:[{id:'', nome:'P1', peso:1, fim:'', itens:itensNovos(1)}, {id:'', nome:'P2', peso:1, fim:'', itens:itensNovos(2)}]}};
   etapasEdit = JSON.parse(JSON.stringify((v.composicao && v.composicao.etapas) || []));
   var sem = lerSemestre(v.semestre);
@@ -1657,7 +1692,9 @@ function abrirForm(d){
       '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
       campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
       campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) + campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
-      campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) + '</div>' +
+      campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
+      campo('fTempoResp', 'Tempo para responder cada questão (min)', 'number', v.tempo_resposta === undefined ? 5 : v.tempo_resposta) + '</div>' +
+      '<p class="aviso" style="margin-top:-6px">O prazo padrão é o tempo que o aluno tem para <b>abrir</b> as questões, contado da liberação. O tempo para responder começa quando ele abre cada questão. Use 0 para não ter tempo por questão. Os dois podem ser mudados antes de cada liberação.</p>' +
       '<p class="aviso" id="fPesoTxt" style="margin-top:-6px"></p>' +
       '<label class="rot" for="fOri" style="margin-top:8px">Orientações fixas para a IA gerar as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea>' +
       '<details style="margin-top:12px"' + (v.glossario.length ? '' : ' open') + '><summary class="link">Glossário · ' + v.glossario.length + ' termo(s)</summary>' +
@@ -1682,7 +1719,7 @@ function abrirForm(d){
     api('salvarDisciplina', {disciplina:{
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSemN').value + ' - ' + $('fSemAno').value, tempos: $('fTempos').value,
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
-      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, orientacoes: $('fOri').value, glossario: $('fGlo').value,
+      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, orientacoes: $('fOri').value, glossario: $('fGlo').value,
       composicao: {etapas: etapasEdit}, material_url: $('fMaterial').value
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
       .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
