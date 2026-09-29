@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Prova por IA — Engenharia de Alimentos</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
@@ -233,7 +235,15 @@ function api(acao, dados){
 }
 
 function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
-function mostrarLogin(){ $('tCarregando').classList.add('oculto'); $('tLogin').classList.remove('oculto'); $('tAluno').classList.add('oculto'); $('tProf').classList.add('oculto'); }
+// Sem login: vai direto para a tela de entrar (com trava de 15 s contra idas e voltas).
+function mostrarLogin(){
+  var agora = Date.now(), ult = 0;
+  try{ ult = Number(sessionStorage.getItem('ip_redir') || 0); }catch(e){}
+  if(agora - ult > 15000){
+    try{ sessionStorage.setItem('ip_redir', String(agora)); }catch(e){}
+    location.replace('index.html?voltar=provas'); return;
+  }
+  $('tCarregando').classList.add('oculto'); $('tLogin').classList.remove('oculto'); $('tAluno').classList.add('oculto'); $('tProf').classList.add('oculto'); }
 
 // contagens regressivas: data-fim (ms do servidor) e data-desvio (servidor - cliente)
 setInterval(function(){
