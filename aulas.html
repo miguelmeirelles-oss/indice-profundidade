@@ -1921,7 +1921,7 @@ function carregarPainelApostila(){
   el.innerHTML = '<div class="caixa"><h2>Apostila</h2><p class="carregando">Carregando…</p></div>';
   api('apostila', {professorId: '', disciplinaId: histDisc}).then(function(r){
     el.innerHTML = '<div class="caixa"><h2>Apostila</h2><p><b>' + r.capitulos.length + ' capítulo(s)</b>' + (r.pendentes ? ' · ' + r.pendentes + ' aula(s) esperando capítulo' : '') +
-      ' · atualizada sozinha no sábado de madrugada.</p><div class="botoes" style="margin-top:0"><button type="button" class="mini" id="apGerar"' + (r.pendentes && resumo.temChave ? '' : ' disabled') + '>Escrever capítulos pendentes agora</button>' +
+      ((discPorId(histDisc) || {}).apostila_auto ? ' · atualizada sozinha no sábado de madrugada.' : ' · geração automática desligada: os capítulos só são escritos quando você clicar no botão abaixo (dá para ligar em Disciplinas → Editar).') + '</p><div class="botoes" style="margin-top:0"><button type="button" class="mini" id="apGerar"' + (r.pendentes && resumo.temChave ? '' : ' disabled') + '>Escrever capítulos pendentes agora</button>' +
       (r.capitulos.length ? '<button type="button" class="secundario mini" id="apLer">Ver capítulos</button>' : '') +
       (r.docUrl ? '<a class="link" target="_blank" rel="noopener" href="' + esc(r.docUrl) + '">Abrir no Google Docs</a>' : '') + '</div>' +
       (r.capitulos.length ? '<label class="rot" for="apCorr" style="margin-top:16px">Corrigir com IA</label><input type="text" id="apCorr" placeholder="ex.: Na aula 4, a HTST é 72 °C por 15 s, não 75 °C por 50 s.">' +
@@ -1990,7 +1990,8 @@ function cartaoDisc(d){
     '<span>Por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s) · peso ' + d.peso_fechadas + '/' + (100 - d.peso_fechadas) + '</span>' +
     '<span>Presença mínima</span><span>' + d.presenca_min + '%</span>' +
     '<span>Tempo para responder</span><span>' + (d.tempo_resposta ? 'fechada ' + d.tempo_resposta + ' min' : 'fechada sem limite') + ' · ' + (d.tempo_aberta ? 'aberta ' + d.tempo_aberta + ' min' : 'aberta sem limite') + '</span>' +
-    '<span>Piores notas</span><span>' + (d.descartar_piores ? 'descartadas acima do mínimo de presença' : 'não descartadas') + '</span></div>' +
+    '<span>Piores notas</span><span>' + (d.descartar_piores ? 'descartadas acima do mínimo de presença' : 'não descartadas') + '</span>' +
+    '<span>Apostila</span><span>' + (d.apostila_auto ? 'automática aos sábados' : 'só quando você pedir') + '</span></div>' +
     '<p class="aviso" style="margin-top:6px">' + (d.orientacoes ? '<span title="' + esc(d.orientacoes) + '">Orientações: definidas</span>' : 'Sem orientações fixas') + ' · ' +
       (gl.length ? 'Glossário: ' + gl.length + ' termo(s)' : 'Sem glossário') + '</p>' +
     '<p class="grupoTitulo" style="margin-top:10px">Composição da nota</p>' +
@@ -2015,7 +2016,7 @@ function lerSemestre(s){
 var etapasEdit = [];
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:'', tempos:p.tempos, prazo_padrao:p.prazo_padrao,
-    presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, tempo_aberta:p.tempo_aberta, descartar_piores:false, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
+    presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, tempo_aberta:p.tempo_aberta, descartar_piores:false, apostila_auto:false, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
     composicao:{etapas:[{id:'', nome:'P1', peso:1, fim:'', itens:itensNovos(1)}, {id:'', nome:'P2', peso:1, fim:'', itens:itensNovos(2)}]}};
   etapasEdit = JSON.parse(JSON.stringify((v.composicao && v.composicao.etapas) || []));
   var sem = lerSemestre(v.semestre);
@@ -2047,6 +2048,8 @@ function abrirForm(d){
       '<br>• respondeu em <b>10 aulas</b>: com esta opção ligada, as <b>3 piores notas são descartadas</b> e fica a soma das 7 melhores ÷ 7.' +
       '<br><br><b>Quem vem sempre é beneficiado:</b> um dia ruim (ou a internet que caiu) pode ser descartado. <b>Quem falta não ganha nada:</b> a média continua dividida pelo mínimo. ' +
       'As notas descartadas continuam aparecendo para o aluno e para você, marcadas como descartadas.</div></details>' +
+      '<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:14px 0 4px;font-size:14px"><input type="checkbox" id="fApostilaAuto"' + (v.apostila_auto ? ' checked' : '') + ' style="width:18px;height:18px;margin-top:2px;flex:none">' +
+      '<span><b>Gerar a apostila automaticamente aos sábados</b><br><span class="aviso">Desligado: a apostila só é escrita quando você clicar em "Escrever capítulos pendentes agora" (em Histórico e apostila). Cada capítulo usa a IA com pesquisa na internet, o que gasta mais da cota do Gemini.</span></span></label>' +
       '<p class="aviso" id="fPesoTxt" style="margin-top:-6px"></p>' +
       '<label class="rot" for="fOri" style="margin-top:8px">Orientações fixas para a IA gerar as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea>' +
       '<details style="margin-top:12px"' + (v.glossario.length ? '' : ' open') + '><summary class="link">Glossário · ' + v.glossario.length + ' termo(s)</summary>' +
@@ -2072,7 +2075,7 @@ function abrirForm(d){
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSemN').value + ' - ' + $('fSemAno').value, tempos: $('fTempos').value,
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
       qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, tempo_aberta: $('fTempoAb').value,
-      descartar_piores: $('fDescartar').checked, orientacoes: $('fOri').value, glossario: $('fGlo').value,
+      descartar_piores: $('fDescartar').checked, apostila_auto: $('fApostilaAuto').checked, orientacoes: $('fOri').value, glossario: $('fGlo').value,
       composicao: {etapas: etapasEdit}, material_url: $('fMaterial').value
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
       .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
