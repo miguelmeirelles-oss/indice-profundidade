@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aula por IA — Engenharia de Alimentos</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
@@ -228,6 +230,7 @@
   .detalhe{border-width:1.5px;border-color:var(--linha);border-left:3px solid var(--menu);border-radius:0 8px 8px 0}
 
   .alerta{box-shadow:var(--sombra);border-width:2.5px}
+  .barrasAula i.desc,.notaDesc{opacity:.55;text-decoration:line-through}
   .ptsCel{font-family:var(--mono);font-size:14px;color:var(--navy)}
   .ptsCel b{font-size:16px;color:var(--menu)}
   .ptsCel.vazio b,.ptsCel.zero b{color:var(--cinza)}
@@ -329,6 +332,14 @@
     </div>
 
     <div id="pInsc" class="oculto">
+      <div class="caixa"><h2>Inscrever aluno</h2>
+        <p class="aviso" style="margin-top:0">Procure quem já tem conta na plataforma e inscreva direto na disciplina (entra já aprovado). O aluno também pode continuar pedindo inscrição pelo app.</p>
+        <div class="campos" style="margin-bottom:8px">
+          <div><label class="rot" for="inscDisc">Disciplina</label><select id="inscDisc"></select></div>
+          <div><label class="rot" for="inscBusca">Nome ou e-mail do aluno</label><input type="text" id="inscBusca" autocomplete="off" placeholder="digite ao menos 2 letras"></div>
+        </div>
+        <div id="inscResultados"></div><div id="inscMsg"></div>
+      </div>
       <div class="caixa"><h2>Pedidos pendentes</h2><div id="listaPend"></div></div>
       <div class="caixa"><h2>Alunos inscritos</h2><div id="listaAprov"></div></div>
     </div>
@@ -392,7 +403,17 @@ function api(acao, dados){
 }
 
 function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
-function mostrarLogin(){ $('tCarregando').classList.add('oculto'); $('tLogin').classList.remove('oculto');
+// Sem login: vai direto para a tela de entrar (o Avaliador devolve para cá depois).
+// A trava de 15 s evita ficar pulando entre as páginas se algo der errado; aí mostra o cartão.
+function mostrarLogin(){
+  if(G && G.fase === 'gravando'){ erroGeral('Sua sessão expirou. Termine a aula e entre de novo.'); return; }
+  var agora = Date.now(), ult = 0;
+  try{ ult = Number(sessionStorage.getItem('ip_redir') || 0); }catch(e){}
+  if(agora - ult > 15000){
+    try{ sessionStorage.setItem('ip_redir', String(agora)); }catch(e){}
+    location.replace('index.html?voltar=aulas'); return;
+  }
+  $('tCarregando').classList.add('oculto'); $('tLogin').classList.remove('oculto');
   $('tAluno').classList.add('oculto'); $('tProf').classList.add('oculto'); }
 
 /* ---------------- início ---------------- */
@@ -648,20 +669,26 @@ function abrirMateria(m){
     var eu = r.eu, h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
       '<h2 style="margin-top:8px">' + esc(m.nome) + ' · ' + esc(m.semestre) + '</h2>';
     h += composicaoAluno(r);
+    // aulas cujas notas foram descartadas (opção da disciplina, quando passou do mínimo de presença)
+    var desc = {};
+    if(r.composicao && r.composicao.meu) r.composicao.meu.etapas.forEach(function(et){ et.itens.forEach(function(v){ (v.descartadas || []).forEach(function(n){ desc[n] = true; }); }); });
+    var DICA_DESC = 'Nota descartada: você foi a mais aulas que o mínimo, então ficam só as suas melhores notas (tantas quanto o mínimo) e as piores saem da média. Quem vem sempre é beneficiado.';
     if(r.N){
       h += '<h4>Questões em sala · pontos de cada aula (de 10)</h4><div class="barrasAula">';
       r.aulas.forEach(function(a){
         var x = a.resultado;
         if(x.tipo === 'x') h += '<i class="x" title="Aula ' + a.numero + ': sem questões">–</i>';
         else if(x.tipo === 'falta') h += '<i class="f" title="Aula ' + a.numero + ': falta">F</i>';
-        else h += '<i class="p" title="Aula ' + a.numero + ': ver a correção" data-iraula="' + a.numero + '" style="cursor:pointer">' + dez(x.nota) + '</i>';
+        else h += '<i class="p' + (desc[a.numero] ? ' desc' : '') + '" title="Aula ' + a.numero + (desc[a.numero] ? ' · ' + DICA_DESC : ': ver a correção') + '" data-iraula="' + a.numero + '" style="cursor:pointer">' + dez(x.nota) + '</i>';
       });
-      h += '</div><p class="aviso" style="margin:0 0 8px">Toque na nota de uma aula para ver cada questão: sua resposta, a correta e o comentário da IA.</p>' + explicacaoNota(r.disciplina.presencaMin);
+      h += '</div><p class="aviso" style="margin:0 0 8px">Toque na nota de uma aula para ver cada questão: sua resposta, a correta e o comentário da IA.' +
+        (Object.keys(desc).length ? ' Notas riscadas foram <b>descartadas</b> (as piores, porque você passou do mínimo de presença).' : '') + '</p>' + explicacaoNota(r.disciplina.presencaMin);
     }
     h += '</div>';
     h += '<div class="caixa"><h2>Aulas · correção de cada questão</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
       var x = a.resultado, dir = x.tipo === 'x' ? '<span class="tag t-cinza">sem questões</span>' : x.tipo === 'falta' ? '<span class="tag t-err">falta</span>'
-        : '<span style="white-space:nowrap"><span class="nota n' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span> <span class="aviso">de 10</span></span>';
+        : '<span style="white-space:nowrap">' + (desc[a.numero] ? '<span class="tag t-cinza" title="' + esc(DICA_DESC) + '">descartada ⓘ</span> ' : '') +
+          '<span class="nota n' + classe(x.nota) + (desc[a.numero] ? ' notaDesc' : '') + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span> <span class="aviso">de 10</span></span>';
       var qs = a.questoes.map(function(q){
         var temVale = q.vale !== undefined && q.vale > 0;
         var pontos = q.emCorrecao ? '<span class="tag t-warn">em correção</span>'
@@ -917,6 +944,7 @@ function desenharInicioAula(pend){
   var sem = !resumo.temChave, pip = 'documentPictureInPicture' in window;
   $('aulaTopo').innerHTML = bannerPendentes(pend) + '<div class="caixa"><h2>Iniciar aula</h2><label class="rot">Disciplina</label>' + chipsDisciplinas(G.disc) +
     (G.disc ? '' : '<p class="aviso" style="margin:6px 0 0">Escolha a disciplina desta aula antes de iniciar a gravação.</p>') +
+    (d && d.material_url ? '<p style="margin:8px 0 0"><a class="botaoLink" href="' + esc(d.material_url) + '" target="_blank" rel="noopener">📁 Pasta da disciplina no Drive</a></p>' : '') +
     '<label class="rot" style="margin-top:14px">Duração</label><div class="chips">' + [1, 2].map(function(t){
       return '<button type="button" class="chip" data-tempos="' + t + '" aria-pressed="' + (G.tempos === t) + '">' + t + ' tempo' + (t > 1 ? 's' : '') + ' · ' + (t * 50) + ' min</button>'; }).join('') + '</div>' +
     '<div class="convite" style="margin-top:16px">O navegador vai pedir permissão para usar o microfone' + (pip ? ' e abrir a <b>janelinha flutuante</b> no canto da tela.' : '. Este navegador não tem a janelinha flutuante: use o Chrome ou o Edge no computador para tê-la.') +
@@ -1421,9 +1449,37 @@ function abrirCompositor(sobre){
   if(Q.poll){ clearInterval(Q.poll); Q.poll = null; }
   var d = discPorId(a.disciplinaId) || {qtd_fechadas:2, qtd_abertas:1, prazo_padrao:40, peso_fechadas:50};
   Q.cfg = {fechadas: d.qtd_fechadas, abertas: d.qtd_abertas, prazo: sobre === 'recente' ? Math.min(10, d.prazo_padrao) : d.prazo_padrao, peso: d.peso_fechadas, sobre: sobre, orientacao: '',
-    tempo: d.tempo_resposta === undefined ? 5 : Number(d.tempo_resposta) || 0};
+    tempoF: d.tempo_resposta === undefined ? 5 : Number(d.tempo_resposta) || 0,
+    tempoA: d.tempo_aberta === undefined ? 10 : Number(d.tempo_aberta) || 0};
   desenharCompositor();
   $('areaQ').scrollIntoView({behavior:'smooth', block:'start'});
+  vigiarTrechos();
+}
+
+/* Aviso "X trechos prontos, Y sendo transcritos": atualiza sozinho a cada 10 s enquanto
+   a tela de liberar questões estiver aberta e faltar algum trecho. Só lê a situação
+   (não chama a IA): não gasta cota do Gemini. */
+function avisoTrechos(est){
+  if(!est) return '';
+  var recebidos = Math.max(est.blocosRecebidos || 0, G.aula && G.aula.id === est.id ? (G.ordem || 0) : 0);
+  var falta = recebidos - (est.blocosFeitos || 0);
+  return falta > 0 ? '<div class="convite" style="margin-top:8px"><b>' + est.blocosFeitos + ' trecho(s) prontos, ' + falta + ' ainda sendo transcrito(s).</b> Cada um leva por volta de 1 minuto; este aviso se atualiza sozinho. Se gerar agora, as questões usam só os prontos.</div>'
+    : (est.blocosFeitos ? '<div class="ok" style="margin-top:8px">Todos os ' + est.blocosFeitos + ' trechos estão transcritos.</div>' : '');
+}
+function vigiarTrechos(){
+  if(Q.vigia) clearInterval(Q.vigia);
+  Q.vigia = setInterval(function(){
+    var el = $('avisoTrechos');
+    if(!el || !Q.aula){ clearInterval(Q.vigia); Q.vigia = null; return; }
+    if(document.hidden) return;
+    api('estadoAula', {aulaId: Q.aula.id}).then(function(est){
+      if(G.aula && est.id === G.aula.id) G.estado = est;
+      Q.estadoTrechos = est;
+      var alvo = $('avisoTrechos'); if(alvo) alvo.innerHTML = avisoTrechos(est);
+      var falta = Math.max(est.blocosRecebidos || 0, G.aula && G.aula.id === est.id ? (G.ordem || 0) : 0) - (est.blocosFeitos || 0);
+      if(falta <= 0 && G.fase !== 'gravando'){ clearInterval(Q.vigia); Q.vigia = null; }
+    }).catch(function(){});
+  }, 10000);
 }
 
 function desenharCompositor(){
@@ -1432,7 +1488,8 @@ function desenharCompositor(){
   $('areaQ').innerHTML = '<div class="caixa"><h2>Liberar questões · aula ' + a.numero + '</h2>' +
     linha('Fechadas (múltipla escolha)', 'fechadas', c.fechadas, 1) + linha('Abertas (corrigidas pela IA)', 'abertas', c.abertas, 1) +
     linha('Prazo para abrir as questões', 'prazo', c.prazo + ' min', 5) +
-    linha('Tempo para responder cada questão', 'tempo', c.tempo ? c.tempo + ' min' : 'sem limite', 1) +
+    linha('Tempo para responder cada fechada', 'tempoF', c.tempoF ? c.tempoF + ' min' : 'sem limite', 1) +
+    linha('Tempo para responder cada aberta', 'tempoA', c.tempoA ? c.tempoA + ' min' : 'sem limite', 1) +
     linha('Peso fechadas / abertas', 'peso', c.peso + ' / ' + (100 - c.peso), 10) +
     '<div class="linha"><span>Sobre</span><span class="chips"><button type="button" class="chip" data-sobre="recente" aria-pressed="' + (c.sobre === 'recente') + '">últimos 20 min</button>' +
     '<button type="button" class="chip" data-sobre="inteira" aria-pressed="' + (c.sobre === 'inteira') + '">aula inteira</button></span></div>' +
@@ -1440,17 +1497,11 @@ function desenharCompositor(){
     (n === 0 ? '<div class="erro">Escolha pelo menos uma questão.</div>' : '') +
     '<label class="rot" for="qOri" style="margin-top:12px">Orientação (opcional)</label><input type="text" id="qOri" placeholder="ex.: foque no exemplo do doce de leite; nível intermediário" value="' + esc(c.orientacao) + '">' +
     '<p class="aviso" style="margin-top:6px">As questões usam o que já foi transcrito. O trecho que está sendo gravado agora entra quando fechar o bloco de 10 minutos.</p>' +
-    (function(){
-      var est = G.estado && G.aula && G.estado.id === a.id ? G.estado : null;
-      if(!est) return '';
-      var falta = Math.max(est.blocosRecebidos || 0, G.ordem || 0) - (est.blocosFeitos || 0);
-      return falta > 0 ? '<div class="convite" style="margin-top:8px"><b>' + est.blocosFeitos + ' trecho(s) prontos, ' + falta + ' ainda sendo transcrito(s).</b> Cada um leva por volta de 1 minuto. Se gerar agora, as questões usam só os prontos.</div>'
-        : '<div class="ok" style="margin-top:8px">Todos os ' + est.blocosFeitos + ' trechos estão transcritos.</div>';
-    })() +
+    '<div id="avisoTrechos">' + avisoTrechos(G.estado && G.aula && G.estado.id === a.id ? G.estado : (Q.estadoTrechos && Q.estadoTrechos.id === a.id ? Q.estadoTrechos : null)) + '</div>' +
     '<div class="botoes"><button type="button" id="qGerar"' + (n ? '' : ' disabled') + '>Gerar questões para revisar</button><button type="button" class="secundario" id="qCanc">Cancelar</button></div><div id="qMsg"></div></div>';
   var box = $('areaQ');
   box.querySelectorAll('[data-k]').forEach(function(b){ b.addEventListener('click', function(){
-    var k = b.dataset.k, lim = {fechadas:[0, 10], abertas:[0, 5], prazo:[5, 240], tempo:[0, 60], peso:[0, 100]}[k];
+    var k = b.dataset.k, lim = {fechadas:[0, 10], abertas:[0, 5], prazo:[5, 240], tempoF:[0, 60], tempoA:[0, 60], peso:[0, 100]}[k];
     c.orientacao = $('qOri').value; c[k] = Math.max(lim[0], Math.min(lim[1], c[k] + Number(b.dataset.v))); desenharCompositor();
   }); });
   box.querySelectorAll('[data-sobre]').forEach(function(b){ b.addEventListener('click', function(){ c.orientacao = $('qOri').value; c.sobre = b.dataset.sobre; desenharCompositor(); }); });
@@ -1523,7 +1574,8 @@ function desenharRevisao(){
   $('qLib').addEventListener('click', function(){
     var b = this; b.disabled = true;
     var ids = Q.propostas.filter(function(q){ return q.ok; }).map(function(q){ return q.id; });
-    var tempos = {}; ids.forEach(function(id){ tempos[id] = Q.cfg.tempo; });   // o mesmo tempo para todas
+    // tempo por tipo: fechadas e abertas têm cada uma o seu
+    var tempos = {}; Q.propostas.forEach(function(q){ if(q.ok) tempos[q.id] = q.tipo === 'fechada' ? Q.cfg.tempoF : Q.cfg.tempoA; });
     api('liberarQuestoes', {aulaId: Q.aula.id, ids: ids, prazo: Q.cfg.prazo, peso: Q.cfg.peso, tempos: tempos}).then(function(){ abrirAcompanhamento(); })
       .catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
@@ -1547,11 +1599,14 @@ function carregarAcompanhamento(){
       return '<div class="linha"><span><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + '</span> ' + (q.tempoResp ? '<span class="tag t-warn">⏱ ' + q.tempoResp + ' min</span> ' : '') + esc(q.enunciado) + '</span>' +
         '<button type="button" class="secundario mini" data-excluirq="' + esc(q.id) + '">Excluir</button></div>';
     }).join('') + '<p class="aviso" style="margin-top:6px">Excluir tira a questão da nota da aula; as notas dos alunos são recalculadas.</p>' : '<p class="aviso">Nenhuma questão liberada.</p>');
-    h += '<h4>Presentes</h4>' + (r.alunos.length ? '<div class="chamada">' + r.alunos.map(function(a){
-      var ok = a.respondidas >= total;
-      return '<label class="' + (ok ? 'on' : '') + '" style="cursor:default"><span style="flex:1">' + esc(a.nome) + '</span>' +
-        (ok ? '<span class="tag t-ok">respondeu tudo</span>' : a.respondidas ? '<span class="tag t-warn">' + a.respondidas + ' de ' + total + '</span>' : aberto ? '<span class="tag t-cinza">aguardando</span>' : '<span class="tag t-err">não respondeu</span>') + '</label>';
-    }).join('') + '</div>' : '<p class="aviso">Ninguém marcado na chamada desta aula.</p>');
+    // chamada editável: marque/desmarque a qualquer momento (também depois da aula)
+    var nPres = r.alunos.filter(function(a){ return a.presente !== false; }).length;
+    h += '<h4>Chamada · ' + nPres + ' de ' + r.alunos.length + ' presentes</h4>' + (r.alunos.length ? '<div class="chamada">' + r.alunos.map(function(a){
+      var presente = a.presente !== false, ok = a.respondidas >= total;
+      return '<label class="' + (presente ? 'on' : '') + '"><input type="checkbox" data-presaula="' + esc(a.id) + '"' + (presente ? ' checked' : '') + '><span style="flex:1">' + esc(a.nome) + '</span>' +
+        (!presente ? '<span class="tag t-cinza">falta</span>' : ok ? '<span class="tag t-ok">respondeu tudo</span>' : a.respondidas ? '<span class="tag t-warn">' + a.respondidas + ' de ' + total + '</span>' : aberto ? '<span class="tag t-cinza">aguardando</span>' : '<span class="tag t-err">não respondeu</span>') + '</label>';
+    }).join('') + '</div><p class="aviso" style="margin-top:6px">Todos começam presentes. Desmarque quem faltou; marque de novo se foi engano. Só quem está marcado consegue responder.</p><div id="msgPresAula"></div>'
+      : '<p class="aviso">Nenhum aluno inscrito nesta disciplina.</p>');
     if(r.abertas.length){
       h += '<h4>Respostas abertas</h4>' + r.abertas.map(function(x){
         return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:4px"><b>' + esc(x.aluno) + '</b> <span class="aviso">' + esc(x.enunciado.slice(0, 80)) + (x.enunciado.length > 80 ? '…' : '') + '</span></p>' +
@@ -1574,6 +1629,15 @@ function carregarAcompanhamento(){
       var p = b.dataset.salvanota.split('|'), inp = $('areaQ').querySelector('[data-nota="' + b.dataset.salvanota + '"]');
       b.disabled = true;
       api('ajustarNota', {questaoId: p[0], alunoId: p[1], nota: paraCem(inp.value)}).then(carregarAcompanhamento).catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    }); });
+    $('areaQ').querySelectorAll('[data-presaula]').forEach(function(c){ c.addEventListener('change', function(){
+      var id = c.dataset.presaula, v = c.checked;
+      c.disabled = true;
+      api('marcarPresenca', {aulaId: Q.aula.id, alunoId: id, presente: v}).then(function(){
+        // mantém a chamada da gravação (se for a aula em andamento) igual
+        if(G.aula && G.aula.id === Q.aula.id && G.pres){ G.pres[id] = v; var cg = document.querySelector('[data-pres="' + id + '"]'); if(cg){ cg.checked = v; cg.parentNode.classList.toggle('on', v); atualizarChamadaTitulo(); } }
+        carregarAcompanhamento();
+      }).catch(function(e){ c.disabled = false; c.checked = !v; $('msgPresAula').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     }); });
     $('qMais').addEventListener('click', function(){ abrirCompositor(G.fase === 'gravando' ? 'recente' : 'inteira'); });
     $('qQR').addEventListener('click', function(){ qrAulas('Aula ' + Q.aula.numero + ' · responda as questões'); });
@@ -1925,7 +1989,8 @@ function cartaoDisc(d){
     '<div class="cfg"><span>Aula</span><span>' + d.tempos + ' × 50 min · prazo ' + d.prazo_padrao + ' min</span>' +
     '<span>Por liberação</span><span>' + d.qtd_fechadas + ' fechada(s) + ' + d.qtd_abertas + ' aberta(s) · peso ' + d.peso_fechadas + '/' + (100 - d.peso_fechadas) + '</span>' +
     '<span>Presença mínima</span><span>' + d.presenca_min + '%</span>' +
-    '<span>Tempo para responder</span><span>' + (d.tempo_resposta ? d.tempo_resposta + ' min por questão, depois de abrir' : 'sem tempo por questão') + '</span></div>' +
+    '<span>Tempo para responder</span><span>' + (d.tempo_resposta ? 'fechada ' + d.tempo_resposta + ' min' : 'fechada sem limite') + ' · ' + (d.tempo_aberta ? 'aberta ' + d.tempo_aberta + ' min' : 'aberta sem limite') + '</span>' +
+    '<span>Piores notas</span><span>' + (d.descartar_piores ? 'descartadas acima do mínimo de presença' : 'não descartadas') + '</span></div>' +
     '<p class="aviso" style="margin-top:6px">' + (d.orientacoes ? '<span title="' + esc(d.orientacoes) + '">Orientações: definidas</span>' : 'Sem orientações fixas') + ' · ' +
       (gl.length ? 'Glossário: ' + gl.length + ' termo(s)' : 'Sem glossário') + '</p>' +
     '<p class="grupoTitulo" style="margin-top:10px">Composição da nota</p>' +
@@ -1950,7 +2015,7 @@ function lerSemestre(s){
 var etapasEdit = [];
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:'', tempos:p.tempos, prazo_padrao:p.prazo_padrao,
-    presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
+    presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, tempo_aberta:p.tempo_aberta, descartar_piores:false, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
     composicao:{etapas:[{id:'', nome:'P1', peso:1, fim:'', itens:itensNovos(1)}, {id:'', nome:'P2', peso:1, fim:'', itens:itensNovos(2)}]}};
   etapasEdit = JSON.parse(JSON.stringify((v.composicao && v.composicao.etapas) || []));
   var sem = lerSemestre(v.semestre);
@@ -1970,8 +2035,18 @@ function abrirForm(d){
       campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
       campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) + campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
       campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
-      campo('fTempoResp', 'Tempo para responder cada questão (min)', 'number', v.tempo_resposta === undefined ? 5 : v.tempo_resposta) + '</div>' +
-      '<p class="aviso" style="margin-top:-6px">O prazo padrão é o tempo que o aluno tem para <b>abrir</b> as questões, contado da liberação. O tempo para responder começa quando ele abre cada questão. Use 0 para não ter tempo por questão. Os dois podem ser mudados antes de cada liberação.</p>' +
+      campo('fTempoResp', 'Tempo para responder cada fechada (min)', 'number', v.tempo_resposta === undefined ? 5 : v.tempo_resposta) +
+      campo('fTempoAb', 'Tempo para responder cada aberta (min)', 'number', v.tempo_aberta === undefined ? 10 : v.tempo_aberta) + '</div>' +
+      '<p class="aviso" style="margin-top:-6px">O prazo padrão é o tempo que o aluno tem para <b>abrir</b> as questões, contado da liberação. O tempo para responder começa quando ele abre cada questão. Use 0 para não ter tempo por questão. Todos podem ser mudados antes de cada liberação.</p>' +
+      '<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:10px 0 4px;font-size:14px"><input type="checkbox" id="fDescartar"' + (v.descartar_piores ? ' checked' : '') + ' style="width:18px;height:18px;margin-top:2px;flex:none">' +
+      '<span><b>Descartar as piores notas de quem passar do mínimo de presença</b></span></label>' +
+      '<details class="balao"><summary class="link" style="font-size:13px">ⓘ Como funciona</summary><div class="convite" style="margin:8px 0 0;font-size:13.5px;line-height:1.55">' +
+      'A nota das questões em sala é sempre dividida pelo <b>número mínimo de aulas</b> (a presença mínima da disciplina). Exemplo com 10 aulas com questões e mínimo de 70% (7 aulas):' +
+      '<br>• respondeu em <b>7 aulas</b>: soma das 7 notas ÷ 7;' +
+      '<br>• respondeu em <b>5 aulas</b>: soma das 5 notas ÷ 7 (as faltas pesam);' +
+      '<br>• respondeu em <b>10 aulas</b>: com esta opção ligada, as <b>3 piores notas são descartadas</b> e fica a soma das 7 melhores ÷ 7.' +
+      '<br><br><b>Quem vem sempre é beneficiado:</b> um dia ruim (ou a internet que caiu) pode ser descartado. <b>Quem falta não ganha nada:</b> a média continua dividida pelo mínimo. ' +
+      'As notas descartadas continuam aparecendo para o aluno e para você, marcadas como descartadas.</div></details>' +
       '<p class="aviso" id="fPesoTxt" style="margin-top:-6px"></p>' +
       '<label class="rot" for="fOri" style="margin-top:8px">Orientações fixas para a IA gerar as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea>' +
       '<details style="margin-top:12px"' + (v.glossario.length ? '' : ' open') + '><summary class="link">Glossário · ' + v.glossario.length + ' termo(s)</summary>' +
@@ -1996,7 +2071,8 @@ function abrirForm(d){
     api('salvarDisciplina', {disciplina:{
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSemN').value + ' - ' + $('fSemAno').value, tempos: $('fTempos').value,
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
-      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, orientacoes: $('fOri').value, glossario: $('fGlo').value,
+      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, tempo_aberta: $('fTempoAb').value,
+      descartar_piores: $('fDescartar').checked, orientacoes: $('fOri').value, glossario: $('fGlo').value,
       composicao: {etapas: etapasEdit}, material_url: $('fMaterial').value
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
       .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
@@ -2053,7 +2129,43 @@ function campo(id, rotulo, tipo, valor, classe_, ph){
 function semestreAtual(){ var d = new Date(); return d.getFullYear() + '.' + (d.getMonth() < 6 ? 1 : 2); }
 
 /* ================= INSCRIÇÕES ================= */
+// Busca de alunos da plataforma para o professor inscrever (lista que aparece enquanto digita)
+var inscTimer = null;
+function prepararInscreverAluno(){
+  var sel = $('inscDisc'), atual = sel.value;
+  sel.innerHTML = ativas().map(function(d){ return '<option value="' + esc(d.id) + '">' + esc(d.nome) + ' · ' + esc(d.semestre) + '</option>'; }).join('');
+  if(atual) sel.value = atual;
+  if(sel.dataset.ligado) return;
+  sel.dataset.ligado = '1';
+  $('inscBusca').addEventListener('input', function(){
+    clearTimeout(inscTimer);
+    var termo = this.value.trim();
+    if(termo.length < 2){ $('inscResultados').innerHTML = ''; return; }
+    inscTimer = setTimeout(function(){ buscarParaInscrever(termo); }, 400);
+  });
+}
+function buscarParaInscrever(termo){
+  var box = $('inscResultados');
+  box.innerHTML = '<p class="carregando">Procurando…</p>';
+  api('buscarAlunos', {termo: termo}).then(function(lista){
+    if($('inscBusca').value.trim() !== termo) return;   // já digitou outra coisa
+    box.innerHTML = lista.length ? '<div class="chamada">' + lista.map(function(a){
+      return '<div class="linha" style="border:2px solid var(--linha);border-radius:6px;padding:8px 12px"><span><b>' + esc(a.nome) + '</b> <span class="aviso">' + esc(a.email) + '</span></span>' +
+        '<button type="button" class="mini" data-inscrever="' + esc(a.id) + '">Inscrever</button></div>';
+    }).join('') + '</div>' : '<p class="aviso">Ninguém encontrado. O aluno precisa ter criado a conta na plataforma.</p>';
+    box.querySelectorAll('[data-inscrever]').forEach(function(b){ b.addEventListener('click', function(){
+      if(!$('inscDisc').value){ $('inscMsg').innerHTML = '<div class="erro">Escolha a disciplina.</div>'; return; }
+      b.disabled = true; b.textContent = 'Inscrevendo…';
+      api('inscreverAluno', {disciplinaId: $('inscDisc').value, alunoId: b.dataset.inscrever}).then(function(t){
+        $('inscMsg').innerHTML = '<div class="ok">' + esc(t) + '</div>'; b.textContent = 'Inscrito';
+        carregarInscricoes(); carregarResumo();
+      }).catch(function(e){ b.disabled = false; b.textContent = 'Inscrever'; $('inscMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    }); });
+  }).catch(function(e){ box.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+
 function carregarInscricoes(){
+  try{ prepararInscreverAluno(); }catch(e){}
   $('listaPend').innerHTML = $('listaAprov').innerHTML = '<p class="carregando">Carregando…</p>';
   api('inscricoes').then(function(r){
     var b = $('badgeInsc'); b.textContent = r.pendentes.length; b.classList.toggle('oculto', !r.pendentes.length);
