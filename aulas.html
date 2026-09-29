@@ -307,7 +307,7 @@
     <div class="abas" role="group" aria-label="Seções do professor">
       <button type="button" class="aba" data-aba="aula" aria-pressed="true">Dar aula</button>
       <button type="button" class="aba" data-aba="notas" aria-pressed="false">Notas</button>
-      <button type="button" class="aba" data-aba="hist" aria-pressed="false">Histórico e apostila</button>
+      <button type="button" class="aba" data-aba="hist" aria-pressed="false">Histórico</button>
       <button type="button" class="aba" data-aba="disc" aria-pressed="false">Disciplinas</button>
       <button type="button" class="aba" data-aba="insc" aria-pressed="false">Inscrições<span class="badge oculto" id="badgeInsc"></span></button>
       <button type="button" class="aba" data-aba="cfg" aria-pressed="false">Configurações</button>
@@ -992,9 +992,9 @@ function listarAulas(){
     el.innerHTML = '<div class="caixa"><h2>Aulas desta disciplina</h2>' + (lista.length ? lista.map(function(a){
       return '<div class="linha"><div><b>Aula ' + a.numero + '</b> ' + (a.tema ? '· ' + esc(a.tema) : '') + ' <span class="aviso">' + esc(a.data) + '</span></div><div class="botoes" style="margin:0">' + statusAula(a) +
         (a.status === 'encerrada' ? ' <button type="button" class="secundario mini" data-qaula="' + esc(a.id) + '">Questões</button>' : '') + '</div></div>';
-    }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + '<p class="aviso" style="margin-top:8px">Atas completas em "Histórico e apostila".</p></div>';
+    }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + '<p class="aviso" style="margin-top:8px">Atas completas em "Histórico".</p></div>';
     var comRec = lista.filter(function(a){ return a.recomendacoes; })[0];
-    if(comRec) el.insertAdjacentHTML('afterbegin', '<div class="convite">Há <b>recomendações para você</b> sobre a aula ' + comRec.numero + (comRec.tema ? ' (' + esc(comRec.tema) + ')' : '') + '. Veja em <button type="button" class="link" id="irRec">Histórico e apostila</button>.</div>');
+    if(comRec) el.insertAdjacentHTML('afterbegin', '<div class="convite">Há <b>recomendações para você</b> sobre a aula ' + comRec.numero + (comRec.tema ? ' (' + esc(comRec.tema) + ')' : '') + '. Veja em <button type="button" class="link" id="irRec">Histórico</button>.</div>');
     var ir = $('irRec'); if(ir) ir.addEventListener('click', function(){ histDisc = G.disc; abrirAba('hist'); });
     el.querySelectorAll('[data-qaula]').forEach(function(b){ b.addEventListener('click', function(){
       var a = lista.filter(function(x){ return x.id === b.dataset.qaula; })[0];
@@ -1391,7 +1391,7 @@ function desenharEncerrada(){
   } else {
     h += '<div class="convite">A ata aparece aqui quando todos os trechos forem transcritos. O que ficar pendente é processado sozinho 3 horas depois e na varredura das 2h. Pode fechar a página: nada se perde.</div>';
   }
-  h += '<p class="aviso">À 1h da madrugada, a IA revisa a aula e deixa <b>recomendações só para você</b> em "Histórico e apostila": possíveis erros, o que acrescentar e o que pode ter ficado confuso.</p>';
+  h += '<p class="aviso">À 1h da madrugada, a IA revisa a aula e deixa <b>recomendações só para você</b> em "Histórico": possíveis erros, o que acrescentar e o que pode ter ficado confuso.</p>';
   h += '<div class="botoes"><button type="button" id="btRodada">Liberar rodada final</button><button type="button" class="secundario" id="btQREnc">QR code</button><button type="button" class="secundario" id="btAtual">Atualizar</button><button type="button" class="secundario" id="btNova">Nova aula</button></div></div>';
   $('aulaTopo').innerHTML = h;
   $('btRodada').addEventListener('click', function(){ abrirCompositor('inteira'); });
@@ -1815,7 +1815,8 @@ function abrirHistorico(){
   var el = $('pHist');
   if(!resumo.disciplinas.length){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
   if(!histDisc || !discPorId(histDisc)) histDisc = (ativas()[0] || resumo.disciplinas[0]).id;
-  el.innerHTML = '<div class="caixa">' + chipsDisciplinas(histDisc, true) + '</div><div id="histApostila"></div><div id="histRevisao"></div><div id="histLinha"><div class="caixa"><p class="carregando">Carregando aulas…</p></div></div><div id="histLeitura"></div>';
+  // ordem: linha do tempo → revisão do semestre → apostila (a leitura dos capítulos abre logo abaixo da apostila)
+  el.innerHTML = '<div class="caixa">' + chipsDisciplinas(histDisc, true) + '</div><div id="histLinha"><div class="caixa"><p class="carregando">Carregando aulas…</p></div></div><div id="histRevisao"></div><div id="histApostila"></div><div id="histLeitura"></div>';
   el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ histDisc = b.dataset.disc; abrirHistorico(); }); });
   carregarLinhaTempo();
   carregarPainelApostila();
@@ -2049,7 +2050,7 @@ function abrirForm(d){
       '<br><br><b>Quem vem sempre é beneficiado:</b> um dia ruim (ou a internet que caiu) pode ser descartado. <b>Quem falta não ganha nada:</b> a média continua dividida pelo mínimo. ' +
       'As notas descartadas continuam aparecendo para o aluno e para você, marcadas como descartadas.</div></details>' +
       '<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:14px 0 4px;font-size:14px"><input type="checkbox" id="fApostilaAuto"' + (v.apostila_auto ? ' checked' : '') + ' style="width:18px;height:18px;margin-top:2px;flex:none">' +
-      '<span><b>Gerar a apostila automaticamente aos sábados</b><br><span class="aviso">Desligado: a apostila só é escrita quando você clicar em "Escrever capítulos pendentes agora" (em Histórico e apostila). Cada capítulo usa a IA com pesquisa na internet, o que gasta mais da cota do Gemini.</span></span></label>' +
+      '<span><b>Gerar a apostila automaticamente aos sábados</b><br><span class="aviso">Desligado: a apostila só é escrita quando você clicar em "Escrever capítulos pendentes agora" (em Histórico). Cada capítulo usa a IA com pesquisa na internet, o que gasta mais da cota do Gemini.</span></span></label>' +
       '<p class="aviso" id="fPesoTxt" style="margin-top:-6px"></p>' +
       '<label class="rot" for="fOri" style="margin-top:8px">Orientações fixas para a IA gerar as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea>' +
       '<details style="margin-top:12px"' + (v.glossario.length ? '' : ' open') + '><summary class="link">Glossário · ' + v.glossario.length + ' termo(s)</summary>' +
