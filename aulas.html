@@ -228,6 +228,14 @@
   .detalhe{border-width:1.5px;border-color:var(--linha);border-left:3px solid var(--menu);border-radius:0 8px 8px 0}
 
   .alerta{box-shadow:var(--sombra);border-width:2.5px}
+  .ptsCel{font-family:var(--mono);font-size:14px;color:var(--navy)}
+  .ptsCel b{font-size:16px;color:var(--menu)}
+  .ptsCel.vazio b,.ptsCel.zero b{color:var(--cinza)}
+  .tabNotaAluno td{white-space:normal;vertical-align:top}
+  .tabNotaAluno td .aviso{font-size:11.5px}
+  .tabNotaAluno tr.linhaFinal td{background:var(--bloco);border-bottom:0}
+  .cabecalho .quem{margin-left:auto;text-align:right}
+  @media (max-width:520px){.cabecalho .quem{margin-left:0;text-align:left}}
   .antifraude{background:#FDF1F0;border:1px solid #EFC6C2;border-left:3px solid #B3261E;border-radius:0 8px 8px 0}
   .tempoResp{font-family:var(--mono);border-radius:4px;border-width:1.5px}
   .suspeita{font-family:var(--mono);font-size:11px;border-width:1px;border-radius:4px}
@@ -641,7 +649,7 @@ function abrirMateria(m){
       '<h2 style="margin-top:8px">' + esc(m.nome) + ' · ' + esc(m.semestre) + '</h2>';
     h += composicaoAluno(r);
     if(r.N){
-      h += '<h4>Questões em aula, aula por aula</h4><div class="barrasAula">';
+      h += '<h4>Questões em sala · pontos de cada aula (de 10)</h4><div class="barrasAula">';
       r.aulas.forEach(function(a){
         var x = a.resultado;
         if(x.tipo === 'x') h += '<i class="x" title="Aula ' + a.numero + ': sem questões">–</i>';
@@ -653,14 +661,18 @@ function abrirMateria(m){
     h += '</div>';
     h += '<div class="caixa"><h2>Aulas · correção de cada questão</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
       var x = a.resultado, dir = x.tipo === 'x' ? '<span class="tag t-cinza">sem questões</span>' : x.tipo === 'falta' ? '<span class="tag t-err">falta</span>'
-        : '<span class="nota n' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>';
+        : '<span style="white-space:nowrap"><span class="nota n' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span> <span class="aviso">de 10</span></span>';
       var qs = a.questoes.map(function(q){
-        return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:6px"><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></p>' +
-          '<p class="aviso" style="margin:0">Sua resposta: ' + (q.suaResposta === null ? '<b>não respondeu</b>' : esc(q.suaResposta)) + '</p>' +
+        var temVale = q.vale !== undefined && q.vale > 0;
+        var pontos = q.emCorrecao ? '<span class="tag t-warn">em correção</span>'
+          : temVale ? '<span class="ptsCel' + (q.pontos ? '' : ' zero') + '"><b>' + nota10(q.pontos || 0) + '</b> de ' + nota10(q.vale) + '</span>'
+          : (q.nota !== null ? '<b>' + dez(q.nota) + '</b> de 10' : '');
+        return '<div class="detalhe" style="margin-top:8px"><div class="linha" style="border:0;padding:0 0 6px;align-items:flex-start"><span><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></span><span style="white-space:nowrap">' + pontos + '</span></div>' +
+          '<p class="aviso" style="margin:0">Sua resposta: ' + (q.suaResposta === null ? '<b>não respondeu</b> (vale zero)' : esc(q.suaResposta)) + '</p>' +
           (q.correta ? '<p class="aviso" style="margin:0">Correta: <b>' + esc(q.correta) + '</b></p>' : '') +
-          (q.emCorrecao ? '<p class="aviso" style="margin:0"><span class="tag t-warn">em correção</span></p>' : q.nota !== null ? '<p class="aviso" style="margin:0">Nota: <b>' + dez(q.nota) + '</b> de 10</p>' : '') +
           (q.comentario ? '<p class="aviso" style="margin:4px 0 0">' + esc(q.comentario) + '</p>' : '') + '</div>';
       }).join('');
+      if(qs && x.tipo === 'nota') qs += '<p style="margin:8px 0 0;text-align:right">Total da aula: <b>' + dez(x.nota) + '</b> de 10' + (x.provisoria ? '*' : '') + '</p>';
       return '<details class="capitulo" id="aulaAluno' + a.numero + '"><summary><span class="linha" style="display:inline-flex;width:calc(100% - 20px);border:0;padding:0"><span>Aula ' + a.numero +
         (a.tema ? ' · ' + esc(a.tema) : '') + ' <span class="aviso">' + esc(a.data.split(' ')[0]) + '</span></span>' + dir + '</span></summary>' +
         (qs || '<p class="aviso" style="margin-top:8px">' + (a.temQuestoes ? 'As questões desta aula ainda estão abertas.' : 'Esta aula não teve questões.') + '</p>') + '</details>';
@@ -704,16 +716,59 @@ function composicaoAluno(r){
   var c = r.composicao; if(!c || !c.meu) return '';
   return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:8px"><span class="grande">' + nota10(c.meu.final) + '</span><span class="aviso">média final de 10' +
     (c.meu.parcial ? ' · <span class="tag t-warn">parcial</span>' : '') + '</span></div>' +
-    c.etapas.map(function(et, k){ return linhasEtapa(et, c.meu.etapas[k], false); }).join('') +
+    tabelaNotaAluno(c) +
     '<div class="calc" style="margin-top:10px">Média final = ' + formulaFinal(c, c.meu) + '</div>' +
-    '<p class="aviso" style="margin-top:6px">Em cada item: nota de 0 a 10 → pontos que ela vale na etapa. * = provisória. A média fica parcial enquanto faltar alguma nota.</p>';
+    '<p class="aviso" style="margin-top:6px">Cada célula mostra os pontos que você já tem nesse item, no valor que ele tem na etapa. Embaixo, a nota de 0 a 10 que deu esses pontos. ' +
+    '* = provisória · ! = abaixo da presença mínima. A média fica parcial enquanto faltar alguma nota.</p>';
+}
+
+// Tabela-resumo do aluno: uma linha por etapa, uma coluna por tipo de item (prova, trabalho, questões em sala),
+// com os pontos já no peso ("6,4 de 8,0") e o total da etapa de 10.
+var TIPO_COLUNA = {prova: 'Prova', trabalho: 'Trabalho', aulas: 'Questões em sala'};
+function tabelaNotaAluno(c){
+  var tipos = [];
+  ['prova', 'trabalho', 'aulas'].concat(c.etapas.reduce(function(l, et){ return l.concat(et.itens.map(function(it){ return it.tipo; })); }, []))
+    .forEach(function(t){
+      if(tipos.indexOf(t) !== -1) return;
+      if(c.etapas.some(function(et){ return et.itens.some(function(it){ return it.tipo === t && it.valor > 0; }); })) tipos.push(t);
+    });
+  var iguais = pesosIguais(c.etapas);
+  var h = '<div class="tabelaBox" style="margin-top:12px"><table class="tabNotaAluno"><tr><th>Etapa</th>' +
+    tipos.map(function(t){ return '<th>' + esc(TIPO_COLUNA[t] || t) + '</th>'; }).join('') + '<th>Total</th></tr>';
+  c.etapas.forEach(function(et, k){
+    var n = c.meu.etapas[k];
+    h += '<tr><td><b>' + esc(et.nome) + '</b>' + (iguais ? '' : '<br><span class="aviso">peso ' + nota10(et.peso) + '</span>') + '</td>';
+    tipos.forEach(function(t){
+      var idx = [];
+      et.itens.forEach(function(it, j){ if(it.tipo === t && it.valor > 0) idx.push(j); });
+      if(!idx.length){ h += '<td><span class="aviso">—</span></td>'; return; }
+      var vale = 0, pts = 0, falta = false, prov = false, abaixo = false, sub = [];
+      idx.forEach(function(j){
+        var it = et.itens[j], v = n.itens[j];
+        vale += it.valor;
+        if(v.nota === null) falta = true; else pts += v.nota * it.valor / 10;
+        if(v.provisoria) prov = true;
+        if(v.abaixo) abaixo = true;
+        if(t === 'aulas') sub.push(v.nota === null ? (v.situacao || 'sem questões ainda') : 'média ' + nota10(v.nota) + (v.situacao ? ' · ' + v.situacao : ''));
+        else sub.push(v.nota === null ? (v.situacao && v.situacao !== 'nota lançada pelo professor' ? v.situacao : 'sem nota ainda') : 'nota ' + nota10(v.nota));
+      });
+      h += '<td><span class="ptsCel' + (falta ? ' vazio' : '') + '"><b>' + (falta && !pts ? '—' : nota10(pts)) + '</b> de ' + nota10(vale) + (prov ? '*' : '') + (abaixo ? ' <span style="color:#B3261E">!</span>' : '') + '</span>' +
+        '<br><span class="aviso">' + esc(sub.join(' · ')) + '</span></td>';
+    });
+    h += '<td><span class="nota n' + classe(n.nota * 10) + '">' + nota10(n.nota) + '</span><br><span class="aviso">de 10' + (n.parcial ? ' · parcial' : '') + '</span></td></tr>';
+  });
+  h += '<tr class="linhaFinal"><td><b>Média final</b></td><td colspan="' + tipos.length + '"><span class="aviso">' + (iguais ? 'média das etapas' : 'média ponderada das etapas') + '</span></td>' +
+    '<td><span class="nota n' + classe(c.meu.final * 10) + '">' + nota10(c.meu.final) + '</span></td></tr></table></div>';
+  return h;
 }
 
 function explicacaoNota(pct){
   return '<details style="margin-top:10px"><summary class="link">Como a nota é calculada</summary><p class="aviso" style="margin-top:8px">' +
     'Em cada etapa (P1, P2…), você pode faltar até ' + (100 - pct) + '% das aulas com questões sem perder nota: a média usa só as aulas em que você esteve presente. ' +
     'Cada falta além disso entra como zero. Exemplo com 10 aulas (mínimo 7): presente em 5 aulas com média 8,0 → 40 ÷ 7 = 5,7. ' +
-    'A nota de cada aula junta a média das fechadas e a das abertas, com o peso definido pelo professor. Questão não respondida vale zero.</p></details>';
+    'Em cada aula, as questões somam 10 pontos: as fechadas dividem entre si o peso das fechadas e as abertas dividem o resto ' +
+    '(ex.: peso 50%, 2 fechadas e 1 aberta → 2,5 + 2,5 + 5,0). Questão não respondida vale zero. ' +
+    'Depois, a média das aulas entra na etapa pelo valor do item "Questões em sala" (ex.: média 8,4 num item que vale 2,0 → 1,7 ponto).</p></details>';
 }
 
 /* ---- leitura da apostila (aluno e professor) ---- */
