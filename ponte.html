@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Entrar — Engenharia de Alimentos</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<style>
+  :root{--menu:#17389C;--azul:#2E62C6;--titulo:#3E76C4;--navy:#0E2A5C;--bloco:#EFF1F5;--ambar:#F5C518;--cinza:#5b6b86;--linha:#D7DEE8;--verde:#1a7a3c;--vermelho:#8a1c1c}
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:var(--navy);background:#fff;font-size:15px;line-height:1.5}
+  .faixa{background:var(--bloco);border-top:4px solid var(--menu);padding:16px 18px;margin-bottom:16px}
+  .faixa h1{margin:0;font-size:22px;font-weight:400;color:var(--titulo)}
+  .faixa p{margin:4px 0 0;font-size:13.5px;color:#4A5C74}
+  .caixa{border:2.5px solid var(--navy);border-radius:14px;padding:16px;box-shadow:inset 0 5px 0 var(--menu),4px 5px 0 rgba(14,42,92,.13)}
+  button{font:inherit;font-weight:bold;font-size:15px;cursor:pointer;border:2px solid var(--navy);border-radius:6px;padding:11px 18px;background:var(--ambar);color:var(--navy);width:100%;margin-top:10px}
+  button.secundario{background:#fff;font-weight:normal;font-size:14px}
+  button:disabled{opacity:.55;cursor:default}
+  .quem{font-size:16px;margin:0 0 4px}
+  .aviso{font-size:13px;color:var(--cinza)}
+  .erro{background:#FDF1F0;border:1px solid #EFC6C2;border-left:3px solid #B3261E;border-radius:0 8px 8px 0;color:#8F1E18;padding:10px 12px;margin-top:12px;font-size:14px}
+  .ok{background:#F1F8F5;border:1px solid #C9E2D8;border-left:3px solid #1B7A57;border-radius:0 8px 8px 0;color:#146144;padding:10px 12px;margin-top:12px;font-size:14px}
+</style>
+</head>
+<body>
+<div class="faixa"><h1>Entrar com a sua conta</h1><p>A mesma conta do Estudar com IA, do Aula por IA e do Prova por IA.</p></div>
+<div class="caixa" id="caixa"><p class="aviso">Carregando…</p></div>
+
+<script>
+/* Janelinha-ponte do Sistema de Extensão.
+   Ela é aberta pelo Sistema de Extensão (dentro do Wix). Aqui a pessoa já está logada
+   no site; a janelinha pede ao servidor um CÓDIGO DE USO ÚNICO (vale 2 minutos) e
+   entrega só esse código ao Sistema de Extensão. O login do site nunca sai daqui. */
+var BACKEND = 'https://script.google.com/macros/s/AKfycbxthqK2s3ErBbC8yhUoU9BWIwVnJvB3JBkULK6BGmiisybYnjrSQ_dRHDSEmz0gByoQeg/exec';
+var token = '';
+try{ token = localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){}
+var pedido = null, conta = null;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function api(acao, dados){
+  return fetch(BACKEND, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({acao:acao, dados:dados || {}})})
+    .then(function(r){ return r.json(); }).then(function(j){ if(!j.ok) throw new Error(j.erro || 'Não deu para concluir.'); return j.resultado; });
+}
+// só aceita pedido vindo de um aplicativo do Google Apps Script (onde roda o Sistema de Extensão)
+function origemPermitida(o){ try{ return /\.googleusercontent\.com$/.test(new URL(o).hostname); }catch(e){ return false; } }
+
+window.addEventListener('message', function(e){
+  if(!e.data || e.data.tipo !== 'extensao-pedido' || !origemPermitida(e.origin)) return;
+  var novo = !pedido;
+  pedido = {origem: e.origin, janela: e.source};
+  if(novo) desenhar();
+});
+
+function irParaLogin(){ location.href = 'index.html?voltar=ponte'; }
+function outraConta(){
+  try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(e){}
+  irParaLogin();
+}
+
+function desenhar(msg){
+  var c = $('caixa');
+  if(!window.opener){
+    c.innerHTML = '<p>Esta janela é aberta pelo <b>Sistema de Extensão</b>, no site da Engenharia de Alimentos.</p><p class="aviso">Volte para a página da extensão e clique em "Entrar com minha conta".</p>';
+    return;
+  }
+  if(!conta){
+    c.innerHTML = '<p>Você ainda não entrou no site neste navegador.</p><button type="button" id="btLogin">Entrar ou criar conta</button>' +
+      '<p class="aviso" style="margin-top:10px">Depois de entrar, esta janela volta para cá e completa o acesso ao Sistema de Extensão.</p>';
+    $('btLogin').addEventListener('click', irParaLogin);
+    return;
+  }
+  c.innerHTML = '<p class="aviso" style="margin:0 0 6px">Entrar no <b>Sistema de Extensão</b> como:</p><p class="quem"><b>' + esc(conta.nome) + '</b><br><span class="aviso">' + esc(conta.email) + '</span></p>' +
+    '<button type="button" id="btEntrar"' + (pedido ? '' : ' disabled') + '>' + (pedido ? 'Entrar' : 'Aguardando o Sistema de Extensão…') + '</button>' +
+    '<button type="button" class="secundario" id="btOutra">Usar outra conta</button>' + (msg || '');
+  $('btOutra').addEventListener('click', outraConta);
+  var b = $('btEntrar');
+  b.addEventListener('click', function(){
+    if(!pedido) return;
+    b.disabled = true; b.textContent = 'Entrando…';
+    api('criarCodigoPonte', {token: token}).then(function(r){
+      pedido.janela.postMessage({tipo: 'extensao-codigo', codigo: r.codigo}, pedido.origem);
+      $('caixa').innerHTML = '<div class="ok">Pronto! Voltando para o Sistema de Extensão…</div>';
+      setTimeout(function(){ window.close(); }, 900);
+    }).catch(function(e){ desenhar('<div class="erro">' + esc(e.message) + '</div>'); });
+  });
+}
+
+if(!token){ desenhar(); }
+else api('sessao', {token: token}).then(function(r){
+  if(r.logado) conta = {nome: r.nome, email: r.email};
+  else { try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(e){} token = ''; }
+  desenhar();
+}).catch(function(e){ $('caixa').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+</script>
+</body>
+</html>
