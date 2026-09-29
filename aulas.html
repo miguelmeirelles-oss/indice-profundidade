@@ -255,6 +255,23 @@
   .tabelaBox{border-width:1.5px;border-radius:8px}
   .calc{font-family:var(--mono);border-radius:0 6px 6px 0;border-left:3px solid var(--ambar)}
   .compl{border-radius:6px}
+
+  /* ===== Chat com IA ===== */
+  .aba.abaChat{border:2px solid var(--menu);color:var(--menu);font-weight:bold;background:#EEF2F8}
+  .aba.abaChat[aria-pressed="true"]{background:var(--menu);color:#fff}
+  .chatCab{display:flex;gap:14px;align-items:center;margin-bottom:10px}
+  .chatCab .robo{font-size:38px;line-height:1;background:var(--bloco);border:2px solid var(--menu);border-radius:14px;width:58px;height:58px;display:flex;align-items:center;justify-content:center;flex:none}
+  .chatCab h2{margin:0 0 2px;border:0!important;padding:0!important}
+  .chatMsgs{display:flex;flex-direction:column;gap:10px;min-height:120px;max-height:52vh;overflow-y:auto;padding:12px;background:#fbfcfe;border:1.5px solid var(--linha);border-radius:10px;margin:10px 0}
+  .msg{max-width:86%;padding:10px 13px;border-radius:12px;font-size:14.5px;line-height:1.5;word-wrap:break-word}
+  .msg.eu{align-self:flex-end;background:var(--menu);color:#fff;border-bottom-right-radius:4px}
+  .msg.ia{align-self:flex-start;background:#fff;border:1.5px solid var(--linha);border-bottom-left-radius:4px;color:var(--navy)}
+  .msg.ia b{color:var(--menu)}
+  .msg.pensando{color:var(--cinza);font-style:italic}
+  .chatEntrada{display:flex;gap:8px;align-items:flex-end}
+  .chatEntrada textarea{min-height:48px;max-height:160px;flex:1}
+  .chatRodape{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-top:8px;font-size:12.5px;color:var(--cinza)}
+  .chatRodape .usoIA{font-family:var(--mono,Consolas,monospace);font-size:11.5px}
 </style>
 </head>
 <body>
@@ -311,6 +328,7 @@
       <button type="button" class="aba" data-aba="disc" aria-pressed="false">Disciplinas</button>
       <button type="button" class="aba" data-aba="insc" aria-pressed="false">Inscrições<span class="badge oculto" id="badgeInsc"></span></button>
       <button type="button" class="aba" data-aba="cfg" aria-pressed="false">Configurações</button>
+      <button type="button" class="aba abaChat" data-aba="chat" aria-pressed="false">🤖 Chat com IA</button>
     </div>
     <div id="avisoChave" class="convite oculto">Cadastre sua chave do Gemini em <b>Configurações</b>. Sem ela, gravação, questões e apostila ficam bloqueadas.</div>
 
@@ -343,6 +361,8 @@
       <div class="caixa"><h2>Pedidos pendentes</h2><div id="listaPend"></div></div>
       <div class="caixa"><h2>Alunos inscritos</h2><div id="listaAprov"></div></div>
     </div>
+
+    <div id="pChat" class="oculto"></div>
 
     <div id="pCfg" class="oculto">
       <div class="caixa">
@@ -833,7 +853,7 @@ document.querySelectorAll('[data-aba]').forEach(function(b){ b.addEventListener(
 function abrirAba(a){
   abaAtual = a;
   document.querySelectorAll('[data-aba]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.aba === a)); });
-  ['aula', 'notas', 'hist', 'disc', 'insc', 'cfg'].forEach(function(x){
+  ['aula', 'notas', 'hist', 'disc', 'insc', 'cfg', 'chat'].forEach(function(x){
     $('p' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('oculto', x !== a);
   });
   if(!resumo) return;
@@ -842,6 +862,7 @@ function abrirAba(a){
   if(a === 'hist') abrirHistorico();
   if(a === 'insc') carregarInscricoes();
   if(a === 'cfg') carregarChaves();
+  if(a === 'chat') abrirChat($('pChat'));
 }
 
 function abrirProf(){ carregarResumo().then(function(){ abrirAba(abaAtual); }); }
@@ -2235,6 +2256,72 @@ $('btTestar').addEventListener('click', function(){
 });
 
 iniciar();
+
+/* ================= CHAT COM IA =================
+   Conversa do professor com a IA sobre a plataforma e os próprios dados.
+   A memória (últimas 10 mensagens) fica neste navegador até fechar a aba. */
+var CHAT = {hist: [], enviando: false};
+try{ CHAT.hist = JSON.parse(sessionStorage.getItem('chat_ia') || '[]'); }catch(e){ CHAT.hist = []; }
+function guardarChat(){ try{ sessionStorage.setItem('chat_ia', JSON.stringify(CHAT.hist.slice(-30))); }catch(e){} }
+function mdChat(t){
+  var h = esc(t);
+  h = h.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  return h.split('\n').map(function(l){
+    if(/^\s*#{1,4}\s+/.test(l)) return '<b>' + l.replace(/^\s*#{1,4}\s+/, '') + '</b>';
+    if(/^\s*[-*]\s+/.test(l)) return '&nbsp;&nbsp;• ' + l.replace(/^\s*[-*]\s+/, '');
+    return l;
+  }).join('<br>');
+}
+function abrirChat(el){
+  if(!el) return;
+  if(!el.dataset.montado){
+    el.dataset.montado = '1';
+    el.innerHTML = '<div class="caixa"><div class="chatCab"><span class="robo" aria-hidden="true">🤖</span><div><h2>Chat com IA</h2>' +
+      '<p class="aviso" style="margin:0">Pergunte sobre o uso da plataforma, suas disciplinas, notas, alunos, aulas e provas. Ele só consulta: para mudar algo, ele diz onde fazer. <b>Só responde sobre as suas próprias disciplinas.</b></p></div></div>' +
+      '<div class="convite" style="margin:0"><b>Use com moderação.</b> Cada mensagem consome a cota do Gemini das suas chaves — a mesma usada para transcrever as aulas, gerar questões e corrigir respostas. Em dia de aula, prefira perguntas objetivas.</div>' +
+      '<div class="chatMsgs" id="chatMsgs" aria-live="polite"></div>' +
+      '<div class="chips" id="chatSug" style="margin-bottom:8px"></div>' +
+      '<div class="chatEntrada"><textarea id="chatTexto" placeholder="Escreva sua pergunta… (Enter envia, Shift+Enter pula linha)"></textarea><button type="button" id="chatEnviar">Enviar</button></div>' +
+      '<div class="chatRodape"><span class="usoIA" id="chatUso">Carregando o uso de hoje…</span><button type="button" class="link" id="chatLimpar" style="font-size:12.5px">Nova conversa</button></div></div>';
+    var sug = ['Quais alunos estão com a menor média?', 'Resuma o desempenho da turma na última aula', 'Quem está abaixo da presença mínima?', 'Como faço para liberar questões?'];
+    $('chatSug').innerHTML = sug.map(function(s){ return '<button type="button" class="chip" data-sug="' + esc(s) + '">' + esc(s) + '</button>'; }).join('');
+    $('chatSug').querySelectorAll('[data-sug]').forEach(function(b){ b.addEventListener('click', function(){ enviarChat(b.dataset.sug); }); });
+    $('chatEnviar').addEventListener('click', function(){ enviarChat($('chatTexto').value); });
+    $('chatTexto').addEventListener('keydown', function(e){ if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); enviarChat($('chatTexto').value); } });
+    $('chatLimpar').addEventListener('click', function(){ CHAT.hist = []; guardarChat(); desenharChat(); });
+  }
+  desenharChat();
+  api('usoIA').then(mostrarUsoIA).catch(function(){ var u = $('chatUso'); if(u) u.textContent = ''; });
+}
+function desenharChat(){
+  var box = $('chatMsgs'); if(!box) return;
+  box.innerHTML = CHAT.hist.length ? CHAT.hist.map(function(m){
+    return '<div class="msg ' + (m.papel === 'ia' ? 'ia' : 'eu') + '">' + (m.papel === 'ia' ? mdChat(m.texto) : esc(m.texto).replace(/\n/g, '<br>')) + '</div>';
+  }).join('') + (CHAT.enviando ? '<div class="msg ia pensando">Pensando…</div>' : '')
+    : '<p class="aviso" style="margin:auto;text-align:center">Faça uma pergunta ou toque numa sugestão abaixo.</p>';
+  $('chatSug').classList.toggle('oculto', CHAT.hist.length > 0);
+  box.scrollTop = box.scrollHeight;
+}
+function mostrarUsoIA(u){
+  var el = $('chatUso'); if(!el || !u) return;
+  el.textContent = 'Uso da IA hoje nas suas chaves: ' + u.chamadas + ' chamada(s) · ' + (u.tokens >= 1000 ? Math.round(u.tokens / 1000) + ' mil' : u.tokens) + ' tokens · ' + u.chaves + ' chave(s). ' +
+    'A cota grátis zera entre 4h e 5h (Brasília); o Google não informa quanto resta.';
+}
+function enviarChat(texto){
+  texto = String(texto || '').trim();
+  if(!texto || CHAT.enviando) return;
+  CHAT.hist.push({papel: 'eu', texto: texto.slice(0, 2000)});
+  CHAT.enviando = true; $('chatTexto').value = ''; $('chatEnviar').disabled = true;
+  guardarChat(); desenharChat();
+  api('chatIA', {mensagens: CHAT.hist.slice(-10)}).then(function(r){
+    CHAT.hist.push({papel: 'ia', texto: r.resposta});
+    mostrarUsoIA(r.uso);
+  }).catch(function(e){
+    CHAT.hist.push({papel: 'ia', texto: '⚠ ' + e.message});
+  }).then(function(){
+    CHAT.enviando = false; $('chatEnviar').disabled = false; guardarChat(); desenharChat(); $('chatTexto').focus();
+  });
+}
 </script>
 </body>
 </html>
