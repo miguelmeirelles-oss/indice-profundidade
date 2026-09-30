@@ -6,7 +6,30 @@
 <title>Índice de Profundidade do conhecimento — Engenharia de Alimentos</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<script>
+// Vindo do Sistema de Extensão: esconde o site atrás de uma cortina (só o login aparece, se precisar)
+if (/[?&]voltar=extensao\b/.test(location.search)) document.documentElement.classList.add('volta-ext');
+</script>
 <style>
+  /* ---- Vindo do Sistema de Extensão ---- */
+  #cortinaExt,#marcaExt{display:none}
+  html.volta-ext #cortinaExt{display:flex;position:fixed;inset:0;z-index:999;background:#f0f4f8;
+    align-items:center;justify-content:center;font-family:Arial,Helvetica,sans-serif}
+  html.volta-ext.volta-login #cortinaExt{display:none}
+  html.volta-ext .cabecalho,html.volta-ext #pInicio,html.volta-ext #pAuth>h2:first-child,
+  html.volta-ext #pAuth>h2:first-child+p,html.volta-ext #pAuth .voltarSemCadastro{display:none!important}
+  html.volta-ext body{background:#f0f4f8}
+  html.volta-ext #pAuth{max-width:460px;margin:24px auto 0}
+  html.volta-ext #voltarExt{display:flex!important}
+  html.volta-ext #marcaExt{display:flex;gap:12px;align-items:center;margin:0 0 16px}
+  .cartaoExt{text-align:center;color:#1e293b}
+  .logoExt{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,#1a3a5c,#2d6a9f);
+    color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none}
+  .cartaoExt .logoExt{margin:0 auto 14px}
+  .giraExt{width:26px;height:26px;border:3px solid #cbd5e1;border-top-color:#1a3a5c;border-radius:50%;
+    margin:16px auto 0;animation:giraExt .8s linear infinite}
+  @keyframes giraExt{to{transform:rotate(360deg)}}
+
   :root{
     --menu:#17389C; --azul:#2E62C6; --titulo:#3E76C4; --navy:#0E2A5C;
     --bloco:#EFF1F5; --ambar:#F5C518; --branco:#fff; --cinza:#5b6b86;
@@ -294,6 +317,12 @@
 </style>
 </head>
 <body>
+<div id="cortinaExt"><div class="cartaoExt">
+  <div class="logoExt">EX</div>
+  <div style="font-weight:bold;font-size:17px;color:#1a3a5c">Sistema de Extensão</div>
+  <div id="cortinaExtTexto" style="font-size:14px;color:#64748b;margin-top:4px">Conferindo seu login…</div>
+  <div class="giraExt"></div>
+</div></div>
 <div class="wrap">
 
   <div class="cabecalho">
@@ -346,6 +375,11 @@
     <p style="margin:0 0 14px;font-size:15px;line-height:1.55">Aqui suas
       avaliações ficam guardadas por assunto, com nota e gargalos, para você
       acompanhar o que já domina do curso e o que precisa revisar.</p>
+    <div id="marcaExt">
+      <div class="logoExt">EX</div>
+      <div><div style="font-weight:bold;font-size:16px;color:#1a3a5c">Sistema de Extensão</div>
+        <div style="font-size:13.5px;color:#64748b">Entre com a sua conta do site para continuar.</div></div>
+    </div>
 
     <label for="manterConectado" style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:0 0 14px;font-family:inherit;font-size:13.5px;letter-spacing:0;text-transform:none;font-weight:normal;color:var(--navy);line-height:1.4">
       <input type="checkbox" id="manterConectado" style="width:18px;height:18px;margin:1px 0 0;flex:none;accent-color:var(--menu)">
@@ -404,8 +438,11 @@
       <b>O que fica guardado:</b> seu nome, e-mail e a instituição. O áudio nunca é gravado. <b>O elaborador do site tem acesso a inclusão de temas na plataforma.</b> — a ferramenta serve para você
       acompanhar a sua formação.</p>
 
-    <div class="botoes">
+    <div class="botoes voltarSemCadastro">
       <button class="link" onclick="mostrar('pInicio')">Voltar ao modo sem cadastro</button>
+    </div>
+    <div class="botoes" id="voltarExt" style="display:none">
+      <button class="link" onclick="location.href='extensao.html'">&larr; Voltar ao Sistema de Extensão</button>
     </div>
     <div id="erroAuth" class="erro oculto"></div>
   </div>
@@ -719,7 +756,7 @@ if((voltarParaAulas || querConta) && !sessao.token) setTimeout(abrirArea, 0);
 
 if(sessao.token){
   api('sessao', {token: sessao.token}).then(function(r){
-    if(r.logado && voltarParaAulas){ location.href = destinoVolta + '.html'; return; }
+    if(r.logado && voltarParaAulas){ irDeVolta(); return; }
     if(r.logado){
       sessao.nome = r.nome; sessao.professor = r.professor;
       sessao.instituicao = r.instituicao || '';
@@ -732,7 +769,18 @@ if(sessao.token){
       sessao.token = ''; apagarToken();
       if(voltarParaAulas || querConta) abrirArea();
     }
-  }).catch(function(){});
+  }).catch(function(){ if(voltarParaAulas) abrirArea(); });
+}
+
+
+// Volta para a página de origem; vindo da extensão, a cortina cobre a troca de página
+function irDeVolta(){
+  var h = document.documentElement;
+  if(h.classList.contains('volta-ext')){
+    h.classList.remove('volta-login');
+    document.getElementById('cortinaExtTexto').textContent = 'Abrindo o Sistema de Extensão…';
+  }
+  location.href = destinoVolta + '.html';
 }
 
 function carregarGoogle(){
@@ -764,7 +812,7 @@ function logou(r){
   sessao.token = r.token; sessao.nome = r.nome;
   sessao.professor = !!r.professor; sessao.instituicao = r.instituicao || '';
   guardarToken(r.token);
-  if(voltarParaAulas){ location.href = destinoVolta + '.html'; return; }
+  if(voltarParaAulas){ irDeVolta(); return; }
   document.getElementById('btAreaTexto').textContent = 'Estudar com IA';
   document.getElementById('btProf').classList.toggle('oculto', !sessao.professor);
   document.getElementById('btConta').classList.remove('oculto');
@@ -1365,6 +1413,7 @@ var acaoSeq = 0, telaAtual = 'pInicio';
 
 function mostrar(id, manterPosicao){
   acaoSeq++;
+  if(id === 'pAuth') document.documentElement.classList.add('volta-login');   // tira a cortina da extensão
   ['pInicio','pAuth','pInstituicao','pProfessor','pCurriculo','pConta','pSubtopico',
    'pFala','pProcessando','pParcial','pFinal','pLimite'].forEach(function(p){
     document.getElementById(p).classList.toggle('oculto', p !== id);
