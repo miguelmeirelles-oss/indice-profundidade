@@ -384,6 +384,8 @@
       <div class="caixa">
         <h2>Consumo da IA e rotinas automáticas</h2>
         <p style="margin-top:0">A cota grátis do Gemini é <b>por projeto</b> e <b>zera todo dia entre 4h e 5h</b> (horário de Brasília). A gravação, as questões e as correções dependem dela; por isso as tarefas automáticas mais pesadas vêm <b>desligadas</b>. Ligue só o que for usar.</p>
+        <h4>Chamadas de hoje por modelo</h4>
+        <div id="cfgUsoTabela"></div>
         <p class="usoIA" id="cfgUso" style="font-family:var(--mono,Consolas,monospace);font-size:12px;color:var(--cinza)"></p>
         <h4>Tarefas automáticas</h4>
         <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;margin:6px 0 12px;font-size:14.5px"><input type="checkbox" id="cfgRecAuto" style="width:18px;height:18px;margin-top:3px;flex:none">
@@ -2284,7 +2286,38 @@ function desenharConfigGeral(c){
   $('cfgApostilas').querySelectorAll('[data-apauto]').forEach(function(c){ c.addEventListener('change', function(){ c.parentNode.classList.toggle('on', c.checked); }); });
   if(c.fuso) $('cfgFuso').textContent = c.fuso === 'America/Sao_Paulo' ? 'de Brasília' : c.fuso;
   var u = c.uso;
-  if(u) $('cfgUso').textContent = 'Uso da IA hoje nas suas chaves: ' + u.chamadas + ' chamada(s) · ' + (u.tokens >= 1000 ? Math.round(u.tokens / 1000) + ' mil' : u.tokens) + ' tokens · ' + u.chaves + ' chave(s). O Google não informa quanto resta da cota.';
+  if(u) $('cfgUso').textContent = 'Total hoje: ' + u.chamadas + ' chamada(s) · ' + (u.tokens >= 1000 ? Math.round(u.tokens / 1000) + ' mil' : u.tokens) + ' tokens · ' + u.chaves + ' chave(s).';
+  desenharUsoModelos(u);
+}
+// Tabela no formato do painel do Google (AI Studio): barra + "usado / limite" por modelo, e o total do dia
+function desenharUsoModelos(u){
+  var box = $('cfgUsoTabela'); if(!box) return;
+  if(!u || !u.modelos){ box.innerHTML = ''; return; }
+  var nK = Math.max(1, u.chaves), varias = nK > 1;
+  var nome = function(m){ return m.replace(/^gemini-/, 'Gemini ').replace(/-flash-lite$/, ' Flash Lite').replace(/-flash$/, ' Flash'); };
+  var cel = function(usado, limite, esgotou){
+    var pct = limite ? Math.min(100, Math.round(100 * usado / limite)) : 0;
+    var cor = esgotou || pct >= 90 ? '#c62828' : pct >= 60 ? '#b07d00' : '#4b5563';
+    return '<td style="text-align:left"><span style="display:inline-block;width:64px;height:8px;border-radius:5px;background:#e5e7eb;vertical-align:middle;margin-right:10px;overflow:hidden">' +
+      '<i style="display:block;height:100%;width:' + (limite ? pct : (usado ? 100 : 0)) + '%;background:' + cor + '"></i></span>' +
+      '<span style="font-variant-numeric:tabular-nums">' + usado + ' / ' + (limite || '?') + '</span>' + (esgotou ? ' <span style="color:#c62828;font-size:11px;font-weight:bold">esgotou</span>' : '') + '</td>';
+  };
+  var usadoK = [], limK = [], usadoTot = 0, limTot = 0;
+  var linhas = u.modelos.filter(function(m){ return m.limite || m.chamadas || (m.esgChave || []).some(Boolean); }).map(function(m){
+    var pk = m.porChave.length ? m.porChave : [m.chamadas];
+    usadoTot += m.chamadas; limTot += m.limite * nK;
+    pk.forEach(function(n, i){ usadoK[i] = (usadoK[i] || 0) + n; limK[i] = (limK[i] || 0) + m.limite; });
+    return '<tr><td>' + esc(nome(m.modelo)) + (m.esgotou && varias ? ' <span style="color:#c62828;font-size:11.5px;font-weight:bold">· esgotado em todas as chaves</span>' : '') + '</td>' +
+      (varias ? pk.map(function(n, i){ return cel(n, m.limite, m.esgChave && m.esgChave[i]); }).join('') : cel(m.chamadas, m.limite, m.esgotou)) + '</tr>';
+  }).join('');
+  var cab = varias ? usadoK.map(function(_, i){ return '<th style="text-align:left">Chave ' + (i + 1) + ' · RPD</th>'; }).join('') : '<th style="text-align:left">RPD (chamadas hoje)</th>';
+  var tot = '<tr style="font-weight:bold"><td>Total do dia</td>' +
+    (varias ? usadoK.map(function(n, i){ return cel(n, limK[i], false); }).join('') : cel(usadoTot, limTot, false)) + '</tr>';
+  box.innerHTML = '<div class="tabelaBox"><table><thead><tr><th>Modelo</th>' + cab + '</tr></thead><tbody>' + linhas + tot + '</tbody></table></div>' +
+    '<p class="aviso" style="margin-top:6px"><b>' + usadoTot + ' de ' + limTot + '</b> chamadas grátis do dia usadas' + (varias ? ' (somando as ' + nK + ' chaves; cada chave em projeto separado do Google tem o seu limite)' : '') + '. ' +
+    'Conta tudo o que <b>este sistema</b> mandou: gravação e ata, questões, correção das respostas dos alunos, provas, apostila, recomendações, chat e teste de chaves. ' +
+    'Se a mesma chave for usada em outro lugar (o Estudar com IA, por exemplo), o painel do Google mostra mais. Quando um modelo esgota, o sistema passa para o próximo da lista. Zera entre 4h e 5h. ' +
+    'Confira em <a href="https://aistudio.google.com/rate-limit" target="_blank" rel="noopener">aistudio.google.com/rate-limit</a>.</p>';
 }
 $('cfgSalvar').addEventListener('click', function(){
   var b = this, ap = {};
