@@ -554,13 +554,30 @@ function abrirAluno(){
 }
 
 /* ---- questões abertas ---- */
+var gruposAbertas = [];
+function assinaturaDe(grupos){ return JSON.stringify(grupos.map(function(g){ return [g.aulaId, g.presente, g.fechaEm, g.questoes.map(function(q){ return q.id + q.respondida + q.fechaEm + q.aguardando + q.esgotada; })]; })); }
 function carregarAbertas(){
   api('questoesAbertas').then(function(grupos){
-    var ass = JSON.stringify(grupos.map(function(g){ return [g.aulaId, g.presente, g.fechaEm, g.questoes.map(function(q){ return q.id + q.respondida + q.fechaEm + q.aguardando + q.esgotada; })]; }));
+    var ass = assinaturaDe(grupos);
     if(ass === assinaturaAbertas) return;   // nada mudou: não redesenha para não apagar o que o aluno digita
-    assinaturaAbertas = ass;
+    // guarda a diferença entre o relógio do servidor e o do aparelho, para redesenhar depois sem errar o tempo
+    grupos.forEach(function(g){ g._desvio = g.agora - Date.now(); });
+    assinaturaAbertas = ass; gruposAbertas = grupos;
     desenharAbertas(grupos);
   }).catch(function(){ /* tenta de novo em 30 s */ });
+}
+// Atualiza uma questão só na tela (sem buscar a lista toda de novo no servidor)
+function trocarQuestaoNaTela(pid, qid, muda, agoraServidor){
+  var achou = false;
+  gruposAbertas.forEach(function(g){
+    if(agoraServidor) g._desvio = agoraServidor - Date.now();
+    g.agora = Date.now() + (g._desvio || 0);
+    if(g.professorId !== pid) return;
+    g.questoes = g.questoes.map(function(q){ if(q.id !== qid) return q; achou = true; return muda(q); });
+  });
+  if(!achou){ assinaturaAbertas = ''; carregarAbertas(); return; }
+  assinaturaAbertas = assinaturaDe(gruposAbertas);
+  desenharAbertas(gruposAbertas);
 }
 
 function desenharAbertas(grupos){
@@ -612,7 +629,10 @@ function desenharAbertas(grupos){
     var ab = card.querySelector('[data-abrirq]');
     if(ab) ab.addEventListener('click', function(){
       ab.disabled = true; ab.textContent = 'Abrindo…';
-      api('abrirQuestao', {professorId: pid, questaoId: qid}).then(function(){ assinaturaAbertas = ''; carregarAbertas(); })
+      api('abrirQuestao', {professorId: pid, questaoId: qid}).then(function(r){
+        if(r && r.questao) trocarQuestaoNaTela(pid, qid, function(){ return r.questao; }, r.agora);
+        else { assinaturaAbertas = ''; carregarAbertas(); }
+      })
         .catch(function(e){ ab.disabled = false; ab.textContent = 'Abrir questão'; card.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });
     var ta = card.querySelector('[data-txt]');
@@ -642,7 +662,8 @@ function desenharAbertas(grupos){
         segundos: s.inicio ? Math.round((Date.now() - s.inicio) / 1000) : 0} : null;
       api('responder', {professorId: pid, questaoId: qid, resposta: r, sinais: env}).then(function(res){
         if(res && res.aberta) api('corrigirResposta', {professorId: pid, questaoId: qid}).catch(function(){});
-        delete rascunho[qid]; delete sinais[qid]; assinaturaAbertas = ''; carregarAbertas();
+        delete rascunho[qid]; delete sinais[qid];
+        trocarQuestaoNaTela(pid, qid, function(q){ q.respondida = true; return q; });
       }).catch(function(e){ bt.disabled = false; bt.textContent = 'Enviar resposta'; card.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });
   });
@@ -2307,7 +2328,8 @@ function desenharUsoModelos(u){
     var pk = m.porChave.length ? m.porChave : [m.chamadas];
     usadoTot += m.chamadas; limTot += m.limite * nK;
     pk.forEach(function(n, i){ usadoK[i] = (usadoK[i] || 0) + n; limK[i] = (limK[i] || 0) + m.limite; });
-    return '<tr><td>' + esc(nome(m.modelo)) + (m.esgotou && varias ? ' <span style="color:#c62828;font-size:11.5px;font-weight:bold">· esgotado em todas as chaves</span>' : '') + '</td>' +
+    return '<tr><td>' + esc(nome(m.modelo)) + (m.esgotou && varias ? ' <span style="color:#c62828;font-size:11.5px;font-weight:bold">· esgotado em todas as chaves</span>' : '') +
+      (m.porMinuto ? ' <span class="aviso" style="font-size:11.5px" title="Muitas chamadas no mesmo minuto (ex.: vários trechos da gravação ao mesmo tempo). Não é a cota do dia: libera sozinho em segundos.">· freou ' + m.porMinuto + '× no limite por minuto</span>' : '') + '</td>' +
       (varias ? pk.map(function(n, i){ return cel(n, m.limite, m.esgChave && m.esgChave[i]); }).join('') : cel(m.chamadas, m.limite, m.esgotou)) + '</tr>';
   }).join('');
   var cab = varias ? usadoK.map(function(_, i){ return '<th style="text-align:left">Chave ' + (i + 1) + ' · RPD</th>'; }).join('') : '<th style="text-align:left">RPD (chamadas hoje)</th>';
@@ -2316,7 +2338,7 @@ function desenharUsoModelos(u){
   box.innerHTML = '<div class="tabelaBox"><table><thead><tr><th>Modelo</th>' + cab + '</tr></thead><tbody>' + linhas + tot + '</tbody></table></div>' +
     '<p class="aviso" style="margin-top:6px"><b>' + usadoTot + ' de ' + limTot + '</b> chamadas grátis do dia usadas' + (varias ? ' (somando as ' + nK + ' chaves; cada chave em projeto separado do Google tem o seu limite)' : '') + '. ' +
     'Conta tudo o que <b>este sistema</b> mandou: gravação e ata, questões, correção das respostas dos alunos, provas, apostila, recomendações, chat e teste de chaves. ' +
-    'Se a mesma chave for usada em outro lugar (o Estudar com IA, por exemplo), o painel do Google mostra mais. Quando um modelo esgota, o sistema passa para o próximo da lista. Zera entre 4h e 5h. ' +
+    'Se a mesma chave for usada em outro lugar (o Estudar com IA, por exemplo), o painel do Google mostra mais. "Freou no limite por minuto" não é falta de cota: são muitas chamadas no mesmo minuto, e libera sozinho. Quando um modelo esgota, o sistema passa para o próximo da lista. Zera entre 4h e 5h. ' +
     'Confira em <a href="https://aistudio.google.com/rate-limit" target="_blank" rel="noopener">aistudio.google.com/rate-limit</a>.</p>';
 }
 $('cfgSalvar').addEventListener('click', function(){
