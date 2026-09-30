@@ -711,7 +711,7 @@ api('config').then(function(c){
 
 // Vindo do aulas.html sem login: abre a tela de entrar e, depois de logar,
 // devolve o aluno para lá.
-var destinoVolta = (location.search.match(/[?&]voltar=(aulas|provas|ponte)\b/) || [])[1] || '';   // ponte = janelinha do Sistema de Extensão
+var destinoVolta = (location.search.match(/[?&]voltar=(aulas|provas|extensao|ponte)\b/) || [])[1] || '';   // extensao = Sistema de Extensão
 var voltarParaAulas = !!destinoVolta;
 // index.html?conta=1 (link "minha conta" do Aula por IA e do Prova por IA): abre direto a página da conta
 var querConta = /[?&]conta=1\b/.test(location.search);
