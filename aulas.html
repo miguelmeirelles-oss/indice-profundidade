@@ -669,9 +669,31 @@ function desenharAbertas(grupos){
   });
 }
 
+/* ---- memória das telas do aluno ----
+   Ao voltar para uma tela já vista, mostra na hora o que já tinha e busca a versão nova por trás;
+   só redesenha se algo mudou. Fica só na memória desta aba (some ao fechar ou recarregar). */
+var memoTela = {};
+function apiLembrar(chave, acao, dados, aindaVale){
+  var memo = memoTela[chave], ok = null;
+  var valer = function(){ return !aindaVale || aindaVale(); };
+  var p = api(acao, dados).then(function(r){
+    var txt = JSON.stringify(r);
+    if(memo && memo.txt === txt) return;          // nada mudou: não redesenha
+    memoTela[chave] = {r: r, txt: txt};
+    if(ok && valer()) ok(r, false);
+  });
+  return {
+    then: function(f){
+      ok = f;
+      if(memo && valer()) setTimeout(function(){ if(valer()) f(memo.r, true); }, 0);
+      return { catch: function(g){ p.catch(function(e){ if(!memoTela[chave] && valer()) g(e); }); } };
+    }
+  };
+}
+
 /* ---- matérias ---- */
 function carregarMinhas(){
-  api('minhasMaterias').then(function(lista){
+  apiLembrar('minhas', 'minhasMaterias', {}).then(function(lista){
     var el = $('listaMinhas');
     if(!lista.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria. Peça inscrição abaixo.</p>'; return; }
     el.innerHTML = lista.map(function(m, i){
@@ -733,12 +755,15 @@ function abrirApostilaAluno(m){
   abrirLeitura($('leituraApostila'), m.professorId, m.disciplinaId);
 }
 
+var materiaAberta = '';
 function abrirMateria(m){
   var el = $('alunoDetalhe');
+  var chaveM = 'notas|' + m.professorId + '|' + m.disciplinaId; materiaAberta = chaveM;
   $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
   el.innerHTML = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button><p class="carregando">Carregando notas…</p></div>';
   el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
-  api('minhasNotas', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
+  apiLembrar(chaveM, 'minhasNotas', {professorId: m.professorId, disciplinaId: m.disciplinaId},
+    function(){ return materiaAberta === chaveM && !el.classList.contains('oculto'); }).then(function(r){
     var eu = r.eu, h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
       '<h2 style="margin-top:8px">' + esc(m.nome) + ' · ' + esc(m.semestre) + '</h2>';
     h += composicaoAluno(r);
@@ -874,7 +899,9 @@ function explicacaoNota(pct){
 /* ---- leitura da apostila (aluno e professor) ---- */
 function abrirLeitura(el, professorId, disciplinaId){
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando apostila…</p></div>';
-  api('apostila', {professorId: professorId || '', disciplinaId: disciplinaId}).then(function(r){
+  var chaveL = 'apostila|' + (professorId || '') + '|' + disciplinaId; el.dataset.leitura = chaveL;
+  apiLembrar(chaveL, 'apostila', {professorId: professorId || '', disciplinaId: disciplinaId},
+    function(){ return el.dataset.leitura === chaveL; }).then(function(r){
     if(!r.capitulos.length){ el.innerHTML = '<div class="caixa"><h2>Apostila</h2><p>A apostila ainda não tem capítulos. Eles são escritos no sábado de madrugada, a partir das aulas da semana.</p></div>'; return; }
     el.innerHTML = '<div class="caixa leitura"><h2>Apostila · ' + esc(r.disciplina) + '</h2><p class="aviso">Gerada por IA a partir das aulas. O que não foi dito em sala aparece marcado como complemento.</p>' +
       r.capitulos.map(function(c){
