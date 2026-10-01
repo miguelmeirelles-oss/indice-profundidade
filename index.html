@@ -968,6 +968,24 @@ function entrarConta(){
   }).then(logou).catch(erroAuth);
 }
 
+// Enter nos campos de login: e-mail passa para a senha; na senha, entra (o mesmo vale para criar conta e recuperar senha)
+(function(){
+  function aoEnter(id, fazer){
+    var el = document.getElementById(id);
+    if(el) el.addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); fazer(); } });
+  }
+  function irPara(id){ return function(){ document.getElementById(id).focus(); }; }
+  aoEnter('eEmail', function(){ if(document.getElementById('eSenha').value) entrarConta(); else irPara('eSenha')(); });
+  aoEnter('eSenha', entrarConta);
+  aoEnter('cNome', irPara('cEmail'));
+  aoEnter('cEmail', irPara('cSenha'));
+  aoEnter('cSenha', criarConta);
+  aoEnter('rEmail', pedirCodigo);
+  aoEnter('rCodigo', irPara('rSenha'));
+  aoEnter('rSenha', irPara('rSenha2'));
+  aoEnter('rSenha2', redefinirSenha);
+})();
+
 /* ---------- senha ----------
    Quem entrou pelo Google pode criar uma senha para entrar com e-mail e senha
    em computador compartilhado, sem logar o Gmail nele. */
