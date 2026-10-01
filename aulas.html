@@ -78,6 +78,8 @@
   .cfg span:nth-child(odd){color:var(--cinza)}
   .cfg span:nth-child(even){font-weight:bold;text-align:right}
   .mono{font-family:Consolas,"Courier New",monospace}
+  details.encerradas>summary{cursor:pointer;font-weight:bold;color:var(--menu);font-size:14px;padding:4px 0}
+  details.encerradas[open]>summary{margin-bottom:4px}
   .grupoTitulo{font-size:13px;font-weight:bold;color:var(--titulo);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 4px}
   .nota{display:inline-block;min-width:44px;text-align:center;font-weight:bold;font-size:13px;border:2px solid var(--navy);border-radius:99px;padding:2px 8px;font-variant-numeric:tabular-nums}
   .n0{background:#fdecec;color:#8a1c1c} .n1{background:#fff4d6;color:#8a6100} .n2{background:#e6f4ea;color:#1a7a3c}
@@ -436,6 +438,9 @@ function hms(seg){ seg = Math.max(0, Math.floor(seg)); var h = Math.floor(seg / 
 
 function api(acao, dados){
   dados = dados || {}; dados.token = token;
+  // tela de Notas/Histórico de uma disciplina encerrada: o servidor lê a planilha de arquivo
+  var ctxArq = abaAtual === 'notas' ? notasDisc : abaAtual === 'hist' ? histDisc : '';
+  if(ctxArq && !dados.arquivoDe){ var dArq = discPorId(ctxArq); if(dArq && dArq.arquivada) dados.arquivoDe = ctxArq; }
   return fetch(BACKEND_AULAS, {
     method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'},
     body: JSON.stringify({acao:acao, dados:dados})
@@ -696,7 +701,7 @@ function carregarMinhas(){
   apiLembrar('minhas', 'minhasMaterias', {}).then(function(lista){
     var el = $('listaMinhas');
     if(!lista.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria. Peça inscrição abaixo.</p>'; return; }
-    el.innerHTML = lista.map(function(m, i){
+    var cartaoMateria = function(m, i){
       var tag = m.situacao === 'aprovada' ? '<span class="tag t-ok">inscrito</span>' : '<span class="tag t-warn">aguardando aprovação</span>';
       return '<div class="cartao"><div class="l1"><span>' + esc(m.nome) + ' · ' + esc(m.semestre) + '</span>' + tag + '</div>' +
         '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') + '</div>' +
@@ -706,7 +711,11 @@ function carregarMinhas(){
         (m.material ? '<a class="botaoLink" href="' + esc(m.material) + '" target="_blank" rel="noopener">📁 Material no Drive</a>' : '') +
         (m.situacao === 'pendente' ? '<button type="button" class="secundario mini" data-cancelar="' + esc(m.inscricaoId) + '" data-prof="' + esc(m.professorId) + '">Cancelar pedido</button>' : '') +
         '</div></div>';
-    }).join('');
+    };
+    var emCurso = [], encerradas = [];
+    lista.forEach(function(m, i){ (m.ativa ? emCurso : encerradas).push(cartaoMateria(m, i)); });
+    el.innerHTML = (emCurso.length ? emCurso.join('') : '<p class="aviso">Nenhuma matéria em andamento.</p>') +
+      (encerradas.length ? '<details class="encerradas" style="margin-top:6px"><summary>📦 Matérias encerradas (' + encerradas.length + ')</summary><div style="margin-top:10px">' + encerradas.join('') + '</div></details>' : '');
     el.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirMateria(lista[Number(b.dataset.abrir)]); }); });
     el.querySelectorAll('[data-apost]').forEach(function(b){ b.addEventListener('click', function(){ abrirApostilaAluno(lista[Number(b.dataset.apost)]); }); });
     el.querySelectorAll('[data-cancelar]').forEach(function(b){
@@ -961,10 +970,15 @@ function carregarResumo(){
 function ativas(){ return resumo ? resumo.disciplinas.filter(function(d){ return d.ativa; }) : []; }
 function discPorId(id){ return (resumo ? resumo.disciplinas : []).filter(function(d){ return d.id === id; })[0]; }
 function chipsDisciplinas(sel, todas){
-  var lista = todas ? resumo.disciplinas : ativas();
-  return '<div class="chips">' + lista.map(function(d){
-    return '<button type="button" class="chip" data-disc="' + esc(d.id) + '" aria-pressed="' + (sel === d.id) + '">' + esc(d.nome) + ' · ' + esc(d.semestre) + '</button>';
-  }).join('') + '</div>';
+  var chip = function(d){ return '<button type="button" class="chip" data-disc="' + esc(d.id) + '" aria-pressed="' + (sel === d.id) + '">' + esc(d.nome) + ' · ' + esc(d.semestre) + '</button>'; };
+  var h = '<div class="chips">' + ativas().map(chip).join('') + '</div>';
+  if(!todas) return h;
+  var enc = resumo.disciplinas.filter(function(d){ return !d.ativa; });
+  if(!enc.length) return h;
+  var atual = discPorId(sel), abrir = atual && !atual.ativa;
+  h += '<details class="encerradas"' + (abrir ? ' open' : '') + '><summary>📦 Disciplinas encerradas (' + enc.length + ')</summary><div class="chips" style="margin-top:8px">' + enc.map(chip).join('') + '</div></details>';
+  if(abrir) h += '<p class="aviso" style="margin:8px 0 0">📦 <b>Disciplina encerrada</b>' + (atual.arquivada ? ': os dados vêm do arquivo do semestre ' + esc(atual.semestre) + '.' : '.') + '</p>';
+  return h;
 }
 
 /* ================= DAR AULA ================= */
@@ -2054,8 +2068,14 @@ function desenharDisciplinas(){
   var el = $('listaDisc'), ds = resumo.disciplinas;
   if(!ds.length){ el.innerHTML = '<div class="caixa"><p>Nenhuma disciplina ainda. Crie a primeira, por exemplo "Conservação de Alimentos".</p></div>'; return; }
   var at = ds.filter(function(d){ return d.ativa; }), arq = ds.filter(function(d){ return !d.ativa; });
-  el.innerHTML = '<div class="grid2">' + at.map(cartaoDisc).join('') + '</div>' +
-    (arq.length ? '<p class="grupoTitulo">Arquivadas</p><div class="grid2">' + arq.map(cartaoDisc).join('') + '</div>' : '');
+  var porSem = {};
+  arq.forEach(function(d){ (porSem[d.semestre] = porSem[d.semestre] || []).push(d); });
+  var sems = Object.keys(porSem).sort().reverse();
+  el.innerHTML = (at.length ? '<div class="grid2">' + at.map(cartaoDisc).join('') + '</div>' : '<div class="caixa"><p>Nenhuma disciplina em andamento. Crie uma nova ou reative uma encerrada.</p></div>') +
+    (arq.length ? '<details class="caixa encerradas"><summary>📦 Ver disciplinas encerradas (' + arq.length + ')</summary>' +
+      '<p class="aviso" style="margin-top:8px">Ficam guardadas para consulta (notas, histórico e apostila), fora dos cálculos e do carregamento do site.</p>' +
+      sems.map(function(sem){ return '<p class="grupoTitulo">' + esc(sem) + '</p>' + porSem[sem].map(cartaoEncerrada).join(''); }).join('') +
+      '</details>' : '');
   el.querySelectorAll('[data-editar]').forEach(function(b){ b.addEventListener('click', function(){ abrirForm(discPorId(b.dataset.editar)); }); });
   el.querySelectorAll('[data-copiar]').forEach(function(b){ b.addEventListener('click', function(){
     var d = discPorId(b.dataset.copiar);
@@ -2067,6 +2087,26 @@ function desenharDisciplinas(){
       });
     }).catch(function(e){ b.disabled = false; b.dataset.conf = ''; b.textContent = 'Copiar para o próximo semestre'; erroGeral(e.message); });
   }); });
+  // encerrar: move os dados para o arquivo do semestre (pede confirmação)
+  el.querySelectorAll('[data-arquivar]').forEach(function(b){ b.addEventListener('click', function(){
+    var d = discPorId(b.dataset.arquivar);
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: encerrar e mover para o Arquivo ' + d.semestre; return; }
+    b.disabled = true; b.textContent = 'Movendo para o arquivo… (pode levar até 1 minuto)';
+    api('arquivarDisciplina', {id: d.id}).then(function(x){
+      return carregarResumo().then(function(){
+        $('listaDisc').insertAdjacentHTML('afterbegin', '<div class="ok"><b>' + esc(d.nome) + ' · ' + esc(d.semestre) + '</b> foi para o arquivo (<a href="' + esc(x.url) + '" target="_blank" rel="noopener">' + esc(x.arquivo) + '</a>). Continua em "Ver disciplinas encerradas" para consulta.</div>');
+      });
+    }).catch(function(e){ b.disabled = false; b.dataset.conf = ''; b.textContent = b.dataset.rotulo || 'Encerrar e arquivar'; erroGeral(e.message); });
+  }); });
+  el.querySelectorAll('[data-desarquivar]').forEach(function(b){ b.addEventListener('click', function(){
+    var d = discPorId(b.dataset.desarquivar);
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: trazer de volta para o semestre em curso'; return; }
+    b.disabled = true; b.textContent = 'Trazendo de volta… (pode levar até 1 minuto)';
+    api('desarquivarDisciplina', {id: d.id}).then(carregarResumo)
+      .catch(function(e){ b.disabled = false; b.dataset.conf = ''; b.textContent = 'Reativar'; erroGeral(e.message); });
+  }); });
+  el.querySelectorAll('[data-vernotas]').forEach(function(b){ b.addEventListener('click', function(){ notasDisc = b.dataset.vernotas; abrirAba('notas'); }); });
+  el.querySelectorAll('[data-verhist]').forEach(function(b){ b.addEventListener('click', function(){ histDisc = b.dataset.verhist; abrirAba('hist'); }); });
   el.querySelectorAll('[data-ativar]').forEach(function(b){
     b.addEventListener('click', function(){
       b.disabled = true;
@@ -2102,7 +2142,21 @@ function cartaoDisc(d){
     (etapas.length > 1 ? '<p class="aviso" style="margin-top:4px">Média final: ' + (pesosIguais(etapas) ? 'média simples das etapas' : 'média ponderada (' + etapas.map(function(e){ return esc(e.nome) + ' peso ' + nota10(e.peso); }).join(', ') + ')') + '</p>' : '') +
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
     '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
-    '<button type="button" class="secundario mini" data-ativar="' + esc(d.id) + '" data-valor="' + (d.ativa ? '0' : '1') + '">' + (d.ativa ? 'Arquivar' : 'Reativar') + '</button></div></div>';
+    '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Encerrar e arquivar">Encerrar e arquivar</button></div></div>';
+}
+// Cartão compacto de uma disciplina encerrada
+function cartaoEncerrada(d){
+  return '<div class="cartao"><div class="l1"><span>' + esc(d.nome) + ' · ' + esc(d.semestre) + '</span>' +
+    (d.arquivada ? '<span class="tag t-cinza">no arquivo</span>' : '<span class="tag t-warn">encerrada</span>') + '</div>' +
+    '<div class="l2">' + d.aprovados + ' aluno(s)' + (d.arquivada ? '' : ' · os dados ainda estão na planilha principal') + '</div>' +
+    '<div class="botoes" style="margin-top:8px">' +
+    '<button type="button" class="mini" data-vernotas="' + esc(d.id) + '">Ver notas</button>' +
+    '<button type="button" class="secundario mini" data-verhist="' + esc(d.id) + '">Ver histórico</button>' +
+    '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
+    (d.arquivada ? '<button type="button" class="secundario mini" data-desarquivar="' + esc(d.id) + '">Reativar</button>'
+      : '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Mover para o arquivo">Mover para o arquivo</button>' +
+        '<button type="button" class="secundario mini" data-ativar="' + esc(d.id) + '" data-valor="1">Reativar</button>') +
+    '</div></div>';
 }
 
 $('btNovaDisc').addEventListener('click', function(){ abrirForm(null); });
