@@ -383,7 +383,7 @@ if (/[?&]voltar=extensao\b/.test(location.search)) document.documentElement.clas
 
     <label for="manterConectado" style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:0 0 14px;font-family:inherit;font-size:13.5px;letter-spacing:0;text-transform:none;font-weight:normal;color:var(--navy);line-height:1.4">
       <input type="checkbox" id="manterConectado" style="width:18px;height:18px;margin:1px 0 0;flex:none;accent-color:var(--menu)">
-      <span><b>Manter conectado neste computador</b><br><span class="aviso" style="margin:0">Deixe desmarcado em computador da faculdade ou de outra pessoa: o login termina quando o navegador fecha.</span></span>
+      <span><b>Manter conectado neste aparelho</b><br><span class="aviso" style="margin:0" id="dicaManter">Deixe desmarcado em computador da faculdade ou de outra pessoa: o login termina quando o navegador fecha ou o computador desliga.</span></span>
     </label>
 
     <div id="caixaGoogle" style="margin-bottom:16px"></div>
@@ -712,22 +712,42 @@ function api(acao, dados){
 /* Onde o login fica guardado: "manter conectado" → localStorage (dura até sair);
    desmarcado → sessionStorage (acaba quando o navegador fecha). O aulas.html e o
    provas.html leem dos dois lugares. */
-function lerToken(){
-  try{ return localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){ return ''; }
+// Login sem "manter conectado" (computador da faculdade): se o site ficou mais de 20 min sem
+// nenhuma aba aberta (ex.: computador desligado e o Chrome restaurou as abas), pede para entrar de novo.
+function tokenSalvo(){
+  try{
+    var t = localStorage.getItem('ip_token'); if(t) return t;
+    t = sessionStorage.getItem('ip_token') || '';
+    var vivo = Number(localStorage.getItem('ip_vivo') || 0);
+    if(t && vivo && Date.now() - vivo > 20 * 60000){ sessionStorage.removeItem('ip_token'); return ''; }
+    if(t) localStorage.setItem('ip_vivo', String(Date.now()));
+    return t;
+  }catch(e){ return ''; }
 }
+setInterval(function(){ try{ if(sessionStorage.getItem('ip_token')) localStorage.setItem('ip_vivo', String(Date.now())); }catch(e){} }, 60000);
+function lerToken(){ return tokenSalvo(); }
 function guardarToken(t){
   var manter = document.getElementById('manterConectado');
   manter = !!(manter && manter.checked);
   try{
     localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token');
     (manter ? localStorage : sessionStorage).setItem('ip_token', t);
-    if(manter) localStorage.setItem('ip_manter', '1'); else localStorage.removeItem('ip_manter');
+    if(!manter) localStorage.setItem('ip_vivo', String(Date.now()));
+    // no celular guarda a escolha; no computador ela não é lembrada (começa sempre desmarcado)
+    if(EH_CELULAR) localStorage.setItem('ip_manter', manter ? '1' : '0'); else localStorage.removeItem('ip_manter');
   }catch(e){}
 }
 function apagarToken(){
   try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(e){}
 }
-try{ if(localStorage.getItem('ip_manter') === '1') document.getElementById('manterConectado').checked = true; }catch(e){}
+// Celular: "manter conectado" já vem marcado (o aluno não precisa entrar toda vez).
+// Computador: começa sempre desmarcado (computador da faculdade ou de outra pessoa).
+var EH_CELULAR = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  !!(window.matchMedia && matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 820);
+try{
+  document.getElementById('manterConectado').checked = EH_CELULAR && localStorage.getItem('ip_manter') !== '0';
+  if(EH_CELULAR) document.getElementById('dicaManter').textContent = 'No celular já vem marcado: você continua conectado. Desmarque se o aparelho não for seu.';
+}catch(e){}
 
 var sessao = {token: lerToken(), nome:'',
               professor:false, instituicao:''};
