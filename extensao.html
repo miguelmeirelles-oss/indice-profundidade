@@ -717,7 +717,20 @@ function mostrarTela(id) {
 // A página agora fica no mesmo endereço do site: o login é o mesmo, automático.
 const SERVIDOR_EXT = 'https://script.google.com/macros/s/AKfycbwm2yAgPVUto8enQguNUxZLVNJJPhthMEqLLw6CEA64Y_8RcfadV58ZqPaHuguegNPk/exec';
 let tokenSite = '';
-try { tokenSite = localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; } catch (e) {}
+// Login sem "manter conectado" (computador da faculdade): se o site ficou mais de 20 min sem
+// nenhuma aba aberta (ex.: computador desligado e o Chrome restaurou as abas), pede para entrar de novo.
+function tokenSalvo(){
+  try{
+    var t = localStorage.getItem('ip_token'); if(t) return t;
+    t = sessionStorage.getItem('ip_token') || '';
+    var vivo = Number(localStorage.getItem('ip_vivo') || 0);
+    if(t && vivo && Date.now() - vivo > 20 * 60000){ sessionStorage.removeItem('ip_token'); return ''; }
+    if(t) localStorage.setItem('ip_vivo', String(Date.now()));
+    return t;
+  }catch(e){ return ''; }
+}
+setInterval(function(){ try{ if(sessionStorage.getItem('ip_token')) localStorage.setItem('ip_vivo', String(Date.now())); }catch(e){} }, 60000);
+tokenSite = tokenSalvo();
 function irParaLogin() { location.href = 'index.html?voltar=extensao'; }
 
 // Fala com o servidor da extensão (Apps Script da conta engalimentoscefetrj)
