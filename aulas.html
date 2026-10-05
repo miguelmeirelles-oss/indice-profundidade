@@ -369,6 +369,7 @@
     <div id="pChat" class="oculto"></div>
 
     <div id="pCfg" class="oculto">
+      <div class="caixa" id="cfgAudios"></div>
       <div class="caixa">
         <h2>Chave do Gemini</h2>
         <p>Todas as tarefas de IA das suas matérias usam só as suas chaves. Elas ficam guardadas no servidor; aqui aparece só o final de cada uma.</p>
@@ -963,7 +964,7 @@ function abrirAba(a){
   if(a === 'notas') abrirNotas();
   if(a === 'hist') abrirHistorico();
   if(a === 'insc') carregarInscricoes();
-  if(a === 'cfg') carregarChaves();
+  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); }
   if(a === 'chat') abrirChat($('pChat'));
 }
 
@@ -1018,6 +1019,122 @@ function idbTodos(){ return idbOp('readonly', function(st){ return st.getAll(); 
 function idbPut(v){ return idbOp('readwrite', function(st){ st.put(v); }); }
 function idbDel(k){ return idbOp('readwrite', function(st){ st.delete(k); }); }
 function blobBase64(b){ return new Promise(function(res, rej){ var f = new FileReader(); f.onload = function(){ res(String(f.result).split(',')[1] || ''); }; f.onerror = rej; f.readAsDataURL(b); }); }
+
+/* ---- áudios guardados neste computador: salvar em pen drive e carregar em outro computador ----
+   Um arquivo por aula, com todos os trechos que não chegaram ao servidor. No outro computador,
+   os trechos entram na mesma fila de envio da gravação (mesmo caminho, nada muda no servidor). */
+function nomesDasAulas(ids){
+  var faltam = {}, nomes = {};
+  ids.forEach(function(id){ faltam[id] = true; });
+  var discs = resumo ? resumo.disciplinas : [];
+  var cadeia = Promise.resolve();
+  discs.forEach(function(d){
+    cadeia = cadeia.then(function(){
+      if(!Object.keys(faltam).length) return;
+      return api('aulasDaDisciplina', {disciplinaId: d.id}).then(function(aulas){
+        aulas.forEach(function(a){
+          if(!faltam[a.id]) return;
+          nomes[a.id] = {titulo: d.nome + ' · aula ' + a.numero + ' · ' + a.data, curto: d.nome + ' aula ' + a.numero + ' ' + String(a.data).replace(/\//g, '-')};
+          delete faltam[a.id];
+        });
+      }).catch(function(){});
+    });
+  });
+  return cadeia.then(function(){ return nomes; });
+}
+
+function carregarAudiosGuardados(){
+  var el = $('cfgAudios'); if(!el) return;
+  idbTodos().then(function(lista){
+    lista = lista.concat(G.memoria || []);
+    var porAula = {};
+    lista.forEach(function(it){ (porAula[it.aulaId] = porAula[it.aulaId] || []).push(it); });
+    var ids = Object.keys(porAula);
+    var importar = '<p class="grupoTitulo" style="margin-top:14px">Carregar áudios de um arquivo</p>' +
+      '<p class="aviso" style="margin:0 0 8px">Trouxe um arquivo de áudios de outro computador (pen drive)? Escolha aqui: os trechos são enviados e a aula é transcrita normalmente. Entre com a mesma conta de quem deu a aula.</p>' +
+      '<input type="file" id="audArq" accept=".json,application/json" multiple><div id="audMsg"></div>';
+    if(!ids.length){
+      el.style.borderColor = '';
+      el.innerHTML = '<h2>Áudios guardados neste computador</h2><p class="aviso" style="margin:0">Nenhum. Todos os trechos gravados aqui já chegaram ao servidor.</p>' + importar;
+      ligarImportarAudios(); return;
+    }
+    el.style.borderColor = '#c62828';
+    el.innerHTML = '<h2 style="color:#c62828">⚠ Áudios que não chegaram ao servidor</h2><p class="carregando">Identificando as aulas…</p>';
+    nomesDasAulas(ids).then(function(nomes){
+      el.innerHTML = '<h2 style="color:#c62828">⚠ Áudios que não chegaram ao servidor</h2>' +
+        '<p style="margin:0 0 10px">Estes trechos foram gravados <b>neste computador</b> e ainda não foram enviados. Não limpe os dados do navegador até resolver. ' +
+        'Tente enviar; se não for (rede ou computador bloqueando), salve no pen drive e carregue em outro computador.</p>' +
+        ids.map(function(id){
+          var n = nomes[id], trechos = porAula[id].sort(function(a, b){ return a.ordem - b.ordem; });
+          var mb = trechos.reduce(function(t, x){ return t + (x.blob ? x.blob.size : 0); }, 0) / 1048576;
+          return '<div class="erro" style="margin:0 0 10px"><b>' + esc(n ? n.titulo : 'Aula ' + id + ' (de outra conta ou já excluída)') + '</b><br>' +
+            trechos.length + ' trecho(s) · ' + mb.toFixed(1).replace('.', ',') + ' MB · trechos ' + trechos.map(function(t){ return t.ordem; }).join(', ') +
+            '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" data-audenviar="' + esc(id) + '">Tentar enviar agora</button>' +
+            '<button type="button" class="secundario mini" data-audsalvar="' + esc(id) + '" data-nome="' + esc(n ? n.curto : id) + '">💾 Salvar no pen drive</button></div></div>';
+        }).join('') + '<div id="audMsgEnvio"></div>' + importar;
+      el.querySelectorAll('[data-audenviar]').forEach(function(b){ b.addEventListener('click', function(){
+        b.disabled = true; $('audMsgEnvio').innerHTML = '<p class="carregando">Enviando…</p>';
+        enviarPendentes().then(function(){ return idbTodos(); }).then(function(p){
+          $('audMsgEnvio').innerHTML = p.length ? '<div class="erro">Ainda não foi: ' + esc(G.statusEnvio || 'o envio falhou') + '. Use "Salvar no pen drive".</div>' : '<div class="ok">Tudo enviado! A transcrição já começou.</div>';
+          if(!p.length) setTimeout(carregarAudiosGuardados, 2500); else b.disabled = false;
+        });
+      }); });
+      el.querySelectorAll('[data-audsalvar]').forEach(function(b){ b.addEventListener('click', function(){ salvarAudiosDaAula(b.dataset.audsalvar, b.dataset.nome, porAula[b.dataset.audsalvar], b); }); });
+      ligarImportarAudios();
+    });
+  });
+}
+
+// Um arquivo por aula, com todos os trechos (o navegador pergunta onde salvar: escolha o pen drive)
+function salvarAudiosDaAula(aulaId, nome, trechos, b){
+  b.disabled = true; var txt = b.textContent; b.textContent = 'Preparando o arquivo…';
+  var ordenados = trechos.slice().sort(function(a, x){ return a.ordem - x.ordem; });
+  Promise.all(ordenados.map(function(t){ return blobBase64(t.blob); })).then(function(b64){
+    var pacote = {formato: 'aula-por-ia-audios', versao: 1, aulaId: aulaId, nome: nome, salvo_em: new Date().toISOString(),
+      trechos: ordenados.map(function(t, i){ return {ordem: t.ordem, inicio: t.inicio, mime: t.mime, dados: b64[i]}; })};
+    var arq = new Blob([JSON.stringify(pacote)], {type: 'application/json'});
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(arq);
+    a.download = 'Audios ' + String(nome).replace(/[\\/:*?"<>|]/g, '-') + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 60000);
+    b.textContent = '✓ Arquivo salvo: ' + a.download; b.disabled = false;
+    $('audMsgEnvio').innerHTML = '<div class="ok">Arquivo gerado. Confira se ele foi para o pen drive (se o Chrome salvou em Downloads, copie de lá). Os trechos <b>continuam guardados neste computador</b> até chegarem ao servidor.</div>';
+  }).catch(function(e){ b.disabled = false; b.textContent = txt; erroGeral('Não deu para gerar o arquivo: ' + (e.message || e)); });
+}
+
+// Carrega arquivos de áudio de um pen drive e põe os trechos na fila de envio
+function ligarImportarAudios(){
+  var inp = $('audArq'); if(!inp) return;
+  inp.addEventListener('change', function(){
+    var arqs = Array.prototype.slice.call(inp.files || []); if(!arqs.length) return;
+    var msg = $('audMsg'); msg.innerHTML = '<p class="carregando">Lendo o arquivo…</p>';
+    var total = 0;
+    var cadeia = Promise.resolve();
+    arqs.forEach(function(f){
+      cadeia = cadeia.then(function(){ return f.text(); }).then(function(t){
+        var pac; try{ pac = JSON.parse(t); }catch(e){ throw new Error(f.name + ' não é um arquivo de áudios do Aula por IA.'); }
+        if(!pac || pac.formato !== 'aula-por-ia-audios' || !pac.aulaId || !(pac.trechos || []).length) throw new Error(f.name + ' não é um arquivo de áudios do Aula por IA.');
+        return Promise.all(pac.trechos.map(function(tr){
+          var bin = atob(tr.dados), bytes = new Uint8Array(bin.length);
+          for(var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+          total++;
+          return idbPut({k: pac.aulaId + '|' + tr.ordem, aulaId: pac.aulaId, ordem: Number(tr.ordem), inicio: Number(tr.inicio) || 0,
+            mime: tr.mime || 'audio/webm', blob: new Blob([bytes], {type: tr.mime || 'audio/webm'})});
+        }));
+      });
+    });
+    cadeia.then(function(){
+      msg.innerHTML = '<p class="carregando">' + total + ' trecho(s) carregado(s). Enviando para o servidor…</p>';
+      return enviarPendentes().then(function(){ return idbTodos(); });
+    }).then(function(p){
+      inp.value = '';
+      msg.innerHTML = p.length ? '<div class="erro">Carregados, mas o envio ainda não foi: ' + esc(G.statusEnvio || 'falha no envio') + '. Eles ficaram guardados neste computador; tente de novo em "Tentar enviar agora".</div>'
+        : '<div class="ok">Pronto: ' + total + ' trecho(s) enviados. A transcrição e a ata saem sozinhas; acompanhe no Histórico.</div>';
+      setTimeout(carregarAudiosGuardados, p.length ? 0 : 4000);
+    }).catch(function(e){ inp.value = ''; msg.innerHTML = '<div class="erro">' + esc(e.message || String(e)) + '</div>'; });
+  });
+}
 
 function abrirDarAula(){
   $('areaQ').innerHTML = '';
