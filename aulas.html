@@ -2591,7 +2591,12 @@ function abrirForm(d){
     // 2. questões em aula
     '<div class="bloco"><p class="grupoTitulo" style="margin-top:0">2. Questões em aula</p><div class="campos">' +
       '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
-      campo('fPrazo', 'Prazo padrão (min · até 1440 = 24 h)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
+      campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
+      // prazo padrão com − / + e atalhos (igual à tela de liberar)
+      '<div style="grid-column:1/-1"><label class="rot">Prazo padrão para abrir as questões</label>' +
+        '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><span class="stepper"><button type="button" data-fprazo="-1" aria-label="Menos">−</button><span id="fPrazoTxt" style="min-width:70px;text-align:center"></span><button type="button" data-fprazo="1" aria-label="Mais">+</button></span>' +
+        '<span class="chips">' + [[30, '30 min'], [60, '1 h'], [120, '2 h'], [360, '6 h'], [720, '12 h'], [1440, '24 h']].map(function(o){ return '<button type="button" class="chip" data-fprazoja="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</span></div>' +
+        '<input type="hidden" id="fPrazo" value="' + (Number(v.prazo_padrao) || 60) + '"></div>' +
       '</div>' +
       // configuração das questões: aula do dia + revisão = total, com peso e tempo por tipo
       '<p class="grupoTitulo" style="margin-top:4px">Configuração das questões ' + ajuda('Parte das questões de cada liberação pode ser sobre <b>temas de aulas anteriores</b>, como revisão. As quantidades de revisão contam <b>dentro</b> do total: com 2 fechadas e 1 de revisão, cai 1 fechada da aula do dia e 1 de revisão. Se todas forem de revisão, nenhuma é sobre a aula do dia.<br><br>' +
@@ -2643,6 +2648,18 @@ function abrirForm(d){
     '<div id="fErro" class="erro oculto"></div>' +
     '<div class="botoes"><button type="button" id="fSalvar">' + (d ? 'Salvar alterações' : 'Criar disciplina') + '</button><button type="button" class="secundario" id="fCancelar">Cancelar</button></div>';
   f.classList.remove('oculto');
+  // prazo padrão: − / + com passo que cresce (5 min, 15 min, 30 min, 1 h) e atalhos
+  var definirPrazo = function(m){
+    m = Math.max(5, Math.min(1440, m)); $('fPrazo').value = m; $('fPrazoTxt').textContent = textoPrazo(m);
+    f.querySelectorAll('[data-fprazoja]').forEach(function(c){ c.setAttribute('aria-pressed', String(Number(c.dataset.fprazoja) === m)); });
+  };
+  definirPrazo(Number($('fPrazo').value) || 60);
+  f.querySelectorAll('[data-fprazo]').forEach(function(b){ b.addEventListener('click', function(){
+    var atual = Number($('fPrazo').value), sobe = b.dataset.fprazo === '1', base = sobe ? atual : atual - 1;
+    var passo = base < 60 ? 5 : base < 180 ? 15 : base < 480 ? 30 : 60;
+    definirPrazo(atual + (sobe ? passo : -passo));
+  }); });
+  f.querySelectorAll('[data-fprazoja]').forEach(function(c){ c.addEventListener('click', function(){ definirPrazo(Number(c.dataset.fprazoja)); }); });
   var rigorForm = Number(v.rigor || 3);
   f.querySelectorAll('[data-rig]').forEach(function(b){ b.addEventListener('click', function(){
     rigorForm = Number(b.dataset.rig); f.querySelectorAll('[data-rig]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
