@@ -1117,17 +1117,26 @@ function carregarAudiosGuardados(){
     }
     el.style.borderColor = '#c62828';
     el.innerHTML = '<h2 style="color:#c62828">⚠ Áudios que não chegaram ao servidor</h2><p class="carregando">Identificando as aulas…</p>';
-    nomesDasAulas(ids).then(function(nomes){
+    // pergunta ao servidor quais trechos já chegaram (ex.: enviados de outro computador pelo pen drive)
+    Promise.all([nomesDasAulas(ids), Promise.all(ids.map(function(id){ return api('estadoAula', {aulaId: id}).catch(function(){ return null; }); }))]).then(function(res){
+      var nomes = res[0], estados = {};
+      ids.forEach(function(id, i){ estados[id] = res[1][i]; });
       el.innerHTML = '<h2 style="color:#c62828">⚠ Áudios que não chegaram ao servidor</h2>' +
         '<p style="margin:0 0 10px">Estes trechos foram gravados <b>neste computador</b> e ainda não foram enviados. Não limpe os dados do navegador até resolver. ' +
         'Tente enviar; se não for (rede ou computador bloqueando), salve no pen drive e carregue em outro computador.</p>' +
         ids.map(function(id){
           var n = nomes[id], trechos = porAula[id].sort(function(a, b){ return a.ordem - b.ordem; });
           var mb = trechos.reduce(function(t, x){ return t + (x.blob ? x.blob.size : 0); }, 0) / 1048576;
+          var est = estados[id], noServidor = est && est.ordens ? est.ordens : [];
+          var chegaram = trechos.length > 0 && trechos.every(function(t){ return noServidor.indexOf(t.ordem) !== -1; });
+          if(chegaram) return '<div class="ok" style="margin:0 0 10px"><b>' + esc(n ? n.titulo : 'Aula ' + id) + '</b><br>' +
+            '✓ Estes ' + trechos.length + ' trecho(s) <b>já chegaram ao servidor</b> (provavelmente enviados de outro computador). A cópia deste computador não é mais necessária.' +
+            '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" data-audapagar="' + esc(id) + '" data-seguro="1">🗑 Apagar deste computador</button></div></div>';
           return '<div class="erro" style="margin:0 0 10px"><b>' + esc(n ? n.titulo : 'Aula ' + id + ' (de outra conta ou já excluída)') + '</b><br>' +
             trechos.length + ' trecho(s) · ' + mb.toFixed(1).replace('.', ',') + ' MB · trechos ' + trechos.map(function(t){ return t.ordem; }).join(', ') +
             '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" data-audenviar="' + esc(id) + '">Tentar enviar agora</button>' +
-            '<button type="button" class="secundario mini" data-audsalvar="' + esc(id) + '" data-nome="' + esc(n ? n.curto : id) + '">💾 Salvar no pen drive</button></div></div>';
+            '<button type="button" class="secundario mini" data-audsalvar="' + esc(id) + '" data-nome="' + esc(n ? n.curto : id) + '">💾 Salvar no pen drive</button>' +
+            '<button type="button" class="link" style="font-size:12.5px" data-audapagar="' + esc(id) + '">apagar deste computador</button></div></div>';
         }).join('') + '<div id="audMsgEnvio"></div>' + importar;
       el.querySelectorAll('[data-audenviar]').forEach(function(b){ b.addEventListener('click', function(){
         b.disabled = true; $('audMsgEnvio').innerHTML = '<p class="carregando">Enviando…</p>';
@@ -1137,6 +1146,14 @@ function carregarAudiosGuardados(){
         });
       }); });
       el.querySelectorAll('[data-audsalvar]').forEach(function(b){ b.addEventListener('click', function(){ salvarAudiosDaAula(b.dataset.audsalvar, b.dataset.nome, porAula[b.dataset.audsalvar], b); }); });
+      // apagar a cópia deste computador: sem confirmação extra quando o servidor já tem tudo; com aviso forte quando não tem
+      el.querySelectorAll('[data-audapagar]').forEach(function(b){ b.addEventListener('click', function(){
+        var id = b.dataset.audapagar;
+        if(!b.dataset.seguro && !window.confirm('ATENÇÃO: estes trechos ainda NÃO chegaram ao servidor. Só apague se você já salvou no pen drive e enviou por outro computador, ou se não precisa desta aula. Apagar mesmo?')) return;
+        b.disabled = true;
+        Promise.all(porAula[id].map(function(t){ G.memoria = (G.memoria || []).filter(function(x){ return x.k !== t.k; }); return idbDel(t.k).catch(function(){}); }))
+          .then(function(){ carregarAudiosGuardados(); });
+      }); });
       ligarImportarAudios();
     });
   });
