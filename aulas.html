@@ -424,6 +424,7 @@
           <tr><th>Tarefa</th><th>Quando roda</th><th>Consumo</th></tr>
           <tr><td>Transcrever os trechos da aula</td><td>durante a aula, a cada 10 min</td><td>1 chamada por trecho, com áudio — a mais pesada (uma aula de 100 min tem ~10 trechos)</td></tr>
           <tr><td>Ata da aula</td><td>quando o último trecho fica pronto</td><td>1 chamada por aula</td></tr>
+          <tr><td>Catalogar os temas das aulas novas</td><td>às 2h da madrugada, só se houve aula nova com ata</td><td>1 chamada por disciplina</td></tr>
           <tr><td>Gerar questões</td><td>quando você clica em "Gerar" ou "Refazer"</td><td>1 chamada por geração</td></tr>
           <tr><td>Corrigir respostas abertas</td><td>logo depois que o aluno responde</td><td>1 chamada por resposta aberta (fechadas não usam IA)</td></tr>
           <tr><td>Corrigir provas</td><td>quando as fotos são enviadas</td><td>1 chamada por aluno, com as fotos</td></tr>
@@ -1806,7 +1807,7 @@ function htmlRevisao(){
   var opcoes = function(sel){ return '<option value="">escolha um tema…</option>' + Q.sug.todos.map(function(t){ return '<option value="' + esc(t.id) + '"' + (t.id === sel ? ' selected' : '') + '>' + esc(t.nome) + ' (aula ' + t.aulas.join(', ') + ')</option>'; }).join(''); };
   if(!Q.sug.todos.length) return '<div class="convite" style="margin-top:8px">Ainda não há temas de aulas anteriores para revisão (eles saem das atas, e nenhum pode estar como "não cobrar"). As questões serão todas da aula de hoje se você zerar a revisão.</div>';
   return '<div class="convite" style="margin-top:8px"><b>Questões de revisão</b> ' + ajuda('Sugestão automática: soma importância (⭐), dificuldade da turma no tema e tempo sem aparecer. A questão será nova, sobre o tema, usando a ata das aulas em que ele foi dado. Troque o tema se quiser.') +
-    (Q.sug.atualizou && Q.sug.atualizou.aulas ? '<br><span class="aviso">Temas atualizados agora a partir de ' + Q.sug.atualizou.aulas + ' ata(s).</span>' : '') +
+    (Q.sug.pendentes ? '<br><span class="aviso">' + Q.sug.pendentes + ' aula(s) anterior(es) ainda sem temas (são catalogadas às 2h). </span><button type="button" class="link" id="btCatalogarJa" style="font-size:12.5px">catalogar agora (uns 20 s)</button>' : '') +
     Q.revSel.map(function(s, i){
       var info = Q.sug.todos.filter(function(t){ return t.id === s.id; })[0];
       return '<div style="margin-top:8px"><span class="tag t-azul">' + (s.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' de revisão</span> <select data-revsel="' + i + '" style="max-width:360px">' + opcoes(s.id) + '</select>' +
@@ -1814,6 +1815,12 @@ function htmlRevisao(){
     }).join('') + '</div>';
 }
 function ligarRevisao(){
+  var bc = $('btCatalogarJa');
+  if(bc) bc.addEventListener('click', function(){
+    bc.disabled = true; bc.textContent = 'catalogando…';
+    api('identificarTemas', {disciplinaId: Q.sug.disciplinaId}).then(function(){ Q.sugChave = ''; Q.sug = null; $('qRevisao').innerHTML = htmlRevisao(); buscarSugestaoRevisao(); })
+      .catch(function(e){ bc.disabled = false; bc.textContent = 'catalogar agora'; erroGeral(e.message); });
+  });
   document.querySelectorAll('[data-revsel]').forEach(function(s){ s.addEventListener('change', function(){
     Q.revSel[Number(s.dataset.revsel)].id = s.value; $('qRevisao').innerHTML = htmlRevisao(); ligarRevisao();
   }); });
