@@ -2298,7 +2298,7 @@ function desenharTemas(discId, r){
       '<button type="button" class="secundario mini" data-renomear="' + esc(t.id) + '">Renomear</button>' +
       '<select data-juntar="' + esc(t.id) + '" aria-label="Juntar com"><option value="">juntar com…</option>' + r.temas.filter(function(x){ return x.id !== t.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select></div>';
   };
-  var h = '<div class="caixa"><div class="linha" style="border:0;padding:0"><h2 style="margin:0">Temas · ' + esc(r.disciplina) + ' ' + ajuda('A IA lê a ata de cada aula e sugere os <b>temas</b> (assuntos). Você decide a importância: <b>⭐ importante</b> (cai mais na revisão e gera alerta se a turma for mal), <b>normal</b> ou <b>não cobrar</b> (nunca vira questão de revisão). Dá para renomear, juntar dois temas iguais ou criar um novo.<br><br>' +
+  var h = '<div class="caixa"><div class="linha" style="border:0;padding:0"><h2 style="margin:0">Configurar prioridade dos temas · ' + esc(r.disciplina) + ' ' + ajuda('A IA lê a ata de cada aula e sugere os <b>temas</b> (assuntos). Você decide a importância: <b>⭐ importante</b> (cai mais na revisão e gera alerta se a turma for mal), <b>normal</b> ou <b>não cobrar</b> (nunca vira questão de revisão). Dá para renomear, juntar dois temas iguais ou criar um novo.<br><br>' +
     '<b>Desempenho da turma</b> = acerto nas fechadas e nota média nas abertas daquele tema (só respostas já corrigidas). Verde: 70% ou mais · amarelo: 50 a 69% · vermelho: abaixo de 50%.<br><br>Ao copiar a disciplina para o próximo semestre, os temas e a importância vão junto (sem as notas).') + '</h2>' +
     '<button type="button" class="link" id="fecharTemas">fechar</button></div>';
   if(r.pendentes.aulas || r.pendentes.questoes){
@@ -2320,7 +2320,13 @@ function desenharTemas(discId, r){
     api('identificarTemas', {disciplinaId: discId}).then(function(x){ desenharTemas(discId, x); }).catch(function(e){ bi.disabled = false; $('msgIdent').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
   el.querySelectorAll('[data-imp]').forEach(function(s){ s.addEventListener('change', function(){
     var t = r.temas.filter(function(x){ return x.id === s.dataset.imp; })[0];
-    api('salvarTema', {disciplinaId: discId, tema: {id: t.id, nome: t.nome, importancia: s.value}}).then(recarregar).catch(erro);
+    // salva sem recarregar a lista: a nova ordem aparece quando o painel for aberto de novo
+    s.disabled = true;
+    api('salvarTema', {disciplinaId: discId, tema: {id: t.id, nome: t.nome, importancia: s.value}}).then(function(){
+      t.importancia = s.value; s.disabled = false;
+      var ok = s.parentNode.querySelector('.salvoTema'); if(!ok){ ok = document.createElement('span'); ok.className = 'salvoTema aviso'; s.after(ok); }
+      ok.textContent = '✓ salvo'; setTimeout(function(){ ok.textContent = ''; }, 2000);
+    }).catch(function(e){ s.disabled = false; erro(e); });
   }); });
   el.querySelectorAll('[data-renomear]').forEach(function(b){ b.addEventListener('click', function(){
     var t = r.temas.filter(function(x){ return x.id === b.dataset.renomear; })[0];
@@ -2426,7 +2432,7 @@ function cartaoDisc(d){
     '<p style="font-size:13.5px;margin:0">' + etapas.map(resumoEtapa).join('<br>') + '</p>' +
     (etapas.length > 1 ? '<p class="aviso" style="margin-top:4px">Média final: ' + (pesosIguais(etapas) ? 'média simples das etapas' : 'média ponderada (' + etapas.map(function(e){ return esc(e.nome) + ' peso ' + nota10(e.peso); }).join(', ') + ')') + '</p>' : '') +
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
-    '<button type="button" class="secundario mini" data-temas="' + esc(d.id) + '">🧩 Temas</button>' +
+    '<button type="button" class="secundario mini" data-temas="' + esc(d.id) + '">🧩 Configurar prioridade dos temas</button>' +
     '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
     '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Encerrar e arquivar">Encerrar e arquivar</button></div></div>';
 }
@@ -2438,7 +2444,7 @@ function cartaoEncerrada(d){
     '<div class="botoes" style="margin-top:8px">' +
     '<button type="button" class="mini" data-vernotas="' + esc(d.id) + '">Ver notas</button>' +
     '<button type="button" class="secundario mini" data-verhist="' + esc(d.id) + '">Ver histórico</button>' +
-    '<button type="button" class="secundario mini" data-temas="' + esc(d.id) + '">🧩 Temas</button>' +
+    '<button type="button" class="secundario mini" data-temas="' + esc(d.id) + '">🧩 Configurar prioridade dos temas</button>' +
     '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
     (d.arquivada ? '<button type="button" class="secundario mini" data-desarquivar="' + esc(d.id) + '">Reativar</button>'
       : '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Mover para o arquivo">Mover para o arquivo</button>' +
@@ -2499,7 +2505,7 @@ function abrirForm(d){
       // revisão de aulas anteriores
       '<p class="grupoTitulo" style="margin-top:16px">Revisão de aulas anteriores ' + ajuda('Parte das questões de cada liberação pode ser sobre <b>temas de aulas anteriores</b>, como revisão. As quantidades de revisão contam <b>dentro</b> do total: com 2 fechadas e 1 de revisão, cai 1 fechada da aula do dia e 1 de revisão. Se todas forem de revisão, nenhuma é sobre a aula do dia.<br><br>' +
         '<b>Como o tema é escolhido:</b> somando a <b>importância</b> que você marcou (⭐ pesa mais), a <b>dificuldade da turma</b> no tema (quanto menor o acerto, mais ele volta) e o <b>tempo sem aparecer</b> (revisão espaçada). Tema mal na aberta tende a voltar como fechada; tema bem na fechada tende a voltar como aberta, para aprofundar.<br><br>' +
-        'A questão de revisão é sempre <b>nova</b> (nunca repete uma já feita) e é igual para a turma toda. Na hora de liberar você vê o tema sugerido e pode trocar. Os temas ficam no botão "Temas" de cada disciplina.') + '</p>' +
+        'A questão de revisão é sempre <b>nova</b> (nunca repete uma já feita) e é igual para a turma toda. Na hora de liberar você vê o tema sugerido e pode trocar. Os temas ficam no botão "Configurar prioridade dos temas" de cada disciplina.') + '</p>' +
       '<div class="campos">' + campo('fRevF', 'Fechadas de revisão (dentro do total)', 'number', v.rev_fechadas || 0) + campo('fRevA', 'Abertas de revisão (dentro do total)', 'number', v.rev_abertas || 0) +
       '<div><label class="rot" for="fRevJ">De quais aulas</label><select id="fRevJ">' + [[0, 'todas as aulas anteriores'], [3, 'só das últimas 3 aulas'], [5, 'só das últimas 5 aulas'], [10, 'só das últimas 10 aulas']].map(function(o){
         return '<option value="' + o[0] + '"' + (Number(v.rev_janela || 0) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
