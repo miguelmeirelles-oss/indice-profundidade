@@ -17,6 +17,15 @@
   body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:var(--navy);background:var(--branco);font-size:15px;line-height:1.45}
   .wrap{max-width:960px;margin:0 auto}
   .oculto{display:none!important}
+  details.ajuda{display:inline-block;vertical-align:middle;margin-left:4px}
+  details.ajuda>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--menu);color:#fff;font-size:12px;font-weight:bold;line-height:1}
+  details.ajuda>summary::-webkit-details-marker{display:none}
+  details.ajuda[open]{display:block;margin:6px 0}
+  details.ajuda>div{font-family:Arial,Helvetica,sans-serif;margin-top:6px;background:#f5f8fe;border-left:4px solid var(--menu);border-radius:0 10px 10px 0;padding:10px 12px;font-size:13.5px;line-height:1.55;font-weight:normal;color:var(--navy);text-transform:none;letter-spacing:0}
+  .rigorBarra{display:flex;gap:6px;flex-wrap:wrap}
+  .rigorBarra button{background:#fff;box-shadow:none;border:2px solid var(--linha);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--navy)}
+  .rigorBarra button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .rigorBarra button:hover{transform:none;box-shadow:none}
   .cabecalho{background:var(--menu);border:2.5px solid var(--navy);border-radius:18px;box-shadow:4px 5px 0 var(--navy);padding:22px 24px;margin-bottom:18px;color:#fff}
   .cabecalho h1{margin:0;font-size:28px;line-height:1.15;color:#fff}
   .cabecalho p{margin:6px 0 0;font-size:14px;color:#cddaf5;max-width:560px}
@@ -668,7 +677,8 @@ function formProva(p){
   var opcoes = itensDeProva(etapas);
   // sugere o primeiro item de prova que ainda não tem prova cadastrada
   var livre = opcoes.filter(function(x){ return !dadosDisc.provas.some(function(pp){ var y = itemDaProva(etapas, pp); return y && y.item.id === x.item.id; }); })[0] || opcoes[0];
-  var v = p || {titulo: livre ? livre.item.nome : 'Prova', item: livre ? livre.item.id : '', inicio: 0, duracao: 120, janela: 120, instrucoes: '', publicada: true, questoes: []};
+  var v = p || {titulo: livre ? livre.item.nome : 'Prova', item: livre ? livre.item.id : '', inicio: 0, duracao: 120, janela: 120, instrucoes: '', publicada: true, questoes: [], rigor: d.rigor || 3};
+  var rigorProva = Number(v.rigor || d.rigor || 3);
   var atual = p ? itemDaProva(etapas, p) : livre;
   qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes, sugestoes:(q.sugestoes || []).slice()}; });
   var el = $('areaProva');
@@ -683,6 +693,10 @@ function formProva(p){
     }).join('') + '</select>' : '<p class="erro" style="margin:0">A composição da nota desta disciplina não tem nenhum item do tipo Prova. Acrescente em Aula por IA → Disciplinas → Editar.</p><input type="hidden" id="pItem" value="">') +
       '<p class="aviso" style="margin:6px 0 0">A prova é corrigida de 0 a 10; o peso vem da composição da nota.</p></div>' +
     '<div class="campoLargo"><label class="rot" for="pIns">Instruções gerais de correção (opcional)</label><textarea id="pIns" placeholder="ex.: Aceitar respostas com outras palavras se o conceito estiver certo. Cálculo sem unidade perde 25% da questão.">' + esc(v.instrucoes) + '</textarea></div></div>' +
+    '<div class="campoLargo" style="margin-bottom:14px"><label class="rot">Rigor da correção pela IA ' +
+      '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Calibra a IA que corrige esta prova. <b>Padrão</b> é o critério normal (crédito parcial pelos tópicos do gabarito). Mais <b>flexível</b>: crédito parcial mais generoso. Mais <b>rigoroso</b>: crédito integral só com resposta completa e precisa.<br><br>' +
+      'Vem preenchido com o rigor da disciplina e vale só para esta prova. <b>As instruções de correção que você escreve têm prioridade</b> (ex.: "aceitar sem unidade" continua valendo). Mudar depois não altera notas já corrigidas; para aplicar, use "Corrigir de novo com IA" nas entregas.</div></details></label>' +
+      '<div class="rigorBarra" id="pRigor">' + ['', 'Bem flexível', 'Flexível', 'Padrão', 'Rigoroso', 'Muito rigoroso'].map(function(t, n){ return n ? '<button type="button" data-prig="' + n + '" aria-pressed="' + (rigorProva === n) + '">' + t + '</button>' : ''; }).join('') + '</div></div>' +
     '<div class="convite">Tem a prova em foto ou PDF? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf" multiple id="pExtrair">Preencher as questões a partir do arquivo</label><div id="msgExtrair"></div></div>' +
     '<h4>Questões <span class="aviso" id="pTotal"></span></h4>' +
     '<p class="aviso">Questão com itens a, b, c: se cada item tem valor próprio, cadastre um por um (Nº 2a, 2b…) para ter nota e retorno por item. ' +
@@ -692,6 +706,9 @@ function formProva(p){
     '<div id="pErro" class="erro oculto"></div><div class="botoes"><button type="button" id="pSalvar">' + (p ? 'Salvar alterações' : 'Criar prova') + '</button><button type="button" class="secundario" id="pCanc">Cancelar</button></div>' +
     (p && p.entregas ? '<p class="aviso">Esta prova já tem entregas. Se mudar gabarito ou pontos, use "Corrigir de novo com IA" nas entregas para recalcular.</p>' : '') + '</div>';
   desenharQs();
+  el.querySelectorAll('[data-prig]').forEach(function(b){ b.addEventListener('click', function(){
+    rigorProva = Number(b.dataset.prig); el.querySelectorAll('[data-prig]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+  }); });
   $('pMaisQ').addEventListener('click', function(){ lerQs(); qsEdit.push({rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); });
   $('pCanc').addEventListener('click', function(){ el.innerHTML = ''; });
   $('pExtrair').addEventListener('change', function(){
@@ -718,7 +735,7 @@ function formProva(p){
     if(!dt || !hr){ $('pErro').textContent = 'Informe a data e a hora da prova.'; $('pErro').classList.remove('oculto'); return; }
     bt.disabled = true;
     api('salvarProva', {prova: {id: p ? p.id : '', disciplinaId: discSel, titulo: $('pTit').value, inicio: new Date(dt + 'T' + hr).getTime(),
-      duracao: $('pDur').value, janela: $('pJan').value, item: $('pItem').value, instrucoes: $('pIns').value,
+      duracao: $('pDur').value, janela: $('pJan').value, item: $('pItem').value, instrucoes: $('pIns').value, rigor: rigorProva,
       publicada: $('pPub').checked, questoes: qsEdit.map(function(q){ q.pontos = String(q.pontos).replace(',', '.'); return q; })}})
       .then(listarProvas).catch(function(e){ bt.disabled = false; $('pErro').textContent = e.message; $('pErro').classList.remove('oculto'); });
   });
