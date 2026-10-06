@@ -562,7 +562,7 @@ setInterval(function(){
 var alunoCarregado = false, timerAbertas = null, assinaturaAbertas = '', rascunho = {};
 // anti-fraude: sinais por questão aberta, enviados junto com a resposta (só o professor vê)
 var sinais = {}, foraDesde = 0;
-function sinaisDe(qid){ return sinais[qid] || (sinais[qid] = {colagens:0, saidas:0, foraSeg:0, maiorSalto:0, eventos:0, inicio:0, ultimoTam:0}); }
+function sinaisDe(qid){ return sinais[qid] || (sinais[qid] = {colagens:0, saidas:0, foraSeg:0, maiorSalto:0, eventos:0, inicio:0, ultimoTam:0, ditado:0, ditadoChars:0, tipo:'', compondo:false}); }
 function abertasNaTela(){ return Array.prototype.map.call(document.querySelectorAll('#qAbertas [data-q] [data-txt]'), function(t){ return t.closest('[data-q]'); }); }
 function saiuDaTela(){
   if(foraDesde) return;
@@ -688,12 +688,23 @@ function desenharAbertas(grupos){
       };
       ta.addEventListener('paste', barrar);
       ta.addEventListener('drop', barrar);
-      ta.addEventListener('beforeinput', function(e){ if(/^insertFrom(Paste|Drop)/.test(e.inputType || '')) barrar(e); });
-      ta.addEventListener('input', function(){
+      ta.addEventListener('beforeinput', function(e){
+        if(/^insertFrom(Paste|Drop)/.test(e.inputType || '')) barrar(e);
+        s.tipo = e.inputType || ''; s.compondo = !!e.isComposing;
+      });
+      // o teclado escreve por "composição" (Android, ditado do Windows/Mac): é assim que chega o texto falado
+      ta.addEventListener('compositionstart', function(){ s.compondo = true; });
+      ta.addEventListener('compositionend', function(){ s.compondo = false; });
+      ta.addEventListener('input', function(e){
         rascunho[qid] = ta.value;
         if(!s.inicio) s.inicio = Date.now();
         s.eventos++;
-        s.maiorSalto = Math.max(s.maiorSalto, ta.value.length - s.ultimoTam);
+        var salto = ta.value.length - s.ultimoTam;
+        var doTeclado = s.compondo || e.isComposing || /^insert(Composition|Replacement)Text$/.test(e.inputType || s.tipo || '') ||
+          (window.matchMedia && matchMedia('(pointer: coarse)').matches);   // celular: colar é bloqueado, então trecho grande é ditado
+        // trecho grande vindo do teclado = microfone do teclado (ditado): permitido, só fica anotado
+        if(salto >= 15 && doTeclado){ s.ditado++; s.ditadoChars += salto; }
+        else s.maiorSalto = Math.max(s.maiorSalto, salto);
         s.ultimoTam = ta.value.length;
       });
     }
@@ -702,7 +713,7 @@ function desenharAbertas(grupos){
       var r = rascunho[qid];
       if(r === undefined || r === ''){ card.querySelector('[data-msg]').innerHTML = '<div class="erro">Responda antes de enviar.</div>'; return; }
       bt.disabled = true; bt.textContent = 'Enviando…';
-      var s = sinais[qid], env = s ? {colagens:s.colagens, saidas:s.saidas, foraSeg:s.foraSeg, maiorSalto:s.maiorSalto, eventos:s.eventos,
+      var s = sinais[qid], env = s ? {colagens:s.colagens, saidas:s.saidas, foraSeg:s.foraSeg, maiorSalto:s.maiorSalto, eventos:s.eventos, ditado:s.ditado, ditadoChars:s.ditadoChars,
         segundos: s.inicio ? Math.round((Date.now() - s.inicio) / 1000) : 0} : null;
       api('responder', {professorId: pid, questaoId: qid, resposta: r, sinais: env}).then(function(res){
         if(res && res.aberta) api('corrigirResposta', {professorId: pid, questaoId: qid}).catch(function(){});
@@ -814,6 +825,7 @@ function abrirMateria(m){
     function(){ return materiaAberta === chaveM && !el.classList.contains('oculto'); }).then(function(r){
     var eu = r.eu, h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
       '<h2 style="margin-top:8px">' + esc(m.nome) + ' · ' + esc(m.semestre) + '</h2>';
+    h += regrasPontuacao(r.disciplina);
     h += composicaoAluno(r);
     // aulas cujas notas foram descartadas (opção da disciplina, quando passou do mínimo de presença)
     var desc = {};
@@ -828,7 +840,7 @@ function abrirMateria(m){
         else h += '<i class="p' + (desc[a.numero] ? ' desc' : '') + '" title="Aula ' + a.numero + (desc[a.numero] ? ' · ' + DICA_DESC : ': ver a correção') + '" data-iraula="' + a.numero + '" style="cursor:pointer">' + dez(x.nota) + '</i>';
       });
       h += '</div><p class="aviso" style="margin:0 0 8px">Toque na nota de uma aula para ver cada questão: sua resposta, a correta e o comentário da IA.' +
-        (Object.keys(desc).length ? ' Notas riscadas foram <b>descartadas</b> (as piores, porque você passou do mínimo de presença).' : '') + '</p>' + explicacaoNota(r.disciplina.presencaMin);
+        (Object.keys(desc).length ? ' Notas riscadas foram <b>descartadas</b> (as piores, porque você passou do mínimo de presença).' : '') + '</p>';
     }
     h += '</div>';
     h += '<div class="caixa"><h2>Aulas · correção de cada questão</h2>' + (r.aulas.length ? r.aulas.slice().reverse().map(function(a){
@@ -939,13 +951,25 @@ function tabelaNotaAluno(c){
   return h;
 }
 
-function explicacaoNota(pct){
-  return '<details style="margin-top:10px"><summary class="link">Como a nota é calculada</summary><p class="aviso" style="margin-top:8px">' +
-    'Em cada etapa (P1, P2…), você pode faltar até ' + (100 - pct) + '% das aulas com questões sem perder nota: a média usa só as aulas em que você esteve presente. ' +
-    'Cada falta além disso entra como zero. Exemplo com 10 aulas (mínimo 7): presente em 5 aulas com média 8,0 → 40 ÷ 7 = 5,7. ' +
-    'Em cada aula, as questões somam 10 pontos: as fechadas dividem entre si o peso das fechadas e as abertas dividem o resto ' +
-    '(ex.: peso 50%, 2 fechadas e 1 aberta → 2,5 + 2,5 + 5,0). Questão não respondida vale zero. ' +
-    'Depois, a média das aulas entra na etapa pelo valor do item "Questões em sala" (ex.: média 8,4 num item que vale 2,0 → 1,7 ponto).</p></details>';
+// Regras de pontuação, com os números da disciplina (aluno e professor veem o mesmo texto)
+function regrasPontuacao(d){
+  var pct = Number(d.presencaMin) || 70, peso = d.peso === undefined ? 50 : Number(d.peso), falta = 100 - pct;
+  var mn = Math.ceil(10 * pct / 100);
+  var exF = Math.round(peso / 2 * 10) / 100, exA = Math.round((100 - peso) * 10) / 100;   // 2 fechadas + 1 aberta
+  var n = function(x){ return String(x).replace('.', ','); };
+  return '<details class="regras" style="margin:10px 0 14px"><summary class="link" style="font-size:14.5px">📘 Regras de pontuação das notas</summary><div class="convite" style="margin:8px 0 0;font-size:14px;line-height:1.6">' +
+    '<b>1. Quem pode responder:</b> só quem está na <b>chamada</b> daquela aula. Se você faltou, as questões daquela aula não aparecem para você.<br><br>' +
+    '<b>2. Nota de cada aula (0 a 10):</b> as questões da aula somam 10 pontos. As fechadas dividem entre si ' + peso + '% e as abertas dividem os outros ' + (100 - peso) + '% ' +
+      '(ex.: 2 fechadas e 1 aberta → ' + n(exF) + ' + ' + n(exF) + ' + ' + n(exA) + '). Questão não respondida vale <b>zero</b>. As abertas são corrigidas pela IA e o professor pode revisar.<br><br>' +
+    '<b>3. Faltas:</b> em cada etapa (P1, P2…) você pode faltar até <b>' + falta + '%</b> das aulas com questões sem perder nota, porque a média é dividida pelo <b>número mínimo de aulas</b> (' + pct + '% delas). ' +
+      'Cada falta além disso pesa como <b>zero</b>. Exemplo com 10 aulas (mínimo ' + mn + '):<br>' +
+      '• presente em ' + mn + ' aulas → soma das ' + mn + ' notas ÷ ' + mn + ';<br>' +
+      '• presente em 5 aulas com média 8,0 → 40 ÷ ' + mn + ' = ' + n((40 / mn).toFixed(1)) + ' (as faltas puxam a média para baixo).<br><br>' +
+    '<b>4. Ir a mais aulas que o mínimo:</b> ' + (d.descartar
+      ? 'nesta disciplina, quem passa do mínimo tem as <b>piores notas descartadas</b>: ficam só as ' + mn + ' melhores. Exemplo: presente nas 10 aulas → as 3 piores saem e a média é a soma das ' + mn + ' melhores ÷ ' + mn + '. <b>Responder sempre só pode ajudar:</b> um dia ruim (ou a internet que caiu) acaba descartado. As notas descartadas continuam aparecendo, riscadas.'
+      : 'a média é a de todas as aulas em que você esteve presente (ex.: presente nas 10 aulas → soma das 10 ÷ 10). Nesta disciplina as piores notas <b>não</b> são descartadas.') + '<br><br>' +
+    '<b>5. Na etapa:</b> a média das aulas entra pelo valor do item "Questões em sala" (ex.: média 8,4 num item que vale 2,0 → 1,7 ponto), somada às provas e trabalhos da etapa.' +
+    '</div></details>';
 }
 
 /* ---- leitura da apostila (aluno e professor) ---- */
@@ -1958,7 +1982,7 @@ function carregarAcompanhamento(){
     if(r.abertas.length){
       h += '<h4>Respostas abertas</h4>' + r.abertas.map(function(x){
         return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:4px"><b>' + esc(x.aluno) + '</b> <span class="aviso">' + esc(x.enunciado.slice(0, 80)) + (x.enunciado.length > 80 ? '…' : '') + '</span></p>' +
-          alertaSuspeita(x.alertas) + '<p style="margin-bottom:6px">' + esc(x.resposta) + '</p>' + (x.comentario ? '<p class="aviso" style="margin-bottom:6px">IA: ' + esc(x.comentario) + '</p>' : '') +
+          alertaSuspeita(x.alertas) + avisoVoz(x.voz) + '<p style="margin-bottom:6px">' + esc(x.resposta) + '</p>' + (x.comentario ? '<p class="aviso" style="margin-bottom:6px">IA: ' + esc(x.comentario) + '</p>' : '') +
           '<div class="botoes" style="margin-top:0">' + (x.status === 'corrigida' ? '' : '<span class="tag t-warn">em correção</span>') +
           '<input type="number" min="0" max="10" step="0.1" style="width:90px" value="' + (x.nota === null ? '' : x.nota / 10) + '" aria-label="Nota" data-nota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">' +
           '<button type="button" class="secundario mini" data-salvanota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">Salvar nota</button>' + (x.ajustada ? '<span class="tag t-azul">ajustada</span>' : '') + '</div></div>';
@@ -2081,7 +2105,7 @@ function abrirNotas(){
           return '<td>' + (x.tipo === 'x' ? '<span class="cel cX">–</span>' : x.tipo === 'falta' ? '<span class="cel cF">F</span>' : '<span class="cel c' + classe(x.nota) + '">' + dez(x.nota) + (x.provisoria ? '*' : '') + '</span>') + '</td>';
         }).join('') + '</tr>';
       }).join('') + '</tbody></table></div><p class="aviso" style="margin-top:8px">F = falta · – = aula sem questões · a presença mínima (' + r.disciplina.presencaMin + '%) vale dentro de cada etapa.</p>' +
-      explicacaoNota(r.disciplina.presencaMin) + '</details></div>';
+      regrasPontuacao(r.disciplina) + '</details></div>';
 
     $('notasErradas').innerHTML = r.erradas.length ? '<div class="caixa"><h2>Questões que a turma mais errou</h2>' + r.erradas.map(function(e){
       return '<div class="linha"><span><span class="nota n' + classe(e.acerto) + '">' + e.acerto + '%</span> &nbsp;Aula ' + e.aula + ' · ' + esc(e.enunciado) + '</span><span class="aviso">' + e.respostas + ' respostas</span></div>';
@@ -2118,6 +2142,7 @@ function formulaFinal(cp, f){
   return '(' + partes.join(' + ') + ') ÷ ' + (iguais ? cp.etapas.length : nota10(cp.somaPesos)) + ' = <b>' + nota10(f.final) + '</b>' + (f.parcial ? ' (parcial)' : '');
 }
 
+function avisoVoz(v){ return v ? '<div class="aviso" style="margin:2px 0 4px">🎤 Respondeu usando o microfone do teclado (ditado).</div>' : ''; }
 function alertaSuspeita(m){
   if(!m || !m.length) return '';
   return '<div class="suspeita" title="Sinais registrados enquanto o aluno escrevia. Não mudam a nota: é só para você avaliar.">⚠ Possível resposta de IA: ' + esc(m.join(' · ')) + '</div>';
@@ -2135,7 +2160,7 @@ function abrirRespostasAluno(al){
       return h + a.questoes.map(function(q){
         var chave = q.id + '|' + al.id;
         return '<div class="caixa" style="margin:8px 0;padding:12px 14px;box-shadow:none;border-width:2px"><p style="margin-bottom:6px"><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></p>' +
-          alertaSuspeita(q.alertas) + '<p style="margin-bottom:6px"><span class="aviso">Resposta do aluno:</span><br>' + (q.resposta === null ? '<i>não respondeu</i>' : esc(q.resposta) || '<i>em branco</i>') + '</p>' +
+          alertaSuspeita(q.alertas) + avisoVoz(q.voz) + '<p style="margin-bottom:6px"><span class="aviso">Resposta do aluno:</span><br>' + (q.resposta === null ? '<i>não respondeu</i>' : esc(q.resposta) || '<i>em branco</i>') + '</p>' +
           '<p class="aviso" style="margin-bottom:6px"><b>' + (q.tipo === 'fechada' ? 'Correta:' : 'Esperado:') + '</b> ' + esc(q.esperado) + '</p>' +
           (q.status === 'pendente' ? '<p class="aviso" style="margin-bottom:6px"><span class="tag t-warn">em correção pela IA</span></p>' : '') +
           '<label class="rot" style="margin-top:8px">Comentário para o aluno</label><textarea data-com="' + esc(chave) + '" style="min-height:54px">' + esc(q.comentario) + '</textarea>' +
