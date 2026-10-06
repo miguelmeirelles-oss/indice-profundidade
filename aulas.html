@@ -2944,9 +2944,16 @@ function carregarInscricoes(){
     var nomes = Object.keys(grupos).sort();
     $('listaAprov').innerHTML = nomes.length ? nomes.map(function(n){
       return '<p class="grupoTitulo">' + esc(n) + ' · ' + grupos[n].length + ' aluno(s)</p>' + grupos[n].map(function(i){
-        return '<div class="linha"><span>' + esc(i.aluno) + ' <span class="aviso">' + esc(i.email) + '</span></span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
+        var portal = !i.temLista ? '' : i.portal
+          ? '<br><span class="aviso">portal: ' + esc(i.portal) + '</span> <select data-vinc="' + esc(i.id) + '" style="width:auto;max-width:220px;padding:3px 6px;font-size:12px"><option value="">trocar…</option>' + i.livres.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>'
+          : '<br><span class="aviso" style="color:#c62828">não encontrado na lista do portal</span> <select data-vinc="' + esc(i.id) + '" style="width:auto;max-width:220px;padding:3px 6px;font-size:12px"><option value="">ligar ao nome…</option>' + i.livres.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>';
+        return '<div class="linha"><span>' + esc(i.aluno) + ' <span class="aviso">' + esc(i.email) + '</span>' + portal + '</span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
       }).join('');
     }).join('') : '<p class="aviso">Nenhum aluno inscrito ainda.</p>';
+    document.querySelectorAll('#pInsc [data-vinc]').forEach(function(s){ s.addEventListener('change', function(){
+      if(!s.value) return; s.disabled = true;
+      api('vincularPortal', {inscricaoId: s.dataset.vinc, nomePortal: s.value}).then(carregarInscricoes).catch(function(e){ s.disabled = false; erroGeral(e.message); });
+    }); });
     document.querySelectorAll('#pInsc [data-dec]').forEach(function(bt){
       bt.addEventListener('click', function(){
         if(bt.dataset.dec === 'removida' && bt.textContent !== 'Confirmar remoção'){ bt.textContent = 'Confirmar remoção'; return; }
