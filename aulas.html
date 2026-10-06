@@ -85,7 +85,7 @@
   details.ajuda>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--menu);color:#fff;font-size:12px;font-weight:bold;line-height:1}
   details.ajuda>summary::-webkit-details-marker{display:none}
   details.ajuda[open]{display:block;margin:6px 0}
-  details.ajuda>div{margin-top:6px;background:#f5f8fe;border-left:4px solid var(--menu);border-radius:0 10px 10px 0;padding:10px 12px;font-size:13.5px;line-height:1.55;font-weight:normal;color:var(--navy);text-transform:none;letter-spacing:0}
+  details.ajuda>div{font-family:Arial,Helvetica,sans-serif;margin-top:6px;background:#f5f8fe;border-left:4px solid var(--menu);border-radius:0 10px 10px 0;padding:10px 12px;font-size:13.5px;line-height:1.55;font-weight:normal;color:var(--navy);text-transform:none;letter-spacing:0}
   .rigorBarra{display:flex;gap:6px;flex-wrap:wrap}
   .rigorBarra button{background:#fff;box-shadow:none;border:2px solid var(--linha);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--navy)}
   .rigorBarra button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -954,7 +954,9 @@ function tabelaNotaAluno(c){
 // Regras de pontuação, com os números da disciplina (aluno e professor veem o mesmo texto)
 function regrasPontuacao(d){
   var pct = Number(d.presencaMin) || 70, peso = d.peso === undefined ? 50 : Number(d.peso), falta = 100 - pct;
-  var mn = Math.ceil(10 * pct / 100);
+  var mn = Math.max(1, Math.ceil(10 * pct / 100));
+  var presEx = Math.max(1, mn - 2);                  // exemplo de quem ficou abaixo do mínimo
+  var descartaEx = 10 - mn;                          // quantas saem de quem foi às 10 aulas
   var exF = Math.round(peso / 2 * 10) / 100, exA = Math.round((100 - peso) * 10) / 100;   // 2 fechadas + 1 aberta
   var n = function(x){ return String(x).replace('.', ','); };
   return '<details class="regras" style="margin:10px 0 14px"><summary class="link" style="font-size:14.5px">📘 Regras de pontuação das notas</summary><div class="convite" style="margin:8px 0 0;font-size:14px;line-height:1.6">' +
@@ -964,9 +966,11 @@ function regrasPontuacao(d){
     '<b>3. Faltas:</b> em cada etapa (P1, P2…) você pode faltar até <b>' + falta + '%</b> das aulas com questões sem perder nota, porque a média é dividida pelo <b>número mínimo de aulas</b> (' + pct + '% delas). ' +
       'Cada falta além disso pesa como <b>zero</b>. Exemplo com 10 aulas (mínimo ' + mn + '):<br>' +
       '• presente em ' + mn + ' aulas → soma das ' + mn + ' notas ÷ ' + mn + ';<br>' +
-      '• presente em 5 aulas com média 8,0 → 40 ÷ ' + mn + ' = ' + n((40 / mn).toFixed(1)) + ' (as faltas puxam a média para baixo).<br><br>' +
-    '<b>4. Ir a mais aulas que o mínimo:</b> ' + (d.descartar
-      ? 'nesta disciplina, quem passa do mínimo tem as <b>piores notas descartadas</b>: ficam só as ' + mn + ' melhores. Exemplo: presente nas 10 aulas → as 3 piores saem e a média é a soma das ' + mn + ' melhores ÷ ' + mn + '. <b>Responder sempre só pode ajudar:</b> um dia ruim (ou a internet que caiu) acaba descartado. As notas descartadas continuam aparecendo, riscadas.'
+      '• presente em ' + presEx + ' aula' + (presEx > 1 ? 's' : '') + ' com média 8,0 → ' + n(8 * presEx) + ' ÷ ' + mn + ' = ' + n((8 * presEx / mn).toFixed(1)) + ' (as faltas além do permitido puxam a média para baixo).<br><br>' +
+    '<b>4. Ir a mais aulas que o mínimo:</b> ' + (descartaEx < 1
+      ? 'com presença mínima de ' + pct + '%, todas as aulas contam e não há notas descartadas.'
+      : d.descartar
+      ? 'nesta disciplina, quem passa do mínimo tem as <b>piores notas descartadas</b>: ficam só as ' + mn + ' melhores. Exemplo: presente nas 10 aulas → ' + (descartaEx === 1 ? 'a pior sai' : 'as ' + descartaEx + ' piores saem') + ' e a média é a soma das ' + mn + ' melhores ÷ ' + mn + '. <b>Responder sempre só pode ajudar:</b> um dia ruim (ou a internet que caiu) acaba descartado. As notas descartadas continuam aparecendo, riscadas.'
       : 'a média é a de todas as aulas em que você esteve presente (ex.: presente nas 10 aulas → soma das 10 ÷ 10). Nesta disciplina as piores notas <b>não</b> são descartadas.') + '<br><br>' +
     '<b>5. Na etapa:</b> a média das aulas entra pelo valor do item "Questões em sala" (ex.: média 8,4 num item que vale 2,0 → 1,7 ponto), somada às provas e trabalhos da etapa.' +
     '</div></details>';
