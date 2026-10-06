@@ -2418,9 +2418,21 @@ function ligarPainelTemas(){
   $('btNovoTema').addEventListener('click', function(){
     var n = $('novoTema').value.trim(), como = $('novoComo').value; if(!n) return;
     var t = como === 'grupo' ? {nome: n, grupo: true} : {nome: n, pai: como};
-    api('salvarTema', {disciplinaId: discId, tema: t}).then(function(){
-      $('novoTema').value = '';
-      $('msgTemas').innerHTML = '<div class="ok">✓ "' + esc(n) + '" criado ' + (como === 'grupo' ? 'como grande tema' : 'como subtema') + '. Aparece na lista quando o painel for aberto de novo.</div>';
+    api('salvarTema', {disciplinaId: discId, tema: t}).then(function(x){
+      // entra no fim da lista (grande tema) ou no fim do grupo (subtema), sem reorganizar o resto
+      var vazio = {respostas: 0, nota: null, acertoF: null, mediaA: null};
+      if(como === 'grupo'){
+        r.grupos.push({id: x.id, nome: n, importancia: 'normal', desempenho: vazio, critico: false, aulas: [], subtemas: []});
+      } else {
+        var g = r.grupos.filter(function(y){ return y.id === como; })[0];
+        var novo = {id: x.id, nome: n, pai: como, importancia: 'herdar', efetiva: g ? g.importancia : 'normal', aulas: [], desempenho: vazio, critico: false};
+        if(g){ g.subtemas.push(novo); TEMAS.abertos[g.id] = true; }
+        r.temas.push(novo);
+      }
+      desenharTemas();
+      var alvo = $('painelTemas').querySelector('[data-sub="' + x.id + '"],[data-grupo="' + x.id + '"]');
+      if(alvo){ alvo.scrollIntoView({behavior:'smooth', block:'center'}); alvo.style.background = '#fff8dc'; setTimeout(function(){ alvo.style.background = ''; }, 2500); }
+      $('msgTemas').innerHTML = '<div class="ok">✓ "' + esc(n) + '" criado ' + (como === 'grupo' ? 'como grande tema' : 'como subtema') + '. Já pode definir a prioridade.</div>';
     }).catch(erro);
   });
 }
