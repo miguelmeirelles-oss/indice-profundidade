@@ -469,7 +469,9 @@ function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
   return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function classe(n){ return n < 45 ? '0' : n < 70 ? '1' : '2'; }
-function mmss(ms){ var s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s / 60), x = s % 60; return (m < 10 ? '0' : '') + m + ':' + (x < 10 ? '0' : '') + x; }
+function mmss(ms){ var s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s / 60), x = s % 60;
+  if(m >= 60) return Math.floor(m / 60) + ' h ' + ((m % 60) < 10 ? '0' : '') + (m % 60) + ' min';   // prazos longos (até 24 h)
+  return (m < 10 ? '0' : '') + m + ':' + (x < 10 ? '0' : '') + x; }
 function hms(seg){ seg = Math.max(0, Math.floor(seg)); var h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
   return [h, m, s].map(function(v){ return (v < 10 ? '0' : '') + v; }).join(':'); }
 
@@ -1719,7 +1721,7 @@ function abrirCompositor(sobre){
   if(!a){ return; }
   Q.aula = a;
   if(Q.poll){ clearInterval(Q.poll); Q.poll = null; }
-  var d = discPorId(a.disciplinaId) || {qtd_fechadas:2, qtd_abertas:1, prazo_padrao:40, peso_fechadas:50};
+  var d = discPorId(a.disciplinaId) || {qtd_fechadas:2, qtd_abertas:1, prazo_padrao:60, peso_fechadas:50};
   Q.cfg = {fechadas: d.qtd_fechadas, abertas: d.qtd_abertas, prazo: sobre === 'recente' ? Math.min(10, d.prazo_padrao) : d.prazo_padrao, peso: d.peso_fechadas, sobre: sobre, orientacao: '',
     tempoF: d.tempo_resposta === undefined ? 5 : Number(d.tempo_resposta) || 0,
     tempoA: d.tempo_aberta === undefined ? 10 : Number(d.tempo_aberta) || 0,
@@ -1756,12 +1758,18 @@ function vigiarTrechos(){
   }, 10000);
 }
 
+function textoPrazo(min){
+  if(min < 60) return min + ' min';
+  var h = Math.floor(min / 60), m = min % 60;
+  return h + ' h' + (m ? ' ' + m + ' min' : '');
+}
 function desenharCompositor(){
   var c = Q.cfg, a = Q.aula, n = c.fechadas + c.abertas;
   var linha = function(rot, k, val, passo){ return '<div class="linha"><span>' + rot + '</span><span class="stepper"><button type="button" data-k="' + k + '" data-v="-' + passo + '" aria-label="Menos">−</button><span>' + val + '</span><button type="button" data-k="' + k + '" data-v="' + passo + '" aria-label="Mais">+</button></span></div>'; };
   $('areaQ').innerHTML = '<div class="caixa"><h2>Liberar questões · aula ' + a.numero + '</h2>' +
     linha('Fechadas (múltipla escolha)', 'fechadas', c.fechadas, 1) + linha('Abertas (corrigidas pela IA)', 'abertas', c.abertas, 1) +
-    linha('Prazo para abrir as questões', 'prazo', c.prazo + ' min', 5) +
+    linha('Prazo para abrir as questões', 'prazo', textoPrazo(c.prazo), 5) +
+    '<div class="linha" style="border-top:0;padding-top:0"><span class="aviso">atalhos do prazo</span><span class="chips">' + [[30, '30 min'], [60, '1 h'], [120, '2 h'], [360, '6 h'], [720, '12 h'], [1440, '24 h']].map(function(o){ return '<button type="button" class="chip" data-prazoja="' + o[0] + '" aria-pressed="' + (c.prazo === o[0]) + '">' + o[1] + '</button>'; }).join('') + '</span></div>' +
     linha('Tempo para responder cada fechada', 'tempoF', c.tempoF ? c.tempoF + ' min' : 'sem limite', 1) +
     linha('Tempo para responder cada aberta', 'tempoA', c.tempoA ? c.tempoA + ' min' : 'sem limite', 1) +
     linha('Peso fechadas / abertas', 'peso', c.peso + ' / ' + (100 - c.peso), 10) +
@@ -1779,10 +1787,17 @@ function desenharCompositor(){
     '<div class="botoes"><button type="button" id="qGerar"' + (n ? '' : ' disabled') + '>Gerar questões para revisar</button><button type="button" class="secundario" id="qCanc">Cancelar</button></div><div id="qMsg"></div></div>';
   var box = $('areaQ');
   box.querySelectorAll('[data-k]').forEach(function(b){ b.addEventListener('click', function(){
-    var k = b.dataset.k, lim = {fechadas:[0, 10], abertas:[0, 5], prazo:[5, 240], tempoF:[0, 60], tempoA:[0, 60], peso:[0, 100], revF:[0, c.fechadas], revA:[0, c.abertas]}[k];
-    c.orientacao = $('qOri').value; c[k] = Math.max(lim[0], Math.min(lim[1], c[k] + Number(b.dataset.v)));
+    var k = b.dataset.k, lim = {fechadas:[0, 10], abertas:[0, 5], prazo:[5, 1440], tempoF:[0, 60], tempoA:[0, 60], peso:[0, 100], revF:[0, c.fechadas], revA:[0, c.abertas]}[k];
+    var passo = Number(b.dataset.v);
+    if(k === 'prazo'){   // até 24 h: o passo cresce com o prazo (5 min, 15 min, 30 min, 1 h)
+      var sobe = passo > 0, base = sobe ? c.prazo : c.prazo - 1;
+      var p = base < 60 ? 5 : base < 180 ? 15 : base < 480 ? 30 : 60;
+      passo = sobe ? p : -p;
+    }
+    c.orientacao = $('qOri').value; c[k] = Math.max(lim[0], Math.min(lim[1], c[k] + passo));
     c.revF = Math.min(c.revF, c.fechadas); c.revA = Math.min(c.revA, c.abertas); desenharCompositor();
   }); });
+  box.querySelectorAll('[data-prazoja]').forEach(function(b){ b.addEventListener('click', function(){ c.orientacao = $('qOri').value; c.prazo = Number(b.dataset.prazoja); desenharCompositor(); }); });
   box.querySelectorAll('[data-qrig]').forEach(function(b){ b.addEventListener('click', function(){ c.orientacao = $('qOri').value; c.rigor = Number(b.dataset.qrig); desenharCompositor(); }); });
   ligarRevisao(); buscarSugestaoRevisao();
   box.querySelectorAll('[data-sobre]').forEach(function(b){ b.addEventListener('click', function(){ c.orientacao = $('qOri').value; c.sobre = b.dataset.sobre; desenharCompositor(); }); });
@@ -1871,7 +1886,7 @@ function desenharRevisao(){
     h += '<div data-msg></div></div>';
   });
   h += '<label class="rot" for="qRef">Orientação para refazer</label><input type="text" id="qRef" placeholder="ex.: mais difícil; sem cálculo; pergunte sobre o exemplo do queijo">' +
-    '<div class="botoes"><button type="button" class="secundario" id="qRefTodas">Refazer todas</button><button type="button" id="qLib"' + (nOk ? '' : ' disabled') + '>Liberar ' + nOk + (nOk === 1 ? ' questão' : ' questões') + ' · ' + 'abrir em até ' + Q.cfg.prazo + ' min</button>' +
+    '<div class="botoes"><button type="button" class="secundario" id="qRefTodas">Refazer todas</button><button type="button" id="qLib"' + (nOk ? '' : ' disabled') + '>Liberar ' + nOk + (nOk === 1 ? ' questão' : ' questões') + ' · ' + 'abrir em até ' + textoPrazo(Q.cfg.prazo) + '</button>' +
     '<button type="button" class="secundario" id="qVoltar">Voltar</button></div><div id="qMsg"></div></div>';
   var box = $('areaQ'); box.innerHTML = h;
   box.querySelectorAll('[data-i]').forEach(function(card){
@@ -2576,7 +2591,7 @@ function abrirForm(d){
     // 2. questões em aula
     '<div class="bloco"><p class="grupoTitulo" style="margin-top:0">2. Questões em aula</p><div class="campos">' +
       '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
-      campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
+      campo('fPrazo', 'Prazo padrão (min · até 1440 = 24 h)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
       '</div>' +
       // configuração das questões: aula do dia + revisão = total, com peso e tempo por tipo
       '<p class="grupoTitulo" style="margin-top:4px">Configuração das questões ' + ajuda('Parte das questões de cada liberação pode ser sobre <b>temas de aulas anteriores</b>, como revisão. As quantidades de revisão contam <b>dentro</b> do total: com 2 fechadas e 1 de revisão, cai 1 fechada da aula do dia e 1 de revisão. Se todas forem de revisão, nenhuma é sobre a aula do dia.<br><br>' +
