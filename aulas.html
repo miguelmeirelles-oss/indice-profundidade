@@ -81,6 +81,19 @@
   .campos4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:10px}
   @media (max-width:700px){ .campos4{grid-template-columns:repeat(2,1fr)} }
   .campos4 input[readonly]{background:var(--bloco);border-color:var(--linha);color:var(--cinza)}
+  details.diario>summary{cursor:pointer;list-style:none}
+  details.diario>summary::-webkit-details-marker{display:none}
+  details.diario>summary::before{content:'▸ ';color:var(--menu)}
+  details.diario[open]>summary::before{content:'▾ '}
+  .diaAula{border:2px solid var(--linha);border-radius:12px;padding:10px 12px;margin:0 0 10px;background:#fff}
+  .diaAula.feito{border-color:#1a7a3c;background:#f1faf3}
+  .diaCab{margin-bottom:6px}
+  .diaLinha{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}
+  .diaLinha .rotDia{font-size:12px;font-weight:bold;color:var(--titulo);text-transform:uppercase;letter-spacing:.04em;min-width:72px}
+  .diaLinha input[type=text]{flex:1;min-width:220px;padding:7px 10px;font-size:14px}
+  .diaLinha .faltasTxt{flex:1;min-width:220px;font-size:14px}
+  .diaLinha .chk{display:flex;gap:5px;align-items:center;font-size:13px;cursor:pointer;white-space:nowrap}
+  .diaLinha .chk input{width:17px;height:17px;accent-color:#1a7a3c}
   details.ajuda{display:inline-block;vertical-align:middle;margin-left:4px}
   details.ajuda>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--menu);color:#fff;font-size:12px;font-weight:bold;line-height:1}
   details.ajuda>summary::-webkit-details-marker{display:none}
@@ -2210,11 +2223,107 @@ function abrirHistorico(){
   if(!resumo.disciplinas.length){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
   if(!histDisc || !discPorId(histDisc)) histDisc = (ativas()[0] || resumo.disciplinas[0]).id;
   // ordem: linha do tempo → revisão do semestre → apostila (a leitura dos capítulos abre logo abaixo da apostila)
-  el.innerHTML = '<div class="caixa">' + chipsDisciplinas(histDisc, true) + '</div><div id="histLinha"><div class="caixa"><p class="carregando">Carregando aulas…</p></div></div><div id="histRevisao"></div><div id="histApostila"></div><div id="histLeitura"></div>';
+  el.innerHTML = '<div class="caixa">' + chipsDisciplinas(histDisc, true) + '</div>' +
+    '<details class="caixa diario" id="histDiario"><summary><b>📋 Diário do portal</b> <span class="aviso">tudo para lançar no sistema da universidade, numa página só</span></summary><div id="diarioCorpo"><p class="carregando">Carregando…</p></div></details>' +
+    '<div id="histLinha"><div class="caixa"><p class="carregando">Carregando aulas…</p></div></div><div id="histRevisao"></div><div id="histApostila"></div><div id="histLeitura"></div>';
   el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ histDisc = b.dataset.disc; abrirHistorico(); }); });
   carregarLinhaTempo();
   carregarPainelApostila();
   carregarRevisao(false);
+  var dd = $('histDiario');
+  try{ if(localStorage.getItem('diario_aberto') === '1'){ dd.open = true; carregarDiario(); } }catch(e){}
+  dd.addEventListener('toggle', function(){
+    try{ localStorage.setItem('diario_aberto', dd.open ? '1' : '0'); }catch(e){}
+    if(dd.open && !dd.dataset.carregado) carregarDiario();
+  });
+}
+
+/* ---- diário do portal: data, períodos, conteúdo e faltas de cada aula, com checks de "lançado" ---- */
+var DIARIO = {r: null, soPendentes: false};
+var DIAS_SEMANA = ['', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
+var MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+function carregarDiario(){
+  var dd = $('histDiario'); if(!dd) return;
+  dd.dataset.carregado = '1';
+  api('diarioPortal', {disciplinaId: histDisc}).then(function(r){ DIARIO.r = r; desenharDiario(); })
+    .catch(function(e){ $('diarioCorpo').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+function copiarTexto(t, b){
+  var ok = function(){ var x = b.textContent; b.textContent = '✓ copiado'; setTimeout(function(){ b.textContent = x; }, 1500); };
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, function(){ window.prompt('Copie o texto:', t); });
+  else window.prompt('Copie o texto:', t);
+}
+function desenharDiario(){
+  var r = DIARIO.r, el = $('diarioCorpo');
+  var feitas = r.aulas.filter(function(a){ return a.conteudoOk && a.faltasOk; }).length;
+  var h = '';
+  // lista da turma do portal (colada uma vez no início do semestre) e avisos do cruzamento
+  h += '<details class="listaPortal"' + (r.lista.length ? '' : ' open') + '><summary class="link" style="font-size:13.5px">' + (r.lista.length ? 'Lista da turma no portal · ' + r.lista.length + ' aluno(s) · editar' : '➕ Colar a lista da turma do portal (uma vez no início do semestre)') + '</summary>' +
+    '<p class="aviso" style="margin:6px 0">Cole os nomes como aparecem no portal, <b>um por linha</b>. Serve para avisar quem está no portal e não tem conta aqui (a presença dessas pessoas você confere na sala).</p>' +
+    '<textarea id="listaPortalTxt" style="min-height:120px" placeholder="ANA ELISA PEREIRA CORREA&#10;BERNARDO LIRIO BEZERRA&#10;...">' + esc(r.lista.join('\n')) + '</textarea>' +
+    '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" id="btListaPortal">Salvar lista</button><span id="msgListaPortal" class="aviso"></span></div></details>';
+  if(r.semConta.length) h += '<div class="erro" style="margin:8px 0"><b>⚠ ' + r.semConta.length + ' aluno(s) do portal fora desta disciplina no sistema</b> (as faltas deles não aparecem aqui: confira na sala). ' +
+    'Se o aluno já tem conta no site, clique no nome para procurá-lo e inscrevê-lo: ' +
+    r.semConta.map(function(n){ return '<button type="button" class="link" style="font-size:13.5px" data-buscainsc="' + esc(n) + '">' + esc(n) + '</button>'; }).join(' · ') + '</div>';
+  if(r.foraDaLista.length) h += '<div class="convite" style="margin:8px 0">' + r.foraDaLista.length + ' conta(s) do sistema não encontrada(s) na lista do portal (nome muito diferente ou outra turma): ' + r.foraDaLista.map(esc).join(' · ') + '</div>';
+  h += '<div class="linha" style="border:0;padding:6px 0"><span><b>' + feitas + ' de ' + r.aulas.length + '</b> aula(s) com tudo lançado · ' + r.totalAlunos + ' aluno(s) inscrito(s) no sistema' + (r.lista.length ? ' · ' + r.lista.length + ' no portal' : '') + ' ' +
+    ajuda('Cada aula traz o que o diário do portal pede: <b>data</b> (como aparece na agenda), <b>períodos</b> (P1 e P2 quando a aula tem 2 tempos), o <b>conteúdo ministrado</b> resumido (tema e subtemas da aula; dá para editar antes de copiar) e <b>quem faltou</b> (desmarcado na chamada daquela aula), em ordem alfabética. Quem faltou leva F em todos os períodos do dia.<br><br>' +
+      'Use <b>📋</b> para copiar e marque <b>lançado</b> depois de passar para o portal: a aula fica verde quando conteúdo e faltas estão lançados. Alunos que não têm conta no sistema não aparecem aqui: confira no portal.') + '</span>' +
+    '<label style="display:flex;gap:6px;align-items:center;font-size:13.5px;cursor:pointer"><input type="checkbox" id="diarioPend"' + (DIARIO.soPendentes ? ' checked' : '') + ' style="width:17px;height:17px"> só pendentes</label></div>';
+  var mesAtual = '';
+  r.aulas.forEach(function(a){
+    var tudo = a.conteudoOk && a.faltasOk;
+    if(DIARIO.soPendentes && tudo) return;
+    if(a.mes !== mesAtual){ mesAtual = a.mes; var pm = a.mes.split('-'); h += '<p class="grupoTitulo">' + MESES[Number(pm[1]) - 1] + ' / ' + pm[0] + '</p>'; }
+    var per = []; for(var i = 1; i <= a.periodos; i++) per.push('P' + i);
+    var texto = a.texto || a.sugerido;
+    h += '<div class="diaAula' + (tudo ? ' feito' : '') + '" data-dia="' + esc(a.id) + '">' +
+      '<div class="diaCab"><b>' + DIAS_SEMANA[Number(a.semana)] + ', ' + esc(a.dia) + '</b> <span class="aviso">aula ' + a.numero + ' · ' + a.periodos + ' período' + (a.periodos > 1 ? 's' : '') + ' (' + per.join(', ') + ')' + (a.gravada ? '' : ' · não gravada') + '</span>' + (tudo ? ' <span class="tag t-ok">lançado</span>' : '') + '</div>' +
+      '<div class="diaLinha"><span class="rotDia">Conteúdo</span><input type="text" data-dtexto value="' + esc(texto) + '" placeholder="escreva o conteúdo ministrado">' +
+        '<button type="button" class="secundario mini" data-dcopiar="texto">📋</button>' +
+        '<label class="chk"><input type="checkbox" data-dok="conteudoOk"' + (a.conteudoOk ? ' checked' : '') + '> lançado</label></div>' +
+      '<div class="diaLinha"><span class="rotDia">Faltas</span><span class="faltasTxt">' + (a.faltas.length ? '<b>' + a.faltas.length + '</b>: ' + a.faltas.map(function(f){
+          return esc(f.nome) + (f.portal && f.portal.toLowerCase() !== f.nome.toLowerCase() ? ' <span class="aviso">(portal: ' + esc(f.portal) + ')</span>' : '');
+        }).join(' · ') + ' <span class="aviso">→ F em ' + per.join(' e ') + '</span>' : '<span class="aviso">ninguém faltou ✓</span>') + (r.semConta.length ? ' <span class="aviso">· +' + r.semConta.length + ' sem conta: confira</span>' : '') + '</span>' +
+        (a.faltas.length ? '<button type="button" class="secundario mini" data-dcopiar="faltas">📋</button>' : '') +
+        '<label class="chk"><input type="checkbox" data-dok="faltasOk"' + (a.faltasOk ? ' checked' : '') + '> lançado</label></div></div>';
+  });
+  if(!r.aulas.length) h += '<p class="aviso">Nenhuma aula ainda.</p>';
+  el.innerHTML = h;
+  $('diarioPend').addEventListener('change', function(){ DIARIO.soPendentes = this.checked; desenharDiario(); });
+  // nome do portal → aba Inscrições já procurando pelo primeiro nome, nesta disciplina
+  document.querySelectorAll('[data-buscainsc]').forEach(function(b){ b.addEventListener('click', function(){
+    var termo = String(b.dataset.buscainsc).trim().split(/\s+/)[0];
+    abrirAba('insc');
+    setTimeout(function(){
+      var sel = $('inscDisc'); if(sel && discPorId(histDisc) && discPorId(histDisc).ativa) sel.value = histDisc;
+      var inp = $('inscBusca'); if(!inp) return;
+      inp.value = termo; inp.scrollIntoView({behavior:'smooth', block:'center'}); buscarParaInscrever(termo);
+    }, 300);
+  }); });
+  $('btListaPortal').addEventListener('click', function(){
+    var b = this; b.disabled = true; $('msgListaPortal').textContent = 'Salvando…';
+    api('salvarListaPortal', {disciplinaId: histDisc, texto: $('listaPortalTxt').value}).then(function(n){
+      $('msgListaPortal').textContent = '✓ ' + n + ' nome(s) salvos'; carregarDiario();
+    }).catch(function(e){ b.disabled = false; $('msgListaPortal').textContent = ''; erroGeral(e.message); });
+  });
+  el.querySelectorAll('[data-dia]').forEach(function(card){
+    var a = r.aulas.filter(function(x){ return x.id === card.dataset.dia; })[0];
+    var inp = card.querySelector('[data-dtexto]');
+    inp.addEventListener('change', function(){
+      a.texto = inp.value;
+      api('salvarDiario', {aulaId: a.id, campos: {texto: inp.value}}).catch(function(e){ erroGeral(e.message); });
+    });
+    card.querySelectorAll('[data-dcopiar]').forEach(function(b){ b.addEventListener('click', function(){
+      copiarTexto(b.dataset.dcopiar === 'texto' ? inp.value : a.faltas.map(function(f){ return f.portal || f.nome; }).join('\n'), b);
+    }); });
+    // checks salvam na hora, sem redesenhar a lista
+    card.querySelectorAll('[data-dok]').forEach(function(c){ c.addEventListener('change', function(){
+      var campo = c.dataset.dok, campos = {}; campos[campo] = c.checked; a[campo] = c.checked;
+      card.classList.toggle('feito', a.conteudoOk && a.faltasOk);
+      api('salvarDiario', {aulaId: a.id, campos: campos}).catch(function(e){ c.checked = !c.checked; a[campo] = c.checked; erroGeral(e.message); });
+    }); });
+  });
 }
 
 // Aula encerrada sem ata: mostra trecho por trecho o que falta e por quê
