@@ -78,6 +78,9 @@
   .cfg span:nth-child(odd){color:var(--cinza)}
   .cfg span:nth-child(even){font-weight:bold;text-align:right}
   .mono{font-family:Consolas,"Courier New",monospace}
+  .campos4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:10px}
+  @media (max-width:700px){ .campos4{grid-template-columns:repeat(2,1fr)} }
+  .campos4 input[readonly]{background:var(--bloco);border-color:var(--linha);color:var(--cinza)}
   details.ajuda{display:inline-block;vertical-align:middle;margin-left:4px}
   details.ajuda>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--menu);color:#fff;font-size:12px;font-weight:bold;line-height:1}
   details.ajuda>summary::-webkit-details-marker{display:none}
@@ -2485,10 +2488,23 @@ function abrirForm(d){
     '<div class="bloco"><p class="grupoTitulo" style="margin-top:0">2. Questões em aula</p><div class="campos">' +
       '<div><label class="rot" for="fTempos">Tempos por aula</label><select id="fTempos"><option value="1"' + (v.tempos == 1 ? ' selected' : '') + '>1 tempo · 50 min</option><option value="2"' + (v.tempos == 2 ? ' selected' : '') + '>2 tempos · 100 min</option></select></div>' +
       campo('fPrazo', 'Prazo padrão (min)', 'number', v.prazo_padrao) + campo('fPres', 'Presença mínima (%)', 'number', v.presenca_min) +
-      campo('fFech', 'Fechadas por liberação', 'number', v.qtd_fechadas) + campo('fAb', 'Abertas por liberação', 'number', v.qtd_abertas) +
-      campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) +
-      campo('fTempoResp', 'Tempo para responder cada fechada (min)', 'number', v.tempo_resposta === undefined ? 5 : v.tempo_resposta) +
-      campo('fTempoAb', 'Tempo para responder cada aberta (min)', 'number', v.tempo_aberta === undefined ? 10 : v.tempo_aberta) + '</div>' +
+      '</div>' +
+      // configuração das questões: aula do dia + revisão = total, com peso e tempo por tipo
+      '<p class="grupoTitulo" style="margin-top:4px">Configuração das questões ' + ajuda('Parte das questões de cada liberação pode ser sobre <b>temas de aulas anteriores</b>, como revisão. As quantidades de revisão contam <b>dentro</b> do total: com 2 fechadas e 1 de revisão, cai 1 fechada da aula do dia e 1 de revisão. Se todas forem de revisão, nenhuma é sobre a aula do dia.<br><br>' +
+        '<b>Como o tema é escolhido:</b> somando a <b>importância</b> que você marcou (⭐ pesa mais), a <b>dificuldade da turma</b> no tema (quanto menor o acerto, mais ele volta) e o <b>tempo sem aparecer</b> (revisão espaçada). Tema mal na aberta tende a voltar como fechada; tema bem na fechada tende a voltar como aberta, para aprofundar.<br><br>' +
+        'A questão de revisão é sempre <b>nova</b> (nunca repete uma já feita) e é igual para a turma toda. Na hora de liberar você vê o tema sugerido e pode trocar. Os temas ficam no botão "Configurar prioridade dos temas" de cada disciplina.') + '</p>' +
+      '<div class="campos4">' + campo('fFechAula', 'Fechadas da aula', 'number', Math.max(0, (v.qtd_fechadas || 0) - (v.rev_fechadas || 0))) +
+        campo('fRevF', 'Fechadas de revisão', 'number', v.rev_fechadas || 0) +
+        '<div><label class="rot" for="fTotF">Total de fechadas</label><input type="number" id="fTotF" readonly tabindex="-1"></div>' +
+        campo('fPeso', 'Peso das fechadas (%)', 'number', v.peso_fechadas) + '</div>' +
+      '<div class="campos4">' + campo('fTempoResp', 'Tempo para responder cada fechada (min)', 'number', v.tempo_resposta === undefined ? 5 : v.tempo_resposta) + '</div>' +
+      '<div class="campos4" style="margin-top:6px">' + campo('fAbAula', 'Abertas da aula', 'number', Math.max(0, (v.qtd_abertas || 0) - (v.rev_abertas || 0))) +
+        campo('fRevA', 'Abertas de revisão', 'number', v.rev_abertas || 0) +
+        '<div><label class="rot" for="fTotA">Total de abertas</label><input type="number" id="fTotA" readonly tabindex="-1"></div>' +
+        '<div><label class="rot" for="fPesoA">Peso das abertas (%)</label><input type="number" id="fPesoA" readonly tabindex="-1"></div></div>' +
+      '<div class="campos4">' + campo('fTempoAb', 'Tempo para responder cada aberta (min)', 'number', v.tempo_aberta === undefined ? 10 : v.tempo_aberta) + '</div>' +
+      '<div class="campos4" style="margin-top:6px"><div style="grid-column:span 2"><label class="rot" for="fRevJ">Revisão: de quais aulas</label><select id="fRevJ">' + [[0, 'todas as aulas anteriores'], [3, 'só das últimas 3 aulas'], [5, 'só das últimas 5 aulas'], [10, 'só das últimas 10 aulas']].map(function(o){
+        return '<option value="' + o[0] + '"' + (Number(v.rev_janela || 0) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
       '<p class="aviso" style="margin-top:-6px">O prazo padrão é o tempo que o aluno tem para <b>abrir</b> as questões, contado da liberação. O tempo para responder começa quando ele abre cada questão. Use 0 para não ter tempo por questão. Todos podem ser mudados antes de cada liberação.</p>' +
       '<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:10px 0 4px;font-size:14px"><input type="checkbox" id="fDescartar"' + (v.descartar_piores ? ' checked' : '') + ' style="width:18px;height:18px;margin-top:2px;flex:none">' +
       '<span><b>Descartar as piores notas de quem passar do mínimo de presença</b></span></label>' +
@@ -2503,13 +2519,7 @@ function abrirForm(d){
       '<span><b>Gerar a apostila automaticamente aos sábados</b><br><span class="aviso">Desligado: a apostila só é escrita quando você clicar em "Escrever capítulos pendentes agora" (em Histórico). Cada capítulo usa a IA com pesquisa na internet, o que gasta mais da cota do Gemini.</span></span></label>' +
       '<p class="aviso" id="fPesoTxt" style="margin-top:-6px"></p>' +
       // revisão de aulas anteriores
-      '<p class="grupoTitulo" style="margin-top:16px">Revisão de aulas anteriores ' + ajuda('Parte das questões de cada liberação pode ser sobre <b>temas de aulas anteriores</b>, como revisão. As quantidades de revisão contam <b>dentro</b> do total: com 2 fechadas e 1 de revisão, cai 1 fechada da aula do dia e 1 de revisão. Se todas forem de revisão, nenhuma é sobre a aula do dia.<br><br>' +
-        '<b>Como o tema é escolhido:</b> somando a <b>importância</b> que você marcou (⭐ pesa mais), a <b>dificuldade da turma</b> no tema (quanto menor o acerto, mais ele volta) e o <b>tempo sem aparecer</b> (revisão espaçada). Tema mal na aberta tende a voltar como fechada; tema bem na fechada tende a voltar como aberta, para aprofundar.<br><br>' +
-        'A questão de revisão é sempre <b>nova</b> (nunca repete uma já feita) e é igual para a turma toda. Na hora de liberar você vê o tema sugerido e pode trocar. Os temas ficam no botão "Configurar prioridade dos temas" de cada disciplina.') + '</p>' +
-      '<div class="campos">' + campo('fRevF', 'Fechadas de revisão (dentro do total)', 'number', v.rev_fechadas || 0) + campo('fRevA', 'Abertas de revisão (dentro do total)', 'number', v.rev_abertas || 0) +
-      '<div><label class="rot" for="fRevJ">De quais aulas</label><select id="fRevJ">' + [[0, 'todas as aulas anteriores'], [3, 'só das últimas 3 aulas'], [5, 'só das últimas 5 aulas'], [10, 'só das últimas 10 aulas']].map(function(o){
-        return '<option value="' + o[0] + '"' + (Number(v.rev_janela || 0) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
-      // rigor
+            // rigor
       '<p class="grupoTitulo" style="margin-top:6px">Rigor da correção das abertas ' + ajuda('Calibra a IA que corrige as questões <b>abertas</b>. <b>Padrão</b> é o critério atual (conceito, raciocínio e aplicação). Mais <b>flexível</b>: valoriza o que o aluno acertou e desconta menos a falta de detalhe. Mais <b>rigoroso</b>: exige justificativa precisa e desconta imprecisões.<br><br>' +
         '<b>O rigor fica gravado em cada questão no momento em que ela é liberada.</b> Mudar aqui vale só para as próximas liberações: <b>nenhuma nota já dada é corrigida de novo</b>. Na hora de liberar dá para ajustar só daquela vez.') + '</p>' +
       '<div class="rigorBarra" id="fRigor">' + [1, 2, 3, 4, 5].map(function(n){ return '<button type="button" data-rig="' + n + '" aria-pressed="' + (Number(v.rigor || 3) === n) + '">' + RIGOR_NOMES[n] + '</button>'; }).join('') + '</div>' +
@@ -2534,8 +2544,14 @@ function abrirForm(d){
     rigorForm = Number(b.dataset.rig); f.querySelectorAll('[data-rig]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
   }); });
   desenharEtapas();
-  var atualizaPeso = function(){ var n = Number($('fPeso').value) || 0; $('fPesoTxt').textContent = 'Nota de cada aula = ' + n + '% média das fechadas + ' + (100 - n) + '% média das abertas.'; };
-  $('fPeso').addEventListener('input', atualizaPeso); atualizaPeso();
+  var atualizaPeso = function(){
+    var n = Number($('fPeso').value) || 0;
+    $('fPesoA').value = Math.max(0, 100 - n);
+    $('fTotF').value = (Number($('fFechAula').value) || 0) + (Number($('fRevF').value) || 0);
+    $('fTotA').value = (Number($('fAbAula').value) || 0) + (Number($('fRevA').value) || 0);
+    $('fPesoTxt').textContent = 'Nota de cada aula = ' + n + '% média das fechadas + ' + (100 - n) + '% média das abertas.';
+  };
+  ['fPeso', 'fFechAula', 'fRevF', 'fAbAula', 'fRevA'].forEach(function(id){ $(id).addEventListener('input', atualizaPeso); }); atualizaPeso();
   $('fMaisEtapa').addEventListener('click', function(){ lerEtapas(); var n = etapasEdit.length + 1; etapasEdit.push({id:'', nome:'P' + n, peso:1, fim:'', itens:itensNovos(n)}); desenharEtapas(); });
   $('fCancelar').addEventListener('click', function(){ f.classList.add('oculto'); });
   $('fSalvar').addEventListener('click', function(){
@@ -2543,8 +2559,8 @@ function abrirForm(d){
     var bt = $('fSalvar'); bt.disabled = true; $('fErro').classList.add('oculto');
     api('salvarDisciplina', {disciplina:{
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSemN').value + ' - ' + $('fSemAno').value, tempos: $('fTempos').value,
-      prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
-      qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, tempo_aberta: $('fTempoAb').value,
+      prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: (Number($('fFechAula').value) || 0) + (Number($('fRevF').value) || 0),
+      qtd_abertas: (Number($('fAbAula').value) || 0) + (Number($('fRevA').value) || 0), peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, tempo_aberta: $('fTempoAb').value,
       descartar_piores: $('fDescartar').checked, apostila_auto: $('fApostilaAuto').checked, orientacoes: $('fOri').value, glossario: $('fGlo').value,
       rigor: rigorForm, rev_fechadas: $('fRevF').value, rev_abertas: $('fRevA').value, rev_janela: $('fRevJ').value, explicar_alts: $('fExplicar').checked,
       composicao: {etapas: etapasEdit}, material_url: $('fMaterial').value
