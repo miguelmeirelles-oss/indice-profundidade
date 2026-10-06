@@ -78,6 +78,22 @@
   .cfg span:nth-child(odd){color:var(--cinza)}
   .cfg span:nth-child(even){font-weight:bold;text-align:right}
   .mono{font-family:Consolas,"Courier New",monospace}
+  details.ajuda{display:inline-block;vertical-align:middle;margin-left:4px}
+  details.ajuda>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--menu);color:#fff;font-size:12px;font-weight:bold;line-height:1}
+  details.ajuda>summary::-webkit-details-marker{display:none}
+  details.ajuda[open]{display:block;margin:6px 0}
+  details.ajuda>div{margin-top:6px;background:#f5f8fe;border-left:4px solid var(--menu);border-radius:0 10px 10px 0;padding:10px 12px;font-size:13.5px;line-height:1.55;font-weight:normal;color:var(--navy);text-transform:none;letter-spacing:0}
+  .rigorBarra{display:flex;gap:6px;flex-wrap:wrap}
+  .rigorBarra button{background:#fff;box-shadow:none;border:2px solid var(--linha);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--navy)}
+  .rigorBarra button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .rigorBarra button:hover{transform:none;box-shadow:none}
+  .temaLinha{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--linha)}
+  .temaLinha .nome{flex:1;min-width:180px;font-weight:bold}
+  .temaLinha select{width:auto;max-width:200px;padding:6px 8px;font-size:13px}
+  .temaLinha button{margin:0}
+  .desemp{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:bold;border:1.5px solid currentColor}
+  .desemp.v{color:#1a7a3c}.desemp.a{color:#8a6100}.desemp.r{color:#c62828}.desemp.c{color:#5b6b86}
+  .expl{font-size:12.5px;color:var(--cinza);display:block;margin:2px 0 4px}
   details.encerradas>summary{cursor:pointer;font-weight:bold;color:var(--menu);font-size:14px;padding:4px 0}
   details.encerradas[open]>summary{margin-bottom:4px}
   .grupoTitulo{font-size:13px;font-weight:bold;color:var(--titulo);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 4px}
@@ -817,7 +833,11 @@ function abrirMateria(m){
           : (q.nota !== null ? '<b>' + dez(q.nota) + '</b> de 10' : '');
         return '<div class="detalhe" style="margin-top:8px"><div class="linha" style="border:0;padding:0 0 6px;align-items:flex-start"><span><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></span><span style="white-space:nowrap">' + pontos + '</span></div>' +
           '<p class="aviso" style="margin:0">Sua resposta: ' + (q.suaResposta === null ? '<b>não respondeu</b> (vale zero)' : esc(q.suaResposta)) + '</p>' +
-          (q.correta ? '<p class="aviso" style="margin:0">Correta: <b>' + esc(q.correta) + '</b></p>' : '') +
+          (q.explicacoes && q.explicacoes.length && q.alternativas && q.alternativas.length
+            ? '<ol class="alts" type="A" style="margin:6px 0 0">' + q.alternativas.map(function(alt, k){
+                return '<li' + (k === q.gabarito ? ' class="certa"' : '') + '>' + esc(alt) + (k === q.gabarito ? ' ✓' : k === q.escolhida ? ' ✗ <span class="aviso">(sua resposta)</span>' : '') +
+                  (q.explicacoes[k] ? '<span class="expl">' + esc(q.explicacoes[k]) + '</span>' : '') + '</li>'; }).join('') + '</ol>'
+            : (q.correta ? '<p class="aviso" style="margin:0">Correta: <b>' + esc(q.correta) + '</b></p>' : '')) +
           (q.comentario ? '<p class="aviso" style="margin:4px 0 0">' + esc(q.comentario) + '</p>' : '') + '</div>';
       }).join('');
       if(qs && x.tipo === 'nota') qs += '<p style="margin:8px 0 0;text-align:right">Total da aula: <b>' + dez(x.nota) + '</b> de 10' + (x.provisoria ? '*' : '') + '</p>';
@@ -1695,7 +1715,9 @@ function abrirCompositor(sobre){
   var d = discPorId(a.disciplinaId) || {qtd_fechadas:2, qtd_abertas:1, prazo_padrao:40, peso_fechadas:50};
   Q.cfg = {fechadas: d.qtd_fechadas, abertas: d.qtd_abertas, prazo: sobre === 'recente' ? Math.min(10, d.prazo_padrao) : d.prazo_padrao, peso: d.peso_fechadas, sobre: sobre, orientacao: '',
     tempoF: d.tempo_resposta === undefined ? 5 : Number(d.tempo_resposta) || 0,
-    tempoA: d.tempo_aberta === undefined ? 10 : Number(d.tempo_aberta) || 0};
+    tempoA: d.tempo_aberta === undefined ? 10 : Number(d.tempo_aberta) || 0,
+    revF: Math.min(d.rev_fechadas || 0, d.qtd_fechadas), revA: Math.min(d.rev_abertas || 0, d.qtd_abertas), rigor: d.rigor || 3};
+  Q.sug = null; Q.sugChave = ''; Q.revSel = [];
   desenharCompositor();
   $('areaQ').scrollIntoView({behavior:'smooth', block:'start'});
   vigiarTrechos();
@@ -1736,6 +1758,10 @@ function desenharCompositor(){
     linha('Tempo para responder cada fechada', 'tempoF', c.tempoF ? c.tempoF + ' min' : 'sem limite', 1) +
     linha('Tempo para responder cada aberta', 'tempoA', c.tempoA ? c.tempoA + ' min' : 'sem limite', 1) +
     linha('Peso fechadas / abertas', 'peso', c.peso + ' / ' + (100 - c.peso), 10) +
+    linha('Dessas fechadas, de revisão', 'revF', c.revF, 1) + linha('Dessas abertas, de revisão', 'revA', c.revA, 1) +
+    '<div id="qRevisao">' + htmlRevisao() + '</div>' +
+    '<div class="linha"><span>Correção das abertas ' + ajuda('Rigor só desta liberação. Fica gravado nas questões: mudar depois não muda notas já dadas.') + '</span><span class="rigorBarra">' +
+      [1, 2, 3, 4, 5].map(function(n){ return '<button type="button" data-qrig="' + n + '" aria-pressed="' + (c.rigor === n) + '">' + RIGOR_NOMES[n] + '</button>'; }).join('') + '</span></div>' +
     '<div class="linha"><span>Sobre</span><span class="chips"><button type="button" class="chip" data-sobre="recente" aria-pressed="' + (c.sobre === 'recente') + '">últimos 20 min</button>' +
     '<button type="button" class="chip" data-sobre="inteira" aria-pressed="' + (c.sobre === 'inteira') + '">aula inteira</button></span></div>' +
     (n === 1 ? '<div class="convite" style="margin-top:10px">Esta liberação terá <b>1 questão</b>. Se for a única da aula, ela vale a nota inteira da aula.</div>' : '') +
@@ -1746,14 +1772,19 @@ function desenharCompositor(){
     '<div class="botoes"><button type="button" id="qGerar"' + (n ? '' : ' disabled') + '>Gerar questões para revisar</button><button type="button" class="secundario" id="qCanc">Cancelar</button></div><div id="qMsg"></div></div>';
   var box = $('areaQ');
   box.querySelectorAll('[data-k]').forEach(function(b){ b.addEventListener('click', function(){
-    var k = b.dataset.k, lim = {fechadas:[0, 10], abertas:[0, 5], prazo:[5, 240], tempoF:[0, 60], tempoA:[0, 60], peso:[0, 100]}[k];
-    c.orientacao = $('qOri').value; c[k] = Math.max(lim[0], Math.min(lim[1], c[k] + Number(b.dataset.v))); desenharCompositor();
+    var k = b.dataset.k, lim = {fechadas:[0, 10], abertas:[0, 5], prazo:[5, 240], tempoF:[0, 60], tempoA:[0, 60], peso:[0, 100], revF:[0, c.fechadas], revA:[0, c.abertas]}[k];
+    c.orientacao = $('qOri').value; c[k] = Math.max(lim[0], Math.min(lim[1], c[k] + Number(b.dataset.v)));
+    c.revF = Math.min(c.revF, c.fechadas); c.revA = Math.min(c.revA, c.abertas); desenharCompositor();
   }); });
+  box.querySelectorAll('[data-qrig]').forEach(function(b){ b.addEventListener('click', function(){ c.orientacao = $('qOri').value; c.rigor = Number(b.dataset.qrig); desenharCompositor(); }); });
+  ligarRevisao(); buscarSugestaoRevisao();
   box.querySelectorAll('[data-sobre]').forEach(function(b){ b.addEventListener('click', function(){ c.orientacao = $('qOri').value; c.sobre = b.dataset.sobre; desenharCompositor(); }); });
   $('qCanc').addEventListener('click', function(){ box.innerHTML = ''; });
   $('qGerar').addEventListener('click', function(){
     c.orientacao = $('qOri').value; this.disabled = true;
     $('qMsg').innerHTML = '<p class="carregando">Gerando questões… (uns 20 a 40 segundos)</p>';
+    c.revisao = c.revF + c.revA ? Q.revSel.filter(function(x){ return x.id; }) : [];
+    if(c.revF + c.revA && c.revisao.length < c.revF + c.revA){ this.disabled = false; $('qMsg').innerHTML = '<div class="erro">Escolha o tema de cada questão de revisão (ou diminua a quantidade de revisão).</div>'; return; }
     api('gerarQuestoes', {aulaId: a.id, cfg: c}).then(function(r){
       Q.propostas = r.questoes.map(function(q){ q.ok = false; return q; });
       desenharRevisao();
@@ -1761,11 +1792,54 @@ function desenharCompositor(){
   });
 }
 
+/* revisão de aulas anteriores na tela de liberar */
+function htmlRevisao(){
+  var c = Q.cfg; if(!c || !(c.revF + c.revA)) return '';
+  if(!Q.sug) return '<div class="convite" style="margin-top:8px"><p class="carregando" style="margin:0">Escolhendo temas de revisão…</p></div>';
+  if(Q.sug.erro) return '<div class="erro">' + esc(Q.sug.erro) + '</div>';
+  var opcoes = function(sel){ return '<option value="">escolha um tema…</option>' + Q.sug.todos.map(function(t){ return '<option value="' + esc(t.id) + '"' + (t.id === sel ? ' selected' : '') + '>' + esc(t.nome) + ' (aula ' + t.aulas.join(', ') + ')</option>'; }).join(''); };
+  if(!Q.sug.todos.length) return '<div class="convite" style="margin-top:8px">Ainda não há temas de aulas anteriores para revisão (eles saem das atas, e nenhum pode estar como "não cobrar"). As questões serão todas da aula de hoje se você zerar a revisão.</div>';
+  return '<div class="convite" style="margin-top:8px"><b>Questões de revisão</b> ' + ajuda('Sugestão automática: soma importância (⭐), dificuldade da turma no tema e tempo sem aparecer. A questão será nova, sobre o tema, usando a ata das aulas em que ele foi dado. Troque o tema se quiser.') +
+    (Q.sug.atualizou && Q.sug.atualizou.aulas ? '<br><span class="aviso">Temas atualizados agora a partir de ' + Q.sug.atualizou.aulas + ' ata(s).</span>' : '') +
+    Q.revSel.map(function(s, i){
+      var info = Q.sug.todos.filter(function(t){ return t.id === s.id; })[0];
+      return '<div style="margin-top:8px"><span class="tag t-azul">' + (s.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' de revisão</span> <select data-revsel="' + i + '" style="max-width:360px">' + opcoes(s.id) + '</select>' +
+        (info ? '<br><span class="aviso">' + esc(info.motivo) + '</span>' : '') + '</div>';
+    }).join('') + '</div>';
+}
+function ligarRevisao(){
+  document.querySelectorAll('[data-revsel]').forEach(function(s){ s.addEventListener('change', function(){
+    Q.revSel[Number(s.dataset.revsel)].id = s.value; $('qRevisao').innerHTML = htmlRevisao(); ligarRevisao();
+  }); });
+}
+function buscarSugestaoRevisao(){
+  var c = Q.cfg; if(!c || !(c.revF + c.revA)) return;
+  var chave = c.revF + '|' + c.revA;
+  if(Q.sugChave === chave && Q.sug) return;
+  Q.sugChave = chave;
+  if(!Q.sug || Q.sug.erro) Q.sug = null;
+  api('sugerirRevisao', {aulaId: Q.aula.id, fechadas: c.revF, abertas: c.revA}).then(function(r){
+    if(Q.sugChave !== chave) return;
+    Q.sug = r;
+    var antigos = Q.revSel || [];
+    var novo = r.fechadas.map(function(t){ return {id: t.id, tipo: 'fechada'}; }).concat(r.abertas.map(function(t){ return {id: t.id, tipo: 'aberta'}; }));
+    // completa até a quantidade pedida (tema em branco = o professor escolhe)
+    while(novo.filter(function(x){ return x.tipo === 'fechada'; }).length < c.revF) novo.push({id: '', tipo: 'fechada'});
+    while(novo.filter(function(x){ return x.tipo === 'aberta'; }).length < c.revA) novo.push({id: '', tipo: 'aberta'});
+    novo.sort(function(a, b){ return a.tipo === b.tipo ? 0 : a.tipo === 'fechada' ? -1 : 1; });
+    // mantém o que o professor já tinha trocado
+    novo.forEach(function(x, i){ var v = antigos.filter(function(y){ return y.tipo === x.tipo; })[novo.filter(function(z, j){ return j < i && z.tipo === x.tipo; }).length]; if(v && v.id) x.id = v.id; });
+    Q.revSel = novo;
+    var box = $('qRevisao'); if(box){ box.innerHTML = htmlRevisao(); ligarRevisao(); }
+  }).catch(function(e){ Q.sug = {erro: e.message, todos: []}; var box = $('qRevisao'); if(box) box.innerHTML = htmlRevisao(); });
+}
+
 function desenharRevisao(){
   var nOk = Q.propostas.filter(function(q){ return q.ok; }).length;
   var h = '<div class="caixa"><h2>Revisar antes de liberar</h2>';
   Q.propostas.forEach(function(q, i){
-    h += '<div class="questaoRev' + (q.ok ? ' aprovada' : '') + '" data-i="' + i + '"><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' ' + (i + 1) + '</span> ' + (q.ok ? '<span class="tag t-ok">aprovada</span>' : '');
+    h += '<div class="questaoRev' + (q.ok ? ' aprovada' : '') + '" data-i="' + i + '"><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' ' + (i + 1) + '</span> ' +
+      (q.revisao ? '<span class="tag t-warn">revisão' + (q.temaNome ? ': ' + esc(q.temaNome) : '') + '</span> ' : '') + (q.ok ? '<span class="tag t-ok">aprovada</span>' : '');
     if(q.editando){
       h += '<label class="rot" style="margin-top:10px">Enunciado</label><textarea data-e="enun">' + esc(q.enunciado) + '</textarea>';
       if(q.tipo === 'fechada'){
@@ -1776,7 +1850,8 @@ function desenharRevisao(){
       h += '<div class="botoes"><button type="button" class="mini" data-acao="salvar">Salvar</button><button type="button" class="secundario mini" data-acao="cancelarEd">Cancelar</button></div>';
     } else {
       h += '<p style="margin:8px 0 0;font-weight:bold">' + esc(q.enunciado) + '</p>';
-      h += q.tipo === 'fechada' ? '<ol class="alts" type="A">' + q.alternativas.map(function(a, k){ return '<li' + (k === q.gabarito ? ' class="certa"' : '') + '>' + esc(a) + (k === q.gabarito ? ' ✓' : '') + '</li>'; }).join('') + '</ol>'
+      h += q.tipo === 'fechada' ? '<ol class="alts" type="A">' + q.alternativas.map(function(a, k){ return '<li' + (k === q.gabarito ? ' class="certa"' : '') + '>' + esc(a) + (k === q.gabarito ? ' ✓' : '') +
+          (q.explicacoes && q.explicacoes[k] ? '<span class="expl">' + esc(q.explicacoes[k]) + '</span>' : '') + '</li>'; }).join('') + '</ol>'
         : '<p class="aviso" style="margin:6px 0 0"><b>Resposta esperada:</b> ' + esc(q.gabarito) + '</p>';
       h += '<div class="botoes"><button type="button" class="mini" data-acao="ok">' + (q.ok ? 'Desmarcar' : '✓ Aprovar') + '</button><button type="button" class="secundario mini" data-acao="editar">Editar</button><button type="button" class="secundario mini" data-acao="refazer">Refazer</button></div>';
     }
@@ -1821,7 +1896,7 @@ function desenharRevisao(){
     var ids = Q.propostas.filter(function(q){ return q.ok; }).map(function(q){ return q.id; });
     // tempo por tipo: fechadas e abertas têm cada uma o seu
     var tempos = {}; Q.propostas.forEach(function(q){ if(q.ok) tempos[q.id] = q.tipo === 'fechada' ? Q.cfg.tempoF : Q.cfg.tempoA; });
-    api('liberarQuestoes', {aulaId: Q.aula.id, ids: ids, prazo: Q.cfg.prazo, peso: Q.cfg.peso, tempos: tempos}).then(function(){ abrirAcompanhamento(); })
+    api('liberarQuestoes', {aulaId: Q.aula.id, ids: ids, prazo: Q.cfg.prazo, peso: Q.cfg.peso, tempos: tempos, rigor: Q.cfg.rigor}).then(function(){ abrirAcompanhamento(); })
       .catch(function(e){ b.disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
 }
@@ -2193,6 +2268,77 @@ function carregarPainelApostila(){
   }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
+/* ================= TEMAS DA DISCIPLINA ================= */
+function carregarAlertasTemas(){
+  api('alertasTemas').then(function(l){
+    var el = $('alertasTemas'); if(!el || !l.length) return;
+    el.innerHTML = '<div class="erro" style="margin-bottom:14px"><b>⚠ Tema(s) importante(s) com a turma indo mal</b> ' + ajuda('Aparece quando um tema marcado como ⭐ importante tem desempenho da turma abaixo de 50%, com pelo menos 5 respostas corrigidas. Vale retomar em sala; ele também tende a cair nas questões de revisão.') +
+      l.map(function(a){ return '<br>• <b>' + esc(a.tema) + '</b> · ' + esc(a.disciplina) + ' · ' + a.nota + '% (' + a.respostas + ' respostas)'; }).join('') + '<br><span style="font-weight:normal">Vale retomar em sala.</span></div>';
+  }).catch(function(){});
+}
+function corDesemp(d){ return d.nota === null ? 'c' : d.nota >= 70 ? 'v' : d.nota >= 50 ? 'a' : 'r'; }
+function abrirTemas(discId){
+  var el = $('painelTemas'); if(!el) return;
+  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando temas…</p></div>';
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+  api('temasDisciplina', {disciplinaId: discId}).then(function(r){ desenharTemas(discId, r); })
+    .catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+function desenharTemas(discId, r){
+  var el = $('painelTemas');
+  var grupos = [['alta', '⭐ Importantes'], ['normal', 'Normais'], ['nao', 'Não cobrar']];
+  var linha = function(t){
+    var d = t.desempenho, det = [];
+    if(d.acertoF !== null) det.push('fechadas ' + d.acertoF + '%');
+    if(d.mediaA !== null) det.push('abertas ' + (d.mediaA / 10).toFixed(1).replace('.', ','));
+    return '<div class="temaLinha"><span class="nome">' + esc(t.nome) + (t.critico ? ' <span class="tag t-err">crítico</span>' : '') +
+      '<br><span class="aviso" style="font-weight:normal">' + (t.aulas.length ? 'aula' + (t.aulas.length > 1 ? 's ' : ' ') + t.aulas.join(', ') : 'ainda sem aula neste semestre') + (det.length ? ' · ' + det.join(' · ') : '') + '</span></span>' +
+      '<span class="desemp ' + corDesemp(d) + '" title="' + d.respostas + ' resposta(s) corrigida(s)">' + (d.nota === null ? 'sem respostas' : d.nota + '%') + '</span>' +
+      '<select data-imp="' + esc(t.id) + '" aria-label="Importância">' + grupos.map(function(g){ return '<option value="' + g[0] + '"' + (t.importancia === g[0] ? ' selected' : '') + '>' + (g[0] === 'alta' ? '⭐ importante' : g[0] === 'normal' ? 'normal' : 'não cobrar') + '</option>'; }).join('') + '</select>' +
+      '<button type="button" class="secundario mini" data-renomear="' + esc(t.id) + '">Renomear</button>' +
+      '<select data-juntar="' + esc(t.id) + '" aria-label="Juntar com"><option value="">juntar com…</option>' + r.temas.filter(function(x){ return x.id !== t.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select></div>';
+  };
+  var h = '<div class="caixa"><div class="linha" style="border:0;padding:0"><h2 style="margin:0">Temas · ' + esc(r.disciplina) + ' ' + ajuda('A IA lê a ata de cada aula e sugere os <b>temas</b> (assuntos). Você decide a importância: <b>⭐ importante</b> (cai mais na revisão e gera alerta se a turma for mal), <b>normal</b> ou <b>não cobrar</b> (nunca vira questão de revisão). Dá para renomear, juntar dois temas iguais ou criar um novo.<br><br>' +
+    '<b>Desempenho da turma</b> = acerto nas fechadas e nota média nas abertas daquele tema (só respostas já corrigidas). Verde: 70% ou mais · amarelo: 50 a 69% · vermelho: abaixo de 50%.<br><br>Ao copiar a disciplina para o próximo semestre, os temas e a importância vão junto (sem as notas).') + '</h2>' +
+    '<button type="button" class="link" id="fecharTemas">fechar</button></div>';
+  if(r.pendentes.aulas || r.pendentes.questoes){
+    h += '<div class="convite" style="margin-top:10px">' + (r.pendentes.aulas ? '<b>' + r.pendentes.aulas + ' aula(s)</b> com ata ainda sem temas identificados. ' : '') + (r.pendentes.questoes ? r.pendentes.questoes + ' questão(ões) sem tema. ' : '') +
+      '<button type="button" class="mini" id="btIdentificar">Identificar temas agora</button> <span class="aviso">usa 1 chamada da IA para várias aulas de uma vez · também acontece sozinho quando você libera questões com revisão</span><div id="msgIdent"></div></div>';
+  }
+  if(!r.temas.length) h += '<p class="aviso" style="margin-top:10px">Nenhum tema ainda. Eles aparecem quando as aulas tiverem ata.</p>';
+  grupos.forEach(function(g){
+    var ts = r.temas.filter(function(t){ return t.importancia === g[0]; });
+    if(ts.length) h += '<p class="grupoTitulo">' + g[1] + ' (' + ts.length + ')</p>' + ts.map(linha).join('');
+  });
+  h += '<div class="botoes"><input type="text" id="novoTema" placeholder="novo tema, ex.: Atividade de água" style="max-width:340px"><button type="button" class="secundario mini" id="btNovoTema">+ Criar tema</button></div><div id="msgTemas"></div></div>';
+  el.innerHTML = h;
+  var recarregar = function(){ abrirTemas(discId); };
+  var erro = function(e){ $('msgTemas').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; };
+  $('fecharTemas').addEventListener('click', function(){ el.innerHTML = ''; });
+  var bi = $('btIdentificar');
+  if(bi) bi.addEventListener('click', function(){ bi.disabled = true; $('msgIdent').innerHTML = '<p class="carregando">Lendo as atas… (uns 20 segundos)</p>';
+    api('identificarTemas', {disciplinaId: discId}).then(function(x){ desenharTemas(discId, x); }).catch(function(e){ bi.disabled = false; $('msgIdent').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
+  el.querySelectorAll('[data-imp]').forEach(function(s){ s.addEventListener('change', function(){
+    var t = r.temas.filter(function(x){ return x.id === s.dataset.imp; })[0];
+    api('salvarTema', {disciplinaId: discId, tema: {id: t.id, nome: t.nome, importancia: s.value}}).then(recarregar).catch(erro);
+  }); });
+  el.querySelectorAll('[data-renomear]').forEach(function(b){ b.addEventListener('click', function(){
+    var t = r.temas.filter(function(x){ return x.id === b.dataset.renomear; })[0];
+    var n = window.prompt('Novo nome do tema:', t.nome); if(!n || n.trim() === t.nome) return;
+    api('salvarTema', {disciplinaId: discId, tema: {id: t.id, nome: n.trim(), importancia: t.importancia}}).then(recarregar).catch(erro);
+  }); });
+  el.querySelectorAll('[data-juntar]').forEach(function(s){ s.addEventListener('change', function(){
+    if(!s.value) return;
+    var a = r.temas.filter(function(x){ return x.id === s.dataset.juntar; })[0], b = r.temas.filter(function(x){ return x.id === s.value; })[0];
+    if(!window.confirm('Juntar "' + a.nome + '" dentro de "' + b.nome + '"? As questões e aulas de "' + a.nome + '" passam para "' + b.nome + '".')){ s.value = ''; return; }
+    api('juntarTemas', {disciplinaId: discId, de: a.id, para: b.id}).then(recarregar).catch(erro);
+  }); });
+  $('btNovoTema').addEventListener('click', function(){
+    var n = $('novoTema').value.trim(); if(!n) return;
+    api('salvarTema', {disciplinaId: discId, tema: {nome: n, importancia: 'normal'}}).then(recarregar).catch(erro);
+  });
+}
+
 /* ================= DISCIPLINAS ================= */
 function desenharDisciplinas(){
   var el = $('listaDisc'), ds = resumo.disciplinas;
@@ -2237,6 +2383,9 @@ function desenharDisciplinas(){
   }); });
   el.querySelectorAll('[data-vernotas]').forEach(function(b){ b.addEventListener('click', function(){ notasDisc = b.dataset.vernotas; abrirAba('notas'); }); });
   el.querySelectorAll('[data-verhist]').forEach(function(b){ b.addEventListener('click', function(){ histDisc = b.dataset.verhist; abrirAba('hist'); }); });
+  el.insertAdjacentHTML('afterbegin', '<div id="alertasTemas"></div><div id="painelTemas"></div>');
+  el.querySelectorAll('[data-temas]').forEach(function(b){ b.addEventListener('click', function(){ abrirTemas(b.dataset.temas); }); });
+  carregarAlertasTemas();
   el.querySelectorAll('[data-ativar]').forEach(function(b){
     b.addEventListener('click', function(){
       b.disabled = true;
@@ -2252,6 +2401,10 @@ function resumoEtapa(e){
   return esc(e.nome) + ' = ' + (itens.length ? itens.map(function(it){ return esc(it.nome) + ' (' + nota10(it.valor) + ')'; }).join(' + ') : 'sem itens');
 }
 
+var RIGOR_NOMES = ['', 'Bem flexível', 'Flexível', 'Padrão', 'Rigoroso', 'Muito rigoroso'];
+// Bolinha "?" que abre uma explicação
+function ajuda(html){ return '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>' + html + '</div></details>'; }
+
 function cartaoDisc(d){
   var etapas = (d.composicao && d.composicao.etapas) || [];
   var gl = d.glossario || [];
@@ -2264,13 +2417,16 @@ function cartaoDisc(d){
     '<span>Presença mínima</span><span>' + d.presenca_min + '%</span>' +
     '<span>Tempo para responder</span><span>' + (d.tempo_resposta ? 'fechada ' + d.tempo_resposta + ' min' : 'fechada sem limite') + ' · ' + (d.tempo_aberta ? 'aberta ' + d.tempo_aberta + ' min' : 'aberta sem limite') + '</span>' +
     '<span>Piores notas</span><span>' + (d.descartar_piores ? 'descartadas acima do mínimo de presença' : 'não descartadas') + '</span>' +
-    '<span>Apostila</span><span>' + (d.apostila_auto ? 'automática aos sábados' : 'só quando você pedir') + '</span></div>' +
+    '<span>Apostila</span><span>' + (d.apostila_auto ? 'automática aos sábados' : 'só quando você pedir') + '</span>' +
+    '<span>Revisão</span><span>' + (d.rev_fechadas || d.rev_abertas ? (d.rev_fechadas ? d.rev_fechadas + ' fechada(s)' : '') + (d.rev_fechadas && d.rev_abertas ? ' + ' : '') + (d.rev_abertas ? d.rev_abertas + ' aberta(s)' : '') + ' de aulas anteriores' : 'sem questões de revisão') + '</span>' +
+    '<span>Correção das abertas</span><span>' + RIGOR_NOMES[d.rigor || 3] + (d.explicar_alts === false ? '' : ' · explica as alternativas') + '</span></div>' +
     '<p class="aviso" style="margin-top:6px">' + (d.orientacoes ? '<span title="' + esc(d.orientacoes) + '">Orientações: definidas</span>' : 'Sem orientações fixas') + ' · ' +
       (gl.length ? 'Glossário: ' + gl.length + ' termo(s)' : 'Sem glossário') + '</p>' +
     '<p class="grupoTitulo" style="margin-top:10px">Composição da nota</p>' +
     '<p style="font-size:13.5px;margin:0">' + etapas.map(resumoEtapa).join('<br>') + '</p>' +
     (etapas.length > 1 ? '<p class="aviso" style="margin-top:4px">Média final: ' + (pesosIguais(etapas) ? 'média simples das etapas' : 'média ponderada (' + etapas.map(function(e){ return esc(e.nome) + ' peso ' + nota10(e.peso); }).join(', ') + ')') + '</p>' : '') +
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
+    '<button type="button" class="secundario mini" data-temas="' + esc(d.id) + '">🧩 Temas</button>' +
     '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
     '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Encerrar e arquivar">Encerrar e arquivar</button></div></div>';
 }
@@ -2282,6 +2438,7 @@ function cartaoEncerrada(d){
     '<div class="botoes" style="margin-top:8px">' +
     '<button type="button" class="mini" data-vernotas="' + esc(d.id) + '">Ver notas</button>' +
     '<button type="button" class="secundario mini" data-verhist="' + esc(d.id) + '">Ver histórico</button>' +
+    '<button type="button" class="secundario mini" data-temas="' + esc(d.id) + '">🧩 Temas</button>' +
     '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
     (d.arquivada ? '<button type="button" class="secundario mini" data-desarquivar="' + esc(d.id) + '">Reativar</button>'
       : '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Mover para o arquivo">Mover para o arquivo</button>' +
@@ -2303,7 +2460,8 @@ function lerSemestre(s){
 var etapasEdit = [];
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:'', tempos:p.tempos, prazo_padrao:p.prazo_padrao,
-    presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, tempo_aberta:p.tempo_aberta, descartar_piores:false, apostila_auto:false, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
+    presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, tempo_aberta:p.tempo_aberta, descartar_piores:false, apostila_auto:false,
+    rigor:3, rev_fechadas:0, rev_abertas:0, rev_janela:0, explicar_alts:true, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
     composicao:{etapas:[{id:'', nome:'P1', peso:1, fim:'', itens:itensNovos(1)}, {id:'', nome:'P2', peso:1, fim:'', itens:itensNovos(2)}]}};
   etapasEdit = JSON.parse(JSON.stringify((v.composicao && v.composicao.etapas) || []));
   var sem = lerSemestre(v.semestre);
@@ -2338,6 +2496,21 @@ function abrirForm(d){
       '<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:14px 0 4px;font-size:14px"><input type="checkbox" id="fApostilaAuto"' + (v.apostila_auto ? ' checked' : '') + ' style="width:18px;height:18px;margin-top:2px;flex:none">' +
       '<span><b>Gerar a apostila automaticamente aos sábados</b><br><span class="aviso">Desligado: a apostila só é escrita quando você clicar em "Escrever capítulos pendentes agora" (em Histórico). Cada capítulo usa a IA com pesquisa na internet, o que gasta mais da cota do Gemini.</span></span></label>' +
       '<p class="aviso" id="fPesoTxt" style="margin-top:-6px"></p>' +
+      // revisão de aulas anteriores
+      '<p class="grupoTitulo" style="margin-top:16px">Revisão de aulas anteriores ' + ajuda('Parte das questões de cada liberação pode ser sobre <b>temas de aulas anteriores</b>, como revisão. As quantidades de revisão contam <b>dentro</b> do total: com 2 fechadas e 1 de revisão, cai 1 fechada da aula do dia e 1 de revisão. Se todas forem de revisão, nenhuma é sobre a aula do dia.<br><br>' +
+        '<b>Como o tema é escolhido:</b> somando a <b>importância</b> que você marcou (⭐ pesa mais), a <b>dificuldade da turma</b> no tema (quanto menor o acerto, mais ele volta) e o <b>tempo sem aparecer</b> (revisão espaçada). Tema mal na aberta tende a voltar como fechada; tema bem na fechada tende a voltar como aberta, para aprofundar.<br><br>' +
+        'A questão de revisão é sempre <b>nova</b> (nunca repete uma já feita) e é igual para a turma toda. Na hora de liberar você vê o tema sugerido e pode trocar. Os temas ficam no botão "Temas" de cada disciplina.') + '</p>' +
+      '<div class="campos">' + campo('fRevF', 'Fechadas de revisão (dentro do total)', 'number', v.rev_fechadas || 0) + campo('fRevA', 'Abertas de revisão (dentro do total)', 'number', v.rev_abertas || 0) +
+      '<div><label class="rot" for="fRevJ">De quais aulas</label><select id="fRevJ">' + [[0, 'todas as aulas anteriores'], [3, 'só das últimas 3 aulas'], [5, 'só das últimas 5 aulas'], [10, 'só das últimas 10 aulas']].map(function(o){
+        return '<option value="' + o[0] + '"' + (Number(v.rev_janela || 0) === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
+      // rigor
+      '<p class="grupoTitulo" style="margin-top:6px">Rigor da correção das abertas ' + ajuda('Calibra a IA que corrige as questões <b>abertas</b>. <b>Padrão</b> é o critério atual (conceito, raciocínio e aplicação). Mais <b>flexível</b>: valoriza o que o aluno acertou e desconta menos a falta de detalhe. Mais <b>rigoroso</b>: exige justificativa precisa e desconta imprecisões.<br><br>' +
+        '<b>O rigor fica gravado em cada questão no momento em que ela é liberada.</b> Mudar aqui vale só para as próximas liberações: <b>nenhuma nota já dada é corrigida de novo</b>. Na hora de liberar dá para ajustar só daquela vez.') + '</p>' +
+      '<div class="rigorBarra" id="fRigor">' + [1, 2, 3, 4, 5].map(function(n){ return '<button type="button" data-rig="' + n + '" aria-pressed="' + (Number(v.rigor || 3) === n) + '">' + RIGOR_NOMES[n] + '</button>'; }).join('') + '</div>' +
+      // explicação das alternativas
+      '<label style="display:flex;gap:9px;align-items:flex-start;cursor:pointer;margin:14px 0 4px;font-size:14px"><input type="checkbox" id="fExplicar"' + (v.explicar_alts === false ? '' : ' checked') + ' style="width:18px;height:18px;margin-top:2px;flex:none">' +
+      '<span><b>Explicar as alternativas para o aluno</b> ' + ajuda('Nas fechadas, a IA escreve uma frase curta para <b>cada alternativa</b> dizendo por que ela está certa ou errada. O aluno vê essas explicações em "Minhas matérias" <b>depois que a questão fecha</b>, junto com a resposta certa. Você também vê na hora de revisar e pode editar a questão.<br><br>' +
+        'Sai na mesma chamada da IA que cria a questão: <b>não gasta chamada a mais</b> (só deixa a resposta da IA um pouco maior). Se você editar as alternativas ou o gabarito, as explicações daquela questão são apagadas para não ficarem erradas.') + '</span></label>' +
       '<label class="rot" for="fOri" style="margin-top:8px">Orientações fixas para a IA gerar as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea>' +
       '<details style="margin-top:12px"' + (v.glossario.length ? '' : ' open') + '><summary class="link">Glossário · ' + v.glossario.length + ' termo(s)</summary>' +
       '<textarea id="fGlo" style="margin-top:8px;min-height:120px" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
@@ -2350,6 +2523,10 @@ function abrirForm(d){
     '<div id="fErro" class="erro oculto"></div>' +
     '<div class="botoes"><button type="button" id="fSalvar">' + (d ? 'Salvar alterações' : 'Criar disciplina') + '</button><button type="button" class="secundario" id="fCancelar">Cancelar</button></div>';
   f.classList.remove('oculto');
+  var rigorForm = Number(v.rigor || 3);
+  f.querySelectorAll('[data-rig]').forEach(function(b){ b.addEventListener('click', function(){
+    rigorForm = Number(b.dataset.rig); f.querySelectorAll('[data-rig]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+  }); });
   desenharEtapas();
   var atualizaPeso = function(){ var n = Number($('fPeso').value) || 0; $('fPesoTxt').textContent = 'Nota de cada aula = ' + n + '% média das fechadas + ' + (100 - n) + '% média das abertas.'; };
   $('fPeso').addEventListener('input', atualizaPeso); atualizaPeso();
@@ -2363,6 +2540,7 @@ function abrirForm(d){
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: $('fFech').value,
       qtd_abertas: $('fAb').value, peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, tempo_aberta: $('fTempoAb').value,
       descartar_piores: $('fDescartar').checked, apostila_auto: $('fApostilaAuto').checked, orientacoes: $('fOri').value, glossario: $('fGlo').value,
+      rigor: rigorForm, rev_fechadas: $('fRevF').value, rev_abertas: $('fRevA').value, rev_janela: $('fRevJ').value, explicar_alts: $('fExplicar').checked,
       composicao: {etapas: etapasEdit}, material_url: $('fMaterial').value
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
       .catch(function(e){ bt.disabled = false; $('fErro').textContent = e.message; $('fErro').classList.remove('oculto'); });
