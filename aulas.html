@@ -112,7 +112,9 @@
   .temaLinha button{margin:0}
   .desemp{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:bold;border:1.5px solid currentColor}
   .desemp.v{color:#1a7a3c}.desemp.a{color:#8a6100}.desemp.r{color:#c62828}.desemp.c{color:#5b6b86}
-  .expl{font-size:12.5px;color:var(--cinza);display:block;margin:2px 0 4px}
+  .expl{display:block;margin:4px 0 6px;padding:6px 10px;font-size:13px;font-weight:normal;color:#0e3a5c;background:#e8f3fb;border-left:4px solid #2e62c6;border-radius:0 8px 8px 0}
+  .expl::before{content:'💡 Por quê: ';font-weight:bold}
+  li.certa .expl{background:#e6f5ea;border-left-color:#1a7a3c;color:#14532d}
   details.encerradas>summary{cursor:pointer;font-weight:bold;color:var(--menu);font-size:14px;padding:4px 0}
   details.encerradas[open]>summary{margin-bottom:4px}
   .grupoTitulo{font-size:13px;font-weight:bold;color:var(--titulo);text-transform:uppercase;letter-spacing:.04em;margin:16px 0 4px}
@@ -652,7 +654,7 @@ function desenharAbertas(grupos){
       h += '<div class="antifraude" role="note"><span class="ic" aria-hidden="true">🛡️</span><span><b>Anti-fraude por IA ativo.</b> Não saia desta tela enquanto responde.</span></div>';
     g.questoes.forEach(function(q, i){
       h += '<div class="caixa" data-q="' + esc(q.id) + '" data-prof="' + esc(g.professorId) + '"><div class="linha" style="border:0;padding:0 0 6px">' +
-        '<span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' · ' + (i + 1) + ' de ' + g.questoes.length + '</span>' +
+        (q.revisao ? '<span class="tag t-warn">🔁 revisão de aula anterior</span> ' : '') + '<span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' · ' + (i + 1) + ' de ' + g.questoes.length + '</span>' +
         (q.aguardando ? '<span class="aviso">⏱ ' + q.tempoMin + ' min para responder</span>'
           : q.respondida || q.esgotada ? ''
           : q.tempoMin ? '<span class="tempoResp">⏱ <span data-fim="' + q.fechaEm + '" data-desvio="' + desvio + '" data-recarregar>' + mmss(q.fechaEm - g.agora) + '</span></span>'
@@ -865,7 +867,8 @@ function abrirMateria(m){
         var pontos = q.emCorrecao ? '<span class="tag t-warn">em correção</span>'
           : temVale ? '<span class="ptsCel' + (q.pontos ? '' : ' zero') + '"><b>' + nota10(q.pontos || 0) + '</b> de ' + nota10(q.vale) + '</span>'
           : (q.nota !== null ? '<b>' + dez(q.nota) + '</b> de 10' : '');
-        return '<div class="detalhe" style="margin-top:8px"><div class="linha" style="border:0;padding:0 0 6px;align-items:flex-start"><span><span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></span><span style="white-space:nowrap">' + pontos + '</span></div>' +
+        return '<div class="detalhe" style="margin-top:8px"><div class="linha" style="border:0;padding:0 0 6px;align-items:flex-start"><span>' + (q.revisao ? '<span class="tag t-warn">🔁 revisão</span> ' : '') + '<span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></span><span style="white-space:nowrap">' + pontos + '</span></div>' +
+          (temVale && q.nota !== null && !q.emCorrecao ? '<p class="aviso" style="margin:0 0 4px">Nota da correção: <b>' + dez(q.nota) + ' de 10</b> → esta questão vale ' + nota10(q.vale) + ' dos 10 pontos da aula, então ficou com ' + nota10(q.pontos || 0) + '.</p>' : '') +
           '<p class="aviso" style="margin:0">Sua resposta: ' + (q.suaResposta === null ? '<b>não respondeu</b> (vale zero)' : esc(q.suaResposta)) + '</p>' +
           (q.explicacoes && q.explicacoes.length && q.alternativas && q.alternativas.length
             ? '<ol class="alts" type="A" style="margin:6px 0 0">' + q.alternativas.map(function(alt, k){
@@ -1224,7 +1227,7 @@ function ligarImportarAudios(){
 }
 
 function abrirDarAula(){
-  $('areaQ').innerHTML = '';
+  // a área de questões não é apagada: as questões abertas continuam guardadas (aparecem na disciplina delas)
   $('aulaTopo').innerHTML = '<div class="caixa"><p class="carregando">Verificando aula em andamento…</p></div>';
   Promise.all([api('aulaAtual'), idbTodos()]).then(function(r){
     var pac = r[0], pend = r[1];
@@ -1266,6 +1269,12 @@ function maxOrdem(aulaId, ordens, pend){
   return m;
 }
 
+// A área de questões (gerar/acompanhar) só aparece na disciplina dela; nas outras fica guardada
+function mostrarAreaQ(){
+  var el = $('areaQ'); if(!el) return;
+  var visivel = !Q.aula || G.fase === 'gravando' || G.fase === 'encerrada' || Q.aula.disciplinaId === G.disc;
+  el.style.display = visivel ? '' : 'none';
+}
 function desenharInicioAula(pend){
   var ds = ativas();
   // nenhuma disciplina vem marcada: o professor escolhe antes de gravar (evita gravar na disciplina errada)
@@ -1287,6 +1296,13 @@ function desenharInicioAula(pend){
     (sem ? '<p class="aviso" style="margin-top:8px">Cadastre sua chave do Gemini em Configurações para gravar.</p>' : '') +
     '<div id="caixaTeste"></div><div id="caixaNG"></div><div id="msgIni"></div></div>';
   ligarBannerPendentes();
+  // questões abertas de outra disciplina: ficam guardadas e voltam ao clicar nela
+  if(Q.aula && $('acomp') && Q.aula.disciplinaId !== G.disc && discPorId(Q.aula.disciplinaId)){
+    $('aulaTopo').insertAdjacentHTML('afterbegin', '<div class="convite">Questões abertas em <b>' + esc(discPorId(Q.aula.disciplinaId).nome) + '</b> · aula ' + Q.aula.numero +
+      '. <button type="button" class="link" id="btVoltarQ">Ver as questões</button></div>');
+    $('btVoltarQ').addEventListener('click', function(){ G.disc = Q.aula.disciplinaId; G.tempos = discPorId(G.disc).tempos; desenharInicioAula(pend); });
+  }
+  mostrarAreaQ();
   $('aulaTopo').querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ G.disc = b.dataset.disc; G.tempos = discPorId(G.disc).tempos; desenharInicioAula(pend); }); });
   $('aulaTopo').querySelectorAll('[data-tempos]').forEach(function(b){ b.addEventListener('click', function(){ G.tempos = Number(b.dataset.tempos); desenharInicioAula(pend); }); });
   $('btIniciar').addEventListener('click', function(){
@@ -1429,6 +1445,8 @@ function comecarGravacao(pac){
       G.ordem = maxOrdem(p.aula.id, p.aula.ordens, pend);
       G.ativoAcum = G.ordem * BLOCO_SEG * 1000; G.ativoDesde = Date.now(); G.pausado = false; G.encerrando = false;
       G.estado = p.aula; G.limiteSeg = ((p.aula.tempos || 2) * 50 + 20) * 60;
+      // aula nova: a área de questões passa a ser dela (as da aula anterior continuam abertas para os alunos)
+      if(Q.aula && Q.aula.id !== p.aula.id){ $('areaQ').innerHTML = ''; if(Q.poll){ clearInterval(Q.poll); Q.poll = null; } }
       Q.aula = p.aula;
       novoGravador();
       pedirWakeLock();
@@ -1729,7 +1747,8 @@ function desenharEncerrada(){
   $('btRodada').addEventListener('click', function(){ abrirCompositor('inteira'); });
   $('btAtual').addEventListener('click', atualizarEstado);
   $('btQREnc').addEventListener('click', function(){ qrAulas(G.discInfo.nome + ' · aula ' + G.aula.numero); });
-  $('btNova').addEventListener('click', function(){ G = {fase:'inicio', disc: '', tempos: 0}; $('areaQ').innerHTML = ''; abrirDarAula(); });
+  $('btNova').addEventListener('click', function(){ G = {fase:'inicio', disc: '', tempos: 0}; abrirDarAula(); });   // as questões abertas ficam guardadas
+  mostrarAreaQ();
 }
 
 /* ---- teste de 30 segundos ---- */
@@ -2018,7 +2037,7 @@ function carregarAcompanhamento(){
         return '<div class="detalhe" style="margin-top:8px"><p style="margin-bottom:4px"><b>' + esc(x.aluno) + '</b> <span class="aviso">' + esc(x.enunciado.slice(0, 80)) + (x.enunciado.length > 80 ? '…' : '') + '</span></p>' +
           alertaSuspeita(x.alertas) + avisoVoz(x.voz) + '<p style="margin-bottom:6px">' + esc(x.resposta) + '</p>' + (x.comentario ? '<p class="aviso" style="margin-bottom:6px">IA: ' + esc(x.comentario) + '</p>' : '') +
           '<div class="botoes" style="margin-top:0">' + (x.status === 'corrigida' ? '' : '<span class="tag t-warn">em correção</span>') +
-          '<input type="number" min="0" max="10" step="0.1" style="width:90px" value="' + (x.nota === null ? '' : x.nota / 10) + '" aria-label="Nota" data-nota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">' +
+          '<input type="number" min="0" max="10" step="0.1" style="width:90px" value="' + (x.nota === null ? '' : x.nota / 10) + '" aria-label="Nota de 0 a 10" data-nota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '"><span class="aviso">de 10</span>' +
           '<button type="button" class="secundario mini" data-salvanota="' + esc(x.questaoId) + '|' + esc(x.alunoId) + '">Salvar nota</button>' + (x.ajustada ? '<span class="tag t-azul">ajustada</span>' : '') + '</div></div>';
       }).join('');
     }
@@ -2958,7 +2977,13 @@ function carregarInscricoes(){
       bt.addEventListener('click', function(){
         if(bt.dataset.dec === 'removida' && bt.textContent !== 'Confirmar remoção'){ bt.textContent = 'Confirmar remoção'; return; }
         bt.disabled = true;
-        api('decidirInscricao', {id: bt.dataset.id, decisao: bt.dataset.dec}).then(function(){ carregarInscricoes(); carregarResumo(); })
+        api('decidirInscricao', {id: bt.dataset.id, decisao: bt.dataset.dec}).then(function(){
+          var linha = bt.closest('.linha'), rot = {aprovada: '✓ aprovado', recusada: '✗ recusado', removida: 'removido'}[bt.dataset.dec];
+          linha.querySelectorAll('button').forEach(function(x){ x.remove(); });
+          linha.insertAdjacentHTML('beforeend', '<span class="tag ' + (bt.dataset.dec === 'aprovada' ? 't-ok' : 't-cinza') + '">' + rot + '</span>');
+          linha.style.opacity = '.6';
+          if(bt.dataset.dec !== 'removida'){ var bg = $('badgeInsc'), n = Math.max(0, (Number(bg.textContent) || 0) - 1); bg.textContent = n; bg.classList.toggle('oculto', !n); }
+        })
           .catch(function(e){ bt.disabled = false; erroGeral(e.message); });
       });
     });
