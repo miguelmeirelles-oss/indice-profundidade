@@ -963,9 +963,19 @@ function desenharQuestaoEstudo(rascunhoTxt){
     var txt = ta.value.trim();
     if(txt.length < 10){ $('estMsg').innerHTML = '<div class="erro">Escreva sua resposta antes de enviar.</div>'; return; }
     var b = this; b.disabled = true; $('estMsg').innerHTML = '<p class="carregando">Corrigindo… (uns 10 a 20 segundos)</p>';
-    api('estudoResponder', {professorId: m.professorId, disciplinaId: m.disciplinaId, questaoId: q.id, resposta: txt, usouAjuda: $('estAjuda').checked})
-      .then(function(r){ EST.ultima = r; desenharCorrecaoEstudo(txt); })
-      .catch(function(e){ b.disabled = false; $('estMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    var tentar = function(n){
+      api('estudoResponder', {professorId: m.professorId, disciplinaId: m.disciplinaId, questaoId: q.id, resposta: txt, usouAjuda: $('estAjuda').checked})
+        .then(function(r){ EST.ultima = r; desenharCorrecaoEstudo(txt); })
+        .catch(function(e){
+          if(/ocupada/i.test(e.message) && n < 2){
+            $('estMsg').innerHTML = '<p class="carregando">A IA está ocupada agora (muita gente no mesmo minuto). Tento de novo sozinho em 40 segundos; sua resposta está guardada aqui.</p>';
+            setTimeout(function(){ if($('estMsg')) { $('estMsg').innerHTML = '<p class="carregando">Corrigindo…</p>'; tentar(n + 1); } }, 40000 + Math.random() * 10000);
+            return;
+          }
+          b.disabled = false; $('estMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>';
+        });
+    };
+    tentar(0);
   });
 }
 function desenharCorrecaoEstudo(txt){
@@ -995,7 +1005,7 @@ function abrirRelatorioEstudo(){
   el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Preparando o seu relatório… (pode levar uns 15 s)</p></div>';
   el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
   api('estudoRelatorio', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
-    el.innerHTML = cabEstudo(m) + '<div class="caixa"><h2>📈 Meu relatório · ' + esc(m.nome) + '</h2><p class="aviso" style="margin-top:0">O seu professor também vê este relatório.</p>' + htmlRelatorio(r) + '</div>';
+    el.innerHTML = cabEstudo(m) + '<div class="caixa"><h2>📈 Meu relatório · ' + esc(m.nome) + '</h2>' + htmlRelatorio(r) + '</div>';
     el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
   }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); }); });
 }
