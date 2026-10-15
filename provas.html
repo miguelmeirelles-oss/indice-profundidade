@@ -677,7 +677,8 @@ function formProva(p){
   var opcoes = itensDeProva(etapas);
   // sugere o primeiro item de prova que ainda não tem prova cadastrada
   var livre = opcoes.filter(function(x){ return !dadosDisc.provas.some(function(pp){ var y = itemDaProva(etapas, pp); return y && y.item.id === x.item.id; }); })[0] || opcoes[0];
-  var v = p || {titulo: livre ? livre.item.nome : 'Prova', item: livre ? livre.item.id : '', inicio: 0, duracao: 120, janela: 120, instrucoes: '', publicada: true, questoes: [], rigor: d.rigor || 3};
+  var v = p || {titulo: livre ? livre.item.nome : 'Prova', item: livre ? livre.item.id : '', inicio: 0, duracao: 120, janela: 120, instrucoes: dadosDisc.instrucoesPadrao || '', publicada: true, questoes: [], rigor: d.rigor || 3};
+  var criteriosMarcados = v.criterios || dadosDisc.criteriosPadrao || ['todo', 'separar'];
   var rigorProva = Number(v.rigor || d.rigor || 3);
   var atual = p ? itemDaProva(etapas, p) : livre;
   qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes, sugestoes:(q.sugestoes || []).slice()}; });
@@ -692,7 +693,20 @@ function formProva(p){
       return '<option value="' + esc(x.item.id) + '"' + (atual && atual.item.id === x.item.id ? ' selected' : '') + '>' + esc(x.etapa.nome + ' · ' + x.item.nome + ' (vale ' + nota10(x.item.valor) + ' na etapa)') + '</option>';
     }).join('') + '</select>' : '<p class="erro" style="margin:0">A composição da nota desta disciplina não tem nenhum item do tipo Prova. Acrescente em Aula por IA → Disciplinas → Editar.</p><input type="hidden" id="pItem" value="">') +
       '<p class="aviso" style="margin:6px 0 0">A prova é corrigida de 0 a 10; o peso vem da composição da nota.</p></div>' +
-    '<div class="campoLargo"><label class="rot" for="pIns">Instruções gerais de correção (opcional)</label><textarea id="pIns" placeholder="ex.: Aceitar respostas com outras palavras se o conceito estiver certo. Cálculo sem unidade perde 25% da questão.">' + esc(v.instrucoes) + '</textarea></div></div>' +
+    // critérios prontos para marcar (os dois primeiros vêm marcados) + orientações livres
+    '<div class="campoLargo"><label class="rot">Critérios de correção ' +
+      '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Regras prontas que a IA segue ao corrigir esta prova. Marque as que valem. Para o que for específico desta prova, use as instruções gerais logo abaixo. Com "usar como padrão", a próxima prova desta disciplina já vem com estes critérios e instruções.</div></details></label>' +
+      (dadosDisc.criteriosOpcoes || []).map(function(c){
+        return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer;margin:3px 0"><input type="checkbox" data-pcrit="' + esc(c.id) + '"' + (criteriosMarcados.indexOf(c.id) !== -1 ? ' checked' : '') + ' style="width:17px;height:17px;margin-top:2px;flex:none"> ' + esc(c.rotulo) + '</label>';
+      }).join('') + '</div>' +
+    '<div class="campoLargo"><label class="rot" for="pIns">Instruções gerais de correção (opcional)</label><textarea id="pIns" placeholder="ex.: Na questão 3, aceitar tanto pasteurização lenta quanto rápida.">' + esc(v.instrucoes) + '</textarea>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer;margin:6px 0 0"><input type="checkbox" id="pPadrao" style="width:17px;height:17px"> Usar estes critérios e instruções como padrão nas próximas provas desta disciplina</label></div></div>' +
+    // aulas que caem nesta prova (o estudo dirigido dos alunos foca nelas até a data da prova)
+    '<div class="campoLargo" style="margin-bottom:14px"><label class="rot">Aulas que caem nesta prova ' +
+      '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Até a data desta prova, o <b>estudo dirigido</b> dos alunos foca nos assuntos destas aulas. Sem nenhuma marcada, o estudo usa todas as aulas já dadas.</div></details></label>' +
+      ((dadosDisc.aulasDisc || []).length ? '<div style="display:flex;flex-wrap:wrap;gap:6px 16px">' + dadosDisc.aulasDisc.map(function(a){
+        return '<label style="display:flex;gap:6px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" data-paula="' + esc(a.id) + '"' + ((v.aulas || []).indexOf(a.id) !== -1 ? ' checked' : '') + ' style="width:17px;height:17px"> Aula ' + a.numero + (a.tema ? ' · ' + esc(a.tema) : '') + '</label>';
+      }).join('') + '</div>' : '<p class="aviso" style="margin:0">Nenhuma aula registrada ainda nesta disciplina.</p>') + '</div>' +
     '<div class="campoLargo" style="margin-bottom:14px"><label class="rot">Rigor da correção pela IA ' +
       '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Calibra a IA que corrige esta prova. <b>Padrão</b> é o critério normal (crédito parcial pelos tópicos do gabarito). Mais <b>flexível</b>: crédito parcial mais generoso. Mais <b>rigoroso</b>: crédito integral só com resposta completa e precisa.<br><br>' +
       'Vem preenchido com o rigor da disciplina e vale só para esta prova. <b>As instruções de correção que você escreve têm prioridade</b> (ex.: "aceitar sem unidade" continua valendo). Mudar depois não altera notas já corrigidas; para aplicar, use "Corrigir de novo com IA" nas entregas.</div></details></label>' +
@@ -736,6 +750,9 @@ function formProva(p){
     bt.disabled = true;
     api('salvarProva', {prova: {id: p ? p.id : '', disciplinaId: discSel, titulo: $('pTit').value, inicio: new Date(dt + 'T' + hr).getTime(),
       duracao: $('pDur').value, janela: $('pJan').value, item: $('pItem').value, instrucoes: $('pIns').value, rigor: rigorProva,
+      criterios: Array.prototype.filter.call(el.querySelectorAll('[data-pcrit]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.pcrit; }),
+      salvarPadrao: $('pPadrao').checked,
+      aulas: Array.prototype.filter.call(el.querySelectorAll('[data-paula]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.paula; }),
       publicada: $('pPub').checked, questoes: qsEdit.map(function(q){ q.pontos = String(q.pontos).replace(',', '.'); return q; })}})
       .then(listarProvas).catch(function(e){ bt.disabled = false; $('pErro').textContent = e.message; $('pErro').classList.remove('oculto'); });
   });
