@@ -3455,6 +3455,17 @@ function desenharConfigGeral(c){
   if(u) $('cfgUso').textContent = 'Total hoje: ' + u.chamadas + ' chamada(s) · ' + (u.tokens >= 1000 ? Math.round(u.tokens / 1000) + ' mil' : u.tokens) + ' tokens · ' + u.chaves + ' chave(s).';
   desenharUsoModelos(u);
 }
+// Embaixo do nome do modelo: o que usou ele hoje e, nos modelos de reserva, por que o sistema desceu até ele
+var MOTIVO_DESCEU = {minuto: 'limite por minuto do modelo de cima', cota: 'cota do dia do modelo de cima acabou', cortada: 'resposta cortada por tamanho',
+  sobrecarga: 'Google sobrecarregado', indisponivel: 'modelo de cima indisponível', erro: 'erro do Google'};
+function detalheUso(m){
+  var lista = function(o, nomes){ return Object.keys(o || {}).sort(function(a, b){ return o[b] - o[a]; }).map(function(k){ return esc(nomes ? nomes[k] || k : k) + ' ' + o[k]; }).join(' · '); };
+  var h = '';
+  if(Object.keys(m.tarefas || {}).length) h += '<br><span class="aviso" style="font-size:11.5px">usado por: ' + lista(m.tarefas) + '</span>';
+  if(Object.keys(m.desceu || {}).length) h += '<br><span class="aviso" style="font-size:11.5px">veio para cá por: ' + lista(m.desceu, MOTIVO_DESCEU) + '</span>';
+  if(Object.keys(m.freouEm || {}).length) h += '<br><span class="aviso" style="font-size:11.5px">freou em: ' + lista(m.freouEm) + '</span>';
+  return h;
+}
 // Tabela no formato do painel do Google (AI Studio): barra + "usado / limite" por modelo, e o total do dia
 function desenharUsoModelos(u){
   var box = $('cfgUsoTabela'); if(!box) return;
@@ -3474,7 +3485,8 @@ function desenharUsoModelos(u){
     usadoTot += m.chamadas; limTot += m.limite * nK;
     pk.forEach(function(n, i){ usadoK[i] = (usadoK[i] || 0) + n; limK[i] = (limK[i] || 0) + m.limite; });
     return '<tr><td>' + esc(nome(m.modelo)) + (m.esgotou && varias ? ' <span style="color:#c62828;font-size:11.5px;font-weight:bold">· esgotado em todas as chaves</span>' : '') +
-      (m.porMinuto ? ' <span class="aviso" style="font-size:11.5px" title="Muitas chamadas no mesmo minuto (ex.: vários trechos da gravação ao mesmo tempo). Não é a cota do dia: libera sozinho em segundos.">· freou ' + m.porMinuto + '× no limite por minuto</span>' : '') + '</td>' +
+      (m.porMinuto ? ' <span class="aviso" style="font-size:11.5px" title="Muitas chamadas no mesmo minuto (ex.: vários trechos da gravação ao mesmo tempo). Não é a cota do dia: libera sozinho em segundos.">· freou ' + m.porMinuto + '× no limite por minuto</span>' : '') +
+      detalheUso(m) + '</td>' +
       (varias ? pk.map(function(n, i){ return cel(n, m.limite, m.esgChave && m.esgChave[i]); }).join('') : cel(m.chamadas, m.limite, m.esgotou)) + '</tr>';
   }).join('');
   var cab = varias ? usadoK.map(function(_, i){ return '<th style="text-align:left">Chave ' + (i + 1) + ' · RPD</th>'; }).join('') : '<th style="text-align:left">RPD (chamadas hoje)</th>';
@@ -3483,7 +3495,7 @@ function desenharUsoModelos(u){
   box.innerHTML = '<div class="tabelaBox"><table><thead><tr><th>Modelo</th>' + cab + '</tr></thead><tbody>' + linhas + tot + '</tbody></table></div>' +
     '<p class="aviso" style="margin-top:6px"><b>' + usadoTot + ' de ' + limTot + '</b> chamadas grátis do dia usadas' + (varias ? ' (somando as ' + nK + ' chaves; cada chave em projeto separado do Google tem o seu limite)' : '') + '. ' +
     'Conta tudo o que <b>este sistema</b> mandou: gravação e ata, questões, correção das respostas dos alunos, provas, apostila, recomendações, chat e teste de chaves. ' +
-    'Se a mesma chave for usada em outro lugar (o Estudar com IA, por exemplo), o painel do Google mostra mais. "Freou no limite por minuto" não é falta de cota: são muitas chamadas no mesmo minuto, e libera sozinho. Quando um modelo esgota, o sistema passa para o próximo da lista. Zera entre 4h e 5h. ' +
+    'Se a mesma chave for usada em outro lugar (o Estudar com IA, por exemplo), o painel do Google mostra mais. "Freou no limite por minuto" não é falta de cota: são muitas chamadas no mesmo minuto, e libera sozinho. Quando um modelo esgota, o sistema passa para o próximo da lista. Embaixo de cada modelo aparece <b>quais tarefas</b> o usaram e, nos de reserva, <b>por que</b> o sistema desceu até ele. Tudo zera entre 4h e 5h. ' +
     'Confira em <a href="https://aistudio.google.com/rate-limit" target="_blank" rel="noopener">aistudio.google.com/rate-limit</a>.</p>';
 }
 $('cfgSalvar').addEventListener('click', function(){
