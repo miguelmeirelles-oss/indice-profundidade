@@ -524,7 +524,10 @@ function mmss(ms){ var s = Math.max(0, Math.round(ms / 1000)), m = Math.floor(s 
 function hms(seg){ seg = Math.max(0, Math.floor(seg)); var h = Math.floor(seg / 3600), m = Math.floor(seg % 3600 / 60), s = seg % 60;
   return [h, m, s].map(function(v){ return (v < 10 ? '0' : '') + v; }).join(':'); }
 
-function api(acao, dados){
+var ACOES_SO_LEITURA = ['sessao', 'professores', 'materias', 'minhasMaterias', 'questoesAbertas', 'minhasNotas', 'apostila', 'minhasProvas', 'acompanhar', 'estudoInicio', 'estadoAula', 'aulaAtual'];
+function esperar(ms){ return new Promise(function(res){ setTimeout(res, ms); }); }
+function api(acao, dados, tentativa){
+  tentativa = tentativa || 0;
   dados = dados || {}; dados.token = token;
   // tela de Notas/Histórico de uma disciplina encerrada: o servidor lê a planilha de arquivo
   var ctxArq = abaAtual === 'notas' ? notasDisc : abaAtual === 'hist' ? histDisc : '';
@@ -537,6 +540,10 @@ function api(acao, dados){
   .then(function(j){
     if(!j.ok){
       if(j.erro === 'SESSAO'){ mostrarLogin(); throw new Error('Sua sessão expirou. Entre de novo.'); }
+      // muita gente ao mesmo tempo: espera um pouco (tempo sorteado, para não voltarem todos juntos) e tenta de novo
+      var passageiro = j.erro === 'OCUPADO' || (ACOES_SO_LEITURA.indexOf(acao) !== -1 && /timed out|tempo limite|Service Spreadsheets|too many|tente novamente/i.test(String(j.erro)));
+      if(passageiro && tentativa < 3) return esperar(1500 + Math.random() * 2500 * (tentativa + 1)).then(function(){ return api(acao, dados, tentativa + 1); });
+      if(j.erro === 'OCUPADO') throw new Error('Muita gente usando ao mesmo tempo. Tente de novo em alguns segundos.');
       throw new Error(j.erro || 'Não deu para concluir.');
     }
     return j.resultado;
@@ -765,12 +772,22 @@ function desenharAbertas(grupos){
       var s = sinais[qid], env = s ? {colagens:s.colagens, saidas:s.saidas, foraSeg:s.foraSeg, maiorSalto:s.maiorSalto, eventos:s.eventos, ditado:s.ditado, ditadoChars:s.ditadoChars,
         segundos: s.inicio ? Math.round((Date.now() - s.inicio) / 1000) : 0} : null;
       api('responder', {professorId: pid, questaoId: qid, resposta: r, sinais: env}).then(function(res){
-        if(res && res.aberta) api('corrigirResposta', {professorId: pid, questaoId: qid}).catch(function(){});
+        if(res && res.aberta) corrigirComFila(pid, qid, 0);
         delete rascunho[qid]; delete sinais[qid];
         trocarQuestaoNaTela(pid, qid, function(q){ q.respondida = true; return q; });
       }).catch(function(e){ bt.disabled = false; bt.textContent = 'Enviar resposta'; card.querySelector('[data-msg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });
   });
+}
+
+// 1ª tentativa em até 12 s (sorteado); se a IA estiver ocupada, tenta de novo em ~1, ~2 e ~4 min.
+// Se o aluno fechar a página, a tela do professor e a fila da madrugada terminam a correção.
+function corrigirComFila(pid, qid, n){
+  var espera = n === 0 ? Math.random() * 12000 : [0, 45000, 90000, 180000][n] + Math.random() * 15000;
+  setTimeout(function(){
+    api('corrigirResposta', {professorId: pid, questaoId: qid}).then(function(ok){ if(ok === false && n < 3) corrigirComFila(pid, qid, n + 1); })
+      .catch(function(){ if(n < 3) corrigirComFila(pid, qid, n + 1); });
+  }, espera);
 }
 
 /* ---- memória das telas do aluno ----
@@ -2374,8 +2391,17 @@ function abrirAcompanhamento(){
   Q.poll = setInterval(function(){ if(abaAtual === 'aula' && $('acomp')) carregarAcompanhamento(); else { clearInterval(Q.poll); Q.poll = null; } }, 15000);
 }
 
+function filaCorrecao(abertas){
+  if(Q.corrigindo) return;
+  var parada = abertas.filter(function(x){ return x.status !== 'corrigida' && x.idade > 90; }).sort(function(a, b){ return b.idade - a.idade; })[0];
+  if(!parada) return;
+  Q.corrigindo = true;
+  api('corrigirPendente', {questaoId: parada.questaoId, alunoId: parada.alunoId})
+    .then(function(){ Q.corrigindo = false; }, function(){ Q.corrigindo = false; });
+}
 function carregarAcompanhamento(){
   api('acompanhar', {aulaId: Q.aula.id}).then(function(r){
+    filaCorrecao(r.abertas || []);
     var desvio = r.agora - Date.now(), fim = Math.max.apply(null, [0].concat(r.questoes.map(function(q){ return q.fechaEm; })));
     var total = r.questoes.length, aberto = fim > r.agora;
     var h = '<div class="caixa" id="acomp"><h2>Questões liberadas · aula ' + Q.aula.numero + '</h2>' +
