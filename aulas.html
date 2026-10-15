@@ -94,6 +94,14 @@
   .diaLinha .faltasTxt{flex:1;min-width:220px;font-size:14px}
   .diaLinha .chk{display:flex;gap:5px;align-items:center;font-size:13px;cursor:pointer;white-space:nowrap}
   .diaLinha .chk input{width:17px;height:17px;accent-color:#1a7a3c}
+  .eixo{border-left:5px solid;border-radius:0 12px 12px 0;padding:8px 12px;margin:8px 0;background:#fafbfd;font-size:14.5px}
+  .modeloEst{background:#e6f5ea;border-left:5px solid #1a7a3c;border-radius:0 12px 12px 0;padding:10px 14px;margin:10px 0;font-size:14.5px}
+  .ajudaEst{background:#eef4ff;border-left:5px solid var(--azul);border-radius:0 12px 12px 0;padding:10px 14px;margin:10px 0;font-size:14.5px}
+  .temaCard{border:2px solid var(--linha);border-radius:12px;padding:10px 12px;background:#fff;text-align:left;box-shadow:none;font-weight:normal;color:var(--navy);cursor:pointer}
+  .temaCard:hover{border-color:var(--azul);transform:none;box-shadow:none}
+  .barraDom{height:9px;border-radius:5px;background:#e5e7eb;overflow:hidden;margin:6px 0 4px}
+  .barraDom i{display:block;height:100%}
+  .numEst{font-family:var(--mono,Consolas,monospace);font-size:26px;font-weight:bold}
   details.ajuda{display:inline-block;vertical-align:middle;margin-left:4px}
   details.ajuda>summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;width:19px;height:19px;border-radius:50%;background:var(--menu);color:#fff;font-size:12px;font-weight:bold;line-height:1}
   details.ajuda>summary::-webkit-details-marker{display:none}
@@ -364,13 +372,16 @@
   <section id="tProf" class="oculto">
     <div class="abas" role="group" aria-label="Seções do professor">
       <button type="button" class="aba" data-aba="aula" aria-pressed="true">Dar aula</button>
+      <button type="button" class="aba" data-aba="quest" aria-pressed="false">Questões</button>
       <button type="button" class="aba" data-aba="notas" aria-pressed="false">Notas</button>
       <button type="button" class="aba" data-aba="hist" aria-pressed="false">Histórico</button>
+      <button type="button" class="aba" data-aba="estudo" aria-pressed="false">Estudo dos alunos</button>
       <button type="button" class="aba" data-aba="disc" aria-pressed="false">Disciplinas</button>
       <button type="button" class="aba" data-aba="insc" aria-pressed="false">Inscrições<span class="badge oculto" id="badgeInsc"></span></button>
       <button type="button" class="aba" data-aba="cfg" aria-pressed="false">Configurações</button>
       <button type="button" class="aba abaChat" data-aba="chat" aria-pressed="false">🤖 Chat com IA</button>
     </div>
+    <div id="discBarra" class="caixa oculto"></div>
     <div id="avisoChave" class="convite oculto">Cadastre sua chave do Gemini em <b>Configurações</b>. Sem ela, gravação, questões e apostila ficam bloqueadas.</div>
 
     <div id="pAula">
@@ -379,7 +390,11 @@
       <div id="aulaLista"></div>
     </div>
 
+    <div id="pQuest" class="oculto"></div>
+
     <div id="pNotas" class="oculto"></div>
+
+    <div id="pEstudo" class="oculto"></div>
 
     <div id="pHist" class="oculto"></div>
 
@@ -407,6 +422,20 @@
 
     <div id="pCfg" class="oculto">
       <div class="caixa" id="cfgAudios"></div>
+      <div class="caixa">
+        <h2>QR code do cadastro</h2>
+        <p style="margin-top:0">Abre a tela de entrar ou criar conta e, depois do login, leva o aluno ao Aula por IA. Para projetar em sala ou imprimir no plano de ensino.</p>
+        <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+          <div id="cfgQR" style="background:#fff;padding:10px;border:1px solid #ddd;border-radius:6px;line-height:0"></div>
+          <div>
+            <p class="qrUrl" id="cfgQRUrl" style="word-break:break-all;font-size:13px;margin:0 0 10px"></p>
+            <div class="botoes" style="margin-top:0">
+              <button type="button" id="cfgQRTela">Mostrar em tela cheia</button>
+              <button type="button" class="secundario" id="cfgQRBaixar">Baixar imagem (PNG)</button>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="caixa">
         <h2>Chave do Gemini</h2>
         <p>Todas as tarefas de IA das suas matérias usam só as suas chaves. Elas ficam guardadas no servidor; aqui aparece só o final de cada uma.</p>
@@ -771,7 +800,8 @@ function carregarMinhas(){
       return '<div class="cartao"><div class="l1"><span>' + esc(m.nome) + ' · ' + esc(m.semestre) + '</span>' + tag + '</div>' +
         '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') + '</div>' +
         '<div class="botoes" style="margin-top:8px">' +
-        (m.situacao === 'aprovada' ? '<button type="button" class="mini" data-abrir="' + i + '">Notas</button>' +
+        (m.situacao === 'aprovada' && m.ativa ? '<button type="button" class="mini" data-estudar="' + i + '">📚 Estudar</button>' : '') +
+        (m.situacao === 'aprovada' ? '<button type="button" class="' + (m.ativa ? 'secundario ' : '') + 'mini" data-abrir="' + i + '">Notas</button>' +
           '<button type="button" class="secundario mini" data-apost="' + i + '">Apostila</button>' : '') +
         (m.material ? '<a class="botaoLink" href="' + esc(m.material) + '" target="_blank" rel="noopener">📁 Material no Drive</a>' : '') +
         (m.situacao === 'pendente' ? '<button type="button" class="secundario mini" data-cancelar="' + esc(m.inscricaoId) + '" data-prof="' + esc(m.professorId) + '">Cancelar pedido</button>' : '') +
@@ -782,6 +812,7 @@ function carregarMinhas(){
     el.innerHTML = (emCurso.length ? emCurso.join('') : '<p class="aviso">Nenhuma matéria em andamento.</p>') +
       (encerradas.length ? '<details class="encerradas" style="margin-top:6px"><summary>📦 Matérias encerradas (' + encerradas.length + ')</summary><div style="margin-top:10px">' + encerradas.join('') + '</div></details>' : '');
     el.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirMateria(lista[Number(b.dataset.abrir)]); }); });
+    el.querySelectorAll('[data-estudar]').forEach(function(b){ b.addEventListener('click', function(){ abrirEstudo(lista[Number(b.dataset.estudar)]); }); });
     el.querySelectorAll('[data-apost]').forEach(function(b){ b.addEventListener('click', function(){ abrirApostilaAluno(lista[Number(b.dataset.apost)]); }); });
     el.querySelectorAll('[data-cancelar]').forEach(function(b){
       b.addEventListener('click', function(){
@@ -819,6 +850,133 @@ function carregarMaterias(){
 }
 
 function voltarListaAluno(){ $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
+
+/* ================= ESTUDO DIRIGIDO (aluno) ================= */
+var EST = {m: null, q: null, ultima: null};
+function dezEst(n){ return n === null || n === undefined ? '—' : (Math.round(n) / 10).toFixed(1).replace('.', ','); }
+function corDom(n){ return n === null ? '#cbd5e1' : n >= 70 ? '#1a7a3c' : n >= 50 ? '#b07d00' : '#c62828'; }
+function htmlModelo(m){
+  if(!m || !(m.passos || []).length) return '';
+  return '<div class="modeloEst"><b>📘 Resposta comentada</b>' + m.passos.map(function(p, i){ return '<p style="margin:6px 0 0"><b>' + (i + 1) + '. ' + esc(p.titulo) + ':</b> ' + esc(p.texto) + '</p>'; }).join('') +
+    (m.conclusao ? '<p style="margin:6px 0 0"><b>Conclusão:</b> ' + esc(m.conclusao) + '</p>' : '') + '</div>';
+}
+function htmlRelatorio(r){
+  var h = '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:6px 0 10px"><div><span class="aviso">questões feitas</span><div class="numEst">' + r.questoes + '</div></div>' +
+    '<div><span class="aviso">média</span><div class="numEst">' + dezEst(r.media) + '</div></div>' +
+    (r.primeira !== null && r.respostas >= 2 ? '<div><span class="aviso">1ª → última resposta</span><div class="numEst">' + dezEst(r.primeira) + ' → ' + dezEst(r.ultima) + '</div></div>' : '') + '</div>';
+  if(r.porTema.length) h += '<p style="margin:4px 0"><b>Domínio por tema</b></p>' + r.porTema.map(function(t){
+    return '<div style="display:flex;gap:10px;align-items:center;font-size:14px"><span style="min-width:200px">' + esc(t.tema) + '</span><span class="barraDom" style="flex:1;max-width:260px;margin:0"><i style="width:' + t.dominio + '%;background:' + corDom(t.dominio) + '"></i></span><b>' + dezEst(t.dominio) + '</b></div>';
+  }).join('');
+  if(r.ia){
+    h += '<div class="eixo" style="border-color:#1a7a3c;margin-top:12px"><b>Pontos fortes</b>' + r.ia.fortes.map(function(x){ return '<br>• ' + esc(x); }).join('') + '</div>' +
+      '<div class="eixo" style="border-color:#c62828"><b>Pontos a melhorar</b>' + r.ia.fracos.map(function(x){ return '<br>• ' + esc(x); }).join('') + '</div>' +
+      '<div class="eixo" style="border-color:#2E62C6"><b>Como você responde</b><br>' + esc(r.ia.como_responde) + '</div>' +
+      '<div class="eixo" style="border-color:#8a6100"><b>Plano de estudo</b>' + r.ia.plano.map(function(x, i){ return '<br>' + (i + 1) + ') ' + esc(x); }).join('') + '</div>' +
+      (r.atualizado ? '<p class="aviso">Atualizado em ' + esc(r.atualizado) + ' · renova a cada 5 respostas novas.</p>' : '');
+  } else if(r.aviso) h += '<p class="aviso" style="margin-top:10px">' + esc(r.aviso) + '</p>';
+  return h;
+}
+function cabEstudo(m, extra){
+  return '<div class="caixa" style="margin-bottom:0"><button type="button" class="link" data-voltar>&#8592; voltar</button> <span class="aviso">📚 Estudo dirigido · ' + esc(m.nome) + '</span>' + (extra || '') + '</div>';
+}
+function abrirEstudo(m){
+  EST.m = m; EST.q = null; EST.ultima = null;
+  var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
+  el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Carregando…</p></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  api('estudoInicio', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
+    var h = cabEstudo(m) + '<div class="caixa"><h2>📚 Estudo dirigido · ' + esc(m.nome) + '</h2>';
+    if(r.prova) h += '<div class="ajudaEst" style="margin-top:0"><b>🎯 Próxima prova: ' + esc(r.prova.titulo) + ' · ' + esc(String(r.prova.data).split(' ')[0]) + '</b> (' + (r.prova.dias === 0 ? 'hoje' : 'em ' + r.prova.dias + ' dia' + (r.prova.dias > 1 ? 's' : '')) + ')' +
+      (r.prova.aulas.length ? ' — cai: aula' + (r.prova.aulas.length > 1 ? 's ' : ' ') + r.prova.aulas.join(', ') + '. As questões focam nesses assuntos.' : '') + '</div>';
+    else h += '<p class="aviso" style="margin-top:0">Sem prova marcada: as questões são das aulas já dadas.</p>';
+    h += '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:10px 0">' +
+      '<div><span class="aviso">questões feitas</span><div class="numEst">' + r.questoes + '</div></div>' +
+      '<div><span class="aviso">média</span><div class="numEst">' + dezEst(r.media) + '</div></div>' +
+      '<div><span class="aviso">sequência</span><div class="numEst">' + (r.sequencia ? '🔥 ' + r.sequencia + ' dia' + (r.sequencia > 1 ? 's' : '') : '—') + '</div></div>' +
+      '<div><span class="aviso">meta da semana</span><div class="numEst">' + Math.min(r.semana, r.metaSemana) + '/' + r.metaSemana + '</div></div></div>';
+    if(r.temas.length){
+      h += '<p style="margin:6px 0"><b>Seu domínio por tema</b> <span class="aviso">(toque para estudar aquele tema)</span></p><div class="grid2" style="gap:10px">' + r.temas.map(function(t){
+        var d = t.dominio;
+        return '<button type="button" class="temaCard" data-tema="' + esc(t.id) + '"><b>' + esc(t.nome) + '</b>' + (t.grupo ? ' <span class="aviso">· ' + esc(t.grupo) + '</span>' : '') +
+          '<div class="barraDom"><i style="width:' + (d || 0) + '%;background:' + corDom(d) + '"></i></div><span class="aviso">' + (d === null ? 'ainda não estudou' : dezEst(d) + (d >= 70 ? ' · dominado' : d >= 50 ? ' · quase lá' : ' · precisa reforçar')) + '</span></button>';
+      }).join('') + '</div>';
+    } else h += '<p class="aviso">Ainda não há assuntos liberados para estudo nesta matéria.</p>';
+    h += '<div class="botoes" style="margin-top:14px"><button type="button" id="estAgora"' + (r.temas.length && r.restantesHoje ? '' : ' disabled') + '>▶ Estudar agora</button><button type="button" class="secundario" id="estRelBt">📈 Meu relatório</button></div>' +
+      '<p class="aviso" style="margin-top:6px">"Estudar agora" escolhe a questão para você: prioriza os assuntos da prova, os mais fracos e os que você não vê há mais tempo. ' +
+      (r.restantesHoje ? 'Hoje você ainda pode fazer ' + r.restantesHoje + ' correção(ões).' : '<b>Você usou as ' + r.limite + ' correções de hoje. Volte amanhã!</b>') + ' O estudo não vale nota: é treino para a prova.</p></div>';
+    el.innerHTML = h;
+    el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+    el.querySelectorAll('[data-tema]').forEach(function(b){ b.addEventListener('click', function(){ if(r.restantesHoje) pedirQuestaoEstudo(b.dataset.tema); }); });
+    var ag = $('estAgora'); if(ag) ag.addEventListener('click', function(){ pedirQuestaoEstudo(''); });
+    $('estRelBt').addEventListener('click', abrirRelatorioEstudo);
+  }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); });
+}
+function pedirQuestaoEstudo(temaId){
+  var m = EST.m, el = $('alunoDetalhe');
+  el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Preparando a questão…</p></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  api('estudoProxima', {professorId: m.professorId, disciplinaId: m.disciplinaId, temaId: temaId}).then(function(q){ EST.q = q; EST.ultima = null; desenharQuestaoEstudo(''); })
+    .catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); }); });
+}
+function desenharQuestaoEstudo(rascunhoTxt){
+  var m = EST.m, q = EST.q, el = $('alunoDetalhe'), u = EST.ultima;
+  var h = cabEstudo(m) + '<div class="caixa"><p style="margin:0 0 6px"><span class="tag t-azul">' + esc(q.tema) + '</span>' + (q.naProva && q.prova ? ' <span class="aviso">· cai na ' + esc(q.prova) + '</span>' : '') + '</p>' +
+    '<p style="font-weight:bold;font-size:16px">' + esc(q.enunciado) + '</p>' +
+    (u ? '<p class="aviso" style="margin:0 0 6px">Tentativa ' + (u.tentativa + 1) + ' · sua melhor nota até agora: <b>' + dezEst(Math.max(u.nota, u.melhorAntes || 0)) + '</b>. Explique de novo, com suas palavras, para tentar aumentar.</p>' : '') +
+    '<label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px;margin:6px 0"><input type="checkbox" id="estAjuda" style="width:18px;height:18px"> 💡 Quero ajuda para montar a resposta</label>' +
+    '<div class="ajudaEst oculto" id="estAjudaBox"><b>Sua resposta deve passar por:</b>' + q.ajuda.map(function(t){ return '<br>• ' + esc(t); }).join('') + '</div>' +
+    '<textarea id="estResp" placeholder="Escreva sua resposta com suas palavras…" style="min-height:140px">' + esc(rascunhoTxt || '') + '</textarea>' +
+    '<div class="botoes"><button type="button" id="estEnviar">Enviar resposta</button><button type="button" class="secundario" id="estPular">Pular esta questão</button></div><div id="estMsg"></div></div>';
+  el.innerHTML = h;
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  var ta = $('estResp');
+  // colar continua bloqueado (o microfone do teclado funciona normalmente)
+  var barrar = function(e){ e.preventDefault(); $('estMsg').innerHTML = '<div class="erro">Escreva a resposta com suas palavras.</div>'; };
+  ta.addEventListener('paste', barrar); ta.addEventListener('drop', barrar);
+  ta.addEventListener('beforeinput', function(e){ if(/^insertFrom(Paste|Drop)/.test(e.inputType || '')) barrar(e); });
+  $('estAjuda').addEventListener('change', function(){ $('estAjudaBox').classList.toggle('oculto', !this.checked); });
+  $('estPular').addEventListener('click', function(){ pedirQuestaoEstudo(''); });
+  $('estEnviar').addEventListener('click', function(){
+    var txt = ta.value.trim();
+    if(txt.length < 10){ $('estMsg').innerHTML = '<div class="erro">Escreva sua resposta antes de enviar.</div>'; return; }
+    var b = this; b.disabled = true; $('estMsg').innerHTML = '<p class="carregando">Corrigindo… (uns 10 a 20 segundos)</p>';
+    api('estudoResponder', {professorId: m.professorId, disciplinaId: m.disciplinaId, questaoId: q.id, resposta: txt, usouAjuda: $('estAjuda').checked})
+      .then(function(r){ EST.ultima = r; desenharCorrecaoEstudo(txt); })
+      .catch(function(e){ b.disabled = false; $('estMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+function desenharCorrecaoEstudo(txt){
+  var m = EST.m, q = EST.q, r = EST.ultima, el = $('alunoDetalhe');
+  var cor = r.nota >= 70 ? '#1a7a3c' : r.nota >= 50 ? '#b07d00' : '#c62828';
+  var subiu = r.melhorAntes !== null && r.nota > r.melhorAntes;
+  var h = cabEstudo(m) + '<div class="caixa"><p style="margin:0 0 6px"><span class="tag t-azul">' + esc(q.tema) + '</span></p><p style="font-weight:bold">' + esc(q.enunciado) + '</p>' +
+    '<details style="margin:0 0 8px"><summary class="link" style="font-size:13px">ver a sua resposta</summary><p class="aviso" style="white-space:pre-line;margin:6px 0 0">' + esc(txt) + '</p></details>' +
+    '<div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap"><div><span class="aviso">sua nota</span><div class="numEst" style="color:' + cor + '">' + dezEst(r.nota) + '</div></div>' +
+      '<span class="aviso">tentativa ' + r.tentativa + (subiu ? ' · <b style="color:#1a7a3c">subiu de ' + dezEst(r.melhorAntes) + ' para ' + dezEst(r.nota) + '! 🎉</b>' : '') + ' · o estudo não vale nota</span></div>' +
+    '<div class="eixo" style="border-color:#1a7a3c"><b>✅ O que você acertou</b><br>' + esc(r.feedback.acertos) + '</div>' +
+    '<div class="eixo" style="border-color:#c62828"><b>🔬 Conteúdo técnico</b><br>' + esc(r.feedback.conteudo) + '</div>' +
+    '<div class="eixo" style="border-color:#2E62C6"><b>🧩 Estrutura da resposta</b><br>' + esc(r.feedback.estrutura) + '</div>' +
+    '<div class="eixo" style="border-color:#8a6100"><b>🧠 Forma de pensar</b><br>' + esc(r.feedback.pensamento) + '</div>' +
+    htmlModelo(r.modelo) +
+    '<div class="botoes"><button type="button" id="estDeNovo">✍ Explicar de novo</button><button type="button" class="secundario" id="estProx"' + (r.restantesHoje ? '' : ' disabled') + '>Próxima questão</button><button type="button" class="secundario" id="estInicio">Voltar ao início</button></div>' +
+    '<p class="aviso">' + (r.restantesHoje ? 'Hoje você ainda pode fazer ' + r.restantesHoje + ' correção(ões).' : 'Você usou as correções de hoje. Volte amanhã!') + '</p></div>';
+  el.innerHTML = h;
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  $('estDeNovo').addEventListener('click', function(){ desenharQuestaoEstudo(''); });
+  $('estProx').addEventListener('click', function(){ pedirQuestaoEstudo(''); });
+  $('estInicio').addEventListener('click', function(){ abrirEstudo(m); });
+  el.scrollIntoView({behavior:'smooth', block:'start'});
+}
+function abrirRelatorioEstudo(){
+  var m = EST.m, el = $('alunoDetalhe');
+  el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Preparando o seu relatório… (pode levar uns 15 s)</p></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  api('estudoRelatorio', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
+    el.innerHTML = cabEstudo(m) + '<div class="caixa"><h2>📈 Meu relatório · ' + esc(m.nome) + '</h2><p class="aviso" style="margin-top:0">O seu professor também vê este relatório.</p>' + htmlRelatorio(r) + '</div>';
+    el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); }); });
+}
 
 function abrirApostilaAluno(m){
   var el = $('alunoDetalhe');
@@ -908,6 +1066,30 @@ function mostrarQR(url, titulo, instrucao){
   document.addEventListener('keydown', tecla);
   ov.querySelector('button').addEventListener('click', fechar);
   try{ if(ov.requestFullscreen) ov.requestFullscreen().catch(function(){}); }catch(e){}
+}
+/* QR code do cadastro (Configurações): tela de login/criar conta que volta ao Aula por IA */
+function urlCadastro(){ return baseSite() + 'index.html?voltar=aulas'; }
+function desenharQRCadastro(){
+  var alvo = $('cfgQR'); if(!alvo || alvo.dataset.feito) return;
+  $('cfgQRUrl').textContent = urlCadastro();
+  if(!window.QRCode){ alvo.textContent = 'Não deu para gerar o QR code agora.'; return; }
+  new QRCode(alvo, {text: urlCadastro(), width: 180, height: 180, correctLevel: QRCode.CorrectLevel.M});
+  alvo.dataset.feito = '1';
+  $('cfgQRTela').onclick = function(){ mostrarQR(urlCadastro(), 'Cadastro · Aula por IA', 'Aponte a câmera do celular, crie sua conta (ou entre) e inscreva-se na disciplina.'); };
+  $('cfgQRBaixar').onclick = baixarQRCadastro;
+}
+function baixarQRCadastro(){
+  var d = document.createElement('div');
+  new QRCode(d, {text: urlCadastro(), width: 900, height: 900, correctLevel: QRCode.CorrectLevel.M});
+  var fonte = d.querySelector('canvas');
+  var c = document.createElement('canvas'); c.width = 1000; c.height = 1100;
+  var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(fonte, 50, 40, 900, 900);
+  g.fillStyle = '#222'; g.textAlign = 'center';
+  g.font = 'bold 44px Arial'; g.fillText('Aula por IA · cadastro do aluno', 500, 1010);
+  g.font = '26px Arial'; g.fillStyle = '#555'; g.fillText(urlCadastro().split('//').pop().split('?')[0].replace(/[^\/]*$/, '').replace(/\/$/, ''), 500, 1060);
+  var a = document.createElement('a'); a.href = c.toDataURL('image/png'); a.download = 'qrcode-cadastro.png';
+  document.body.appendChild(a); a.click(); a.remove();
 }
 function qrAulas(titulo){ mostrarQR(baseSite() + 'aulas.html', titulo, 'Aponte a câmera do celular, entre com sua conta e responda as questões.'); }
 
@@ -1029,15 +1211,18 @@ document.querySelectorAll('[data-aba]').forEach(function(b){ b.addEventListener(
 function abrirAba(a){
   abaAtual = a;
   document.querySelectorAll('[data-aba]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.aba === a)); });
-  ['aula', 'notas', 'hist', 'disc', 'insc', 'cfg', 'chat'].forEach(function(x){
+  ['aula', 'quest', 'notas', 'hist', 'estudo', 'disc', 'insc', 'cfg', 'chat'].forEach(function(x){
     $('p' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('oculto', x !== a);
   });
   if(!resumo) return;
+  desenharDiscBarra();
   if(a === 'aula' && G.fase !== 'gravando' && G.fase !== 'encerrada') abrirDarAula();
+  if(a === 'quest') abrirQuestoesAba();
+  if(a === 'estudo') abrirEstudoProf();
   if(a === 'notas') abrirNotas();
   if(a === 'hist') abrirHistorico();
   if(a === 'insc') carregarInscricoes();
-  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); }
+  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); }
   if(a === 'chat') abrirChat($('pChat'));
 }
 
@@ -1056,6 +1241,162 @@ function carregarResumo(){
 
 function ativas(){ return resumo ? resumo.disciplinas.filter(function(d){ return d.ativa; }) : []; }
 function discPorId(id){ return (resumo ? resumo.disciplinas : []).filter(function(d){ return d.id === id; })[0]; }
+/* ---- disciplina escolhida no quadro de cima: vale para todas as abas ---- */
+var DISC = '';
+try{ DISC = sessionStorage.getItem('disc_sel') || ''; }catch(e){}
+function discAtual(){
+  if(!DISC || !discPorId(DISC)) DISC = (ativas()[0] || resumo.disciplinas[0] || {}).id || '';
+  return DISC;
+}
+function escolherDisc(id){
+  DISC = id; notasDisc = id; histDisc = id;
+  try{ sessionStorage.setItem('disc_sel', id); }catch(e){}
+  if(G.fase === 'inicio' || !G.fase){ var d = discPorId(id); G.disc = d && d.ativa ? id : ''; if(d && d.ativa) G.tempos = d.tempos; }
+}
+var ABAS_COM_DISC = ['aula', 'quest', 'notas', 'hist', 'estudo'];
+function desenharDiscBarra(){
+  var el = $('discBarra'); if(!el || !resumo) return;
+  var mostra = ABAS_COM_DISC.indexOf(abaAtual) !== -1 && resumo.disciplinas.length;
+  el.classList.toggle('oculto', !mostra);
+  if(!mostra) return;
+  discAtual();
+  // durante a gravação a aba Dar aula fica presa na disciplina que está sendo gravada
+  el.innerHTML = chipsDisciplinas(DISC, true) + (abaAtual === 'aula' && G.fase === 'gravando' ? '<p class="aviso" style="margin:6px 0 0">Gravando: a aba Dar aula continua na disciplina da aula em andamento.</p>' : '');
+  el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ escolherDisc(b.dataset.disc); abrirAba(abaAtual); }); });
+}
+
+/* ---- aba Questões: atalho para as questões de cada aula (abre a mesma tela de acompanhar) ---- */
+function abrirQuestoesAba(){
+  var el = $('pQuest'), disc = discPorId(discAtual());
+  if(!disc){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
+  el.innerHTML = '<div class="caixa"><h2>Questões · ' + esc(disc.nome) + '</h2><p class="carregando">Carregando…</p></div>';
+  api('questoesDisciplina', {disciplinaId: disc.id}).then(function(lista){
+    var agora = Date.now();
+    var h = '<div class="caixa"><h2>Questões · ' + esc(disc.nome) + '</h2>';
+    if(!lista.length) h += '<p class="aviso">Nenhuma questão liberada ainda nesta disciplina.</p>';
+    lista.forEach(function(a){
+      var aberta = a.abertaAte && a.abertaAte > agora;
+      h += '<div class="linha"><span>' + (aberta ? '<span class="tag t-err">● aberta agora</span> ' : '') + '<b>Aula ' + a.numero + ' · ' + esc(String(a.data).split(' ')[0]) + (a.tema ? ' · ' + esc(a.tema) : '') + '</b><br>' +
+        '<span class="aviso">' + a.nQuestoes + ' questão(ões) · ' + a.alunosResponderam + ' aluno(s) responderam' + (a.media !== null ? ' · média ' + dez(a.media) : '') +
+        (aberta ? ' · fecha em ' + mmss(a.abertaAte - agora) : '') + '</span></span>' +
+        '<button type="button" class="' + (aberta ? 'mini' : 'secundario mini') + '" data-qacomp="' + esc(a.id) + '">' + (aberta ? 'Acompanhar' : 'Ver questões e respostas') + '</button></div>';
+    });
+    h += '<p class="aviso" style="margin-top:8px">Atalho: abre a mesma tela de acompanhar de Dar aula (com a chamada, as respostas e as notas).</p></div>';
+    el.innerHTML = h;
+    el.querySelectorAll('[data-qacomp]').forEach(function(b){ b.addEventListener('click', function(){
+      var a = lista.filter(function(x){ return x.id === b.dataset.qacomp; })[0];
+      Q.aula = a; abrirAba('aula'); mostrarAreaQ(); abrirAcompanhamento();
+      setTimeout(function(){ var ar = $('areaQ'); if(ar) ar.scrollIntoView({behavior:'smooth', block:'start'}); }, 400);
+    }); });
+  }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+
+/* ---- aba Estudo dos alunos: turma, banco de questões e configuração ---- */
+var EST_PROF = {filtro: 'todas', banco: [], abertos: {}};
+function abrirEstudoProf(){
+  var el = $('pEstudo'), disc = discPorId(discAtual());
+  if(!disc){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
+  el.innerHTML = '<div id="estTurma" class="caixa"><h2>Estudo dos alunos · ' + esc(disc.nome) + '</h2><p class="carregando">Carregando…</p></div>' +
+    '<div id="estRel"></div><div id="estBanco" class="caixa"><h2>Banco de questões do estudo</h2><p class="carregando">Carregando…</p></div><div id="estCfg" class="caixa"></div>';
+  api('estudoTurma', {disciplinaId: disc.id}).then(function(r){ desenharEstudoTurma(disc, r); desenharEstudoCfg(disc, r.cfg); })
+    .catch(function(e){ $('estTurma').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+  carregarBancoEstudo(disc);
+}
+function desenharEstudoTurma(disc, r){
+  var t = r.turma;
+  var h = '<h2>Estudo dos alunos · ' + esc(disc.nome) + ' ' + ajuda('O <b>estudo dirigido</b> é o treino dos alunos para a prova (em "Minhas matérias" → 📚 Estudar). Não conta na nota. As questões são criadas pela IA a partir das aulas, da sua apostila e das suas regras, e ficam num banco reaproveitado por todos. Aqui você acompanha quem está estudando, os temas mais fracos da turma e o relatório de cada aluno.') + '</h2>' +
+    '<p class="aviso" style="margin-top:0">' + t.estudaramSemana + ' de ' + t.alunos + ' aluno(s) estudaram nos últimos 7 dias · ' + t.respostas + ' resposta(s)' + (t.media !== null ? ' · média ' + dez(t.media) : '') + '</p>' +
+    (t.temasFracos.length ? '<p style="margin:4px 0 10px"><b>Temas mais fracos da turma:</b> ' + t.temasFracos.map(function(x){ return esc(x.tema) + ' (' + dez(x.media) + ')'; }).join(' · ') + '</p>' : '');
+  h += r.alunos.length ? '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Questões</th><th>Média</th><th>Evolução</th><th>Tema mais fraco</th><th></th></tr></thead><tbody>' + r.alunos.map(function(a){
+    return '<tr><td>' + esc(a.nome) + '</td><td>' + a.questoes + '</td><td>' + (a.media === null ? '—' : dez(a.media)) + '</td><td>' + (a.inicio === null ? '—' : dez(a.inicio) + ' → ' + dez(a.fim) + (a.fim > a.inicio ? ' ▲' : '')) + '</td>' +
+      '<td>' + esc(a.temaFraco || '—') + '</td><td>' + (a.questoes ? '<button type="button" class="link" data-relaluno="' + esc(a.id) + '">relatório</button>' : '<span class="tag t-warn">não estudou</span>') + '</td></tr>';
+  }).join('') + '</tbody></table></div>' : '<p class="aviso">Nenhum aluno inscrito.</p>';
+  $('estTurma').innerHTML = h;
+  $('estTurma').querySelectorAll('[data-relaluno]').forEach(function(b){ b.addEventListener('click', function(){
+    var box = $('estRel'); box.innerHTML = '<div class="caixa"><p class="carregando">Preparando o relatório… (pode levar uns 15 s na primeira vez)</p></div>';
+    box.scrollIntoView({behavior:'smooth', block:'start'});
+    api('relatorioAlunoProf', {disciplinaId: disc.id, alunoId: b.dataset.relaluno}).then(function(rel){
+      box.innerHTML = '<div class="caixa"><div class="linha" style="border:0;padding:0"><h2 style="margin:0">Relatório · ' + esc(rel.aluno) + '</h2><button type="button" class="link" id="fecharRel">fechar</button></div>' + htmlRelatorio(rel) + '</div>';
+      $('fecharRel').addEventListener('click', function(){ box.innerHTML = ''; });
+    }).catch(function(e){ box.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+  }); });
+}
+function carregarBancoEstudo(disc){
+  api('bancoEstudo', {disciplinaId: disc.id}).then(function(b){ EST_PROF.banco = b; desenharBancoEstudo(disc); })
+    .catch(function(e){ $('estBanco').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+function desenharBancoEstudo(disc){
+  var b = EST_PROF.banco, f = EST_PROF.filtro;
+  var n = {todas: b.length, nova: 0, boa: 0, banida: 0};
+  b.forEach(function(q){ n[q.status] = (n[q.status] || 0) + 1; });
+  var lista = b.filter(function(q){ return f === 'todas' ? q.status !== 'banida' : q.status === f; });
+  var h = '<h2>Banco de questões do estudo ' + ajuda('Todas as questões já criadas para o estudo desta disciplina. <b>✓ boa</b>: marca como exemplo do que você gosta. <b>🚫 banir</b>: tira do estudo; escreva o motivo, porque é com ele que a IA aprende o seu jeito de cobrar (os motivos viram as "regras" lá embaixo). Quem já respondeu uma questão banida mantém o histórico. O banco vai junto quando a disciplina é copiada para o próximo semestre.') + '</h2>' +
+    '<div class="chips" style="margin-bottom:8px">' + [['todas', 'em uso'], ['nova', 'não revisadas'], ['boa', 'boas'], ['banida', 'banidas']].map(function(x){
+      return '<button type="button" class="chip" data-bfiltro="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + ' (' + (x[0] === 'todas' ? b.length - (n.banida || 0) : n[x[0]] || 0) + ')</button>'; }).join('') + '</div>';
+  if(!lista.length) h += '<p class="aviso">' + (b.length ? 'Nenhuma questão neste filtro.' : 'Ainda não há questões: elas são criadas quando os alunos começam a estudar.') + '</p>';
+  lista.forEach(function(q){
+    var aberto = EST_PROF.abertos[q.id];
+    h += '<div class="linha" style="align-items:flex-start' + (q.status === 'banida' ? ';background:#fdf2f2' : '') + '"><span style="flex:1;min-width:240px">' +
+      '<span class="tag t-azul">' + esc(q.tema) + '</span> ' + (q.status === 'boa' ? '<span class="tag t-ok">boa</span> ' : q.status === 'banida' ? '<span class="tag t-err">banida</span> ' : '') +
+      (q.status === 'banida' ? '<s>' + esc(q.enunciado) + '</s>' : '<b>' + esc(q.enunciado) + '</b>') +
+      '<br><span class="aviso">' + (q.alunos ? q.alunos + ' aluno(s) · média ' + dez(q.media) : 'ainda não respondida') + (q.motivo ? ' · <b>motivo:</b> ' + esc(q.motivo) : '') + '</span>' +
+      (aberto ? '<div class="ajudaEst" style="margin-top:6px"><b>Ajuda (tópicos):</b> ' + q.ajuda.map(esc).join(' · ') + '</div>' + htmlModelo(q.modelo) : '') + '</span>' +
+      '<span class="botoes" style="margin:0"><button type="button" class="link" style="font-size:12.5px" data-bver="' + esc(q.id) + '">' + (aberto ? 'esconder' : 'ver resposta comentada') + '</button>' +
+      (q.status === 'banida' ? '<button type="button" class="secundario mini" data-bacao="desfazer" data-bq="' + esc(q.id) + '">desfazer</button>'
+        : (q.status !== 'boa' ? '<button type="button" class="secundario mini" data-bacao="boa" data-bq="' + esc(q.id) + '">✓ boa</button>' : '') +
+          '<button type="button" class="secundario mini" style="color:#c62828" data-bacao="banir" data-bq="' + esc(q.id) + '">🚫 banir</button>') + '</span></div>';
+  });
+  $('estBanco').innerHTML = h;
+  var box = $('estBanco');
+  box.querySelectorAll('[data-bfiltro]').forEach(function(c){ c.addEventListener('click', function(){ EST_PROF.filtro = c.dataset.bfiltro; desenharBancoEstudo(disc); }); });
+  box.querySelectorAll('[data-bver]').forEach(function(c){ c.addEventListener('click', function(){ EST_PROF.abertos[c.dataset.bver] = !EST_PROF.abertos[c.dataset.bver]; desenharBancoEstudo(disc); }); });
+  box.querySelectorAll('[data-bacao]').forEach(function(c){ c.addEventListener('click', function(){
+    var acao = c.dataset.bacao, motivo = '';
+    if(acao === 'banir'){ motivo = window.prompt('Por que banir esta questão? (a IA aprende com o motivo)', ''); if(!motivo) return; }
+    c.disabled = true;
+    api('avaliarQuestaoEstudo', {questaoId: c.dataset.bq, acao: acao, motivo: motivo}).then(function(){
+      var q = EST_PROF.banco.filter(function(x){ return x.id === c.dataset.bq; })[0];
+      q.status = acao === 'desfazer' ? 'nova' : acao === 'banir' ? 'banida' : 'boa'; q.motivo = acao === 'banir' ? motivo : '';
+      desenharBancoEstudo(disc);
+      if(acao === 'banir') { var aviso = $('regrasPend'); if(aviso) aviso.classList.remove('oculto'); }
+    }).catch(function(e){ c.disabled = false; erroGeral(e.message); });
+  }); });
+}
+function desenharEstudoCfg(disc, cfg){
+  var el = $('estCfg');
+  el.innerHTML = '<h2>Configuração do estudo dirigido</h2>' +
+    '<p class="grupoTitulo" style="margin-top:0">Apostila de referência ' + ajuda('Envie a sua apostila em PDF. Ela é lida e resumida <b>uma vez só</b> (1 chamada da IA) e passa a ser a base dos <b>conceitos</b> das questões de estudo, para não depender dos exemplos específicos que você deu em aula. Para trocar, é só enviar outra.') + '</p>' +
+    (cfg.temRef ? '<div class="linha"><span>📄 ' + esc(cfg.refNome) + ' <span class="aviso">· lida em ' + esc(cfg.refEm) + '</span></span><button type="button" class="secundario mini" id="estRemRef">remover</button></div>' : '<p class="aviso" style="margin:0 0 6px">Nenhuma apostila enviada.</p>') +
+    '<label class="arquivo" style="margin-top:6px"><input type="file" accept="application/pdf" id="estRefArq">' + (cfg.temRef ? 'Trocar a apostila (PDF)' : 'Enviar a apostila (PDF)') + '</label><div id="estRefMsg"></div>' +
+    '<label class="check" style="display:flex;gap:8px;align-items:center;margin:12px 0 4px"><input type="checkbox" id="estUsarAp"' + (cfg.usarApostila ? ' checked' : '') + ' style="width:18px;height:18px"> Também usar a apostila gerada das aulas</label>' +
+    '<label class="check" style="display:flex;gap:8px;align-items:flex-start;margin:4px 0"><input type="checkbox" id="estEvitar"' + (cfg.evitarCasos ? ' checked' : '') + ' style="width:18px;height:18px;margin-top:2px"> <span>Não cobrar histórias, casos de fábrica e experiências profissionais contadas em sala (só os conceitos)</span></label>' +
+    '<div style="display:flex;gap:10px;align-items:center;margin:10px 0"><label class="rot" for="estLimite" style="margin:0">Correções por aluno por dia</label><input type="number" id="estLimite" min="1" max="100" value="' + cfg.limite + '" style="width:90px">' +
+      ajuda('Cada resposta corrigida usa 1 chamada das <b>suas</b> chaves do Gemini. O limite evita que a turma esgote a cota que você usa nas aulas. As questões e as respostas comentadas são reaproveitadas do banco e quase não gastam.') + '</div>' +
+    '<p class="grupoTitulo">O que a IA aprendeu com você ' + ajuda('Regras que a IA segue ao criar as questões de estudo. Saem dos motivos das questões que você baniu (e das que marcou como boas): toda madrugada, se houve banimentos novos, elas são atualizadas. Você pode editar à mão.') + '</p>' +
+    '<p class="aviso' + (cfg.regrasPendente ? '' : ' oculto') + '" id="regrasPend" style="margin:0 0 6px">Há banimentos novos: as regras são atualizadas na madrugada, ou <button type="button" class="link" id="estResumir" style="font-size:12.5px">atualizar agora</button>.</p>' +
+    '<textarea id="estRegras" placeholder="ex.: • Não cobrar casos contados em sala; cobrar o conceito por trás.">' + esc(cfg.regras) + '</textarea>' +
+    '<div class="botoes"><button type="button" id="estSalvarCfg">Salvar configuração</button><span id="estCfgMsg" class="aviso"></span></div>';
+  $('estSalvarCfg').addEventListener('click', function(){
+    var b = this; b.disabled = true;
+    api('salvarEstudoConfig', {disciplinaId: disc.id, cfg: {usarApostila: $('estUsarAp').checked, evitarCasos: $('estEvitar').checked, limite: $('estLimite').value, regras: $('estRegras').value}})
+      .then(function(){ b.disabled = false; $('estCfgMsg').textContent = '✓ salvo'; }).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+  });
+  var rs = $('estResumir');
+  if(rs) rs.addEventListener('click', function(){ rs.disabled = true; rs.textContent = 'atualizando…';
+    api('resumirRegras', {disciplinaId: disc.id}).then(function(c){ desenharEstudoCfg(disc, c); }).catch(function(e){ rs.disabled = false; rs.textContent = 'atualizar agora'; erroGeral(e.message); }); });
+  var rm = $('estRemRef');
+  if(rm) rm.addEventListener('click', function(){ if(!window.confirm('Remover a apostila de referência?')) return;
+    api('removerApostilaRef', {disciplinaId: disc.id}).then(function(c){ desenharEstudoCfg(disc, c); }).catch(function(e){ erroGeral(e.message); }); });
+  $('estRefArq').addEventListener('change', function(){
+    var f = this.files[0]; if(!f) return;
+    if(f.size > 20 * 1048576){ $('estRefMsg').innerHTML = '<div class="erro">Arquivo muito grande (máximo 20 MB).</div>'; return; }
+    $('estRefMsg').innerHTML = '<p class="carregando">Lendo e resumindo a apostila… (pode levar 1 minuto)</p>';
+    blobBase64(f).then(function(b64){ return api('enviarApostilaRef', {disciplinaId: disc.id, nome: f.name, mime: f.type || 'application/pdf', dados: b64}); })
+      .then(function(c){ desenharEstudoCfg(disc, c); $('estRefMsg').innerHTML = '<div class="ok">✓ Apostila lida. As próximas questões do estudo usam ela como referência.</div>'; })
+      .catch(function(e){ $('estRefMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+
 function chipsDisciplinas(sel, todas){
   var chip = function(d){ return '<button type="button" class="chip" data-disc="' + esc(d.id) + '" aria-pressed="' + (sel === d.id) + '">' + esc(d.nome) + ' · ' + esc(d.semestre) + '</button>'; };
   var h = '<div class="chips">' + ativas().map(chip).join('') + '</div>';
@@ -1277,14 +1618,15 @@ function mostrarAreaQ(){
 }
 function desenharInicioAula(pend){
   var ds = ativas();
-  // nenhuma disciplina vem marcada: o professor escolhe antes de gravar (evita gravar na disciplina errada)
-  if(G.disc && !discPorId(G.disc)) G.disc = '';
+  // a disciplina vem do quadro de cima (só as em andamento podem gravar)
+  G.disc = DISC && discPorId(DISC) && discPorId(DISC).ativa ? DISC : '';
   var d = G.disc ? discPorId(G.disc) : null;
   if(!G.tempos && d) G.tempos = d.tempos;
   if(!ds.length){ $('aulaTopo').innerHTML = '<div class="caixa"><h2>Dar aula</h2><p>Crie uma disciplina em <b>Disciplinas</b> para começar.</p></div>'; $('aulaLista').innerHTML = ''; return; }
   var sem = !resumo.temChave, pip = 'documentPictureInPicture' in window;
-  $('aulaTopo').innerHTML = bannerPendentes(pend) + '<div class="caixa"><h2>Iniciar aula</h2><label class="rot">Disciplina</label>' + chipsDisciplinas(G.disc) +
-    (G.disc ? '' : '<p class="aviso" style="margin:6px 0 0">Escolha a disciplina desta aula antes de iniciar a gravação.</p>') +
+  $('aulaTopo').innerHTML = bannerPendentes(pend) + '<div class="caixa"><h2>Iniciar aula</h2><label class="rot">Disciplina</label>' +
+    (d ? '<p style="margin:0;font-size:16px"><b>' + esc(d.nome) + ' · ' + esc(d.semestre) + '</b> <span class="aviso">(troque no quadro de disciplinas acima)</span></p>'
+       : '<p class="aviso" style="margin:6px 0 0">Escolha a disciplina desta aula no <b>quadro de disciplinas acima</b> antes de iniciar a gravação.</p>') +
     (d && d.material_url ? '<p style="margin:8px 0 0"><a class="botaoLink" href="' + esc(d.material_url) + '" target="_blank" rel="noopener">📁 Pasta da disciplina no Drive</a></p>' : '') +
     '<label class="rot" style="margin-top:14px">Duração</label><div class="chips">' + [1, 2].map(function(t){
       return '<button type="button" class="chip" data-tempos="' + t + '" aria-pressed="' + (G.tempos === t) + '">' + t + ' tempo' + (t > 1 ? 's' : '') + ' · ' + (t * 50) + ' min</button>'; }).join('') + '</div>' +
@@ -1300,10 +1642,10 @@ function desenharInicioAula(pend){
   if(Q.aula && $('acomp') && Q.aula.disciplinaId !== G.disc && discPorId(Q.aula.disciplinaId)){
     $('aulaTopo').insertAdjacentHTML('afterbegin', '<div class="convite">Questões abertas em <b>' + esc(discPorId(Q.aula.disciplinaId).nome) + '</b> · aula ' + Q.aula.numero +
       '. <button type="button" class="link" id="btVoltarQ">Ver as questões</button></div>');
-    $('btVoltarQ').addEventListener('click', function(){ G.disc = Q.aula.disciplinaId; G.tempos = discPorId(G.disc).tempos; desenharInicioAula(pend); });
+    $('btVoltarQ').addEventListener('click', function(){ escolherDisc(Q.aula.disciplinaId); desenharDiscBarra(); desenharInicioAula(pend); });
   }
   mostrarAreaQ();
-  $('aulaTopo').querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ G.disc = b.dataset.disc; G.tempos = discPorId(G.disc).tempos; desenharInicioAula(pend); }); });
+
   $('aulaTopo').querySelectorAll('[data-tempos]').forEach(function(b){ b.addEventListener('click', function(){ G.tempos = Number(b.dataset.tempos); desenharInicioAula(pend); }); });
   $('btIniciar').addEventListener('click', function(){
     if(!G.disc){ $('msgIni').innerHTML = '<div class="erro">Selecione a disciplina antes de iniciar a gravação.</div>'; return; }
@@ -1343,7 +1685,7 @@ function listarAulas(){
     }).join('') : '<p class="aviso">Nenhuma aula ainda.</p>') + '<p class="aviso" style="margin-top:8px">Atas completas em "Histórico".</p></div>';
     var comRec = lista.filter(function(a){ return a.recomendacoes; })[0];
     if(comRec) el.insertAdjacentHTML('afterbegin', '<div class="convite">Há <b>recomendações para você</b> sobre a aula ' + comRec.numero + (comRec.tema ? ' (' + esc(comRec.tema) + ')' : '') + '. Veja em <button type="button" class="link" id="irRec">Histórico</button>.</div>');
-    var ir = $('irRec'); if(ir) ir.addEventListener('click', function(){ histDisc = G.disc; abrirAba('hist'); });
+    var ir = $('irRec'); if(ir) ir.addEventListener('click', function(){ escolherDisc(G.disc); abrirAba('hist'); });
     el.querySelectorAll('[data-qaula]').forEach(function(b){ b.addEventListener('click', function(){
       var a = lista.filter(function(x){ return x.id === b.dataset.qaula; })[0];
       Q.aula = a;
@@ -2080,11 +2422,10 @@ var notasDisc = '';
 function abrirNotas(){
   var el = $('pNotas');
   if(!resumo.disciplinas.length){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
-  if(!notasDisc || !discPorId(notasDisc)) notasDisc = (ativas()[0] || resumo.disciplinas[0]).id;
-  el.innerHTML = '<div class="caixa"><div class="linha" style="border:0;padding:0">' + chipsDisciplinas(notasDisc, true) +
-    (resumo.planilhaUrl ? '<a class="link" target="_blank" rel="noopener" href="' + esc(resumo.planilhaUrl) + '">Abrir planilha no Drive</a>' : '') + '</div></div>' +
+  notasDisc = discAtual();
+  el.innerHTML = (resumo.planilhaUrl ? '<p style="text-align:right;margin:0 0 6px"><a class="link" target="_blank" rel="noopener" href="' + esc(resumo.planilhaUrl) + '">Abrir planilha no Drive</a></p>' : '') +
     '<div id="notasCorpo"><div class="caixa"><p class="carregando">Calculando notas…</p></div></div><div id="notasAulas"></div><div id="notasErradas"></div>';
-  el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ notasDisc = b.dataset.disc; abrirNotas(); }); });
+
   api('notasDisciplina', {disciplinaId: notasDisc}).then(function(r){
     var c = $('notasCorpo'), cp = r.composicao;
     if(!r.alunos.length){ c.innerHTML = '<div class="caixa"><p class="aviso">Nenhum aluno inscrito nesta disciplina.</p></div>'; return; }
@@ -2240,12 +2581,12 @@ var histDisc = '';
 function abrirHistorico(){
   var el = $('pHist');
   if(!resumo.disciplinas.length){ el.innerHTML = '<div class="caixa"><p>Crie uma disciplina primeiro.</p></div>'; return; }
-  if(!histDisc || !discPorId(histDisc)) histDisc = (ativas()[0] || resumo.disciplinas[0]).id;
+  histDisc = discAtual();
   // ordem: linha do tempo → revisão do semestre → apostila (a leitura dos capítulos abre logo abaixo da apostila)
-  el.innerHTML = '<div class="caixa">' + chipsDisciplinas(histDisc, true) + '</div>' +
+  el.innerHTML = '' +
     '<details class="caixa diario" id="histDiario"><summary><b>📋 Diário do portal</b> <span class="aviso">tudo para lançar no sistema da universidade, numa página só</span></summary><div id="diarioCorpo"><p class="carregando">Carregando…</p></div></details>' +
     '<div id="histLinha"><div class="caixa"><p class="carregando">Carregando aulas…</p></div></div><div id="histRevisao"></div><div id="histApostila"></div><div id="histLeitura"></div>';
-  el.querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ histDisc = b.dataset.disc; abrirHistorico(); }); });
+
   carregarLinhaTempo();
   carregarPainelApostila();
   carregarRevisao(false);
@@ -2668,8 +3009,8 @@ function desenharDisciplinas(){
     api('desarquivarDisciplina', {id: d.id}).then(carregarResumo)
       .catch(function(e){ b.disabled = false; b.dataset.conf = ''; b.textContent = 'Reativar'; erroGeral(e.message); });
   }); });
-  el.querySelectorAll('[data-vernotas]').forEach(function(b){ b.addEventListener('click', function(){ notasDisc = b.dataset.vernotas; abrirAba('notas'); }); });
-  el.querySelectorAll('[data-verhist]').forEach(function(b){ b.addEventListener('click', function(){ histDisc = b.dataset.verhist; abrirAba('hist'); }); });
+  el.querySelectorAll('[data-vernotas]').forEach(function(b){ b.addEventListener('click', function(){ escolherDisc(b.dataset.vernotas); abrirAba('notas'); }); });
+  el.querySelectorAll('[data-verhist]').forEach(function(b){ b.addEventListener('click', function(){ escolherDisc(b.dataset.verhist); abrirAba('hist'); }); });
   el.insertAdjacentHTML('afterbegin', '<div id="alertasTemas"></div><div id="painelTemas"></div>');
   el.querySelectorAll('[data-temas]').forEach(function(b){ b.addEventListener('click', function(){ abrirTemas(b.dataset.temas); }); });
   carregarAlertasTemas();
