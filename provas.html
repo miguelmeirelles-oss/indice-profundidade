@@ -708,8 +708,9 @@ function formProva(p){
     // aulas que caem nesta prova (o estudo dirigido dos alunos foca nelas até a data da prova)
     '<div class="campoLargo" style="margin-bottom:14px"><label class="rot">Aulas que caem nesta prova ' +
       '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Até a data desta prova, o <b>estudo dirigido</b> dos alunos foca nos assuntos destas aulas. Sem nenhuma marcada, o estudo usa todas as aulas já dadas.</div></details></label>' +
-      ((dadosDisc.aulasDisc || []).length ? '<div style="display:flex;flex-wrap:wrap;gap:6px 16px">' + dadosDisc.aulasDisc.map(function(a){
-        return '<label style="display:flex;gap:6px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" data-paula="' + esc(a.id) + '"' + ((v.aulas || []).indexOf(a.id) !== -1 ? ' checked' : '') + ' style="width:17px;height:17px"> Aula ' + a.numero + (a.tema ? ' · ' + esc(a.tema) : '') + '</label>';
+      ((dadosDisc.aulasDisc || []).length ? '<div style="display:flex;flex-direction:column;gap:3px">' + dadosDisc.aulasDisc.map(function(a){
+        var tema = String(a.tema || '').replace(/^\s*aula\s*\d+\s*[-–:·.]\s*/i, '');
+        return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer;margin:2px 0"><input type="checkbox" data-paula="' + esc(a.id) + '"' + ((v.aulas || []).indexOf(a.id) !== -1 ? ' checked' : '') + ' style="width:17px;height:17px;margin-top:2px;flex:none"> <span><b>Aula ' + a.numero + '</b>' + (tema ? ' · ' + esc(tema) : '') + '</span></label>';
       }).join('') + '</div>' : '<p class="aviso" style="margin:0">Nenhuma aula registrada ainda nesta disciplina.</p>') + '</div>' +
     '<div class="campoLargo" style="margin-bottom:14px"><label class="rot">Rigor da correção pela IA ' +
       '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Calibra a IA que corrige esta prova. <b>Padrão</b> é o critério normal (crédito parcial pelos tópicos do gabarito). Mais <b>flexível</b>: crédito parcial mais generoso. Mais <b>rigoroso</b>: crédito integral só com resposta completa e precisa.<br><br>' +
