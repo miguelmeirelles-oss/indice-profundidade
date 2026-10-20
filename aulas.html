@@ -1525,9 +1525,23 @@ function carregarAudiosGuardados(){
     Promise.all([nomesDasAulas(ids), Promise.all(ids.map(function(id){ return api('estadoAula', {aulaId: id}).catch(function(){ return null; }); }))]).then(function(res){
       var nomes = res[0], estados = {};
       ids.forEach(function(id, i){ estados[id] = res[1][i]; });
+      // as aulas da conta aberta (com nome) primeiro; as de outra conta por último
+      ids.sort(function(a, b){ return (nomes[a] ? 0 : 1) - (nomes[b] ? 0 : 1); });
+      var quando = function(trechos){
+        var t = trechos.map(function(x){ return x.gravado; }).filter(Boolean).sort()[0];
+        if(!t) return '';
+        var d = new Date(t), dd = function(n){ return (n < 10 ? '0' : '') + n; };
+        return ' · gravada em ' + dd(d.getDate()) + '/' + dd(d.getMonth() + 1) + ' às ' + dd(d.getHours()) + ':' + dd(d.getMinutes());
+      };
+      var pendentesIds = ids.filter(function(id){
+        var est = estados[id], noServidor = est && est.ordens ? est.ordens : [];
+        return !porAula[id].every(function(t){ return noServidor.indexOf(t.ordem) !== -1; });
+      });
       el.innerHTML = '<h2 style="color:#c62828">⚠ Áudios que não chegaram ao servidor</h2>' +
         '<p style="margin:0 0 10px">Estes trechos foram gravados <b>neste computador</b> e ainda não foram enviados. Não limpe os dados do navegador até resolver. ' +
         'Tente enviar; se não for (rede ou computador bloqueando), salve no pen drive e carregue em outro computador.</p>' +
+        (pendentesIds.length > 1 ? '<div class="botoes" style="margin:0 0 10px"><button type="button" id="audSalvarTodas">💾 Salvar todas no pen drive (' + pendentesIds.length + ' aulas)</button>' +
+          '<span class="aviso">um arquivo por aula; se o Chrome perguntar, permita baixar vários arquivos</span></div>' : '') +
         ids.map(function(id){
           var n = nomes[id], trechos = porAula[id].sort(function(a, b){ return a.ordem - b.ordem; });
           var mb = trechos.reduce(function(t, x){ return t + (x.blob ? x.blob.size : 0); }, 0) / 1048576;
@@ -1536,7 +1550,8 @@ function carregarAudiosGuardados(){
           if(chegaram) return '<div class="ok" style="margin:0 0 10px"><b>' + esc(n ? n.titulo : 'Aula ' + id) + '</b><br>' +
             '✓ Estes ' + trechos.length + ' trecho(s) <b>já chegaram ao servidor</b> (provavelmente enviados de outro computador). A cópia deste computador não é mais necessária.' +
             '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" data-audapagar="' + esc(id) + '" data-seguro="1">🗑 Apagar deste computador</button></div></div>';
-          return '<div class="erro" style="margin:0 0 10px"><b>' + esc(n ? n.titulo : 'Aula ' + id + ' (de outra conta ou já excluída)') + '</b><br>' +
+          return '<div class="erro" style="margin:0 0 10px"><b>' + esc(n ? n.titulo : 'Aula ' + id + ' (de outra conta ou já excluída)') + '</b>' + esc(quando(trechos)) + '<br>' +
+            (n ? '' : '<span style="font-size:13px">Não é uma aula da conta aberta agora: para enviá-la, entre com a conta de quem deu a aula.</span><br>') +
             trechos.length + ' trecho(s) · ' + mb.toFixed(1).replace('.', ',') + ' MB · trechos ' + trechos.map(function(t){ return t.ordem; }).join(', ') +
             '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" data-audenviar="' + esc(id) + '">Tentar enviar agora</button>' +
             '<button type="button" class="secundario mini" data-audsalvar="' + esc(id) + '" data-nome="' + esc(n ? n.curto : id) + '">💾 Salvar no pen drive</button>' +
@@ -1550,6 +1565,20 @@ function carregarAudiosGuardados(){
         });
       }); });
       el.querySelectorAll('[data-audsalvar]').forEach(function(b){ b.addEventListener('click', function(){ salvarAudiosDaAula(b.dataset.audsalvar, b.dataset.nome, porAula[b.dataset.audsalvar], b); }); });
+      // salvar todas: um arquivo por aula, um depois do outro (o navegador baixa em sequência)
+      var bt = $('audSalvarTodas');
+      if(bt) bt.addEventListener('click', function(){
+        bt.disabled = true;
+        var cadeia = Promise.resolve();
+        pendentesIds.forEach(function(id){
+          cadeia = cadeia.then(function(){
+            var b = el.querySelector('[data-audsalvar="' + id + '"]');
+            if(b) salvarAudiosDaAula(id, b.dataset.nome, porAula[id], b);
+            return new Promise(function(res){ setTimeout(res, 1500); });
+          });
+        });
+        cadeia.then(function(){ bt.disabled = false; bt.textContent = '✓ ' + pendentesIds.length + ' arquivos gerados'; });
+      });
       // apagar a cópia deste computador: sem confirmação extra quando o servidor já tem tudo; com aviso forte quando não tem
       el.querySelectorAll('[data-audapagar]').forEach(function(b){ b.addEventListener('click', function(){
         var id = b.dataset.audapagar;
@@ -1872,7 +1901,7 @@ function trocarBloco(){ var velho = G.rec; novoGravador(); try{ velho.stop(); }c
 function guardarBloco(blob, ini, dur){
   if(dur < 5 && blob.size < 30000) return Promise.resolve();   // pedacinho vazio no fim
   G.ordem++;
-  var item = {k: G.aula.id + '|' + G.ordem, aulaId: G.aula.id, ordem: G.ordem, inicio: Math.round(ini), mime: blob.type, blob: blob};
+  var item = {k: G.aula.id + '|' + G.ordem, aulaId: G.aula.id, ordem: G.ordem, inicio: Math.round(ini), mime: blob.type, blob: blob, gravado: Date.now()};
   return idbPut(item).catch(function(){ G.memoria = (G.memoria || []).concat([item]); })
     .then(function(){ atualizarPainel(); enviarPendentes(); });
 }
