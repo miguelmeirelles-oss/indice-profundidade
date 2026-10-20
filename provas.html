@@ -82,6 +82,9 @@
   .questao{border:2px solid var(--linha);border-radius:14px;padding:12px 14px;margin-bottom:12px}
   .questao .cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;font-weight:bold}
   .fb{font-size:14px;margin:6px 0 0}
+  .ilegivel{background:#fde2e2;color:#9b1c1c;border-radius:3px;padding:0 3px}
+  .vistaBox{border-left:4px solid #b07d00;background:#fff8e6;padding:8px 12px;margin-top:10px;border-radius:6px;font-size:14px}
+  .salvarCampo{margin-top:6px}
   .fb b{color:var(--menu)}
   .miniaturas{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
   .miniaturas figure{margin:0;position:relative;width:110px}
@@ -514,6 +517,14 @@ function desenharProvasAluno(){
     bt.addEventListener('click', function(){ enviarAluno(i, sel, box); });
   });
   el.querySelectorAll('[data-reenviar]').forEach(function(b){ b.addEventListener('click', function(){ envioAberto[Number(b.dataset.reenviar)] = true; desenharProvasAluno(); }); });
+  el.querySelectorAll('[data-vistaenv]').forEach(function(b){ b.addEventListener('click', function(){
+    var i = Number(b.dataset.vistaenv), it = provasAluno[i], box = b.closest('details'), itens = {};
+    box.querySelectorAll('[data-vista]').forEach(function(t){ if(t.value.trim()) itens[t.dataset.vista] = t.value.trim(); });
+    b.disabled = true;
+    api('pedirVistaProva', {professorId: it.professorId, entregaId: it.entrega.id, itens: itens, geral: $('rev' + i).value}).then(function(ent){
+      it.entrega = ent; desenharProvasAluno();
+    }).catch(function(e){ b.disabled = false; $('msgRev' + i).innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  }); });
   el.querySelectorAll('[data-revisao]').forEach(function(b){ b.addEventListener('click', function(){
     var i = Number(b.dataset.revisao), it = provasAluno[i], ta = $('rev' + i);
     b.disabled = true;
@@ -556,13 +567,20 @@ function correcaoAluno(it, i){
       (q.faltou ? '<p class="fb"><b>O que faltou:</b> ' + esc(q.faltou) + '</p>' : '') +
       (q.melhorar ? '<p class="fb"><b>Como melhorar:</b> ' + esc(q.melhorar) + '</p>' : '') +
       (q.professor ? '<p class="fb"><b>Professor:</b> ' + esc(q.professor) + '</p>' : '') +
-      '<details style="margin-top:6px"><summary class="link" style="font-size:13px">O que a IA leu da sua resposta</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada: em branco ou não encontrada</i>') + '</p></details></div>';
+      '<details style="margin-top:6px"><summary class="link" style="font-size:13px">O que a IA leu da sua resposta</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada: em branco ou não encontrada</i>') + '</p></details>' +
+      (q.vista ? '<div class="vistaBox"><b>Sua vista:</b> ' + esc(q.vista.texto) + '<br>' + (q.vista.resposta ? '<b>Resposta do professor:</b> ' + esc(q.vista.resposta) : '<span class="aviso">aguardando o professor</span>') + '</div>' : '') + '</div>';
   }).join('');
-  if(!e.confirmada){
-    h += e.revisaoPedida
-      ? '<div class="ok">Pedido de revisão enviado: "' + esc(e.revisaoPedida) + '". O professor vai olhar.</div>'
-      : '<details><summary class="link">A IA leu ou corrigiu algo errado? Pedir revisão ao professor</summary><textarea id="rev' + i + '" style="margin-top:8px" placeholder="ex.: Na questão 2 eu escrevi 72 °C, não 12 °C."></textarea>' +
-        '<div class="botoes"><button type="button" class="mini" data-revisao="' + i + '">Enviar pedido</button></div><div id="msgRev' + i + '"></div></details>';
+  if(e.revisaoPedida) h += '<div class="ok">Outro ponto enviado ao professor: "' + esc(e.revisaoPedida) + '".</div>';
+  // vista de prova: só nas questões ainda sem resposta do professor
+  var abertas = e.questoes.filter(function(q){ return !(q.vista && q.vista.resposta); });
+  if(abertas.length){
+    h += '<details style="margin-top:8px"><summary class="link">Pedir vista de prova</summary>' +
+      '<div class="convite" style="margin:8px 0;font-size:14px">A vista serve para <b>explicar o que você já escreveu</b> e pode não ter ficado claro (letra, abreviação, uma frase confusa) ou para apontar um erro de leitura. <b>Ela não completa a resposta:</b> o que não está na folha não conta. Escreva só nas questões que quer contestar.</div>' +
+      abertas.map(function(q){
+        return '<label class="rot" style="margin-top:8px">Questão ' + esc(q.rotulo || q.ordem) + (q.vista ? ' · <span class="aviso">já enviada; pode reescrever</span>' : '') + '</label><textarea data-vista="' + esc(q.id) + '" style="min-height:50px" placeholder="ex.: Na 2ª linha eu escrevi 72 °C (não 12 °C), por isso a conclusão é pasteurização rápida.">' + esc(q.vista ? q.vista.texto : '') + '</textarea>';
+      }).join('') +
+      '<label class="rot" style="margin-top:8px">Outro ponto (opcional)</label><textarea id="rev' + i + '" style="min-height:44px"></textarea>' +
+      '<div class="botoes"><button type="button" class="mini" data-vistaenv="' + i + '">Enviar vista</button></div><div id="msgRev' + i + '"></div></details>';
   }
   return h;
 }
@@ -820,7 +838,7 @@ function abrirEntregas(provaId){
       '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
         var e = a.entrega;
-        return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + (e.enviadoPor === 'professor' ? ' <span class="aviso">(enviada por você)</span>' : '') : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
+        return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + (e && e.vistaAberta ? ' <span class="tag t-warn" title="questões contestadas ainda sem resposta">vista: ' + e.vistaAberta + '</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + (e.enviadoPor === 'professor' ? ' <span class="aviso">(enviada por você)</span>' : '') : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
           '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
           '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
           '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
@@ -880,6 +898,76 @@ function envioPeloProfessor(aluno, provaId){
   });
 }
 
+// ---- ajustes da correção: confiança da leitura, salvar comentário na hora, recorrigir uma questão, vista ----
+function corConf(n){ return n >= 85 ? '#1a7a3c' : n >= 60 ? '#b07d00' : '#c62828'; }
+function marcarIlegivel(t){ return esc(t).replace(/\[(ilegível|ilegivel)[^\]]*\]/gi, function(m){ return '<span class="ilegivel">' + m + '</span>'; }); }
+function htmlFbIA(q){
+  return (q.acertos ? '<p class="fb"><b>Acertos:</b> ' + esc(q.acertos) + '</p>' : '') + (q.faltou ? '<p class="fb"><b>Faltou:</b> ' + esc(q.faltou) + '</p>' : '') + (q.melhorar ? '<p class="fb"><b>Melhorar:</b> ' + esc(q.melhorar) + '</p>' : '');
+}
+function htmlVistaProf(q){
+  var v = q.vista; if(!v) return '';
+  var ia = v.ia, nomes = {sim: 'procede', parcial: 'procede em parte', nao: 'não procede'};
+  return '<div class="vistaBox"><b>Vista do aluno</b> <span class="aviso">(' + esc(v.em) + ')</span>: ' + esc(v.texto) +
+    (ia ? '<div style="margin-top:8px"><b>Análise da IA:</b> ' + nomes[ia.procede] + ' · sugere <b>' + num(ia.pontos) + '</b> de ' + num(q.max) +
+      (ia.leituraOk ? '' : '<br><span style="color:#9b1c1c">A leitura estava errada. Leitura correta: ' + esc(ia.transcricao) + '</span>') +
+      '<br><span class="aviso">' + esc(ia.justificativa) + '</span>' +
+      '<div class="botoes" style="margin-top:6px"><button type="button" class="secundario mini" data-aplicapts="' + ia.pontos + '">Usar ' + num(ia.pontos) + ' pontos</button><button type="button" class="secundario mini" data-usaresp>Usar a resposta sugerida</button></div></div>' : '') +
+    '<label class="rot" style="margin-top:8px">Sua resposta à vista (o aluno vê)</label><textarea data-vistaresp data-salvo="' + esc(v.resposta) + '" data-sugestao="' + esc(ia ? ia.resposta : '') + '" style="min-height:50px">' + esc(v.resposta) + '</textarea>' +
+    '<button type="button" class="secundario mini salvarCampo oculto" data-salvacampo="vista">Salvar resposta</button>' +
+    (v.resposta ? '<p class="aviso" style="margin:4px 0 0">Respondida em ' + esc(v.respondidaEm) + '. Se mudar os pontos, use "Salvar" no fim da página.</p>' : '<p class="aviso" style="margin:4px 0 0">Se mudar os pontos, use "Salvar" no fim da página.</p>') + '</div>';
+}
+function ligarCamposProva(el, entregaId, e, soma){
+  // botão "Salvar" aparece só quando o texto mudou
+  var vigiar = function(ta, bt, campo, qid){
+    var mostra = function(){ bt.classList.toggle('oculto', ta.value === ta.dataset.salvo); bt.textContent = campo === 'vista' ? 'Salvar resposta' : 'Salvar comentário'; };
+    ta.addEventListener('input', mostra);
+    bt.addEventListener('click', function(){
+      bt.disabled = true;
+      api('salvarCampoProva', {entregaId: entregaId, questaoId: qid || '', campo: campo, texto: ta.value}).then(function(){
+        bt.disabled = false; ta.dataset.salvo = ta.value; bt.textContent = '✓ salvo'; setTimeout(mostra, 1500);
+      }).catch(function(x){ bt.disabled = false; bt.textContent = 'Tentar de novo'; erroGeral(x.message); });
+    });
+  };
+  el.querySelectorAll('[data-qid]').forEach(function(box){
+    var qid = box.dataset.qid, q = e.questoes.filter(function(x){ return x.id === qid; })[0];
+    vigiar(box.querySelector('[data-com]'), box.querySelector('[data-salvacampo="professor"]'), 'professor', qid);
+    var ligarVista = function(){
+      var vr = box.querySelector('[data-vistaresp]'); if(!vr) return;
+      vigiar(vr, box.querySelector('[data-salvacampo="vista"]'), 'vista', qid);
+      var ap = box.querySelector('[data-aplicapts]');
+      if(ap) ap.addEventListener('click', function(){ box.querySelector('[data-pts]').value = ap.dataset.aplicapts; soma(); ap.textContent = '✓ aplicado (falta salvar no fim)'; });
+      var ur = box.querySelector('[data-usaresp]');
+      if(ur) ur.addEventListener('click', function(){ vr.value = vr.dataset.sugestao; vr.dispatchEvent(new Event('input')); });
+    };
+    ligarVista();
+    box._redesenharVista = function(){ box.querySelector('[data-vistabox]').innerHTML = htmlVistaProf(q); ligarVista(); };
+    // arrumar a leitura e recorrigir só esta questão
+    box.querySelector('[data-recorr]').addEventListener('click', function(){
+      var b = this, msg = box.querySelector('[data-recmsg]');
+      b.disabled = true; msg.innerHTML = '<p class="carregando">Corrigindo esta questão… (uns 10 segundos)</p>';
+      api('recorrigirQuestaoProva', {entregaId: entregaId, questaoId: qid, transcricao: box.querySelector('[data-transc]').value}).then(function(r){
+        b.disabled = false;
+        Object.assign(q, r.questao, {confianca: 100, duvidas: '', transcricaoEditada: true});
+        box.querySelector('[data-pts]').value = r.questao.pontos; soma();
+        box.querySelector('[data-fbia]').innerHTML = htmlFbIA(q);
+        msg.innerHTML = '<div class="ok">Recorrigida: ' + num(r.questao.pontos) + ' de ' + num(q.max) + ' (já salva).</div>';
+      }).catch(function(x){ b.disabled = false; msg.innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
+    });
+  });
+  vigiar($('eGeral'), $('eGeralSalvar'), 'geral', '');
+  var bv = $('eVistaIA');
+  if(bv) bv.addEventListener('click', function(){
+    bv.disabled = true; $('eVistaMsg').innerHTML = '<p class="carregando">A IA está olhando as fotos e as explicações… (até 1 minuto)</p>';
+    api('analisarVistaProva', {entregaId: entregaId}).then(function(ias){
+      bv.disabled = false; $('eVistaMsg').innerHTML = '<div class="ok">Análise pronta: veja embaixo de cada questão contestada. Nada muda na nota até você aplicar e salvar.</div>';
+      el.querySelectorAll('[data-qid]').forEach(function(box){
+        var q = e.questoes.filter(function(x){ return x.id === box.dataset.qid; })[0];
+        if(q.vista && ias[q.id]){ q.vista.ia = ias[q.id]; box._redesenharVista(); }
+      });
+    }).catch(function(x){ bv.disabled = false; $('eVistaMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
+  });
+}
+
 function abrirEntrega(entregaId){
   var el = $('areaEntrega');
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando a prova e as fotos…</p></div>';
@@ -891,16 +979,32 @@ function abrirEntrega(entregaId){
       return f.mime === 'application/pdf' ? '<a class="link" download="prova.pdf" href="data:application/pdf;base64,' + f.dados + '">Abrir PDF ' + (i + 1) + '</a>' : '<img src="data:' + f.mime + ';base64,' + f.dados + '" alt="Página ' + (i + 1) + '">';
     }).join('') + '</div></details>';
     if(!e.geral.legivel) h += '<div class="erro">A IA marcou as fotos como ilegíveis: ' + esc(e.geral.comentario) + '</div>';
+    // confiança da leitura (vem na mesma correção da IA)
+    var comConf = e.questoes.filter(function(q){ return q.confianca !== null && q.confianca !== undefined; });
+    if(comConf.length){
+      var media = Math.round(comConf.reduce(function(t, q){ return t + q.confianca; }, 0) / comConf.length);
+      var pior = comConf.slice().sort(function(a, b){ return a.confianca - b.confianca; })[0];
+      h += '<p class="aviso" style="margin:8px 0 0">Confiança da leitura da IA: <b style="color:' + corConf(media) + '">' + media + '%</b>' + (pior.confianca < 80 ? ' · mais baixa: questão ' + esc(pior.rotulo || pior.ordem) + ' (' + pior.confianca + '%)' : '') + '. Abra "O que a IA leu" para conferir e arrumar.</p>';
+    }
+    var nVista = e.questoes.filter(function(q){ return q.vista; }).length;
+    if(nVista) h += '<div class="convite"><b>Vista de prova:</b> o aluno contestou ' + nVista + ' questão(ões) (veja embaixo de cada uma). <button type="button" class="mini" id="eVistaIA">Analisar a vista com IA</button> <span class="aviso">olha as fotos; 1 chamada para a prova inteira</span><div id="eVistaMsg"></div></div>';
     h += '<h4>Correção <span class="aviso" id="eNota"></span></h4>' + e.questoes.map(function(q){
       return '<div class="questao" data-qid="' + esc(q.id) + '" data-max="' + q.max + '"><div class="cab"><span>Questão ' + esc(q.rotulo || q.ordem) + (q.assunto ? ' · <span style="font-weight:normal">' + esc(q.assunto) + '</span>' : '') + '</span><span class="aviso">vale ' + num(q.max) + '</span></div>' +
         '<p class="aviso" style="margin:4px 0 8px">' + esc(q.enunciado) + '</p>' +
-        '<details><summary class="link" style="font-size:13px">O que a IA leu</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada</i>') + '</p></details>' +
-        (q.acertos ? '<p class="fb"><b>Acertos:</b> ' + esc(q.acertos) + '</p>' : '') + (q.faltou ? '<p class="fb"><b>Faltou:</b> ' + esc(q.faltou) + '</p>' : '') + (q.melhorar ? '<p class="fb"><b>Melhorar:</b> ' + esc(q.melhorar) + '</p>' : '') +
+        '<details><summary class="link" style="font-size:13px">O que a IA leu' + (q.confianca !== null && q.confianca !== undefined ? ' · <b style="color:' + corConf(q.confianca) + '">' + q.confianca + '% de confiança</b>' : '') + (q.transcricaoEditada ? ' · <span class="tag t-azul">leitura arrumada por você</span>' : '') + '</summary>' +
+          '<p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (marcarIlegivel(q.transcricao) || '<i>nada</i>') + '</p>' +
+          (q.duvidas ? '<p class="fb" style="color:#9b1c1c"><b>Trechos com dúvida:</b> ' + esc(q.duvidas) + '</p>' : '') +
+          '<label class="rot" style="margin-top:8px">Arrumar a leitura (escreva o que o aluno escreveu de fato)</label><textarea data-transc style="min-height:60px">' + esc(q.transcricao) + '</textarea>' +
+          '<div class="botoes" style="margin-top:6px"><button type="button" class="secundario mini" data-recorr>Corrigir esta questão de novo com esta leitura</button><span class="aviso">1 chamada leve da IA, só texto</span></div><div data-recmsg></div></details>' +
+        '<div data-fbia>' + htmlFbIA(q) + '</div>' +
         '<div class="campos" style="margin:10px 0 0"><div><label class="rot">Pontos</label><input type="number" min="0" max="' + q.max + '" step="0.25" data-pts value="' + (q.pontos === null ? '' : q.pontos) + '"></div>' +
-        '<div class="campoLargo"><label class="rot">Seu comentário para o aluno (opcional)</label><textarea data-com style="min-height:50px">' + esc(q.professor) + '</textarea></div></div></div>';
+        '<div class="campoLargo"><label class="rot">Seu comentário para o aluno (opcional)</label><textarea data-com data-salvo="' + esc(q.professor) + '" style="min-height:50px">' + esc(q.professor) + '</textarea>' +
+          '<button type="button" class="secundario mini salvarCampo oculto" data-salvacampo="professor">Salvar comentário</button></div></div>' +
+        '<div data-vistabox>' + htmlVistaProf(q) + '</div></div>';
     }).join('');
     h += '<div class="detalhe"><p class="fb" style="margin-top:0"><b>Visão geral da IA:</b> ' + esc(e.geral.comentario) + '</p>' + (e.geral.fortes ? '<p class="fb"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') + (e.geral.estudar ? '<p class="fb"><b>O que estudar:</b> ' + esc(e.geral.estudar) + '</p>' : '') + '</div>' +
-      '<label class="rot" style="margin-top:12px" for="eGeral">Seu comentário geral para o aluno (opcional)</label><textarea id="eGeral">' + esc(e.geral.professor) + '</textarea>' +
+      '<label class="rot" style="margin-top:12px" for="eGeral">Seu comentário geral para o aluno (opcional)</label><textarea id="eGeral" data-salvo="' + esc(e.geral.professor) + '">' + esc(e.geral.professor) + '</textarea>' +
+      '<button type="button" class="secundario mini salvarCampo oculto" id="eGeralSalvar">Salvar comentário</button>' +
       '<div class="botoes"><button type="button" id="eConf">Salvar e confirmar nota</button><button type="button" class="secundario" id="eSalvar">Salvar sem confirmar</button><button type="button" class="secundario" id="eRecorr">Corrigir de novo com IA</button></div>' +
       '<div id="eMsg"></div><p class="aviso">Ao confirmar, o aluno vê "nota confirmada" e recebe um e-mail.</p></div>';
     el.innerHTML = h;
@@ -911,6 +1015,7 @@ function abrirEntrega(entregaId){
       $('eNota').textContent = '· ' + num(t) + ' de ' + num(m) + ' pontos = nota ' + nota10(m ? Math.round(t / m * 100) / 10 : 0);
     }
     el.querySelectorAll('[data-pts]').forEach(function(i){ i.addEventListener('input', soma); }); soma();
+    ligarCamposProva(el, entregaId, e, soma);
     function salvar(confirmar, bt){
       bt.disabled = true;
       var qs = Array.prototype.map.call(el.querySelectorAll('[data-qid]'), function(box){
