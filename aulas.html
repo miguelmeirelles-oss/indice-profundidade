@@ -3543,8 +3543,9 @@ function desenharApostilaRef(d){
 function desenharRecados(box, discId, r){
   box.innerHTML = '<div class="detalhe" style="margin-top:10px"><p class="grupoTitulo" style="margin-top:0">📣 Aviso à turma</p>' +
     '<p class="aviso" style="margin:0 0 6px">' + r.alunos + ' aluno(s) inscrito(s) · ' + (r.ligado ? r.comCelular + ' com avisos ligados no celular' : 'avisos no celular ainda não configurados') + '. O recado também aparece em "Minhas matérias" por 15 dias.</p>' +
-    '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px">' + ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'].map(function(em){ return '<button type="button" class="secundario mini" data-emoji="' + em + '" style="font-size:18px;padding:2px 8px;line-height:1.3" aria-label="Inserir ' + em + '">' + em + '</button>'; }).join('') + '</div>' +
-    '<textarea data-rectexto style="min-height:60px" placeholder="ex.: Amanhã a aula será prática no laboratório 3. Tragam jaleco."></textarea>' +
+    '<button type="button" class="secundario mini" data-emojiabrir aria-expanded="false" style="margin:0 0 6px">😀 Emojis ▾</button>' +
+    '<div data-emojis style="display:none;flex-wrap:wrap;gap:4px;margin:0 0 6px">' + ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'].map(function(em){ return '<button type="button" class="secundario mini" data-emoji="' + em + '" style="font-size:18px;padding:2px 8px;line-height:1.3" aria-label="Inserir ' + em + '">' + em + '</button>'; }).join('') + '</div>' +
+    '<textarea data-rectexto style="min-height:120px" placeholder="ex.: Amanhã a aula será prática no laboratório 3. Tragam jaleco."></textarea>' +
     '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:6px 0"><input type="checkbox" data-recemail style="width:17px;height:17px"> Mandar também por e-mail (para quem não ativou os avisos)</label>' +
     '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-recenviar>Enviar para a turma</button></div><div data-recmsg></div>' +
     (r.recados.length ? '<p class="grupoTitulo">Enviados</p>' + r.recados.map(function(x){
@@ -3556,6 +3557,8 @@ function desenharRecados(box, discId, r){
         (x.naoLeram.length && x.naoLeram.length < total ? '<details style="font-size:12.5px"><summary class="link">quem ainda não leu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : '') +
         '</span><button type="button" class="link" data-recexcluir="' + esc(x.id) + '" style="font-size:12.5px">apagar</button></div>';
     }).join('') + '<p class="aviso" style="margin-top:4px">"Lido" conta quem abriu a cartinha ✉️ no app ou tocou na notificação.</p>' : '') + '</div>';
+  var ea = box.querySelector('[data-emojiabrir]'), eg = box.querySelector('[data-emojis]');
+  ea.addEventListener('click', function(){ var abrir = eg.style.display === 'none'; eg.style.display = abrir ? 'flex' : 'none'; ea.setAttribute('aria-expanded', String(abrir)); ea.textContent = abrir ? '😀 Emojis ▴' : '😀 Emojis ▾'; });
   // emoji entra onde está o cursor
   box.querySelectorAll('[data-emoji]').forEach(function(e){ e.addEventListener('click', function(){
     var ta = box.querySelector('[data-rectexto]'), i = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length, f = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : i;
