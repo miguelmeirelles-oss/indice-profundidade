@@ -6,6 +6,11 @@
 <title>Aula por IA — Engenharia de Alimentos</title>
 <link rel="icon" href="favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0E2A5C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Aula por IA">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
   :root{
@@ -65,6 +70,11 @@
   .tag{display:inline-block;font-size:11px;font-weight:bold;text-transform:uppercase;letter-spacing:.04em;border-radius:99px;padding:2px 9px;border:1.5px solid currentColor;white-space:nowrap}
   .t-ok{color:var(--verde)} .t-warn{color:var(--ocre)} .t-err{color:#c62828} .t-azul{color:var(--azul)} .t-cinza{color:var(--cinza)}
   .cartao{border:2.5px solid var(--navy);border-radius:14px;padding:12px 14px;background:#fff;margin-bottom:12px}
+  .recado{border-left:4px solid #b07d00;background:#fff8e6;border-radius:6px;padding:7px 10px;margin-top:8px;font-size:14px}
+  .cartaoAvisos{border:2.5px solid #b07d00;background:#fff8e6;border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  .correioBt{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--navy);border:2px solid var(--navy);border-radius:10px;padding:7px 12px;font-weight:bold;cursor:pointer;font-size:15px}
+  .correioBt .badge{background:#c62828;color:#fff;border-radius:999px;padding:1px 8px;font-size:12.5px}
+  .recado.nova{border-left-color:#c62828;background:#fdecec}
   .cartao .l1{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-weight:bold}
   .cartao .l2{font-size:13px;color:var(--cinza);margin-top:4px}
   .linha{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--linha);flex-wrap:wrap}
@@ -359,6 +369,8 @@
   <section id="tAluno" class="oculto">
     <div id="qAbertas"></div>
     <div id="alunoLista">
+      <div id="cartaoAvisos"></div>
+      <div id="correio" style="margin-bottom:12px"></div>
       <div class="caixa">
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
@@ -441,6 +453,7 @@
           </div>
         </div>
       </div>
+      <div class="caixa oculto" id="cfgAvisos"></div>
       <div class="caixa">
         <h2>Chave do Gemini</h2>
         <p>Todas as tarefas de IA das suas matérias usam só as suas chaves. Elas ficam guardadas no servidor; aqui aparece só o final de cada uma.</p>
@@ -640,7 +653,14 @@ window.addEventListener('focus', voltouATela);
 
 function abrirAluno(){
   voltarListaAluno();
-  carregarMinhas(); carregarAbertas();
+  carregarMinhas(); carregarAbertas(); desenharCartaoAvisos();
+  try{
+    var qp = new URLSearchParams(location.search);
+    if(qp.get('recado') && qp.get('p')){
+      api('marcarRecadosLidos', {itens: [{professorId: qp.get('p'), ids: [qp.get('recado')]}]}).catch(function(){});
+      history.replaceState(null, '', location.pathname);
+    }
+  }catch(e){}
   if(!timerAbertas) timerAbertas = setInterval(function(){ if(!$('tAluno').classList.contains('oculto')) carregarAbertas(); }, 30000);
   if(!alunoCarregado){
     alunoCarregado = true;
@@ -812,9 +832,147 @@ function apiLembrar(chave, acao, dados, aindaVale){
   };
 }
 
+/* ---- avisos no celular ----
+   O aluno ativa uma vez por aparelho e pode desligar quando quiser. O cartão aparece no topo ao entrar,
+   para alunos novos e antigos; "agora não" esconde por 3 dias. No iPhone, só funciona com o app na tela de início. */
+var AVISOS = {reg: null};
+function lerLS(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function gravarLS(k, v){ try{ if(v === null) localStorage.removeItem(k); else localStorage.setItem(k, String(v)); }catch(e){} }
+function avisosSuportados(){ return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+function ehIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function ehAndroid(){ return /android/i.test(navigator.userAgent); }
+// navegador de dentro de outro app (WhatsApp, Instagram, Facebook…): não recebe avisos
+function navegadorDeApp(){ return /FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(navigator.userAgent); }
+function appInstalado(){ return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function registrarSW(){
+  if(!('serviceWorker' in navigator)) return Promise.resolve(null);
+  if(AVISOS.reg) return Promise.resolve(AVISOS.reg);
+  return navigator.serviceWorker.register('sw-avisos.js').then(function(r){ AVISOS.reg = r; return r; }).catch(function(){ return null; });
+}
+function carregarScript(src){
+  return new Promise(function(res, rej){ var sc = document.createElement('script'); sc.src = src; sc.onload = res; sc.onerror = function(){ rej(new Error('Não deu para carregar o serviço de avisos. Verifique a internet.')); }; document.head.appendChild(sc); });
+}
+// Pega o código deste aparelho no Firebase e registra no servidor
+function tokenAvisos(){
+  return api('avisosWeb', {}).then(function(c){
+    if(!c.ligado) throw new Error('Os avisos ainda não foram configurados. Tente mais tarde.');
+    var base = 'https://www.gstatic.com/firebasejs/10.12.2/';
+    var sdk = window.firebase && window.firebase.messaging ? Promise.resolve() : carregarScript(base + 'firebase-app-compat.js').then(function(){ return carregarScript(base + 'firebase-messaging-compat.js'); });
+    return sdk.then(registrarSW).then(function(reg){
+      if(!reg) throw new Error('Este navegador não aceita avisos.');
+      if(!firebase.apps.length) firebase.initializeApp(c.config);
+      return navigator.serviceWorker.ready.then(function(){ return firebase.messaging().getToken({vapidKey: c.vapid, serviceWorkerRegistration: reg}); });
+    });
+  }).then(function(t){
+    if(!t) throw new Error('O aparelho não liberou os avisos.');
+    return api('registrarAvisos', {fcm: t, aparelho: navigator.userAgent.slice(0, 120)}).then(function(){ gravarLS('avisos_token', t); gravarLS('avisos_em', Date.now()); return t; });
+  });
+}
+function desenharCartaoAvisos(){
+  var el = $('cartaoAvisos'); if(!el) return;
+  var adiado = Number(lerLS('avisos_adiar') || 0) > Date.now();
+  var fechar = '<button type="button" class="link" data-avadiar style="font-size:13px">agora não</button>';
+  if(ehAndroid() && navegadorDeApp() && !adiado){
+    // Android dentro do WhatsApp/Instagram: precisa abrir no Chrome
+    el.innerHTML = '<div class="cartaoAvisos"><b>🔔 Para receber avisos, abra no Chrome</b><br><span style="font-size:14px">Você abriu o Aula por IA por dentro de outro app (WhatsApp, Instagram…), e esse navegador não recebe avisos. Toque nos <b>três pontinhos ⋮</b> no canto de cima e escolha <b>Abrir no Chrome</b> (ou "Abrir no navegador"). Lá, entre e toque em <b>Ativar avisos</b>.</span>' +
+      '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="avCopiar">Copiar o endereço</button>' + fechar + '</div></div>';
+  } else if(!avisosSuportados()){
+    // iPhone fora da tela de início: explica como instalar
+    if(!ehIOS() || adiado) el.innerHTML = '';
+    else if(appInstalado()) el.innerHTML = '<div class="cartaoAvisos"><b>🔔 Avisos no iPhone</b><br><span style="font-size:14px">Seu iPhone precisa do <b>iOS 16.4 ou mais novo</b> para receber avisos. Atualize em <b>Ajustes → Geral → Atualização de Software</b> e abra o Aula por IA de novo. Enquanto isso, as mensagens do professor ficam na cartinha ✉️ logo abaixo.</span><div style="margin-top:6px">' + fechar + '</div></div>';
+    else el.innerHTML = '<div class="cartaoAvisos"><b>🔔 Como receber avisos no iPhone</b><br><span style="font-size:14px">No iPhone, os avisos só funcionam com o Aula por IA instalado na tela de início. Leva 1 minuto:</span>' +
+      '<ol style="font-size:14px;line-height:1.55;margin:6px 0 4px;padding-left:20px">' +
+        '<li>Abra este site no <b>Safari</b>.</li>' +
+        '<li>Toque no botão <b>Compartilhar</b> (o quadrado com a seta para cima, na barra de baixo).</li>' +
+        '<li>Role a lista, toque em <b>Adicionar à Tela de Início</b> e depois em <b>Adicionar</b>.</li>' +
+        '<li>Feche o Safari e abra o <b>Aula por IA</b> pelo ícone novo na tela do iPhone.</li>' +
+        '<li>Entre com sua conta e toque em <b>Ativar avisos</b> → <b>Permitir</b>.</li></ol>' +
+      '<span class="aviso">Precisa do iOS 16.4 ou mais novo. Enquanto não ativar, as mensagens do professor ficam na cartinha ✉️ logo abaixo.</span><div style="margin-top:6px">' + fechar + '</div></div>';
+  } else if(Notification.permission === 'granted' && lerLS('avisos_token')){
+    el.innerHTML = '<p class="aviso" style="margin:0 0 10px">🔔 Avisos ligados neste aparelho · <button type="button" class="link" id="avDesligar" style="font-size:13px">desligar</button>' +
+      (ehAndroid() ? '<br><details style="display:inline"><summary class="link" style="font-size:12.5px">os avisos não aparecem?</summary><span style="font-size:13px">No Android, abra <b>Configurações → Apps → Chrome → Notificações</b> e deixe ligadas. Se o celular estiver em economia de bateria, os avisos podem atrasar alguns minutos.</span></details>' : '') + '</p>';
+    // renova o registro a cada 3 dias (o código do aparelho pode mudar)
+    if(Date.now() - Number(lerLS('avisos_em') || 0) > 3 * 86400000) tokenAvisos().catch(function(){});
+  } else if(Notification.permission === 'denied'){
+    el.innerHTML = adiado ? '' : ehAndroid()
+      ? '<div class="cartaoAvisos"><b>🔕 Os avisos estão bloqueados neste celular</b><ol style="font-size:14px;line-height:1.55;margin:6px 0 4px;padding-left:20px">' +
+          '<li>No Chrome, toque no <b>ícone ao lado do endereço</b> do site (cadeado ou ajustes).</li>' +
+          '<li>Toque em <b>Permissões</b> (ou "Configurações do site") → <b>Notificações</b> → <b>Permitir</b>.</li>' +
+          '<li>Recarregue a página e toque em <b>Ativar avisos</b>.</li></ol>' +
+          '<span class="aviso">Se não aparecer a opção, confira também <b>Configurações do Android → Apps → Chrome → Notificações</b>.</span><div style="margin-top:6px">' + fechar + '</div></div>'
+      : '<p class="aviso" style="margin:0 0 10px">🔕 Os avisos estão bloqueados neste navegador. Para ligar, libere as notificações nas configurações do site (o cadeado ao lado do endereço) e recarregue. ' + fechar + '</p>';
+  } else if(!adiado){
+    el.innerHTML = '<div class="cartaoAvisos"><b>🔔 Ativar avisos no celular</b><br><span style="font-size:14px">Saiba na hora quando o professor liberar questões, quando faltarem 20 minutos para fechar, quando sua prova for corrigida e quando houver recado da turma. Você pode desligar quando quiser.</span>' +
+      '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" id="avAtivar">Ativar avisos</button>' + fechar + '</div>' +
+      (ehAndroid() ? '<p class="aviso" style="margin:6px 0 0;font-size:12.5px">Quando o Chrome perguntar, toque em <b>Permitir</b>. Dica: em ⋮ → <b>Adicionar à tela inicial</b> (ou "Instalar app"), o Aula por IA ganha um ícone como os outros apps.</p>' : '') +
+      '<div id="avisosMsg"></div></div>';
+  } else el.innerHTML = '';
+  var bt = $('avAtivar');
+  if(bt) bt.addEventListener('click', function(){
+    bt.disabled = true; bt.textContent = 'Ativando…';
+    Notification.requestPermission().then(function(perm){
+      if(perm !== 'granted') throw new Error(perm === 'denied' ? 'Os avisos foram bloqueados. Libere nas configurações do navegador e tente de novo.' : 'Você não permitiu os avisos.');
+      return tokenAvisos();
+    }).then(function(){ gravarLS('avisos_adiar', null); desenharCartaoAvisos(); carregarMinhas(); })
+      .catch(function(e){ bt.disabled = false; bt.textContent = 'Ativar avisos'; $('avisosMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  var cp = $('avCopiar');
+  if(cp) cp.addEventListener('click', function(){
+    var url = location.href.split('#')[0];
+    (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(function(){ cp.textContent = '✓ Copiado: cole no Chrome'; })
+      .catch(function(){ window.prompt('Copie o endereço e cole no Chrome:', url); });
+  });
+  var dl = $('avDesligar');
+  if(dl) dl.addEventListener('click', function(){
+    dl.disabled = true;
+    var t = lerLS('avisos_token');
+    api('removerAvisos', {fcm: t}).then(function(){
+      try{ if(window.firebase && firebase.apps.length) firebase.messaging().deleteToken(); }catch(e){}
+      gravarLS('avisos_token', null); gravarLS('avisos_adiar', Date.now() + 3650 * 86400000);   // desligou: o cartão não volta a insistir
+      el.innerHTML = '<p class="aviso" style="margin:0 0 10px">🔕 Avisos desligados neste aparelho. <button type="button" class="link" id="avReligar" style="font-size:13px">ligar de novo</button></p>';
+      $('avReligar').addEventListener('click', function(){ gravarLS('avisos_adiar', null); desenharCartaoAvisos(); });
+      carregarMinhas();   // sem avisos: volta a cartinha
+    }).catch(function(e){ dl.disabled = false; erroGeral(e.message); });
+  });
+  el.querySelectorAll('[data-avadiar]').forEach(function(b){ b.addEventListener('click', function(){ gravarLS('avisos_adiar', Date.now() + 3 * 86400000); el.innerHTML = ''; }); });
+}
+registrarSW();
+
+// Cartinha ✉️: só para quem NÃO recebe avisos neste aparelho. Mostra as mensagens do professor e quantas são novas;
+// ao abrir, marca como lidas (o professor vê quantos leram).
+function recebeAvisos(){ return avisosSuportados() && Notification.permission === 'granted' && !!lerLS('avisos_token'); }
+function desenharCorreio(lista){
+  var el = $('correio'); if(!el) return;
+  if(recebeAvisos()){ el.innerHTML = ''; return; }
+  var msgs = [];
+  (lista || []).forEach(function(m){ (m.recados || []).forEach(function(r){ msgs.push({id: r.id, texto: r.texto, em: r.em, t: r.t, lido: r.lido, disc: m.nome, professorId: m.professorId}); }); });
+  msgs.sort(function(a, b){ return b.t - a.t; });
+  var novas = msgs.filter(function(x){ return !x.lido; });
+  el.innerHTML = '<button type="button" class="correioBt" id="correioBt" aria-expanded="false">✉️ Mensagens do professor' +
+    (novas.length ? ' <span class="badge">' + novas.length + (novas.length > 1 ? ' novas' : ' nova') + '</span>' : msgs.length ? '' : ' <span class="aviso" style="font-weight:normal">(nenhuma)</span>') + '</button><div id="correioLista"></div>';
+  $('correioBt').addEventListener('click', function(){
+    var box = $('correioLista'), bt = this;
+    if(box.innerHTML){ box.innerHTML = ''; bt.setAttribute('aria-expanded', 'false'); return; }
+    bt.setAttribute('aria-expanded', 'true');
+    box.innerHTML = msgs.length ? msgs.map(function(x){
+      return '<div class="recado' + (x.lido ? '' : ' nova') + '">' + (x.lido ? '' : '<span class="tag t-err">nova</span> ') + '<b>' + esc(x.disc) + '</b> <span class="aviso">' + esc(x.em) + '</span><br>' + esc(x.texto).replace(/\n/g, '<br>') + '</div>';
+    }).join('') : '<p class="aviso" style="margin:8px 0 0">Nenhuma mensagem nos últimos 30 dias.</p>';
+    if(!novas.length) return;
+    var porProf = {};
+    novas.forEach(function(x){ (porProf[x.professorId] = porProf[x.professorId] || []).push(x.id); });
+    api('marcarRecadosLidos', {itens: Object.keys(porProf).map(function(k){ return {professorId: k, ids: porProf[k]}; })}).then(function(){
+      novas.forEach(function(x){ x.lido = true; });
+      (lista || []).forEach(function(m){ (m.recados || []).forEach(function(r){ r.lido = true; }); });
+      var b = bt.querySelector('.badge'); if(b) b.remove();
+      novas = [];
+    }).catch(function(){});
+  });
+}
+
 /* ---- matérias ---- */
 function carregarMinhas(){
   apiLembrar('minhas', 'minhasMaterias', {}).then(function(lista){
+    desenharCorreio(lista);
     var el = $('listaMinhas');
     if(!lista.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria. Peça inscrição abaixo.</p>'; return; }
     var cartaoMateria = function(m, i){
@@ -827,7 +985,7 @@ function carregarMinhas(){
           '<button type="button" class="secundario mini" data-apost="' + i + '">Apostila</button>' : '') +
         (m.material ? '<a class="botaoLink" href="' + esc(m.material) + '" target="_blank" rel="noopener">📁 Material no Drive</a>' : '') +
         (m.situacao === 'pendente' ? '<button type="button" class="secundario mini" data-cancelar="' + esc(m.inscricaoId) + '" data-prof="' + esc(m.professorId) + '">Cancelar pedido</button>' : '') +
-        '</div></div>';
+        '</div>' + (m.recados || []).slice(0, 3).map(function(r){ return '<div class="recado">📣 <b>Recado do professor</b> <span class="aviso">' + esc(r.em) + '</span><br>' + esc(r.texto).replace(/\n/g, '<br>') + '</div>'; }).join('') + '</div>';
     };
     var emCurso = [], encerradas = [];
     lista.forEach(function(m, i){ (m.ativa ? emCurso : encerradas).push(cartaoMateria(m, i)); });
@@ -1280,7 +1438,7 @@ function abrirAba(a){
   if(a === 'notas') abrirNotas();
   if(a === 'hist') abrirHistorico();
   if(a === 'insc') carregarInscricoes();
-  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); }
+  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); carregarAvisosAdmin(); }
   if(a === 'chat') abrirChat($('pChat'));
 }
 
@@ -3134,6 +3292,13 @@ function desenharDisciplinas(){
   el.querySelectorAll('[data-verhist]').forEach(function(b){ b.addEventListener('click', function(){ escolherDisc(b.dataset.verhist); abrirAba('hist'); }); });
   el.insertAdjacentHTML('afterbegin', '<div id="alertasTemas"></div><div id="painelTemas"></div>');
   el.querySelectorAll('[data-temas]').forEach(function(b){ b.addEventListener('click', function(){ abrirTemas(b.dataset.temas); }); });
+  el.querySelectorAll('[data-recado]').forEach(function(b){ b.addEventListener('click', function(){
+    var box = el.querySelector('[data-recadobox="' + b.dataset.recado + '"]');
+    if(box.innerHTML){ box.innerHTML = ''; return; }
+    box.innerHTML = '<p class="carregando">Carregando…</p>';
+    api('recadosDisciplina', {disciplinaId: b.dataset.recado}).then(function(r){ desenharRecados(box, b.dataset.recado, r); })
+      .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  }); });
   carregarAlertasTemas();
   el.querySelectorAll('[data-ativar]').forEach(function(b){
     b.addEventListener('click', function(){
@@ -3177,7 +3342,9 @@ function cartaoDisc(d){
     '<div class="botoes"><button type="button" class="secundario mini" data-editar="' + esc(d.id) + '">Editar</button>' +
     '<button type="button" class="secundario mini" data-temas="' + esc(d.id) + '">🧩 Configurar prioridade dos temas</button>' +
     '<button type="button" class="secundario mini" data-copiar="' + esc(d.id) + '">Copiar para o próximo semestre</button>' +
-    '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Encerrar e arquivar">Encerrar e arquivar</button></div></div>';
+    '<button type="button" class="secundario mini" data-recado="' + esc(d.id) + '">📣 Aviso à turma</button>' +
+    '<button type="button" class="secundario mini" data-arquivar="' + esc(d.id) + '" data-rotulo="Encerrar e arquivar">Encerrar e arquivar</button></div>' +
+    '<div data-recadobox="' + esc(d.id) + '"></div></div>';
 }
 // Cartão compacto de uma disciplina encerrada
 function cartaoEncerrada(d){
@@ -3354,6 +3521,82 @@ function desenharApostilaRef(d){
     blobBase64(f).then(function(b64){ return api('enviarApostilaRef', {disciplinaId: d.id, nome: f.name, mime: f.type || 'application/pdf', dados: b64}); })
       .then(function(c){ atualiza(c); $('fRefMsg').innerHTML = '<div class="ok">✓ Apostila lida e guardada.' + (c.refAluno ? ' Os alunos já veem o PDF em "Apostila".' : '') + '</div>'; })
       .catch(function(e){ $('fRefMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+
+// Aviso à turma: vai para os celulares com avisos ligados, aparece em "Minhas matérias" por 15 dias e, se marcar, vai por e-mail
+function desenharRecados(box, discId, r){
+  box.innerHTML = '<div class="detalhe" style="margin-top:10px"><p class="grupoTitulo" style="margin-top:0">📣 Aviso à turma</p>' +
+    '<p class="aviso" style="margin:0 0 6px">' + r.alunos + ' aluno(s) inscrito(s) · ' + (r.ligado ? r.comCelular + ' com avisos ligados no celular' : 'avisos no celular ainda não configurados') + '. O recado também aparece em "Minhas matérias" por 15 dias.</p>' +
+    '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px">' + ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'].map(function(em){ return '<button type="button" class="secundario mini" data-emoji="' + em + '" style="font-size:18px;padding:2px 8px;line-height:1.3" aria-label="Inserir ' + em + '">' + em + '</button>'; }).join('') + '</div>' +
+    '<textarea data-rectexto style="min-height:60px" placeholder="ex.: Amanhã a aula será prática no laboratório 3. Tragam jaleco."></textarea>' +
+    '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:6px 0"><input type="checkbox" data-recemail style="width:17px;height:17px"> Mandar também por e-mail (para quem não ativou os avisos)</label>' +
+    '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-recenviar>Enviar para a turma</button></div><div data-recmsg></div>' +
+    (r.recados.length ? '<p class="grupoTitulo">Enviados</p>' + r.recados.map(function(x){
+      var total = x.lidos + x.naoLeram.length;
+      return '<div class="linha"><span style="font-size:14px">' + esc(x.texto) + '<br><span class="aviso">' + esc(x.em) + '</span>' +
+        '<br><span style="font-size:12.5px">' + (x.celulares ? '<span style="color:#1a7a3c">✓ chegou em ' + x.celulares + ' celular(es)</span>' : '<span class="aviso">nenhum celular com avisos ligados</span>') +
+        (x.falhas ? ' · <span style="color:#c62828">⚠ ' + x.falhas + ' falhou(aram)' + (x.erro ? ': ' + esc(x.erro) : '') + '</span>' : '') +
+        (x.email ? ' · ✉️ e-mail enviado' : '') + ' · 👁 lido por <b>' + x.lidos + ' de ' + total + '</b></span>' +
+        (x.naoLeram.length && x.naoLeram.length < total ? '<details style="font-size:12.5px"><summary class="link">quem ainda não leu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : '') +
+        '</span><button type="button" class="link" data-recexcluir="' + esc(x.id) + '" style="font-size:12.5px">apagar</button></div>';
+    }).join('') + '<p class="aviso" style="margin-top:4px">"Lido" conta quem abriu a cartinha ✉️ no app ou tocou na notificação.</p>' : '') + '</div>';
+  // emoji entra onde está o cursor
+  box.querySelectorAll('[data-emoji]').forEach(function(e){ e.addEventListener('click', function(){
+    var ta = box.querySelector('[data-rectexto]'), i = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length, f = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : i;
+    ta.value = ta.value.slice(0, i) + e.dataset.emoji + ' ' + ta.value.slice(f); ta.focus(); ta.selectionStart = ta.selectionEnd = i + e.dataset.emoji.length + 1;
+  }); });
+  var bt = box.querySelector('[data-recenviar]');
+  bt.addEventListener('click', function(){
+    var t = box.querySelector('[data-rectexto]').value.trim(); if(!t) return;
+    if(bt.dataset.conf !== '1'){ bt.dataset.conf = '1'; bt.textContent = 'Confirmar: enviar para ' + r.alunos + ' aluno(s)'; return; }
+    bt.disabled = true; bt.textContent = 'Enviando…';
+    api('enviarRecado', {disciplinaId: discId, texto: t, porEmail: box.querySelector('[data-recemail]').checked}).then(function(n){
+      desenharRecados(box, discId, n);
+      box.querySelector('[data-recmsg]').innerHTML = '<div class="ok">Enviado: chegou em ' + n.enviado.celulares + ' celular(es)' + (n.enviado.emails ? ' e ' + n.enviado.emails + ' e-mail(s)' : '') + '. Todos os ' + n.enviado.alunos + ' alunos veem o recado no app.</div>' +
+        (n.enviado.falhas ? '<div class="erro">⚠ ' + n.enviado.falhas + ' aviso(s) não chegaram' + (n.enviado.erro ? ': ' + esc(n.enviado.erro) : '') + '. Esses alunos ainda veem o recado na cartinha ✉️ do app.</div>' : '');
+    }).catch(function(e){ bt.disabled = false; bt.dataset.conf = ''; bt.textContent = 'Enviar para a turma'; box.querySelector('[data-recmsg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  box.querySelectorAll('[data-recexcluir]').forEach(function(x){ x.addEventListener('click', function(){
+    if(!window.confirm('Apagar este recado da tela dos alunos? (quem já recebeu no celular continua com a notificação)')) return;
+    api('excluirRecado', {disciplinaId: discId, id: x.dataset.recexcluir}).then(function(n){ desenharRecados(box, discId, n); }).catch(function(e){ erroGeral(e.message); });
+  }); });
+}
+
+// Configurações: avisos no celular (só para o administrador da plataforma)
+function carregarAvisosAdmin(){
+  var el = $('cfgAvisos'); if(!el) return;
+  api('avisosConfigAdmin', {}).then(function(c){ el.classList.remove('oculto'); desenharAvisosAdmin(c); }).catch(function(){ el.classList.add('oculto'); });
+}
+function desenharAvisosAdmin(c){
+  var el = $('cfgAvisos');
+  el.innerHTML = '<h2>Avisos no celular</h2>' +
+    (c.ligado ? '<div class="ok">Ligados · projeto ' + esc(c.projeto) + ' · ' + c.celulares + ' aparelho(s) cadastrado(s).</div><div class="botoes"><button type="button" class="secundario mini" id="avTeste">Enviar um aviso de teste para mim</button></div><div id="avTesteMsg"></div>' +
+      ((c.historico || []).length ? '<details style="margin-top:8px"><summary class="link">Últimos envios (' + c.historico.length + ')</summary><div class="tabelaBox"><table><tr><th>Quando</th><th>Aviso</th><th>Chegou</th><th>Falhou</th></tr>' +
+        c.historico.map(function(h){ return '<tr><td>' + esc(h.em) + '</td><td>' + esc(h.titulo) + '</td><td>' + h.ok + ' de ' + h.aparelhos + '</td><td>' + (h.falhas ? '<span style="color:#c62828">' + h.falhas + (h.erro ? ' · ' + esc(h.erro) : '') + '</span>' : '—') + '</td></tr>'; }).join('') + '</table></div></details>' : '') :
+      '<p class="aviso" style="margin-top:0">Ainda não configurados. É uma configuração única no Firebase (gratuito, sua conta Google).</p>') +
+    '<details' + (c.ligado ? '' : ' open') + ' style="margin-top:8px"><summary class="link">' + (c.ligado ? 'Trocar a configuração' : 'Como configurar (uns 10 minutos)') + '</summary>' +
+    '<ol style="font-size:14px;line-height:1.6;padding-left:20px">' +
+      '<li>Abra <a href="https://console.firebase.google.com" target="_blank" rel="noopener">console.firebase.google.com</a> → <b>Criar um projeto</b> (ex.: "aula-por-ia"; pode desligar o Google Analytics).</li>' +
+      '<li>Na engrenagem ⚙️ → <b>Configurações do projeto</b> → aba <b>Geral</b> → em "Seus apps", clique no ícone <b>&lt;/&gt;</b> (Web), dê o apelido "Aula por IA" e registre. Copie o bloco <b>firebaseConfig</b> e cole no campo 1.</li>' +
+      '<li>Aba <b>Cloud Messaging</b> → "Configuração da Web" → <b>Certificados push da Web</b> → <b>Gerar par de chaves</b>. Copie a chave e cole no campo 2.</li>' +
+      '<li>Aba <b>Contas de serviço</b> → <b>Gerar nova chave privada</b>. Baixa um arquivo .json: escolha ele no campo 3. Esse arquivo é secreto: depois de salvar aqui, pode apagar do computador.</li></ol>' +
+    '<label class="rot">1. Bloco firebaseConfig</label><textarea id="avWeb" style="min-height:90px" placeholder="const firebaseConfig = { apiKey: ..., projectId: ..., ... };"></textarea>' +
+    '<label class="rot" style="margin-top:8px">2. Chave do certificado push da Web</label><input type="text" id="avVapid" autocomplete="off">' +
+    '<label class="rot" style="margin-top:8px">3. Arquivo da conta de serviço (.json)</label><input type="file" id="avConta" accept=".json,application/json">' +
+    '<div class="botoes"><button type="button" id="avSalvar">Salvar e testar</button></div><div id="avMsg"></div></details>' +
+    '<p class="aviso" style="margin-top:8px">Os alunos ativam no próprio celular (cartão no topo de "Minhas matérias") e podem desligar quando quiserem. No iPhone, só funciona com o app adicionado à tela de início. Não usa a cota do Gemini.</p>';
+  var t = $('avTeste');
+  if(t) t.addEventListener('click', function(){ t.disabled = true;
+    api('testarAvisos', {}).then(function(r){ t.disabled = false; $('avTesteMsg').innerHTML = r.enviados ? '<div class="ok">Enviado para ' + r.enviados + ' aparelho(s) seu(s).</div>' : '<div class="aviso">Nenhum aparelho seu com avisos ligados. Ative no seu celular em "Minhas matérias" (entrando como aluno) e teste de novo.</div>'; })
+      .catch(function(e){ t.disabled = false; $('avTesteMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
+  $('avSalvar').addEventListener('click', function(){
+    var b = this, f = $('avConta').files[0];
+    if(!f){ $('avMsg').innerHTML = '<div class="erro">Escolha o arquivo da conta de serviço (passo 4).</div>'; return; }
+    b.disabled = true; $('avMsg').innerHTML = '<p class="carregando">Salvando e testando o acesso ao Firebase…</p>';
+    f.text().then(function(conta){ return api('salvarAvisosConfig', {web: $('avWeb').value, vapid: $('avVapid').value, conta: conta}); })
+      .then(function(c2){ desenharAvisosAdmin(c2); })
+      .catch(function(e){ b.disabled = false; $('avMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
 }
 
