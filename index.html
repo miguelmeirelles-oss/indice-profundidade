@@ -712,19 +712,32 @@ function api(acao, dados){
 /* Onde o login fica guardado: "manter conectado" → localStorage (dura até sair);
    desmarcado → sessionStorage (acaba quando o navegador fecha). O aulas.html e o
    provas.html leem dos dois lugares. */
-// Login sem "manter conectado" (computador da faculdade): se o site ficou mais de 20 min sem
-// nenhuma aba aberta (ex.: computador desligado e o Chrome restaurou as abas), pede para entrar de novo.
+// Ao sair da conta (ou quando o login acaba porque o navegador do computador foi fechado),
+// este aparelho para de receber os avisos dessa conta.
+function desligarAvisosAoSair(tk){
+  try{
+    var f = localStorage.getItem('avisos_token');
+    localStorage.removeItem('avisos_token'); localStorage.removeItem('avisos_em');
+    if(f && tk) fetch('https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec', {method: 'POST', keepalive: true,
+      headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({acao: 'removerAvisos', dados: {token: tk, fcm: f}})}).catch(function(){});
+    if(navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(function(r){ return r && r.pushManager.getSubscription(); })
+      .then(function(sub){ if(sub) sub.unsubscribe(); }).catch(function(){});
+  }catch(e){}
+}
+// Login sem "manter conectado" (computador da faculdade): o login acaba quando o Chrome/Edge é fechado.
+// Cada aba aberta dá sinal de vida a cada 30 s; se ficou mais de 3 min sem nenhuma aba aberta
+// (navegador fechado, mesmo que ele restaure as abas depois), pede para entrar de novo.
 function tokenSalvo(){
   try{
     var t = localStorage.getItem('ip_token'); if(t) return t;
     t = sessionStorage.getItem('ip_token') || '';
     var vivo = Number(localStorage.getItem('ip_vivo') || 0);
-    if(t && vivo && Date.now() - vivo > 20 * 60000){ sessionStorage.removeItem('ip_token'); return ''; }
+    if(t && vivo && Date.now() - vivo > 3 * 60000){ desligarAvisosAoSair(t); sessionStorage.removeItem('ip_token'); return ''; }
     if(t) localStorage.setItem('ip_vivo', String(Date.now()));
     return t;
   }catch(e){ return ''; }
 }
-setInterval(function(){ try{ if(sessionStorage.getItem('ip_token')) localStorage.setItem('ip_vivo', String(Date.now())); }catch(e){} }, 60000);
+setInterval(function(){ try{ if(sessionStorage.getItem('ip_token')) localStorage.setItem('ip_vivo', String(Date.now())); }catch(e){} }, 30000);
 function lerToken(){ return tokenSalvo(); }
 function guardarToken(t){
   var manter = document.getElementById('manterConectado');
@@ -1064,6 +1077,7 @@ function salvarSenha(){
 
 function sairConta(){
   api('sair', {token: sessao.token}).catch(function(){});
+  desligarAvisosAoSair(sessao.token);
   sessao = {token:'', nome:''};
   apagarToken();
   document.getElementById('btAreaTexto').textContent = 'Estudar com IA';

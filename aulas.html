@@ -511,19 +511,32 @@ var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPM
 
 var BLOCO_SEG = 600;          // 10 min por bloco de áudio
 var token = '';
-// Login sem "manter conectado" (computador da faculdade): se o site ficou mais de 20 min sem
-// nenhuma aba aberta (ex.: computador desligado e o Chrome restaurou as abas), pede para entrar de novo.
+// Ao sair da conta (ou quando o login acaba porque o navegador do computador foi fechado),
+// este aparelho para de receber os avisos dessa conta.
+function desligarAvisosAoSair(tk){
+  try{
+    var f = localStorage.getItem('avisos_token');
+    localStorage.removeItem('avisos_token'); localStorage.removeItem('avisos_em');
+    if(f && tk) fetch('https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec', {method: 'POST', keepalive: true,
+      headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({acao: 'removerAvisos', dados: {token: tk, fcm: f}})}).catch(function(){});
+    if(navigator.serviceWorker) navigator.serviceWorker.getRegistration().then(function(r){ return r && r.pushManager.getSubscription(); })
+      .then(function(sub){ if(sub) sub.unsubscribe(); }).catch(function(){});
+  }catch(e){}
+}
+// Login sem "manter conectado" (computador da faculdade): o login acaba quando o Chrome/Edge é fechado.
+// Cada aba aberta dá sinal de vida a cada 30 s; se ficou mais de 3 min sem nenhuma aba aberta
+// (navegador fechado, mesmo que ele restaure as abas depois), pede para entrar de novo.
 function tokenSalvo(){
   try{
     var t = localStorage.getItem('ip_token'); if(t) return t;
     t = sessionStorage.getItem('ip_token') || '';
     var vivo = Number(localStorage.getItem('ip_vivo') || 0);
-    if(t && vivo && Date.now() - vivo > 20 * 60000){ sessionStorage.removeItem('ip_token'); return ''; }
+    if(t && vivo && Date.now() - vivo > 3 * 60000){ desligarAvisosAoSair(t); sessionStorage.removeItem('ip_token'); return ''; }
     if(t) localStorage.setItem('ip_vivo', String(Date.now()));
     return t;
   }catch(e){ return ''; }
 }
-setInterval(function(){ try{ if(sessionStorage.getItem('ip_token')) localStorage.setItem('ip_vivo', String(Date.now())); }catch(e){} }, 60000);
+setInterval(function(){ try{ if(sessionStorage.getItem('ip_token')) localStorage.setItem('ip_vivo', String(Date.now())); }catch(e){} }, 30000);
 token = tokenSalvo();
 var sessao = null, resumo = null;
 
@@ -594,6 +607,7 @@ function iniciar(){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
       // o login é o mesmo do Avaliador: apagar o token deste navegador desconecta os dois
+      desligarAvisosAoSair(token);
       try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); localStorage.removeItem('aulas_visao'); }catch(x){}
       location.href = 'index.html';
     });
@@ -870,6 +884,7 @@ function tokenAvisos(){
 }
 function desenharCartaoAvisos(){
   var el = $('cartaoAvisos'); if(!el) return;
+  if(!/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) && !lerLS('ip_token') && !lerLS('avisos_token')){ el.innerHTML = ''; return; }
   var adiado = Number(lerLS('avisos_adiar') || 0) > Date.now();
   var fechar = '<button type="button" class="link" data-avadiar style="font-size:13px">agora não</button>';
   if(ehAndroid() && navegadorDeApp() && !adiado){
