@@ -85,6 +85,9 @@
   .carregando{color:var(--cinza);font-size:14px;padding:8px 0}
   .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
   .cfg{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:13.5px;margin-top:8px}
+  .listaDiscs .cfg{grid-template-columns:max-content 1fr max-content 1fr;gap:6px 14px}
+  .listaDiscs .cfg span:nth-child(even){text-align:left}
+  @media (max-width:760px){ .listaDiscs .cfg{grid-template-columns:1fr auto} .listaDiscs .cfg span:nth-child(even){text-align:right} }
   .cfg span:nth-child(odd){color:var(--cinza)}
   .cfg span:nth-child(even){font-weight:bold;text-align:right}
   .mono{font-family:Consolas,"Courier New",monospace}
@@ -3269,7 +3272,7 @@ function desenharDisciplinas(){
   var porSem = {};
   arq.forEach(function(d){ (porSem[d.semestre] = porSem[d.semestre] || []).push(d); });
   var sems = Object.keys(porSem).sort().reverse();
-  el.innerHTML = (at.length ? '<div class="grid2">' + at.map(cartaoDisc).join('') + '</div>' : '<div class="caixa"><p>Nenhuma disciplina em andamento. Crie uma nova ou reative uma encerrada.</p></div>') +
+  el.innerHTML = (at.length ? '<div class="listaDiscs">' + at.map(cartaoDisc).join('') + '</div>' : '<div class="caixa"><p>Nenhuma disciplina em andamento. Crie uma nova ou reative uma encerrada.</p></div>') +
     (arq.length ? '<details class="caixa encerradas"><summary>📦 Ver disciplinas encerradas (' + arq.length + ')</summary>' +
       '<p class="aviso" style="margin-top:8px">Ficam guardadas para consulta (notas, histórico e apostila), fora dos cálculos e do carregamento do site.</p>' +
       sems.map(function(sem){ return '<p class="grupoTitulo">' + esc(sem) + '</p>' + porSem[sem].map(cartaoEncerrada).join(''); }).join('') +
