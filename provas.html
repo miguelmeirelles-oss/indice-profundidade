@@ -550,6 +550,14 @@ function tagAluno(e){
   return e.confirmada ? '<span class="tag t-ok">nota definitiva</span>' : '<span class="tag t-warn">nota provisória</span>';
 }
 // Para o professor: o que o aluno já recebeu desta prova (nada, nota provisória ou nota definitiva)
+// Etiqueta da prova liberada: quantas notas provisórias e definitivas os alunos já veem
+function tagLiberadas(p){
+  var def = p.confirmadas || 0, prov = Math.max(0, (p.corrigidas || 0) - def), quando = ' title="correção liberada para a turma em ' + esc(p.resultadosEm) + '"';
+  if(!def && !prov) return '<span class="tag t-ok"' + quando + '>correção liberada (nenhuma pronta ainda)</span>';
+  if(!prov) return '<span class="tag t-ok"' + quando + '>✅ liberadas: ' + def + ' definitiva(s)</span>';
+  if(!def) return '<span class="tag t-warn"' + quando + '>📝 liberadas: ' + prov + ' provisória(s)</span>';
+  return '<span class="tag t-warn"' + quando + '>liberadas: 📝 ' + prov + ' provisória(s) · ✅ ' + def + ' definitiva(s)</span>';
+}
 function tagEnvio(e, liberada){
   if(!e || e.status !== 'corrigida') return '<span class="tag t-cinza">nada enviado</span>';
   if(!liberada) return e.confirmada ? '<span class="tag t-cinza" title="O aluno vê quando você liberar a correção para a turma">definitiva salva, não enviada</span>' : '<span class="tag t-cinza">nada enviado</span>';
@@ -658,7 +666,7 @@ function listarProvas(){
       var sit = r.agora < p.inicio ? '<span class="tag t-cinza">agendada</span>' : r.agora <= p.fimProva ? '<span class="tag t-err">em andamento</span>' : r.agora <= p.fimEnvio ? '<span class="tag t-warn">envio aberto</span>' : '<span class="tag t-ok">encerrada</span>';
       return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
         (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
-        (p.resultadosLiberados ? ' <span class="tag t-ok" title="liberada em ' + esc(p.resultadosEm) + '">correção liberada para a turma</span>' : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '')) +
+        (p.resultadosLiberados ? ' ' + tagLiberadas(p) : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '')) +
         '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + (p.questoes.length ? p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos' : '<span class="tag t-warn">sem questões ainda</span>') +
           (function(){ var n = p.questoes.reduce(function(t, q){ return t + ((q.sugestoes || []).length ? 1 : 0); }, 0);
             return n ? ' <span class="tag t-err">' + n + ' questão(ões) com sugestão da IA a revisar</span>' : ''; })() + '</div>' +
@@ -1042,7 +1050,8 @@ function abrirEntrega(entregaId){
         '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>' + (e.prova.resultadosLiberados
           ? 'Grava os seus ajustes e o aluno já vê a nota nova como <b>"nota provisória"</b>, sem e-mail nem aviso. Use enquanto ainda revisa (por exemplo, esperando as vistas de prova). Quando terminar, use "Liberar nota definitiva".'
           : 'Grava os seus ajustes sem fechar a nota. A correção desta prova ainda está <b>oculta</b> para a turma: o aluno só vê a nota quando você usar "Liberar correção para a turma" na lista, e aí ela aparece como <b>"nota provisória"</b> até você salvar a nota definitiva.') + '</div></details>' +
-        '<button type="button" class="secundario" id="eRecorr">Corrigir de novo com IA</button></div>' +
+        '<button type="button" class="secundario" id="eRecorr">Corrigir de novo com IA</button>' +
+        (e.confirmada ? '<button type="button" class="secundario" id="eDesfazer">↩ Voltar para nota provisória</button>' : '') + '</div>' +
       '<div id="eMsg"></div></div>';
     el.innerHTML = h;
     el.querySelectorAll('.fotosGrandes img').forEach(function(img){ img.addEventListener('click', function(){ ampliar(img.src); }); });
@@ -1067,6 +1076,13 @@ function abrirEntrega(entregaId){
     }
     $('eConf').addEventListener('click', function(){ salvar(true, this); });
     $('eSalvar').addEventListener('click', function(){ salvar(false, this); });
+    var bd = $('eDesfazer');
+    if(bd) bd.addEventListener('click', function(){
+      if(!window.confirm('Voltar a nota de ' + e.alunoNome + ' para PROVISÓRIA? Os pontos e comentários ficam como estão. O aluno não recebe aviso; se ainda estiver no prazo, ele volta a poder pedir vista.')) return;
+      bd.disabled = true;
+      api('voltarParaProvisoria', {entregaId: entregaId}).then(function(){ abrirEntrega(entregaId); })
+        .catch(function(x){ bd.disabled = false; $('eMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
+    });
     $('eRecorr').addEventListener('click', function(){
       var b = this;
       if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: refazer a correção (apaga os ajustes)'; return; }
