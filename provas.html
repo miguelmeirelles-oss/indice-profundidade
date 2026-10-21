@@ -199,6 +199,14 @@
   .chatEntrada textarea{min-height:48px;max-height:160px;flex:1}
   .chatRodape{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-top:8px;font-size:12.5px;color:var(--cinza)}
   .chatRodape .usoIA{font-family:var(--mono,Consolas,monospace);font-size:11.5px}
+
+  /* bolinha "?" pequena, como expoente; ao clicar abre uma caixinha flutuante (fecha clicando fora) */
+  details.ajuda{display:inline-block;position:relative;vertical-align:super;margin:0 0 0 2px;line-height:1}
+  details.ajuda[open]{display:inline-block;margin:0 0 0 2px}
+  details.ajuda>summary{width:14px;height:14px;font-size:9.5px;line-height:14px;font-weight:bold;box-shadow:none;border:0}
+  details.ajuda>div{position:absolute;z-index:60;top:19px;left:-10px;width:300px;max-width:78vw;margin:0;background:#fff;color:var(--navy);
+    border:1px solid var(--linha,#d9dee8);border-left:4px solid var(--menu);border-radius:8px;box-shadow:0 8px 24px rgba(14,42,92,.18);
+    padding:10px 12px;font-size:13px;line-height:1.5;font-weight:normal;text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
 </style>
 </head>
 <body>
@@ -565,6 +573,24 @@ function tagLiberadas(p){
   if(!def) return '<span class="tag t-warn"' + quando + '>📝 liberadas: ' + prov + ' provisória(s)</span>';
   return '<span class="tag t-warn"' + quando + '>liberadas: 📝 ' + prov + ' provisória(s) · ✅ ' + def + ' definitiva(s)</span>';
 }
+// Se o aluno abriu a correção: quantas vezes, tempo total e quando (só o professor vê)
+function tempoTxt(seg){ seg = Math.round(seg || 0); return seg < 60 ? seg + ' s' : seg < 3600 ? Math.round(seg / 60) + ' min' : Math.floor(seg / 3600) + ' h ' + Math.round(seg % 3600 / 60) + ' min'; }
+function textoVisto(e){
+  if(!e || e.status !== 'corrigida') return '<span class="aviso">—</span>';
+  var v = e.visto || {};
+  if(!v.vezes) return '<span class="aviso">não abriu ainda</span>';
+  return '<span title="1ª vez: ' + esc(v.primeiro) + ' · última: ' + esc(v.ultimo) + '">👁 ' + v.vezes + '× · ' + tempoTxt(v.seg) + '<br><span class="aviso">último ' + esc(String(v.ultimo).slice(0, 16)) + '</span></span>';
+}
+// Resumo acima da tabela: quantos alunos já abriram a correção liberada
+function resumoVistos(r){
+  if(!r.prova.resultadosLiberados) return '';
+  var com = r.alunos.filter(function(a){ return a.entrega && a.entrega.status === 'corrigida'; });
+  if(!com.length) return '';
+  var viram = com.filter(function(a){ return a.entrega.visto && a.entrega.visto.vezes; });
+  var falta = com.filter(function(a){ return !(a.entrega.visto && a.entrega.visto.vezes); }).map(function(a){ return a.nome; });
+  return '<p style="margin:8px 0;font-size:14px">👁 <b>' + viram.length + ' de ' + com.length + '</b> alunos já abriram a correção' +
+    (falta.length ? ' <span class="aviso">· ainda não abriram: ' + falta.map(esc).join(', ') + '</span>' : ' <span style="color:#1a7a3c">· todos viram</span>') + '</p>';
+}
 function tagEnvio(e, liberada){
   if(!e || e.status !== 'corrigida') return '<span class="tag t-cinza">nada enviado</span>';
   if(!liberada) return e.confirmada ? '<span class="tag t-cinza" title="O aluno vê quando você liberar a correção para a turma">definitiva salva, não enviada</span>' : '<span class="tag t-cinza">nada enviado</span>';
@@ -642,6 +668,9 @@ function enviarAluno(i, sel, box){
    PROFESSOR
    ===================================================================== */
 var discSel = '', dadosDisc = null;
+// link do aviso de vista: provas.html?disc=…&prova=…&entrega=… abre direto a correção do aluno
+var ABRIR_DIRETO = (function(){ try{ var q = new URLSearchParams(location.search); return q.get('entrega') ? {disc: q.get('disc'), prova: q.get('prova'), entrega: q.get('entrega')} : null; }catch(e){ return null; } })();
+if(ABRIR_DIRETO && ABRIR_DIRETO.disc) discSel = ABRIR_DIRETO.disc;
 
 function abrirProf(){
   $('profTopo').innerHTML = '<div class="caixa"><p class="carregando">Carregando disciplinas…</p></div>';
@@ -690,6 +719,7 @@ function listarProvas(){
     $('btNovaProva').addEventListener('click', function(){ formProva(null); });
     el.querySelectorAll('[data-editar]').forEach(function(b){ b.addEventListener('click', function(){ formProva(r.provas[Number(b.dataset.editar)]); }); });
     el.querySelectorAll('[data-entregas]').forEach(function(b){ b.addEventListener('click', function(){ abrirEntregas(r.provas[Number(b.dataset.entregas)].id); }); });
+    if(ABRIR_DIRETO && r.provas.some(function(p){ return p.id === ABRIR_DIRETO.prova; })) abrirEntregas(ABRIR_DIRETO.prova);
     el.querySelectorAll('[data-liberar]').forEach(function(b){ b.addEventListener('click', function(){
       var p = r.provas[Number(b.dataset.liberar)], liberar = b.dataset.valor === '1';
       if(b.dataset.conf !== '1'){
@@ -887,11 +917,13 @@ function abrirEntregas(provaId){
       (r.prova.pastaUrl ? ' · <a class="link" style="font-size:12.5px" target="_blank" rel="noopener" href="' + esc(r.prova.pastaUrl) + '">pasta das fotos no Drive</a>' : '') + '</p>' +
       (r.prova.resultadosLiberados ? '<div class="ok">Correção liberada para a turma em ' + esc(r.prova.resultadosEm) + ': cada aluno vê a nota provisória e a correção, e pode pedir vista. Revise cada um e use "Liberar nota definitiva" na correção dele.</div>'
         : '<div class="convite">Correção <b>oculta</b> da turma: os alunos veem só “em correção”. Revise o que quiser e, quando terminar, use “Liberar correção para a turma” na lista de provas: aí cada aluno recebe a nota provisória.</div>') +
-      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
+      resumoVistos(r) +
+      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
         var e = a.entrega;
         return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + (e && e.vistaAberta ? ' <span class="tag t-warn" title="questões contestadas ainda sem resposta">vista: ' + e.vistaAberta + '</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + (e.enviadoPor === 'professor' ? ' <span class="aviso">(enviada por você)</span>' : '') : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
           '<td>' + (e ? tagEnvio(e, r.prova.resultadosLiberados) : '—') + '</td>' +
+          '<td style="font-size:12.5px">' + textoVisto(e) + '</td>' +
           '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
           '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
           '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
@@ -900,6 +932,7 @@ function abrirEntregas(provaId){
       '</div><div id="msgRecorr"></div></div><div id="areaEntrega"></div>';
     el.innerHTML = h;
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
+    if(ABRIR_DIRETO && ABRIR_DIRETO.prova === provaId){ var ent = ABRIR_DIRETO.entrega; ABRIR_DIRETO = null; try{ history.replaceState(null, '', location.pathname); }catch(x){} abrirEntrega(ent); }
     var btR = $('btRecorrTodas');
     if(btR) btR.addEventListener('click', function(){
       if(btR.dataset.conf !== '1'){
@@ -1026,7 +1059,7 @@ function abrirEntrega(entregaId){
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando a prova e as fotos…</p></div>';
   api('verEntrega', {entregaId: entregaId}).then(function(e){
     var h = '<div class="caixa"><h2>' + esc(e.alunoNome) + ' · ' + esc(e.prova.titulo) + '</h2>' +
-      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + (e.enviadoPor === 'professor' ? ' por você' : ' pelo aluno') + ' · ' + tagEntrega(e, 'fechada') + ' · <span id="eEnvio">' + tagEnvio(e, e.prova.resultadosLiberados) + '</span>' + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
+      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + (e.enviadoPor === 'professor' ? ' por você' : ' pelo aluno') + ' · ' + tagEntrega(e, 'fechada') + ' · <span id="eEnvio">' + tagEnvio(e, e.prova.resultadosLiberados) + '</span>' + (e.visto && e.visto.vezes ? ' · 👁 o aluno abriu ' + e.visto.vezes + '× (' + tempoTxt(e.visto.seg) + '; 1ª vez ' + esc(e.visto.primeiro) + ', última ' + esc(e.visto.ultimo) + ')' : e.status === 'corrigida' && e.prova.resultadosLiberados ? ' · o aluno ainda não abriu a correção' : '') + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
     if(e.revisaoPedida) h += '<div class="convite"><b>O aluno pediu revisão:</b> ' + esc(e.revisaoPedida) + '</div>';
     h += '<details open><summary class="link">Fotos (' + e.fotos.length + ')</summary><div class="fotosGrandes">' + e.fotos.map(function(f, i){
       return f.mime === 'application/pdf' ? '<a class="link" download="prova.pdf" href="data:application/pdf;base64,' + f.dados + '">Abrir PDF ' + (i + 1) + '</a>' : '<img src="data:' + f.mime + ';base64,' + f.dados + '" alt="Página ' + (i + 1) + '">';
@@ -1180,6 +1213,18 @@ function enviarChat(texto){
     CHAT.enviando = false; $('chatEnviar').disabled = false; guardarChat(); desenharChat(); $('chatTexto').focus();
   });
 }
+
+// bolinhas "?": abre uma por vez, fecha ao clicar fora e não deixa a caixinha sair da tela
+document.addEventListener('click', function(ev){
+  document.querySelectorAll('details.ajuda[open]').forEach(function(d){ if(!d.contains(ev.target)) d.removeAttribute('open'); });
+});
+document.addEventListener('toggle', function(ev){
+  var d = ev.target; if(!d || !d.matches || !d.matches('details.ajuda') || !d.open) return;
+  var cx = d.querySelector(':scope > div'); if(!cx) return;
+  cx.style.left = '-10px';
+  var r = cx.getBoundingClientRect(), sobra = r.right - (window.innerWidth - 8);
+  if(sobra > 0) cx.style.left = (-10 - sobra) + 'px';
+}, true);
 </script>
 </body>
 </html>

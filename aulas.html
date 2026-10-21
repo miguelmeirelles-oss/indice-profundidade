@@ -347,6 +347,14 @@
   .chatEntrada textarea{min-height:48px;max-height:160px;flex:1}
   .chatRodape{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline;margin-top:8px;font-size:12.5px;color:var(--cinza)}
   .chatRodape .usoIA{font-family:var(--mono,Consolas,monospace);font-size:11.5px}
+
+  /* bolinha "?" pequena, como expoente; ao clicar abre uma caixinha flutuante (fecha clicando fora) */
+  details.ajuda{display:inline-block;position:relative;vertical-align:super;margin:0 0 0 2px;line-height:1}
+  details.ajuda[open]{display:inline-block;margin:0 0 0 2px}
+  details.ajuda>summary{width:14px;height:14px;font-size:9.5px;line-height:14px;font-weight:bold;box-shadow:none;border:0}
+  details.ajuda>div{position:absolute;z-index:60;top:19px;left:-10px;width:300px;max-width:78vw;margin:0;background:#fff;color:var(--navy);
+    border:1px solid var(--linha,#d9dee8);border-left:4px solid var(--menu);border-radius:8px;box-shadow:0 8px 24px rgba(14,42,92,.18);
+    padding:10px 12px;font-size:13px;line-height:1.5;font-weight:normal;text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
 </style>
 </head>
 <body>
@@ -633,6 +641,7 @@ function iniciar(){
       location.href = 'index.html';
     });
     $('btMensagens').classList.remove('oculto');
+    if(r.professor) api('contarAvisosProf', {}).then(function(c){ AVISOS_PROF = c.naoLidos || 0; atualizarSeloMsgs(); }).catch(function(){});
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
     try{ if(new URLSearchParams(location.search).get('msgs')){ history.replaceState(null, '', location.pathname); setTimeout(function(){ abrirMensagens(); }, 300); } }catch(x){}
@@ -989,13 +998,14 @@ function desenharCorreio(lista){
 /* ================= MENSAGENS (botão no topo) =================
    Professor: escreve para uma ou várias disciplinas, escolhe quando expira (padrão 15 dias; data maior = some só
    nessa data), vê por matéria, ativas e expiradas, entrega e leitura. Aluno: mensagens ativas por matéria. */
-var VISAO = 'aluno', MINHAS_LISTA = [], MSGS = {r: null, filtro: '', aba: 'ativas'};
+var VISAO = 'aluno', MINHAS_LISTA = [], MSGS = {r: null, filtro: '', aba: 'ativas'}, AVISOS_PROF = 0;
 function ddmm(ms){ var d = new Date(ms); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2); }
 function atualizarSeloMsgs(){
   var n = 0;
   MINHAS_LISTA.forEach(function(m){ (m.recados || []).forEach(function(r){ if(!r.lido) n++; }); });
+  if(VISAO === 'prof') n = AVISOS_PROF;   // professor: avisos para ele (ex.: pedido de vista)
   var b = $('msgBadge'); if(!b) return;
-  b.textContent = n + (n > 1 ? ' novas' : ' nova'); b.classList.toggle('oculto', !n || VISAO === 'prof');
+  b.textContent = n + (n > 1 ? ' novas' : ' nova'); b.classList.toggle('oculto', !n);
 }
 $('btMensagens').addEventListener('click', function(){ abrirMensagens(); });
 // Professor: a página abre embaixo das abas (o cabeçalho e as abas continuam); aluno: no lugar da lista, com "voltar"
@@ -1049,7 +1059,13 @@ function desenharMsgsProf(discPre){
   var lista = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && (MSGS.aba === 'ativas' ? x.ativa : !x.ativa); });
   var nAt = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && x.ativa; }).length;
   var nEx = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && !x.ativa; }).length;
-  var h = cabMsgs() + '<div class="caixa"><h2 style="margin-top:0">✉️ Escrever mensagem</h2>' +
+  var av = r.avisos || [], novosAv = av.filter(function(a){ return !a.lido; }).length;
+  var h = cabMsgs() + (av.length ? '<div class="caixa"><h2 style="margin-top:0">🔔 Para você' + (novosAv ? ' <span class="tag t-err">' + novosAv + ' novo(s)</span>' : '') + '</h2>' +
+      av.slice(0, 10).map(function(a){
+        return '<div class="msgItem' + (a.lido ? '' : ' nova') + '"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) +
+          (a.link ? '<div class="botoes" style="margin-top:6px"><a class="botaoLink" href="' + esc(a.link) + '">Abrir a correção</a></div>' : '') + '</div>';
+      }).join('') + (av.length > 10 ? '<p class="aviso">Mostrando os 10 mais recentes.</p>' : '') + '</div>' : '') +
+    '<div class="caixa"><h2 style="margin-top:0">✉️ Escrever mensagem</h2>' +
     '<p class="aviso" style="margin:0 0 6px">' + (r.ligado ? 'Vai para os celulares com avisos ligados e fica no app até expirar.' : 'Os avisos no celular ainda não estão configurados: a mensagem fica no app até expirar.') + '</p>' +
     '<label class="rot">Para</label><div style="display:flex;flex-wrap:wrap;gap:6px 16px">' + discs.map(function(d){
       return '<label style="display:flex;gap:6px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" data-msgdisc="' + esc(d.id) + '"' + ((discPre ? d.id === discPre : discs.length === 1) ? ' checked' : '') + ' style="width:17px;height:17px"> ' + esc(d.nome) + ' <span class="aviso">(' + d.alunos + ' alunos · ' + d.comCelular + ' com avisos)</span></label>';
@@ -1083,6 +1099,7 @@ function desenharMsgsProf(discPre){
     }).join('') : '<p class="aviso">' + (MSGS.aba === 'ativas' ? 'Nenhuma mensagem ativa.' : 'Nenhuma mensagem expirada.') + '</p>') + '</div>';
   el.innerHTML = h;
   ligarFecharMsgs();
+  if(novosAv) api('marcarAvisosProfLidos', {}).then(function(){ av.forEach(function(a){ a.lido = true; }); AVISOS_PROF = 0; atualizarSeloMsgs(); }).catch(function(){});
   // escrever
   var eg = $('msgEmojis');
   $('msgEmojiBt').addEventListener('click', function(){ var abrir = eg.style.display === 'none'; eg.style.display = abrir ? 'flex' : 'none'; this.textContent = abrir ? '😀 Emojis ▴' : '😀 Emojis ▾'; });
@@ -1194,7 +1211,7 @@ function carregarMaterias(){
   }).catch(function(e){ el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
 
-function voltarListaAluno(){ $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
+function voltarListaAluno(){ if(typeof fimLeitura === 'function') fimLeitura(); $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
 
 /* ================= MINHAS PROVAS (aluno) =================
    As provas ficam aqui no Aula por IA: o professor envia as fotos, o aluno vê a nota e a correção
@@ -1242,8 +1259,25 @@ function carregarProvasAluno(){
     }catch(x){}
   }).catch(function(e){ $('listaProvasAluno').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
+// Tempo com a correção aberta (para o professor saber se o aluno leu). Pausa quando a aba sai da frente.
+var LEITURA = null;
+function enviarLeitura(abriu, segundos, it){
+  try{
+    fetch(BACKEND_AULAS, {method: 'POST', keepalive: true, headers: {'Content-Type': 'text/plain;charset=utf-8'},
+      body: JSON.stringify({acao: 'leituraProva', dados: {token: token, professorId: it.professorId, entregaId: it.entrega.id, abriu: !!abriu, segundos: segundos || 0}})}).catch(function(){});
+  }catch(e){}
+}
+function pausarLeitura(){
+  if(!LEITURA || !LEITURA.t0) return;
+  var seg = Math.round((Date.now() - LEITURA.t0) / 1000); LEITURA.t0 = 0;
+  if(seg >= 3) enviarLeitura(false, seg, LEITURA.it);
+}
+function fimLeitura(){ pausarLeitura(); LEITURA = null; }
+document.addEventListener('visibilitychange', function(){ if(!LEITURA) return; if(document.hidden) pausarLeitura(); else LEITURA.t0 = Date.now(); });
+window.addEventListener('pagehide', pausarLeitura);
 function abrirProvaAluno(i){
   var it = PROVAS_ALUNO[i], e = it.entrega, el = $('alunoDetalhe');
+  fimLeitura(); LEITURA = {it: it, t0: Date.now()}; enviarLeitura(true, 0, it);
   $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
   var total = e.questoes.reduce(function(t, q){ return t + q.max; }, 0), obt = e.questoes.reduce(function(t, q){ return t + (q.pontos || 0); }, 0);
   var h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
@@ -4117,6 +4151,18 @@ function enviarChat(texto){
     CHAT.enviando = false; $('chatEnviar').disabled = false; guardarChat(); desenharChat(); $('chatTexto').focus();
   });
 }
+
+// bolinhas "?": abre uma por vez, fecha ao clicar fora e não deixa a caixinha sair da tela
+document.addEventListener('click', function(ev){
+  document.querySelectorAll('details.ajuda[open]').forEach(function(d){ if(!d.contains(ev.target)) d.removeAttribute('open'); });
+});
+document.addEventListener('toggle', function(ev){
+  var d = ev.target; if(!d || !d.matches || !d.matches('details.ajuda') || !d.open) return;
+  var cx = d.querySelector(':scope > div'); if(!cx) return;
+  cx.style.left = '-10px';
+  var r = cx.getBoundingClientRect(), sobra = r.right - (window.innerWidth - 8);
+  if(sobra > 0) cx.style.left = (-10 - sobra) + 'px';
+}, true);
 </script>
 </body>
 </html>
