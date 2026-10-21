@@ -370,7 +370,7 @@
   </div>
 
   <div id="erroGeral" class="erro oculto" role="alert"></div>
-  <div id="painelMsgs" class="painelMsgs oculto" role="dialog" aria-label="Mensagens"><div class="dentro" id="painelMsgsDentro"></div></div>
+
 
   <section id="tLogin" class="caixa oculto">
     <h2>Entre com sua conta</h2>
@@ -456,6 +456,7 @@
     </div>
 
     <div id="pChat" class="oculto"></div>
+    <div id="pMsgs" class="oculto"><div id="painelMsgsDentro"></div></div>
 
     <div id="pCfg" class="oculto">
       <div class="caixa" id="cfgAudios"></div>
@@ -634,6 +635,7 @@ function iniciar(){
     $('btMensagens').classList.remove('oculto');
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
+    try{ if(new URLSearchParams(location.search).get('msgs')){ history.replaceState(null, '', location.pathname); setTimeout(function(){ abrirMensagens(); }, 300); } }catch(x){}
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
 }
 function lerPref(){ try{ return localStorage.getItem('aulas_visao'); }catch(e){ return null; } }
@@ -996,22 +998,35 @@ function atualizarSeloMsgs(){
   b.textContent = n + (n > 1 ? ' novas' : ' nova'); b.classList.toggle('oculto', !n || VISAO === 'prof');
 }
 $('btMensagens').addEventListener('click', function(){ abrirMensagens(); });
-function fecharMensagens(){ $('painelMsgs').classList.add('oculto'); document.body.style.overflow = ''; }
+// Professor: a página abre embaixo das abas (o cabeçalho e as abas continuam); aluno: no lugar da lista, com "voltar"
+function areaMsgs(){ return VISAO === 'prof' ? $('painelMsgsDentro') : $('alunoDetalhe'); }
+var ABA_ANTES_MSGS = 'aula';
+function fecharMensagens(){ if(VISAO === 'prof') abrirAba(ABA_ANTES_MSGS === 'msgs' ? 'aula' : ABA_ANTES_MSGS); else voltarListaAluno(); }
 function abrirMensagens(discId){
-  $('painelMsgs').classList.remove('oculto'); document.body.style.overflow = 'hidden';
-  var el = $('painelMsgsDentro');
-  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando mensagens…</p></div>';
   if(VISAO === 'prof'){
+    if(abaAtual !== 'msgs') ABA_ANTES_MSGS = abaAtual;
+    MSGS.pre = discId || '';
     if(discId) MSGS.filtro = discId;
-    api('mensagensProfessor', {}).then(function(r){ MSGS.r = r; desenharMsgsProf(discId); }).catch(function(e){ el.innerHTML = cabMsgs() + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; ligarFecharMsgs(); });
-  } else desenharMsgsAluno();
+    abrirAba('msgs');
+    $('pMsgs').scrollIntoView({behavior: 'smooth', block: 'start'});
+  } else {
+    $('alunoLista').classList.add('oculto'); $('alunoDetalhe').classList.remove('oculto');
+    desenharMsgsAluno();
+    $('alunoDetalhe').scrollIntoView({behavior: 'smooth', block: 'start'});
+  }
+}
+function carregarMsgsProf(){
+  var el = areaMsgs();
+  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando mensagens…</p></div>';
+  api('mensagensProfessor', {}).then(function(r){ MSGS.r = r; desenharMsgsProf(MSGS.pre); MSGS.pre = ''; })
+    .catch(function(e){ el.innerHTML = cabMsgs() + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; ligarFecharMsgs(); });
 }
 function cabMsgs(){ return '<div class="botoes" style="margin:0 0 10px;justify-content:space-between"><button type="button" class="secundario mini" data-fecharmsgs>&#8592; voltar</button></div>'; }
-function ligarFecharMsgs(){ $('painelMsgsDentro').querySelectorAll('[data-fecharmsgs]').forEach(function(b){ b.addEventListener('click', fecharMensagens); }); }
+function ligarFecharMsgs(){ areaMsgs().querySelectorAll('[data-fecharmsgs]').forEach(function(b){ b.addEventListener('click', fecharMensagens); }); }
 
 // ---- aluno: mensagens ativas por matéria; abrir marca como lidas ----
 function desenharMsgsAluno(){
-  var el = $('painelMsgsDentro'), grupos = MINHAS_LISTA.filter(function(m){ return (m.recados || []).length; });
+  var el = areaMsgs(), grupos = MINHAS_LISTA.filter(function(m){ return (m.recados || []).length; });
   el.innerHTML = cabMsgs() + '<div class="caixa"><h2 style="margin-top:0">✉️ Mensagens dos professores</h2>' +
     (grupos.length ? grupos.map(function(m){
       return '<p class="grupoTitulo">' + esc(m.nome) + '</p>' + m.recados.map(function(r){
@@ -1029,7 +1044,7 @@ function desenharMsgsAluno(){
 // ---- professor: escrever, filtrar, prolongar, expirar, apagar ----
 var EMOJIS_MSG = ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'];
 function desenharMsgsProf(discPre){
-  var r = MSGS.r, el = $('painelMsgsDentro'), agora = Date.now();
+  var r = MSGS.r, el = areaMsgs(), agora = Date.now();
   var discs = r.disciplinas;
   var lista = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && (MSGS.aba === 'ativas' ? x.ativa : !x.ativa); });
   var nAt = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && x.ativa; }).length;
@@ -1672,7 +1687,7 @@ document.querySelectorAll('[data-aba]').forEach(function(b){ b.addEventListener(
 function abrirAba(a){
   abaAtual = a;
   document.querySelectorAll('[data-aba]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.aba === a)); });
-  ['aula', 'quest', 'notas', 'hist', 'estudo', 'disc', 'insc', 'cfg', 'chat'].forEach(function(x){
+  ['aula', 'quest', 'notas', 'hist', 'estudo', 'disc', 'insc', 'cfg', 'chat', 'msgs'].forEach(function(x){
     $('p' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('oculto', x !== a);
   });
   if(!resumo) return;
@@ -1685,6 +1700,7 @@ function abrirAba(a){
   if(a === 'insc') carregarInscricoes();
   if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); carregarAvisosAdmin(); }
   if(a === 'chat') abrirChat($('pChat'));
+  if(a === 'msgs') carregarMsgsProf();
 }
 
 function abrirProf(){ carregarResumo().then(function(){ abrirAba(abaAtual); }); }

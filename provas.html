@@ -34,6 +34,9 @@
   .quem b{color:#fff;display:block;font-size:14px}
   .quem a{color:#cddaf5}
   .visao{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .barraVisao{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .barraVisao .visao{margin-top:0}
+  .btMsg{margin-left:auto;display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--menu);border:1.5px solid var(--menu);border-radius:4px;padding:7px 15px;font-size:13.5px;font-weight:bold;text-decoration:none}
   .visao button{background:rgba(255,255,255,.12);color:#fff;border:2px solid rgba(255,255,255,.45);box-shadow:none;border-radius:999px;padding:7px 15px;font-size:13px}
   .visao button[aria-pressed="true"]{background:var(--ambar);color:var(--navy);border-color:var(--navy);box-shadow:3px 4px 0 rgba(0,0,0,.35)}
   .visao button:hover{transform:none}
@@ -209,9 +212,12 @@
       </div>
       <div class="quem" id="quem"></div>
     </div>
-    <div class="visao oculto" id="visao" role="group" aria-label="Escolher visão">
-      <button type="button" data-visao="prof" aria-pressed="true">Professor</button>
-      <button type="button" data-visao="aluno" aria-pressed="false">Aluno</button>
+    <div class="barraVisao">
+      <div class="visao oculto" id="visao" role="group" aria-label="Escolher visão">
+        <button type="button" data-visao="prof" aria-pressed="true">Professor</button>
+        <button type="button" data-visao="aluno" aria-pressed="false">Aluno</button>
+      </div>
+      <a class="btMsg oculto" id="btMensagens" href="aulas.html?msgs=1">✉️ Mensagens</a>
     </div>
   </div>
 
@@ -327,6 +333,7 @@ function iniciar(){
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : '') +
       '<a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){ e.preventDefault(); desligarAvisosAoSair(token); try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
+    $('btMensagens').classList.remove('oculto');
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
@@ -666,11 +673,11 @@ function listarProvas(){
       var sit = r.agora < p.inicio ? '<span class="tag t-cinza">agendada</span>' : r.agora <= p.fimProva ? '<span class="tag t-err">em andamento</span>' : r.agora <= p.fimEnvio ? '<span class="tag t-warn">envio aberto</span>' : '<span class="tag t-ok">encerrada</span>';
       return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
         (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
-        (p.resultadosLiberados ? ' ' + tagLiberadas(p) : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '')) +
+        '<span data-taglib="' + esc(p.id) + '">' + (p.resultadosLiberados ? ' ' + tagLiberadas(p) : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '')) + '</span>' +
         '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + (p.questoes.length ? p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos' : '<span class="tag t-warn">sem questões ainda</span>') +
           (function(){ var n = p.questoes.reduce(function(t, q){ return t + ((q.sugestoes || []).length ? 1 : 0); }, 0);
             return n ? ' <span class="tag t-err">' + n + ' questão(ões) com sugestão da IA a revisar</span>' : ''; })() + '</div>' +
-        '<div class="aviso">' + p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' confirmada(s)</div></div>' +
+        '<div class="aviso" data-contlib="' + esc(p.id) + '">' + p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' definitiva(s)</div></div>' +
         '<div class="botoes" style="margin:0"><button type="button" class="mini" data-entregas="' + i + '">Entregas</button><button type="button" class="secundario mini" data-editar="' + i + '">Editar</button>' +
         (p.resultadosLiberados ? '<button type="button" class="secundario mini" data-liberar="' + i + '" data-valor="0">Ocultar correção da turma</button>'
           : '<button type="button" class="mini" data-liberar="' + i + '" data-valor="1"' + (p.entregas ? '' : ' disabled') + '>Liberar correção para a turma</button>') +
@@ -860,6 +867,17 @@ function lerQs(){
 
 /* ---- entregas ---- */
 var provaAtual = null;
+// Atualiza a etiqueta e a contagem das provas lá em cima (sem recarregar a lista nem fechar as entregas abertas)
+function atualizarTopoProvas(){
+  api('provasDisciplina', {disciplinaId: discSel}).then(function(r){
+    dadosDisc = r;
+    (r.provas || []).forEach(function(p){
+      var t = document.querySelector('[data-taglib="' + p.id + '"]'), c = document.querySelector('[data-contlib="' + p.id + '"]');
+      if(t) t.innerHTML = p.resultadosLiberados ? ' ' + tagLiberadas(p) : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '');
+      if(c) c.textContent = p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' definitiva(s)';
+    });
+  }).catch(function(){});
+}
 function abrirEntregas(provaId){
   var el = $('areaProva');
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando entregas…</p></div>';
@@ -881,7 +899,7 @@ function abrirEntregas(provaId){
       (r.alunos.some(function(a){ return a.entrega; }) ? '<button type="button" class="secundario mini" id="btRecorrTodas">Corrigir todas de novo com o gabarito atual</button>' : '') +
       '</div><div id="msgRecorr"></div></div><div id="areaEntrega"></div>';
     el.innerHTML = h;
-    $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); });
+    $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
     var btR = $('btRecorrTodas');
     if(btR) btR.addEventListener('click', function(){
       if(btR.dataset.conf !== '1'){
@@ -1071,6 +1089,7 @@ function abrirEntrega(entregaId){
         bt.disabled = false;
         e.status = 'corrigida'; e.confirmada = !!r.confirmada; e.confirmadaEm = r.confirmadaEm || '';
         if($('eEnvio')) $('eEnvio').innerHTML = tagEnvio(e, e.prova.resultadosLiberados);
+        atualizarTopoProvas();
         $('eMsg').innerHTML = '<div class="ok">Salvo. Nota final: ' + nota10(r.notaFinal) + (r.confirmada ? ' (definitiva' + (e.prova.resultadosLiberados ? '; o aluno foi avisado por e-mail e no celular).' : '; o aluno vê quando você liberar a correção para a turma).') : e.prova.resultadosLiberados ? ' (provisória; o aluno já vê).' : ' (provisória; a correção ainda está oculta para a turma).') + ' Clique em Atualizar na lista para ver a tabela nova.</div>';
       }).catch(function(x){ bt.disabled = false; $('eMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
     }
@@ -1080,7 +1099,7 @@ function abrirEntrega(entregaId){
     if(bd) bd.addEventListener('click', function(){
       if(!window.confirm('Voltar a nota de ' + e.alunoNome + ' para PROVISÓRIA? Os pontos e comentários ficam como estão. O aluno não recebe aviso; se ainda estiver no prazo, ele volta a poder pedir vista.')) return;
       bd.disabled = true;
-      api('voltarParaProvisoria', {entregaId: entregaId}).then(function(){ abrirEntrega(entregaId); })
+      api('voltarParaProvisoria', {entregaId: entregaId}).then(function(){ abrirEntrega(entregaId); atualizarTopoProvas(); })
         .catch(function(x){ bd.disabled = false; $('eMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
     });
     $('eRecorr').addEventListener('click', function(){
