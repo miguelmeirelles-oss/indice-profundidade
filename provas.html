@@ -548,6 +548,12 @@ function tagAluno(e){
   if(!e || e.recebida || e.status !== 'corrigida') return '<span class="tag t-warn">em correção</span>';
   return e.confirmada ? '<span class="tag t-ok">nota definitiva</span>' : '<span class="tag t-warn">nota provisória</span>';
 }
+// Para o professor: o que o aluno já recebeu desta prova (nada, nota provisória ou nota definitiva)
+function tagEnvio(e, liberada){
+  if(!e || e.status !== 'corrigida') return '<span class="tag t-cinza">nada enviado</span>';
+  if(!liberada) return e.confirmada ? '<span class="tag t-cinza" title="O aluno vê quando você liberar a correção para a turma">definitiva salva, não enviada</span>' : '<span class="tag t-cinza">nada enviado</span>';
+  return e.confirmada ? '<span class="tag t-ok"' + (e.confirmadaEm ? ' title="em ' + esc(e.confirmadaEm) + '"' : '') + '>✅ definitiva enviada</span>' : '<span class="tag t-warn">📝 provisória enviada</span>';
+}
 function tagEntrega(e, sit){
   if(e && e.status === 'recebida') return '<span class="tag t-ok">fotos enviadas</span>';
   if(!e) return sit === 'fechada' ? '<span class="tag t-err">não enviada</span>' : sit === 'aberta' ? '<span class="tag t-warn">aguardando envio</span>' : '<span class="tag t-cinza">agendada</span>';
@@ -854,10 +860,11 @@ function abrirEntregas(provaId){
       (r.prova.pastaUrl ? ' · <a class="link" style="font-size:12.5px" target="_blank" rel="noopener" href="' + esc(r.prova.pastaUrl) + '">pasta das fotos no Drive</a>' : '') + '</p>' +
       (r.prova.resultadosLiberados ? '<div class="ok">Correção liberada para a turma em ' + esc(r.prova.resultadosEm) + ': cada aluno vê a nota provisória e a correção, e pode pedir vista. Revise cada um e use "Liberar nota definitiva" na correção dele.</div>'
         : '<div class="convite">Correção <b>oculta</b> da turma: os alunos veem só “em correção”. Revise o que quiser e, quando terminar, use “Liberar correção para a turma” na lista de provas: aí cada aluno recebe a nota provisória.</div>') +
-      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
+      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
         var e = a.entrega;
         return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + (e && e.vistaAberta ? ' <span class="tag t-warn" title="questões contestadas ainda sem resposta">vista: ' + e.vistaAberta + '</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + (e.enviadoPor === 'professor' ? ' <span class="aviso">(enviada por você)</span>' : '') : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
+          '<td>' + (e ? tagEnvio(e, r.prova.resultadosLiberados) : '—') + '</td>' +
           '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
           '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
           '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
@@ -992,7 +999,7 @@ function abrirEntrega(entregaId){
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando a prova e as fotos…</p></div>';
   api('verEntrega', {entregaId: entregaId}).then(function(e){
     var h = '<div class="caixa"><h2>' + esc(e.alunoNome) + ' · ' + esc(e.prova.titulo) + '</h2>' +
-      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + (e.enviadoPor === 'professor' ? ' por você' : ' pelo aluno') + ' · ' + tagEntrega(e, 'fechada') + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
+      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + (e.enviadoPor === 'professor' ? ' por você' : ' pelo aluno') + ' · ' + tagEntrega(e, 'fechada') + ' · <span id="eEnvio">' + tagEnvio(e, e.prova.resultadosLiberados) + '</span>' + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
     if(e.revisaoPedida) h += '<div class="convite"><b>O aluno pediu revisão:</b> ' + esc(e.revisaoPedida) + '</div>';
     h += '<details open><summary class="link">Fotos (' + e.fotos.length + ')</summary><div class="fotosGrandes">' + e.fotos.map(function(f, i){
       return f.mime === 'application/pdf' ? '<a class="link" download="prova.pdf" href="data:application/pdf;base64,' + f.dados + '">Abrir PDF ' + (i + 1) + '</a>' : '<img src="data:' + f.mime + ';base64,' + f.dados + '" alt="Página ' + (i + 1) + '">';
@@ -1052,6 +1059,8 @@ function abrirEntrega(entregaId){
       });
       api('revisarEntrega', {entregaId: entregaId, questoes: qs, comentario: $('eGeral').value, confirmar: confirmar}).then(function(r){
         bt.disabled = false;
+        e.status = 'corrigida'; e.confirmada = !!r.confirmada; e.confirmadaEm = r.confirmadaEm || '';
+        if($('eEnvio')) $('eEnvio').innerHTML = tagEnvio(e, e.prova.resultadosLiberados);
         $('eMsg').innerHTML = '<div class="ok">Salvo. Nota final: ' + nota10(r.notaFinal) + (r.confirmada ? ' (definitiva' + (e.prova.resultadosLiberados ? '; o aluno foi avisado por e-mail e no celular).' : '; o aluno vê quando você liberar a correção para a turma).') : e.prova.resultadosLiberados ? ' (provisória; o aluno já vê).' : ' (provisória; a correção ainda está oculta para a turma).') + ' Clique em Atualizar na lista para ver a tabela nova.</div>';
       }).catch(function(x){ bt.disabled = false; $('eMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
     }
