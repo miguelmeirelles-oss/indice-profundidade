@@ -205,7 +205,7 @@
     <div class="topoFlex">
       <div>
         <h1>Prova por IA</h1>
-        <p>Envie as fotos da prova e receba a correção questão por questão: o que acertou, o que faltou e como melhorar.</p>
+        <p>Veja a correção da sua prova questão por questão: o que acertou, o que faltou e como melhorar.</p>
       </div>
       <div class="quem" id="quem"></div>
     </div>
@@ -512,16 +512,12 @@ function desenharProvasAluno(){
   el.innerHTML = provasAluno.map(function(it, i){
     var p = it.prova, e = it.entrega, sit = situacaoProva(it), desvio = it.agora - Date.now();
     var h = '<div class="caixa" id="prova' + i + '"><div class="linha" style="border:0;padding:0 0 8px"><div><h3 style="margin:0">' + esc(p.titulo) + ' · ' + esc(it.disciplina) + '</h3>' +
-      '<span class="aviso">Prof. ' + esc(it.professor) + ' · ' + dataHora(p.inicio) + '</span></div>' + tagEntrega(e, sit) + '</div>';
-    if(sit === 'antes') h += '<p>O envio das fotos abre no início da prova, <b>' + dataHora(p.inicio) + '</b>.</p>';
-    if(sit === 'aberta' && !(e && e.confirmada)) h += '<p>Envio aberto até <b>' + hora(p.fimEnvio) + '</b> · faltam <span class="contagem" data-fim="' + p.fimEnvio + '" data-desvio="' + desvio + '">' + mmss(p.fimEnvio - it.agora) + '</span></p>';
+      '<span class="aviso">Prof. ' + esc(it.professor) + ' · ' + dataHora(p.inicio) + '</span></div>' +
+      (e ? tagAluno(e) : sit === 'antes' ? '<span class="tag t-cinza">agendada</span>' : '<span class="tag t-cinza">aguardando o professor</span>') + '</div>';
+    // as fotos são enviadas só pelo professor: o aluno acompanha a correção
     if(e) h += correcaoAluno(it, i);
-    if(sit === 'aberta' && !(e && e.confirmada)){
-      h += '<div data-envio="' + i + '" class="' + (e && !envioAberto[i] ? 'oculto' : '') + '"><h4>' + (e ? 'Enviar fotos novas (substituem as anteriores)' : 'Enviar as fotos da prova') + '</h4><div data-seletor></div>' +
-        '<div class="botoes"><button type="button" data-enviar="' + i + '" disabled>Enviar prova</button></div><div data-msg></div></div>';
-      if(e && !envioAberto[i]) h += '<div class="botoes"><button type="button" class="secundario mini" data-reenviar="' + i + '">Enviar fotos novas</button></div>';
-    }
-    if(sit === 'fechada' && !e) h += '<p class="aviso">O prazo de envio terminou e nenhuma foto foi enviada. Fale com o professor.</p>';
+    else if(sit === 'antes') h += '<p>Prova em <b>' + dataHora(p.inicio) + '</b>. Faça a prova em papel e entregue ao professor: ele envia as fotos e a correção aparece aqui.</p>';
+    else h += '<p class="aviso">Entregue a prova em papel ao professor. Ele envia as fotos e a correção aparece aqui; você também recebe um aviso.</p>';
     return h + '</div>';
   }).join('');
   el.querySelectorAll('[data-envio]').forEach(function(box){
@@ -547,29 +543,35 @@ function desenharProvasAluno(){
   }); });
 }
 
+// Etiqueta da tela do aluno: nada sobre as fotos, só "em correção" ou a nota
+function tagAluno(e){
+  if(!e || e.recebida || e.status !== 'corrigida') return '<span class="tag t-warn">em correção</span>';
+  return e.confirmada ? '<span class="tag t-ok">nota definitiva</span>' : '<span class="tag t-warn">nota provisória</span>';
+}
 function tagEntrega(e, sit){
   if(e && e.status === 'recebida') return '<span class="tag t-ok">fotos enviadas</span>';
   if(!e) return sit === 'fechada' ? '<span class="tag t-err">não enviada</span>' : sit === 'aberta' ? '<span class="tag t-warn">aguardando envio</span>' : '<span class="tag t-cinza">agendada</span>';
   if(e.status === 'pendente' || e.status === 'corrigindo') return '<span class="tag t-warn">na fila de correção</span>';
   if(e.status === 'erro') return '<span class="tag t-err">correção com problema</span>';
   if(e.status === 'ilegivel') return '<span class="tag t-err">fotos ilegíveis</span>';
-  return e.confirmada ? '<span class="tag t-ok">nota confirmada</span>' : '<span class="tag t-warn">nota provisória</span>';
+  return e.confirmada ? '<span class="tag t-ok">nota definitiva</span>' : '<span class="tag t-warn">nota provisória</span>';
 }
 
 function correcaoAluno(it, i){
   var e = it.entrega;
-  if(e.recebida){
-    return '<div class="ok">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A nota e a correção aparecem aqui quando o professor liberar os resultados. Você também recebe um e-mail.</div>';
+  if(e.recebida || e.status !== 'corrigida'){
+    return '<div class="convite">Sua prova está em correção. A nota e a correção aparecem aqui quando o professor liberar os resultados; você recebe um e-mail e um aviso no celular.</div>';
   }
   if(e.status === 'pendente' || e.status === 'corrigindo'){
     return '<div class="convite">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A correção está na fila' + (e.erro === 'cota' ? ' (a cota de IA do dia acabou; ela é feita sozinha assim que a cota voltar)' : e.erro === 'sem_questoes' ? ' e começa quando o professor terminar de cadastrar a prova' : '') +
       '. Você recebe um e-mail quando ficar pronta.</div><div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" onclick="abrirAluno()">Atualizar</button></div>';
   }
   if(e.status === 'erro') return '<div class="erro">A correção automática não funcionou. O professor foi avisado e vai corrigir.</div>';
-  if(e.status === 'ilegivel') return '<div class="erro">A IA não conseguiu ler as fotos: ' + esc(e.geral.comentario) + '<br>Se o prazo ainda estiver aberto, envie fotos novas. Se não, fale com o professor.</div>';
+  if(e.status === 'ilegivel') return '<div class="erro">A IA não conseguiu ler as fotos: ' + esc(e.geral.comentario) + '<br>O professor foi avisado e vai enviar fotos novas.</div>';
   var total = e.questoes.reduce(function(t, q){ return t + q.max; }, 0), obt = e.questoes.reduce(function(t, q){ return t + (q.pontos || 0); }, 0);
   var h = '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 10px"><span class="grande">' + nota10(e.notaFinal) + '</span><span class="aviso">de 10 · ' + num(obt) + ' de ' + num(total) + ' pontos · ' +
-    (e.confirmada ? 'nota confirmada pelo professor' : 'nota provisória, até o professor confirmar') + '</span></div>';
+    (e.confirmada ? 'nota definitiva, revisada pelo professor' : 'nota provisória') + '</span></div>' +
+    (e.confirmada ? '' : '<div class="convite" style="margin:0 0 10px">⏳ <b>Esta nota é provisória:</b> o professor ainda vai revisar a correção. Se algo foi lido ou corrigido errado, peça <b>vista de prova</b> no fim desta página.</div>');
   if(e.geral.professor) h += '<div class="detalhe"><b>Comentário do professor:</b> ' + esc(e.geral.professor) + '</div>';
   h += '<div class="detalhe"><p class="fb" style="margin-top:0"><b>Visão geral:</b> ' + esc(e.geral.comentario) + '</p>' +
     (e.geral.fortes ? '<p class="fb"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') +
@@ -584,13 +586,15 @@ function correcaoAluno(it, i){
       (q.vista ? '<div class="vistaBox"><b>Sua vista:</b> ' + esc(q.vista.texto) + '<br>' + (q.vista.resposta ? '<b>Resposta do professor:</b> ' + esc(q.vista.resposta) : '<span class="aviso">aguardando o professor</span>') + '</div>' : '') + '</div>';
   }).join('');
   if(e.revisaoPedida) h += '<div class="ok">Outro ponto enviado ao professor: "' + esc(e.revisaoPedida) + '".</div>';
-  // vista de prova: só nas questões ainda sem resposta do professor
-  var abertas = e.questoes.filter(function(q){ return !(q.vista && q.vista.resposta); });
+  // vista de prova: UMA vez por prova, enquanto a nota é provisória
+  var enviouVista = e.questoes.some(function(q){ return q.vista; });
+  if(enviouVista && !e.confirmada) h += '<div class="ok">Vista enviada. O professor vai revisar e responder em cada questão.</div>';
+  var abertas = !e.confirmada && !enviouVista ? e.questoes : [];
   if(abertas.length){
     h += '<details style="margin-top:8px"><summary class="link">Pedir vista de prova</summary>' +
-      '<div class="convite" style="margin:8px 0;font-size:14px">A vista serve para <b>explicar o que você já escreveu</b> e pode não ter ficado claro (letra, abreviação, uma frase confusa) ou para apontar um erro de leitura. <b>Ela não completa a resposta:</b> o que não está na folha não conta. Escreva só nas questões que quer contestar.</div>' +
+      '<div class="convite" style="margin:8px 0;font-size:14px">A vista serve para <b>explicar o que você já escreveu</b> e pode não ter ficado claro (letra, abreviação, uma frase confusa) ou para apontar um erro de leitura. <b>Ela não completa a resposta:</b> o que não está na folha não conta. Escreva só nas questões que quer contestar. <b>A vista é enviada uma vez só</b>, com todas as questões juntas.</div>' +
       abertas.map(function(q){
-        return '<label class="rot" style="margin-top:8px">Questão ' + esc(q.rotulo || q.ordem) + (q.vista ? ' · <span class="aviso">já enviada; pode reescrever</span>' : '') + '</label><textarea data-vista="' + esc(q.id) + '" style="min-height:50px" placeholder="ex.: Na 2ª linha eu escrevi 72 °C (não 12 °C), por isso a conclusão é pasteurização rápida.">' + esc(q.vista ? q.vista.texto : '') + '</textarea>';
+        return '<label class="rot" style="margin-top:8px">Questão ' + esc(q.rotulo || q.ordem) + '</label><textarea data-vista="' + esc(q.id) + '" style="min-height:50px" placeholder="ex.: Na 2ª linha eu escrevi 72 °C (não 12 °C), por isso a conclusão é pasteurização rápida."></textarea>';
       }).join('') +
       '<label class="rot" style="margin-top:8px">Outro ponto (opcional)</label><textarea id="rev' + i + '" style="min-height:44px"></textarea>' +
       '<div class="botoes"><button type="button" class="mini" data-vistaenv="' + i + '">Enviar vista</button></div><div id="msgRev' + i + '"></div></details>';
@@ -1000,7 +1004,10 @@ function abrirEntrega(entregaId){
       h += '<p class="aviso" style="margin:8px 0 0">Confiança da leitura da IA: <b style="color:' + corConf(media) + '">' + media + '%</b>' + (pior.confianca < 80 ? ' · mais baixa: questão ' + esc(pior.rotulo || pior.ordem) + ' (' + pior.confianca + '%)' : '') + '. Abra "O que a IA leu" para conferir e arrumar.</p>';
     }
     var nVista = e.questoes.filter(function(q){ return q.vista; }).length;
-    if(nVista) h += '<div class="convite"><b>Vista de prova:</b> o aluno contestou ' + nVista + ' questão(ões) (veja embaixo de cada uma). <button type="button" class="mini" id="eVistaIA">Analisar a vista com IA</button> <span class="aviso">olha as fotos; 1 chamada para a prova inteira</span><div id="eVistaMsg"></div></div>';
+    var jaAnalisou = e.questoes.some(function(q){ return q.vista && q.vista.ia; });
+    if(nVista) h += '<div class="convite"><b>Vista de prova:</b> o aluno contestou ' + nVista + ' questão(ões) (veja embaixo de cada uma). ' +
+      (jaAnalisou ? 'A IA já analisou e deixou a sugestão em cada uma.' : e.vistaNaFila ? '<b>A IA está analisando</b> (leva cerca de 1 minuto depois do envio; recarregue para ver).' : 'A análise automática ainda não rodou.') +
+      ' <button type="button" class="' + (jaAnalisou ? 'secundario ' : '') + 'mini" id="eVistaIA">' + (jaAnalisou ? 'Analisar de novo' : 'Analisar agora') + '</button> <span class="aviso">1 chamada para a prova inteira, olhando as fotos</span><div id="eVistaMsg"></div></div>';
     h += '<h4>Correção <span class="aviso" id="eNota"></span></h4>' + e.questoes.map(function(q){
       return '<div class="questao" data-qid="' + esc(q.id) + '" data-max="' + q.max + '"><div class="cab"><span>Questão ' + esc(q.rotulo || q.ordem) + (q.assunto ? ' · <span style="font-weight:normal">' + esc(q.assunto) + '</span>' : '') + '</span><span class="aviso">vale ' + num(q.max) + '</span></div>' +
         '<p class="aviso" style="margin:4px 0 8px">' + esc(q.enunciado) + '</p>' +
@@ -1018,8 +1025,15 @@ function abrirEntrega(entregaId){
     h += '<div class="detalhe"><p class="fb" style="margin-top:0"><b>Visão geral da IA:</b> ' + esc(e.geral.comentario) + '</p>' + (e.geral.fortes ? '<p class="fb"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') + (e.geral.estudar ? '<p class="fb"><b>O que estudar:</b> ' + esc(e.geral.estudar) + '</p>' : '') + '</div>' +
       '<label class="rot" style="margin-top:12px" for="eGeral">Seu comentário geral para o aluno (opcional)</label><textarea id="eGeral" data-salvo="' + esc(e.geral.professor) + '">' + esc(e.geral.professor) + '</textarea>' +
       '<button type="button" class="secundario mini salvarCampo oculto" id="eGeralSalvar">Salvar comentário</button>' +
-      '<div class="botoes"><button type="button" id="eConf">Salvar e confirmar nota</button><button type="button" class="secundario" id="eSalvar">Salvar sem confirmar</button><button type="button" class="secundario" id="eRecorr">Corrigir de novo com IA</button></div>' +
-      '<div id="eMsg"></div><p class="aviso">Ao confirmar, o aluno vê "nota confirmada" e recebe um e-mail.</p></div>';
+      // nomes conforme a situação: com os resultados ocultos, o aluno ainda não vê a nota provisória
+      '<div class="botoes" style="align-items:center"><button type="button" id="eConf">' + (e.prova.resultadosLiberados ? 'Liberar nota definitiva' : 'Salvar nota definitiva') + '</button>' +
+        '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>A <b>nota definitiva</b> é a nota já revisada por você. O aluno passa a ver <b>"nota definitiva"</b>' + (e.prova.resultadosLiberados ? '' : ' (quando você usar "Liberar resultados" na lista)') + ' e recebe um e-mail e um aviso no celular. Se precisar, você ainda pode mudar depois e salvar de novo (ele recebe um novo aviso).</div></details>' +
+        '<button type="button" class="secundario" id="eSalvar">' + (e.prova.resultadosLiberados ? 'Liberar nota provisória' : 'Salvar nota provisória') + '</button>' +
+        '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>' + (e.prova.resultadosLiberados
+          ? 'Grava os seus ajustes e o aluno já vê a nota nova como <b>"nota provisória"</b>, sem e-mail nem aviso. Use enquanto ainda revisa (por exemplo, esperando as vistas de prova). Quando terminar, use "Liberar nota definitiva".'
+          : 'Grava os seus ajustes sem fechar a nota. Os resultados desta prova ainda estão <b>ocultos</b>: o aluno só vê a nota quando você usar "Liberar resultados" na lista, e aí ela aparece como <b>"nota provisória"</b> até você salvar a nota definitiva.') + '</div></details>' +
+        '<button type="button" class="secundario" id="eRecorr">Corrigir de novo com IA</button></div>' +
+      '<div id="eMsg"></div></div>';
     el.innerHTML = h;
     el.querySelectorAll('.fotosGrandes img').forEach(function(img){ img.addEventListener('click', function(){ ampliar(img.src); }); });
     function soma(){
@@ -1036,7 +1050,7 @@ function abrirEntrega(entregaId){
       });
       api('revisarEntrega', {entregaId: entregaId, questoes: qs, comentario: $('eGeral').value, confirmar: confirmar}).then(function(r){
         bt.disabled = false;
-        $('eMsg').innerHTML = '<div class="ok">Salvo. Nota final: ' + nota10(r.notaFinal) + (r.confirmada ? ' (confirmada; o aluno foi avisado por e-mail).' : ' (provisória).') + ' Clique em Atualizar na lista para ver a tabela nova.</div>';
+        $('eMsg').innerHTML = '<div class="ok">Salvo. Nota final: ' + nota10(r.notaFinal) + (r.confirmada ? ' (definitiva' + (e.prova.resultadosLiberados ? '; o aluno foi avisado por e-mail e no celular).' : '; o aluno vê quando você liberar os resultados).') : e.prova.resultadosLiberados ? ' (provisória; o aluno já vê).' : ' (provisória; os resultados ainda estão ocultos).') + ' Clique em Atualizar na lista para ver a tabela nova.</div>';
       }).catch(function(x){ bt.disabled = false; $('eMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
     }
     $('eConf').addEventListener('click', function(){ salvar(true, this); });
