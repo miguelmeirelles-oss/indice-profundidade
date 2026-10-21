@@ -687,13 +687,15 @@ function abrirProf(){
   }).catch(function(e){ $('profTopo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
+var AVISO_LIBERACAO = '';
 function listarProvas(){
   var el = $('profCorpo');
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando provas…</p></div>';
   api('provasDisciplina', {disciplinaId: discSel}).then(function(r){
     dadosDisc = r;
+    var avisoAgora = AVISO_LIBERACAO; AVISO_LIBERACAO = '';
     var d = r.disciplina, etapas = (d.composicao && d.composicao.etapas) || [];
-    var h = '<div class="caixa"><h2>Provas · ' + esc(d.nome) + '</h2>' +
+    var h = (avisoAgora ? '<div class="ok">' + avisoAgora + '</div>' : '') + '<div class="caixa"><h2>Provas · ' + esc(d.nome) + '</h2>' +
       '<p class="aviso">Composição da nota (cada atividade de 0 a 10; cada etapa soma 10): ' + etapas.map(function(et){
         var its = (et.itens || []).filter(function(it){ return Number(it.valor) > 0; });
         return '<b>' + esc(et.nome) + '</b> = ' + its.map(function(it){ return esc(it.nome) + ' (' + nota10(it.valor) + ')'; }).join(' + ');
@@ -702,13 +704,14 @@ function listarProvas(){
       var sit = r.agora < p.inicio ? '<span class="tag t-cinza">agendada</span>' : r.agora <= p.fimProva ? '<span class="tag t-err">em andamento</span>' : r.agora <= p.fimEnvio ? '<span class="tag t-warn">envio aberto</span>' : '<span class="tag t-ok">encerrada</span>';
       return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
         (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
-        '<span data-taglib="' + esc(p.id) + '">' + (p.resultadosLiberados ? ' ' + tagLiberadas(p) : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '')) + '</span>' +
+        '<span data-taglib="' + esc(p.id) + '">' + (p.resultadosLiberados ? ' ' + tagLiberadas(p) : p.resultadosAgendados ? ' <span class="tag t-warn">⏳ libera sozinha em ' + esc(p.liberaEm) + '</span>' : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '')) + '</span>' +
         '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + (p.questoes.length ? p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos' : '<span class="tag t-warn">sem questões ainda</span>') +
           (function(){ var n = p.questoes.reduce(function(t, q){ return t + ((q.sugestoes || []).length ? 1 : 0); }, 0);
             return n ? ' <span class="tag t-err">' + n + ' questão(ões) com sugestão da IA a revisar</span>' : ''; })() + '</div>' +
         '<div class="aviso" data-contlib="' + esc(p.id) + '">' + p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' definitiva(s)</div></div>' +
         '<div class="botoes" style="margin:0"><button type="button" class="mini" data-entregas="' + i + '">Entregas</button><button type="button" class="secundario mini" data-editar="' + i + '">Editar</button>' +
         (p.resultadosLiberados ? '<button type="button" class="secundario mini" data-liberar="' + i + '" data-valor="0">Ocultar correção da turma</button>'
+          : p.resultadosAgendados ? '<button type="button" class="secundario mini" data-liberar="' + i + '" data-valor="0">Cancelar a liberação agendada</button>'
           : '<button type="button" class="mini" data-liberar="' + i + '" data-valor="1"' + (p.entregas ? '' : ' disabled') + '>Liberar correção para a turma</button>') +
         '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div><b>Liberar correção para a turma</b> abre, de uma vez, para todos os alunos desta prova: cada um vê a correção da IA como <b>nota provisória</b>, recebe e-mail e aviso no celular e pode pedir <b>vista de prova</b>. Correções que ficarem prontas depois aparecem na hora.<br><br>' +
           'Antes de liberar, os alunos veem só "em correção". Depois, revise cada aluno e use <b>"Liberar nota definitiva"</b> na correção dele. <b>Ocultar</b> esconde de novo para a turma toda.</div></details>' +
@@ -724,11 +727,16 @@ function listarProvas(){
       var p = r.provas[Number(b.dataset.liberar)], liberar = b.dataset.valor === '1';
       if(b.dataset.conf !== '1'){
         b.dataset.conf = '1';
-        b.textContent = liberar ? 'Confirmar: mostrar nota e correção a todos (' + p.corrigidas + ' de ' + p.entregas + ' corrigidas)' : 'Confirmar: esconder dos alunos';
+        b.textContent = liberar ? (Date.now() < p.fimEnvio ? 'Confirmar: agendar para liberar em ' + p.liberaEm : 'Confirmar: mostrar nota e correção a todos (' + p.corrigidas + ' de ' + p.entregas + ' corrigidas)')
+          : p.resultadosAgendados ? 'Confirmar: cancelar a liberação agendada' : 'Confirmar: esconder dos alunos';
         return;
       }
       b.disabled = true;
-      api('liberarResultados', {provaId: p.id, liberar: liberar}).then(listarProvas).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+      api('liberarResultados', {provaId: p.id, liberar: liberar}).then(function(res){
+        AVISO_LIBERACAO = res && res.agendado ? '⏳ A prova ainda está no horário de aplicação/envio. Os alunos <b>ainda não veem nada</b>: a correção será liberada automaticamente para a turma em <b>' + esc(res.liberaEm) + '</b> (e-mail e aviso no celular). Até lá, continue corrigindo normalmente.'
+          : res && res.liberados ? '✓ Correção liberada para a turma: ' + res.avisados + ' aluno(s) avisado(s) agora.' : '';
+        listarProvas();
+      }).catch(function(e){ b.disabled = false; erroGeral(e.message); });
     }); });
     el.querySelectorAll('[data-qr]').forEach(function(b){ b.addEventListener('click', function(){
       var p = r.provas[Number(b.dataset.qr)];
@@ -903,7 +911,7 @@ function atualizarTopoProvas(){
     dadosDisc = r;
     (r.provas || []).forEach(function(p){
       var t = document.querySelector('[data-taglib="' + p.id + '"]'), c = document.querySelector('[data-contlib="' + p.id + '"]');
-      if(t) t.innerHTML = p.resultadosLiberados ? ' ' + tagLiberadas(p) : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '');
+      if(t) t.innerHTML = p.resultadosLiberados ? ' ' + tagLiberadas(p) : p.resultadosAgendados ? ' <span class="tag t-warn">⏳ libera sozinha em ' + esc(p.liberaEm) + '</span>' : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '');
       if(c) c.textContent = p.entregas + ' de ' + r.inscritos + ' entregas · ' + p.corrigidas + ' corrigida(s) · ' + p.confirmadas + ' definitiva(s)';
     });
   }).catch(function(){});
@@ -915,13 +923,14 @@ function abrirEntregas(provaId){
     provaAtual = r.prova;
     var h = '<div class="caixa"><h2>Entregas · ' + esc(r.prova.titulo) + '</h2><p class="aviso">' + dataHora(r.prova.inicio) + ' · envio até ' + dataHora(r.prova.fimEnvio) +
       (r.prova.pastaUrl ? ' · <a class="link" style="font-size:12.5px" target="_blank" rel="noopener" href="' + esc(r.prova.pastaUrl) + '">pasta das fotos no Drive</a>' : '') + '</p>' +
-      (r.prova.resultadosLiberados ? '<div class="ok">Correção liberada para a turma em ' + esc(r.prova.resultadosEm) + ': cada aluno vê a nota provisória e a correção, e pode pedir vista. Revise cada um e use "Liberar nota definitiva" na correção dele.</div>'
+      (r.prova.resultadosAgendados ? '<div class="convite">⏳ <b>Liberação agendada:</b> a correção aparece para a turma automaticamente em <b>' + esc(r.prova.liberaEm) + '</b> (fim do prazo de envio). Até lá os alunos veem só “em correção”.</div>'
+        : r.prova.resultadosLiberados ? '<div class="ok">Correção liberada para a turma em ' + esc(r.prova.resultadosEm) + ': cada aluno vê a nota provisória e a correção, e pode pedir vista. Revise cada um e use "Liberar nota definitiva" na correção dele.</div>'
         : '<div class="convite">Correção <b>oculta</b> da turma: os alunos veem só “em correção”. Revise o que quiser e, quando terminar, use “Liberar correção para a turma” na lista de provas: aí cada aluno recebe a nota provisória.</div>') +
       resumoVistos(r) +
       '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
         var e = a.entrega;
-        return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + (e && e.vistaAberta ? ' <span class="tag t-warn" title="questões contestadas ainda sem resposta">vista: ' + e.vistaAberta + '</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + (e.enviadoPor === 'professor' ? ' <span class="aviso">(enviada por você)</span>' : '') : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
+        return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + (e && e.vistaAberta ? ' <span class="tag t-warn" title="questões contestadas ainda sem resposta">vista: ' + e.vistaAberta + '</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + '' : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
           '<td>' + (e ? tagEnvio(e, r.prova.resultadosLiberados) : '—') + '</td>' +
           '<td style="font-size:12.5px">' + textoVisto(e) + '</td>' +
           '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
@@ -1059,7 +1068,7 @@ function abrirEntrega(entregaId){
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando a prova e as fotos…</p></div>';
   api('verEntrega', {entregaId: entregaId}).then(function(e){
     var h = '<div class="caixa"><h2>' + esc(e.alunoNome) + ' · ' + esc(e.prova.titulo) + '</h2>' +
-      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + (e.enviadoPor === 'professor' ? ' por você' : ' pelo aluno') + ' · ' + tagEntrega(e, 'fechada') + ' · <span id="eEnvio">' + tagEnvio(e, e.prova.resultadosLiberados) + '</span>' + (e.visto && e.visto.vezes ? ' · 👁 o aluno abriu ' + e.visto.vezes + '× (' + tempoTxt(e.visto.seg) + '; 1ª vez ' + esc(e.visto.primeiro) + ', última ' + esc(e.visto.ultimo) + ')' : e.status === 'corrigida' && e.prova.resultadosLiberados ? ' · o aluno ainda não abriu a correção' : '') + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
+      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + '' + ' · ' + tagEntrega(e, 'fechada') + ' · <span id="eEnvio">' + tagEnvio(e, e.prova.resultadosLiberados) + '</span>' + (e.visto && e.visto.vezes ? ' · 👁 o aluno abriu ' + e.visto.vezes + '× (' + tempoTxt(e.visto.seg) + '; 1ª vez ' + esc(e.visto.primeiro) + ', última ' + esc(e.visto.ultimo) + ')' : e.status === 'corrigida' && e.prova.resultadosLiberados ? ' · o aluno ainda não abriu a correção' : '') + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
     if(e.revisaoPedida) h += '<div class="convite"><b>O aluno pediu revisão:</b> ' + esc(e.revisaoPedida) + '</div>';
     h += '<details open><summary class="link">Fotos (' + e.fotos.length + ')</summary><div class="fotosGrandes">' + e.fotos.map(function(f, i){
       return f.mime === 'application/pdf' ? '<a class="link" download="prova.pdf" href="data:application/pdf;base64,' + f.dados + '">Abrir PDF ' + (i + 1) + '</a>' : '<img src="data:' + f.mime + ';base64,' + f.dados + '" alt="Página ' + (i + 1) + '">';
