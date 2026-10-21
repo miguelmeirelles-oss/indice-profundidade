@@ -31,6 +31,15 @@
   .quem b{color:#fff;display:block;font-size:14px}
   .quem a{color:#cddaf5}
   .visao{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .barraVisao{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:14px}
+  .barraVisao .visao{margin-top:0}
+  .btMsg{margin-left:auto;display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--navy);border:2px solid var(--navy);border-radius:999px;padding:7px 15px;font-size:13.5px;font-weight:bold;box-shadow:none;cursor:pointer}
+  .btMsg .badge{background:#c62828;color:#fff;border-radius:999px;padding:1px 8px;font-size:12px}
+  .painelMsgs{position:fixed;inset:0;z-index:900;background:var(--fundo,#f4f6fa);overflow:auto;padding:18px 16px 40px}
+  .painelMsgs .dentro{max-width:900px;margin:0 auto}
+  .msgItem{border:1.5px solid var(--linha);border-left:4px solid var(--menu);border-radius:10px;background:#fff;padding:10px 12px;margin-top:10px}
+  .msgItem.expirada{border-left-color:#9aa3b2;opacity:.85}
+  .msgItem.nova{border-left-color:#c62828;background:#fdf3f3}
   .visao button{background:rgba(255,255,255,.12);color:#fff;border:2px solid rgba(255,255,255,.45);box-shadow:none;border-radius:999px;padding:7px 15px;font-size:13px}
   .visao button[aria-pressed="true"]{background:var(--ambar);color:var(--navy);border-color:var(--navy);box-shadow:3px 4px 0 rgba(0,0,0,.35)}
   .visao button:hover{transform:none}
@@ -72,8 +81,6 @@
   .cartao{border:2.5px solid var(--navy);border-radius:14px;padding:12px 14px;background:#fff;margin-bottom:12px}
   .recado{border-left:4px solid #b07d00;background:#fff8e6;border-radius:6px;padding:7px 10px;margin-top:8px;font-size:14px}
   .cartaoAvisos{border:2.5px solid #b07d00;background:#fff8e6;border-radius:12px;padding:12px 14px;margin-bottom:14px}
-  .correioBt{display:inline-flex;align-items:center;gap:8px;background:#fff;color:var(--navy);border:2px solid var(--navy);border-radius:10px;padding:7px 12px;font-weight:bold;cursor:pointer;font-size:15px}
-  .correioBt .badge{background:#c62828;color:#fff;border-radius:999px;padding:1px 8px;font-size:12.5px}
   .recado.nova{border-left-color:#c62828;background:#fdecec}
   .cartao .l1{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;font-weight:bold}
   .cartao .l2{font-size:13px;color:var(--cinza);margin-top:4px}
@@ -246,6 +253,7 @@
   .cabecalho .quem a{color:var(--azul)}
   .visao button{background:#fff;color:#41546C;border:1.5px solid var(--linha);border-radius:4px;box-shadow:none;font-weight:normal}
   .visao button[aria-pressed="true"]{background:var(--menu);color:#fff;border-color:var(--menu);box-shadow:none}
+  .btMsg{border-radius:4px;border:1.5px solid var(--menu);color:var(--menu);font-weight:bold}
   /* cartões: borda escura, sombra leve, filete azul no topo */
   .caixa{box-shadow:inset 0 5px 0 var(--menu),var(--sombra);padding-top:22px}
   .caixa>h2:first-child{padding-bottom:10px;border-bottom:1px dashed var(--linha)}
@@ -352,13 +360,17 @@
       </div>
       <div class="quem" id="quem"></div>
     </div>
-    <div class="visao oculto" id="visao" role="group" aria-label="Escolher visão">
-      <button type="button" data-visao="prof" aria-pressed="true">Professor</button>
-      <button type="button" data-visao="aluno" aria-pressed="false">Aluno</button>
+    <div class="barraVisao">
+      <div class="visao oculto" id="visao" role="group" aria-label="Escolher visão">
+        <button type="button" data-visao="prof" aria-pressed="true">Professor</button>
+        <button type="button" data-visao="aluno" aria-pressed="false">Aluno</button>
+      </div>
+      <button type="button" class="btMsg oculto" id="btMensagens">✉️ Mensagens <span class="badge oculto" id="msgBadge"></span></button>
     </div>
   </div>
 
   <div id="erroGeral" class="erro oculto" role="alert"></div>
+  <div id="painelMsgs" class="painelMsgs oculto" role="dialog" aria-label="Mensagens"><div class="dentro" id="painelMsgsDentro"></div></div>
 
   <section id="tLogin" class="caixa oculto">
     <h2>Entre com sua conta</h2>
@@ -374,9 +386,14 @@
     <div id="alunoLista">
       <div id="cartaoAvisos"></div>
       <div id="correio" style="margin-bottom:12px"></div>
+      <div id="avisoVista"></div>
       <div class="caixa">
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
+      </div>
+      <div class="caixa" id="caixaProvas">
+        <h2>📝 Minhas provas</h2>
+        <div id="listaProvasAluno"><p class="carregando">Carregando…</p></div>
       </div>
       <div class="caixa">
         <h2>Inscrever-se em uma matéria</h2>
@@ -605,7 +622,7 @@ function iniciar(){
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      '<a href="provas.html">Prova por IA</a> · <a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
@@ -614,6 +631,7 @@ function iniciar(){
       try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); localStorage.removeItem('aulas_visao'); }catch(x){}
       location.href = 'index.html';
     });
+    $('btMensagens').classList.remove('oculto');
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
@@ -625,6 +643,8 @@ function trocarVisao(v){
   $('tAluno').classList.toggle('oculto', v !== 'aluno');
   $('tProf').classList.toggle('oculto', v !== 'prof');
   try{ localStorage.setItem('aulas_visao', v); }catch(e){}
+  VISAO = v;
+  atualizarSeloMsgs();
   if(v === 'aluno') abrirAluno(); else abrirProf();
 }
 document.querySelectorAll('[data-visao]').forEach(function(b){ b.addEventListener('click', function(){ trocarVisao(b.dataset.visao); }); });
@@ -670,7 +690,7 @@ window.addEventListener('focus', voltouATela);
 
 function abrirAluno(){
   voltarListaAluno();
-  carregarMinhas(); carregarAbertas(); desenharCartaoAvisos();
+  carregarMinhas(); carregarAbertas(); desenharCartaoAvisos(); carregarProvasAluno();
   try{
     var qp = new URLSearchParams(location.search);
     if(qp.get('recado') && qp.get('p')){
@@ -960,31 +980,143 @@ registrarSW();
 // ao abrir, marca como lidas (o professor vê quantos leram).
 function recebeAvisos(){ return avisosSuportados() && Notification.permission === 'granted' && !!lerLS('avisos_token'); }
 function desenharCorreio(lista){
-  var el = $('correio'); if(!el) return;
-  if(recebeAvisos()){ el.innerHTML = ''; return; }
-  var msgs = [];
-  (lista || []).forEach(function(m){ (m.recados || []).forEach(function(r){ msgs.push({id: r.id, texto: r.texto, em: r.em, t: r.t, lido: r.lido, disc: m.nome, professorId: m.professorId}); }); });
-  msgs.sort(function(a, b){ return b.t - a.t; });
-  var novas = msgs.filter(function(x){ return !x.lido; });
-  el.innerHTML = '<button type="button" class="correioBt" id="correioBt" aria-expanded="false">✉️ Mensagens do professor' +
-    (novas.length ? ' <span class="badge">' + novas.length + (novas.length > 1 ? ' novas' : ' nova') + '</span>' : msgs.length ? '' : ' <span class="aviso" style="font-weight:normal">(nenhuma)</span>') + '</button><div id="correioLista"></div>';
-  $('correioBt').addEventListener('click', function(){
-    var box = $('correioLista'), bt = this;
-    if(box.innerHTML){ box.innerHTML = ''; bt.setAttribute('aria-expanded', 'false'); return; }
-    bt.setAttribute('aria-expanded', 'true');
-    box.innerHTML = msgs.length ? msgs.map(function(x){
-      return '<div class="recado' + (x.lido ? '' : ' nova') + '">' + (x.lido ? '' : '<span class="tag t-err">nova</span> ') + '<b>' + esc(x.disc) + '</b> <span class="aviso">' + esc(x.em) + '</span><br>' + esc(x.texto).replace(/\n/g, '<br>') + '</div>';
-    }).join('') : '<p class="aviso" style="margin:8px 0 0">Nenhuma mensagem nos últimos 30 dias.</p>';
-    if(!novas.length) return;
-    var porProf = {};
-    novas.forEach(function(x){ (porProf[x.professorId] = porProf[x.professorId] || []).push(x.id); });
-    api('marcarRecadosLidos', {itens: Object.keys(porProf).map(function(k){ return {professorId: k, ids: porProf[k]}; })}).then(function(){
-      novas.forEach(function(x){ x.lido = true; });
-      (lista || []).forEach(function(m){ (m.recados || []).forEach(function(r){ r.lido = true; }); });
-      var b = bt.querySelector('.badge'); if(b) b.remove();
-      novas = [];
-    }).catch(function(){});
+  MINHAS_LISTA = lista || [];
+  atualizarSeloMsgs();   // as mensagens ficam no botão "Mensagens" do topo
+}
+
+/* ================= MENSAGENS (botão no topo) =================
+   Professor: escreve para uma ou várias disciplinas, escolhe quando expira (padrão 15 dias; data maior = some só
+   nessa data), vê por matéria, ativas e expiradas, entrega e leitura. Aluno: mensagens ativas por matéria. */
+var VISAO = 'aluno', MINHAS_LISTA = [], MSGS = {r: null, filtro: '', aba: 'ativas'};
+function ddmm(ms){ var d = new Date(ms); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2); }
+function atualizarSeloMsgs(){
+  var n = 0;
+  MINHAS_LISTA.forEach(function(m){ (m.recados || []).forEach(function(r){ if(!r.lido) n++; }); });
+  var b = $('msgBadge'); if(!b) return;
+  b.textContent = n + (n > 1 ? ' novas' : ' nova'); b.classList.toggle('oculto', !n || VISAO === 'prof');
+}
+$('btMensagens').addEventListener('click', function(){ abrirMensagens(); });
+function fecharMensagens(){ $('painelMsgs').classList.add('oculto'); document.body.style.overflow = ''; }
+function abrirMensagens(discId){
+  $('painelMsgs').classList.remove('oculto'); document.body.style.overflow = 'hidden';
+  var el = $('painelMsgsDentro');
+  el.innerHTML = '<div class="caixa"><p class="carregando">Carregando mensagens…</p></div>';
+  if(VISAO === 'prof'){
+    if(discId) MSGS.filtro = discId;
+    api('mensagensProfessor', {}).then(function(r){ MSGS.r = r; desenharMsgsProf(discId); }).catch(function(e){ el.innerHTML = cabMsgs() + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; ligarFecharMsgs(); });
+  } else desenharMsgsAluno();
+}
+function cabMsgs(){ return '<div class="botoes" style="margin:0 0 10px;justify-content:space-between"><button type="button" class="secundario mini" data-fecharmsgs>&#8592; voltar</button></div>'; }
+function ligarFecharMsgs(){ $('painelMsgsDentro').querySelectorAll('[data-fecharmsgs]').forEach(function(b){ b.addEventListener('click', fecharMensagens); }); }
+
+// ---- aluno: mensagens ativas por matéria; abrir marca como lidas ----
+function desenharMsgsAluno(){
+  var el = $('painelMsgsDentro'), grupos = MINHAS_LISTA.filter(function(m){ return (m.recados || []).length; });
+  el.innerHTML = cabMsgs() + '<div class="caixa"><h2 style="margin-top:0">✉️ Mensagens dos professores</h2>' +
+    (grupos.length ? grupos.map(function(m){
+      return '<p class="grupoTitulo">' + esc(m.nome) + '</p>' + m.recados.map(function(r){
+        return '<div class="msgItem' + (r.lido ? '' : ' nova') + '">' + (r.lido ? '' : '<span class="tag t-err">nova</span> ') + '<span class="aviso">' + esc(r.em) + ' · fica até ' + esc(String(r.expira || '').slice(0, 5)) + '</span><br>' + esc(r.texto).replace(/\n/g, '<br>') + '</div>';
+      }).join('');
+    }).join('') : '<p class="aviso">Nenhuma mensagem no momento.</p>') + '</div>';
+  ligarFecharMsgs();
+  var porProf = {};
+  MINHAS_LISTA.forEach(function(m){ (m.recados || []).forEach(function(r){ if(!r.lido) (porProf[m.professorId] = porProf[m.professorId] || []).push(r.id); }); });
+  if(Object.keys(porProf).length) api('marcarRecadosLidos', {itens: Object.keys(porProf).map(function(k){ return {professorId: k, ids: porProf[k]}; })}).then(function(){
+    MINHAS_LISTA.forEach(function(m){ (m.recados || []).forEach(function(r){ r.lido = true; }); }); atualizarSeloMsgs();
+  }).catch(function(){});
+}
+
+// ---- professor: escrever, filtrar, prolongar, expirar, apagar ----
+var EMOJIS_MSG = ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'];
+function desenharMsgsProf(discPre){
+  var r = MSGS.r, el = $('painelMsgsDentro'), agora = Date.now();
+  var discs = r.disciplinas;
+  var lista = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && (MSGS.aba === 'ativas' ? x.ativa : !x.ativa); });
+  var nAt = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && x.ativa; }).length;
+  var nEx = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && !x.ativa; }).length;
+  var h = cabMsgs() + '<div class="caixa"><h2 style="margin-top:0">✉️ Escrever mensagem</h2>' +
+    '<p class="aviso" style="margin:0 0 6px">' + (r.ligado ? 'Vai para os celulares com avisos ligados e fica no app até expirar.' : 'Os avisos no celular ainda não estão configurados: a mensagem fica no app até expirar.') + '</p>' +
+    '<label class="rot">Para</label><div style="display:flex;flex-wrap:wrap;gap:6px 16px">' + discs.map(function(d){
+      return '<label style="display:flex;gap:6px;align-items:center;font-size:14px;cursor:pointer"><input type="checkbox" data-msgdisc="' + esc(d.id) + '"' + ((discPre ? d.id === discPre : discs.length === 1) ? ' checked' : '') + ' style="width:17px;height:17px"> ' + esc(d.nome) + ' <span class="aviso">(' + d.alunos + ' alunos · ' + d.comCelular + ' com avisos)</span></label>';
+    }).join('') + '</div>' +
+    '<button type="button" class="secundario mini" id="msgEmojiBt" style="margin:10px 0 6px">😀 Emojis ▾</button>' +
+    '<div id="msgEmojis" style="display:none;flex-wrap:wrap;gap:4px;margin:0 0 6px">' + EMOJIS_MSG.map(function(em){ return '<button type="button" class="secundario mini" data-msgemoji="' + em + '" style="font-size:18px;padding:2px 8px;line-height:1.3">' + em + '</button>'; }).join('') + '</div>' +
+    '<textarea id="msgTexto" style="min-height:120px" placeholder="ex.: Amanhã a aula será prática no laboratório 3. Tragam jaleco."></textarea>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0"><label class="rot" for="msgExpira" style="margin:0">Some da tela dos alunos</label>' +
+      '<select id="msgExpira" style="width:auto">' + [[1, 'em 1 dia'], [3, 'em 3 dias'], [7, 'em 7 dias'], [15, 'em 15 dias (padrão)'], [30, 'em 30 dias'], ['data', 'numa data que eu escolher']].map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === 15 ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
+      '<input type="date" id="msgData" class="oculto" style="width:auto"></div>' +
+    '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:0 0 6px"><input type="checkbox" id="msgEmail" style="width:17px;height:17px"> Mandar também por e-mail</label>' +
+    '<div class="botoes" style="margin-top:4px"><button type="button" id="msgEnviar">Enviar</button></div><div id="msgEnvMsg"></div></div>';
+  // lista
+  h += '<div class="caixa"><h2 style="margin-top:0">Enviadas</h2>' +
+    '<div class="chips" style="margin-bottom:8px"><button type="button" class="chip" data-msgfiltro="" aria-pressed="' + (!MSGS.filtro) + '">Todas</button>' +
+      discs.map(function(d){ return '<button type="button" class="chip" data-msgfiltro="' + esc(d.id) + '" aria-pressed="' + (MSGS.filtro === d.id) + '">' + esc(d.nome) + '</button>'; }).join('') + '</div>' +
+    '<div class="chips"><button type="button" class="chip" data-msgaba="ativas" aria-pressed="' + (MSGS.aba === 'ativas') + '">Ativas (' + nAt + ')</button><button type="button" class="chip" data-msgaba="expiradas" aria-pressed="' + (MSGS.aba === 'expiradas') + '">Expiradas (' + nEx + ')</button></div>' +
+    (lista.length ? lista.map(function(x){
+      var dias = Math.ceil((x.expiraMs - agora) / 86400000);
+      return '<div class="msgItem' + (x.ativa ? '' : ' expirada') + '"><span class="tag t-azul">' + esc(x.disc) + '</span> <span class="aviso">enviada ' + esc(x.em) + ' · ' +
+          (x.ativa ? 'some em <b>' + ddmm(x.expiraMs) + '</b> (' + (dias <= 1 ? 'amanhã' : 'em ' + dias + ' dias') + ')' : 'expirou em ' + ddmm(x.expiraMs)) + '</span>' +
+        '<p style="margin:6px 0">' + esc(x.texto).replace(/\n/g, '<br>') + '</p>' +
+        '<span style="font-size:12.5px">' + (x.celulares ? '<span style="color:#1a7a3c">✓ chegou em ' + x.celulares + ' celular(es)</span>' : '<span class="aviso">nenhum celular com avisos</span>') +
+          (x.falhas ? ' · <span style="color:#c62828">⚠ ' + x.falhas + ' falhou(aram)' + (x.erro ? ': ' + esc(x.erro) : '') + '</span>' : '') + (x.email ? ' · ✉️ e-mail' : '') +
+          ' · 👁 lido por <b>' + x.lidos + ' de ' + x.total + '</b></span>' +
+        (x.naoLeram.length && x.naoLeram.length < x.total ? '<details style="font-size:12.5px"><summary class="link">quem ainda não leu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : '') +
+        '<div class="botoes" style="margin-top:6px">' + (x.ativa
+          ? '<button type="button" class="secundario mini" data-msgmais="' + esc(x.id) + '" data-exp="' + x.expiraMs + '">+7 dias</button><button type="button" class="secundario mini" data-msgdata="' + esc(x.id) + '">mudar data</button><button type="button" class="secundario mini" data-msgexpirar="' + esc(x.id) + '">expirar agora</button>'
+          : '<button type="button" class="secundario mini" data-msgreativar="' + esc(x.id) + '">mostrar de novo por 15 dias</button>') +
+          '<button type="button" class="link" data-msgapagar="' + esc(x.id) + '" style="font-size:12.5px">apagar</button></div></div>';
+    }).join('') : '<p class="aviso">' + (MSGS.aba === 'ativas' ? 'Nenhuma mensagem ativa.' : 'Nenhuma mensagem expirada.') + '</p>') + '</div>';
+  el.innerHTML = h;
+  ligarFecharMsgs();
+  // escrever
+  var eg = $('msgEmojis');
+  $('msgEmojiBt').addEventListener('click', function(){ var abrir = eg.style.display === 'none'; eg.style.display = abrir ? 'flex' : 'none'; this.textContent = abrir ? '😀 Emojis ▴' : '😀 Emojis ▾'; });
+  el.querySelectorAll('[data-msgemoji]').forEach(function(b){ b.addEventListener('click', function(){
+    var ta = $('msgTexto'), i = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length, f = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : i;
+    ta.value = ta.value.slice(0, i) + b.dataset.msgemoji + ' ' + ta.value.slice(f); ta.focus(); ta.selectionStart = ta.selectionEnd = i + b.dataset.msgemoji.length + 1;
+  }); });
+  $('msgExpira').addEventListener('change', function(){ $('msgData').classList.toggle('oculto', this.value !== 'data'); });
+  var bt = $('msgEnviar');
+  bt.addEventListener('click', function(){
+    var t = $('msgTexto').value.trim(), ids = Array.prototype.filter.call(el.querySelectorAll('[data-msgdisc]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.msgdisc; });
+    var msg = $('msgEnvMsg');
+    if(!ids.length){ msg.innerHTML = '<div class="erro">Escolha pelo menos uma disciplina.</div>'; return; }
+    if(t.length < 3){ msg.innerHTML = '<div class="erro">Escreva a mensagem.</div>'; return; }
+    var op = $('msgExpira').value, expira;
+    if(op === 'data'){
+      if(!$('msgData').value){ msg.innerHTML = '<div class="erro">Escolha a data.</div>'; return; }
+      expira = new Date($('msgData').value + 'T23:59:00').getTime();
+      if(expira <= Date.now()){ msg.innerHTML = '<div class="erro">Escolha uma data futura.</div>'; return; }
+    } else expira = Date.now() + Number(op) * 86400000;
+    var alunos = discs.filter(function(d){ return ids.indexOf(d.id) !== -1; }).reduce(function(a, d){ return a + d.alunos; }, 0);
+    if(bt.dataset.conf !== '1'){ bt.dataset.conf = '1'; bt.textContent = 'Confirmar: enviar para ' + alunos + ' aluno(s)'; return; }
+    bt.disabled = true; bt.textContent = 'Enviando…';
+    api('enviarMensagem', {disciplinaIds: ids, texto: t, porEmail: $('msgEmail').checked, expira: expira}).then(function(n){
+      MSGS.r = n; MSGS.aba = 'ativas'; desenharMsgsProf();
+      var e = n.enviado;
+      $('msgEnvMsg').innerHTML = '<div class="ok">Enviada a ' + e.alunos + ' aluno(s): chegou em ' + e.celulares + ' celular(es)' + (e.emails ? ' e ' + e.emails + ' e-mail(s)' : '') + '. Some da tela dos alunos em ' + ddmm(expira) + '.</div>' +
+        (e.falhas || e.erros.length ? '<div class="erro">' + (e.falhas ? '⚠ ' + e.falhas + ' aviso(s) não chegaram. ' : '') + esc(e.erros.join(' · ')) + '</div>' : '');
+    }).catch(function(x){ bt.disabled = false; bt.dataset.conf = ''; bt.textContent = 'Enviar'; msg.innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
   });
+  // filtros
+  el.querySelectorAll('[data-msgfiltro]').forEach(function(b){ b.addEventListener('click', function(){ MSGS.filtro = b.dataset.msgfiltro; desenharMsgsProf(); }); });
+  el.querySelectorAll('[data-msgaba]').forEach(function(b){ b.addEventListener('click', function(){ MSGS.aba = b.dataset.msgaba; desenharMsgsProf(); }); });
+  // ações
+  var mudar = function(id, expira){ api('alterarExpiracao', {id: id, expira: expira}).then(function(n){ MSGS.r = n; desenharMsgsProf(); }).catch(function(e){ erroGeral(e.message); }); };
+  el.querySelectorAll('[data-msgmais]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; mudar(b.dataset.msgmais, Number(b.dataset.exp) + 7 * 86400000); }); });
+  el.querySelectorAll('[data-msgdata]').forEach(function(b){ b.addEventListener('click', function(){
+    var v = window.prompt('Até quando a mensagem fica na tela dos alunos? (dd/mm/aaaa)', ''); if(!v) return;
+    var m = v.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); if(!m){ erroGeral('Use o formato dd/mm/aaaa.'); return; }
+    var t = new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1]), 23, 59).getTime();
+    if(t <= Date.now()){ erroGeral('Escolha uma data futura.'); return; }
+    mudar(b.dataset.msgdata, t);
+  }); });
+  el.querySelectorAll('[data-msgexpirar]').forEach(function(b){ b.addEventListener('click', function(){ if(window.confirm('Tirar esta mensagem da tela dos alunos agora?')) mudar(b.dataset.msgexpirar, -1); }); });
+  el.querySelectorAll('[data-msgreativar]').forEach(function(b){ b.addEventListener('click', function(){ mudar(b.dataset.msgreativar, Date.now() + 15 * 86400000); }); });
+  el.querySelectorAll('[data-msgapagar]').forEach(function(b){ b.addEventListener('click', function(){
+    if(!window.confirm('Apagar esta mensagem de vez (também da sua lista)?')) return;
+    api('apagarMensagem', {id: b.dataset.msgapagar}).then(function(n){ MSGS.r = n; desenharMsgsProf(); }).catch(function(e){ erroGeral(e.message); });
+  }); });
 }
 
 /* ---- matérias ---- */
@@ -1048,6 +1180,101 @@ function carregarMaterias(){
 }
 
 function voltarListaAluno(){ $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
+
+/* ================= MINHAS PROVAS (aluno) =================
+   As provas ficam aqui no Aula por IA: o professor envia as fotos, o aluno vê a nota e a correção
+   e pode pedir vista UMA vez, até 7 dias depois de a nota provisória sair (ou até a nota definitiva). */
+var PROVAS_ALUNO = [];
+function n10(n){ return n === null || n === undefined ? '—' : (Math.round(Number(n) * 10) / 10).toFixed(1).replace('.', ','); }
+function nPt(n){ return String(Math.round(Number(n || 0) * 100) / 100).replace('.', ','); }
+function situacaoProvaAluno(it){
+  var e = it.entrega;
+  if(!e) return Date.now() < it.prova.inicio ? 'agendada' : 'aguardando';
+  if(e.recebida || e.status !== 'corrigida') return 'correcao';
+  return e.confirmada ? 'definitiva' : 'provisoria';
+}
+function tagProvaAluno(it){
+  return {agendada: '<span class="tag t-cinza">agendada</span>', aguardando: '<span class="tag t-cinza">aguardando o professor</span>', correcao: '<span class="tag t-warn">em correção</span>',
+    provisoria: '<span class="tag t-warn">nota provisória</span>', definitiva: '<span class="tag t-ok">nota definitiva</span>'}[situacaoProvaAluno(it)];
+}
+function carregarProvasAluno(){
+  apiLembrar('minhasProvas', 'minhasProvas', {}).then(function(lista){
+    PROVAS_ALUNO = lista || [];
+    var el = $('listaProvasAluno');
+    if(!PROVAS_ALUNO.length){ el.innerHTML = '<p class="aviso" style="margin:0">Nenhuma prova ainda. Elas aparecem aqui quando o professor agendar.</p>'; $('avisoVista').innerHTML = ''; return; }
+    el.innerHTML = PROVAS_ALUNO.map(function(it, i){
+      var e = it.entrega, sit = situacaoProvaAluno(it), temNota = sit === 'provisoria' || sit === 'definitiva';
+      return '<div class="linha"><span><b>' + esc(it.prova.titulo) + '</b> · ' + esc(it.disciplina) + '<br><span class="aviso">' +
+        (temNota ? 'nota ' + n10(e.notaFinal) + (e.vistaPode ? ' · <b style="color:#b07d00">vista até ' + esc(e.vistaAte.slice(0, 5)) + '</b>' : '') : sit === 'agendada' ? new Date(it.prova.inicio).toLocaleString('pt-BR', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'}) : '') +
+        '</span></span><span style="display:flex;gap:8px;align-items:center">' + tagProvaAluno(it) + (temNota ? '<button type="button" class="mini" data-verprova="' + i + '">Ver correção</button>' : '') + '</span></div>';
+    }).join('');
+    el.querySelectorAll('[data-verprova]').forEach(function(b){ b.addEventListener('click', function(){ abrirProvaAluno(Number(b.dataset.verprova)); }); });
+    // aviso no topo: nota provisória com vista ainda aberta
+    var abertas = PROVAS_ALUNO.filter(function(it){ return it.entrega && it.entrega.vistaPode; });
+    $('avisoVista').innerHTML = abertas.map(function(it){
+      return '<div class="cartaoAvisos" style="border-color:#b07d00"><b>📝 Sua nota provisória da ' + esc(it.prova.titulo) + ' saiu: ' + n10(it.entrega.notaFinal) + '</b><br><span style="font-size:14px">' + esc(it.disciplina) +
+        '. O professor ainda vai revisar. Se algo foi lido ou corrigido errado, você pode pedir <b>vista de prova até ' + esc(it.entrega.vistaAte.slice(0, 5)) + '</b>.</span>' +
+        '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" data-verprova="' + PROVAS_ALUNO.indexOf(it) + '">Ver correção e pedir vista</button></div></div>';
+    }).join('');
+    $('avisoVista').querySelectorAll('[data-verprova]').forEach(function(b){ b.addEventListener('click', function(){ abrirProvaAluno(Number(b.dataset.verprova)); }); });
+    // veio do e-mail ou do aviso do celular (aulas.html?provas=1)
+    try{
+      if(new URLSearchParams(location.search).get('provas')){
+        history.replaceState(null, '', location.pathname);
+        if(abertas.length === 1) abrirProvaAluno(PROVAS_ALUNO.indexOf(abertas[0]));
+        else $('caixaProvas').scrollIntoView({behavior: 'smooth', block: 'start'});
+      }
+    }catch(x){}
+  }).catch(function(e){ $('listaProvasAluno').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+function abrirProvaAluno(i){
+  var it = PROVAS_ALUNO[i], e = it.entrega, el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
+  var total = e.questoes.reduce(function(t, q){ return t + q.max; }, 0), obt = e.questoes.reduce(function(t, q){ return t + (q.pontos || 0); }, 0);
+  var h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
+    '<h2 style="margin-top:8px">' + esc(it.prova.titulo) + ' · ' + esc(it.disciplina) + '</h2>' +
+    '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 10px"><span style="font-size:30px;font-weight:bold">' + n10(e.notaFinal) + '</span><span class="aviso">de 10 · ' + nPt(obt) + ' de ' + nPt(total) + ' pontos · ' +
+      (e.confirmada ? 'nota definitiva, revisada pelo professor' : 'nota provisória') + '</span></div>' +
+    (e.confirmada ? '' : '<div class="convite" style="margin:0 0 10px">⏳ <b>Esta nota é provisória:</b> o professor ainda vai revisar a correção.' + (e.vistaPode ? ' Se algo foi lido ou corrigido errado, peça <b>vista de prova até ' + esc(e.vistaAte) + '</b>, no fim desta página.' : '') + '</div>');
+  if(e.geral.professor) h += '<div class="detalhe"><b>Comentário do professor:</b> ' + esc(e.geral.professor) + '</div>';
+  if(e.geral.comentario) h += '<div class="detalhe"><p style="margin:0"><b>Visão geral:</b> ' + esc(e.geral.comentario) + '</p>' +
+    (e.geral.fortes ? '<p style="margin:6px 0 0"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') + (e.geral.estudar ? '<p style="margin:6px 0 0"><b>O que estudar:</b> ' + esc(e.geral.estudar) + '</p>' : '') + '</div>';
+  h += '<h4>Questão por questão</h4>' + e.questoes.map(function(q){
+    return '<div class="detalhe" style="margin-top:8px"><p style="margin:0;display:flex;justify-content:space-between;gap:8px"><b>Questão ' + esc(q.rotulo || q.ordem) + (q.assunto ? ' · <span style="font-weight:normal">' + esc(q.assunto) + '</span>' : '') + '</b><b>' + nPt(q.pontos) + ' / ' + nPt(q.max) + '</b></p>' +
+      (q.acertos ? '<p style="margin:6px 0 0"><b>O que você acertou:</b> ' + esc(q.acertos) + '</p>' : '') +
+      (q.faltou ? '<p style="margin:6px 0 0"><b>O que faltou:</b> ' + esc(q.faltou) + '</p>' : '') +
+      (q.melhorar ? '<p style="margin:6px 0 0"><b>Como melhorar:</b> ' + esc(q.melhorar) + '</p>' : '') +
+      (q.professor ? '<p style="margin:6px 0 0"><b>Professor:</b> ' + esc(q.professor) + '</p>' : '') +
+      '<details style="margin-top:6px"><summary class="link" style="font-size:13px">O que a IA leu da sua resposta</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada: em branco ou não encontrada</i>') + '</p></details>' +
+      (q.vista ? '<div class="recado"><b>Sua vista:</b> ' + esc(q.vista.texto) + '<br>' + (q.vista.resposta ? '<b>Resposta do professor:</b> ' + esc(q.vista.resposta) : '<span class="aviso">aguardando o professor</span>') + '</div>' : '') + '</div>';
+  }).join('');
+  if(e.revisaoPedida) h += '<div class="ok">Outro ponto enviado ao professor: "' + esc(e.revisaoPedida) + '".</div>';
+  var enviou = e.questoes.some(function(q){ return q.vista; });
+  if(enviou && !e.confirmada) h += '<div class="ok">Vista enviada. O professor vai revisar e responder em cada questão.</div>';
+  else if(e.vistaPode){
+    h += '<h4>Vista de prova · até ' + esc(e.vistaAte) + '</h4>' +
+      '<div class="convite" style="font-size:14px">A vista serve para <b>explicar o que você já escreveu</b> e pode não ter ficado claro (letra, abreviação, uma frase confusa) ou para apontar um erro de leitura. <b>Ela não completa a resposta:</b> o que não está na folha não conta. Escreva só nas questões que quer contestar. <b>A vista é enviada uma vez só</b>, com todas as questões juntas.</div>' +
+      e.questoes.map(function(q){
+        return '<label class="rot" style="margin-top:8px">Questão ' + esc(q.rotulo || q.ordem) + '</label><textarea data-vistaq="' + esc(q.id) + '" style="min-height:50px" placeholder="ex.: Na 2ª linha eu escrevi 72 °C (não 12 °C), por isso a conclusão é pasteurização rápida."></textarea>';
+      }).join('') +
+      '<label class="rot" style="margin-top:8px">Outro ponto (opcional)</label><textarea id="vistaGeral" style="min-height:44px"></textarea>' +
+      '<div class="botoes"><button type="button" id="btVista">Enviar vista</button></div><div id="msgVista"></div>';
+  } else if(!e.confirmada && e.vistaAte) h += '<p class="aviso">O prazo para pedir vista terminou em ' + esc(e.vistaAte) + '.</p>';
+  el.innerHTML = h + '</div>';
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarListaAluno(); });
+  var bt = $('btVista');
+  if(bt) bt.addEventListener('click', function(){
+    var itens = {};
+    el.querySelectorAll('[data-vistaq]').forEach(function(t){ if(t.value.trim()) itens[t.dataset.vistaq] = t.value.trim(); });
+    if(!Object.keys(itens).length && $('vistaGeral').value.trim().length < 10){ $('msgVista').innerHTML = '<div class="erro">Escreva, em pelo menos uma questão, o que você quis dizer.</div>'; return; }
+    if(bt.dataset.conf !== '1'){ bt.dataset.conf = '1'; bt.textContent = 'Confirmar: enviar a vista (uma vez só)'; return; }
+    bt.disabled = true; bt.textContent = 'Enviando…';
+    api('pedirVistaProva', {professorId: it.professorId, entregaId: e.id, itens: itens, geral: $('vistaGeral').value}).then(function(nova){
+      it.entrega = nova; delete memoTela.minhasProvas; abrirProvaAluno(i); carregarProvasAluno();
+    }).catch(function(x){ bt.disabled = false; bt.dataset.conf = ''; bt.textContent = 'Enviar vista'; $('msgVista').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; });
+  });
+  el.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
 
 /* ================= ESTUDO DIRIGIDO (aluno) ================= */
 var EST = {m: null, q: null, ultima: null};
@@ -3310,13 +3537,7 @@ function desenharDisciplinas(){
   el.querySelectorAll('[data-verhist]').forEach(function(b){ b.addEventListener('click', function(){ escolherDisc(b.dataset.verhist); abrirAba('hist'); }); });
   el.insertAdjacentHTML('afterbegin', '<div id="alertasTemas"></div><div id="painelTemas"></div>');
   el.querySelectorAll('[data-temas]').forEach(function(b){ b.addEventListener('click', function(){ abrirTemas(b.dataset.temas); }); });
-  el.querySelectorAll('[data-recado]').forEach(function(b){ b.addEventListener('click', function(){
-    var box = el.querySelector('[data-recadobox="' + b.dataset.recado + '"]');
-    if(box.innerHTML){ box.innerHTML = ''; return; }
-    box.innerHTML = '<p class="carregando">Carregando…</p>';
-    api('recadosDisciplina', {disciplinaId: b.dataset.recado}).then(function(r){ desenharRecados(box, b.dataset.recado, r); })
-      .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
-  }); });
+  el.querySelectorAll('[data-recado]').forEach(function(b){ b.addEventListener('click', function(){ abrirMensagens(b.dataset.recado); }); });
   carregarAlertasTemas();
   el.querySelectorAll('[data-ativar]').forEach(function(b){
     b.addEventListener('click', function(){
@@ -3542,47 +3763,6 @@ function desenharApostilaRef(d){
   });
 }
 
-// Aviso à turma: vai para os celulares com avisos ligados, aparece em "Minhas matérias" por 15 dias e, se marcar, vai por e-mail
-function desenharRecados(box, discId, r){
-  box.innerHTML = '<div class="detalhe" style="margin-top:10px"><p class="grupoTitulo" style="margin-top:0">📣 Aviso à turma</p>' +
-    '<p class="aviso" style="margin:0 0 6px">' + r.alunos + ' aluno(s) inscrito(s) · ' + (r.ligado ? r.comCelular + ' com avisos ligados no celular' : 'avisos no celular ainda não configurados') + '. O recado também aparece em "Minhas matérias" por 15 dias.</p>' +
-    '<button type="button" class="secundario mini" data-emojiabrir aria-expanded="false" style="margin:0 0 6px">😀 Emojis ▾</button>' +
-    '<div data-emojis style="display:none;flex-wrap:wrap;gap:4px;margin:0 0 6px">' + ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'].map(function(em){ return '<button type="button" class="secundario mini" data-emoji="' + em + '" style="font-size:18px;padding:2px 8px;line-height:1.3" aria-label="Inserir ' + em + '">' + em + '</button>'; }).join('') + '</div>' +
-    '<textarea data-rectexto style="min-height:120px" placeholder="ex.: Amanhã a aula será prática no laboratório 3. Tragam jaleco."></textarea>' +
-    '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:6px 0"><input type="checkbox" data-recemail style="width:17px;height:17px"> Mandar também por e-mail (para quem não ativou os avisos)</label>' +
-    '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-recenviar>Enviar para a turma</button></div><div data-recmsg></div>' +
-    (r.recados.length ? '<p class="grupoTitulo">Enviados</p>' + r.recados.map(function(x){
-      var total = x.lidos + x.naoLeram.length;
-      return '<div class="linha"><span style="font-size:14px">' + esc(x.texto) + '<br><span class="aviso">' + esc(x.em) + '</span>' +
-        '<br><span style="font-size:12.5px">' + (x.celulares ? '<span style="color:#1a7a3c">✓ chegou em ' + x.celulares + ' celular(es)</span>' : '<span class="aviso">nenhum celular com avisos ligados</span>') +
-        (x.falhas ? ' · <span style="color:#c62828">⚠ ' + x.falhas + ' falhou(aram)' + (x.erro ? ': ' + esc(x.erro) : '') + '</span>' : '') +
-        (x.email ? ' · ✉️ e-mail enviado' : '') + ' · 👁 lido por <b>' + x.lidos + ' de ' + total + '</b></span>' +
-        (x.naoLeram.length && x.naoLeram.length < total ? '<details style="font-size:12.5px"><summary class="link">quem ainda não leu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : '') +
-        '</span><button type="button" class="link" data-recexcluir="' + esc(x.id) + '" style="font-size:12.5px">apagar</button></div>';
-    }).join('') + '<p class="aviso" style="margin-top:4px">"Lido" conta quem abriu a cartinha ✉️ no app ou tocou na notificação.</p>' : '') + '</div>';
-  var ea = box.querySelector('[data-emojiabrir]'), eg = box.querySelector('[data-emojis]');
-  ea.addEventListener('click', function(){ var abrir = eg.style.display === 'none'; eg.style.display = abrir ? 'flex' : 'none'; ea.setAttribute('aria-expanded', String(abrir)); ea.textContent = abrir ? '😀 Emojis ▴' : '😀 Emojis ▾'; });
-  // emoji entra onde está o cursor
-  box.querySelectorAll('[data-emoji]').forEach(function(e){ e.addEventListener('click', function(){
-    var ta = box.querySelector('[data-rectexto]'), i = typeof ta.selectionStart === 'number' ? ta.selectionStart : ta.value.length, f = typeof ta.selectionEnd === 'number' ? ta.selectionEnd : i;
-    ta.value = ta.value.slice(0, i) + e.dataset.emoji + ' ' + ta.value.slice(f); ta.focus(); ta.selectionStart = ta.selectionEnd = i + e.dataset.emoji.length + 1;
-  }); });
-  var bt = box.querySelector('[data-recenviar]');
-  bt.addEventListener('click', function(){
-    var t = box.querySelector('[data-rectexto]').value.trim(); if(!t) return;
-    if(bt.dataset.conf !== '1'){ bt.dataset.conf = '1'; bt.textContent = 'Confirmar: enviar para ' + r.alunos + ' aluno(s)'; return; }
-    bt.disabled = true; bt.textContent = 'Enviando…';
-    api('enviarRecado', {disciplinaId: discId, texto: t, porEmail: box.querySelector('[data-recemail]').checked}).then(function(n){
-      desenharRecados(box, discId, n);
-      box.querySelector('[data-recmsg]').innerHTML = '<div class="ok">Enviado: chegou em ' + n.enviado.celulares + ' celular(es)' + (n.enviado.emails ? ' e ' + n.enviado.emails + ' e-mail(s)' : '') + '. Todos os ' + n.enviado.alunos + ' alunos veem o recado no app.</div>' +
-        (n.enviado.falhas ? '<div class="erro">⚠ ' + n.enviado.falhas + ' aviso(s) não chegaram' + (n.enviado.erro ? ': ' + esc(n.enviado.erro) : '') + '. Esses alunos ainda veem o recado na cartinha ✉️ do app.</div>' : '');
-    }).catch(function(e){ bt.disabled = false; bt.dataset.conf = ''; bt.textContent = 'Enviar para a turma'; box.querySelector('[data-recmsg]').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
-  });
-  box.querySelectorAll('[data-recexcluir]').forEach(function(x){ x.addEventListener('click', function(){
-    if(!window.confirm('Apagar este recado da tela dos alunos? (quem já recebeu no celular continua com a notificação)')) return;
-    api('excluirRecado', {disciplinaId: discId, id: x.dataset.recexcluir}).then(function(n){ desenharRecados(box, discId, n); }).catch(function(e){ erroGeral(e.message); });
-  }); });
-}
 
 // Configurações: avisos no celular (só para o administrador da plataforma)
 function carregarAvisosAdmin(){

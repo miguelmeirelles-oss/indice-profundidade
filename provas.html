@@ -337,7 +337,8 @@ function trocarVisao(v){
   $('tAluno').classList.toggle('oculto', v !== 'aluno');
   $('tProf').classList.toggle('oculto', v !== 'prof');
   try{ localStorage.setItem('provas_visao', v); }catch(e){}
-  if(v === 'aluno') abrirAluno(); else abrirProf();
+  if(v === 'aluno'){ location.replace('aulas.html?provas=1'); return; }   // as provas do aluno ficam no Aula por IA
+  abrirProf();
 }
 document.querySelectorAll('[data-visao]').forEach(function(b){ b.addEventListener('click', function(){ trocarVisao(b.dataset.visao); }); });
 document.querySelectorAll('[data-pa]').forEach(function(b){ b.addEventListener('click', function(){
