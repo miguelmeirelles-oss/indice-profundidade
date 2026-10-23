@@ -1050,6 +1050,8 @@ function funcaoDaSerieFig(s){
 // {"x":[…],"y":[…]}, "pontos":"(0.1, 20) (0.2, 35)" ou x/y soltos na série
 function lerPontosFig(s){
   var b = s.pontos != null ? s.pontos : s.dados != null ? s.dados : s.valores != null ? s.valores : null;
+  var prm = s.parametros && typeof s.parametros === 'object' && !Array.isArray(s.parametros) ? s.parametros : {};
+  if(b == null) b = prm.pontos != null ? prm.pontos : prm.dados != null ? prm.dados : prm.valores != null ? prm.valores : null;   // às vezes vem dentro de "parametros"
   if(b == null && Array.isArray(s.x) && Array.isArray(s.y)) b = s.x.map(function(x, k){ return [x, s.y[k]]; });
   if(b && !Array.isArray(b) && typeof b === 'object'){
     if(Array.isArray(b.x) && Array.isArray(b.y)){ var bx = b.x, by = b.y; b = bx.map(function(x, k){ return [x, by[k]]; }); }
