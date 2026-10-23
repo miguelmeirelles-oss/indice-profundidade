@@ -1046,6 +1046,32 @@ function funcaoDaSerieFig(s){
   md.p.forEach(function(k){ var v = nFig(s.parametros[k], OPCIONAIS_CURVA[k]); if(v === undefined || !isFinite(v)) ok = false; a[k] = v; });
   return ok ? function(x){ return md.f(x, a); } : null;
 }
+// Pontos de uma curva em qualquer formato que a IA costuma usar: [[x,y]], [{x,y}], [{aw:..,v:..}], ["0,1; 20"],
+// {"x":[…],"y":[…]}, "pontos":"(0.1, 20) (0.2, 35)" ou x/y soltos na série
+function lerPontosFig(s){
+  var b = s.pontos != null ? s.pontos : s.dados != null ? s.dados : s.valores != null ? s.valores : null;
+  if(b == null && Array.isArray(s.x) && Array.isArray(s.y)) b = s.x.map(function(x, k){ return [x, s.y[k]]; });
+  if(b && !Array.isArray(b) && typeof b === 'object'){
+    if(Array.isArray(b.x) && Array.isArray(b.y)){ var bx = b.x, by = b.y; b = bx.map(function(x, k){ return [x, by[k]]; }); }
+    else b = Object.keys(b).map(function(k){ return [k, b[k]]; });
+  }
+  if(typeof b === 'string'){
+    var ns = b.match(/-?\d+(?:\.\d+)?/g) || [], par = [];
+    for(var i = 0; i + 1 < ns.length; i += 2) par.push([ns[i], ns[i + 1]]);
+    b = par;
+  }
+  if(!Array.isArray(b)) return [];
+  return b.map(function(p){
+    if(Array.isArray(p)) return [nFig(p[0], NaN), nFig(p[1], NaN)];
+    if(p && typeof p === 'object'){
+      if('x' in p || 'y' in p) return [nFig(p.x, NaN), nFig(p.y, NaN)];
+      var v = Object.keys(p).map(function(k){ return nFig(p[k], NaN); }).filter(function(n){ return isFinite(n); });
+      return [v[0], v[1]];
+    }
+    if(typeof p === 'string'){ var m = p.match(/-?\d+(?:[.,]\d+)?/g) || []; return [nFig(m[0], NaN), nFig(m[1], NaN)]; }
+    return [NaN, NaN];
+  }).filter(function(p){ return isFinite(p[0]) && isFinite(p[1]); }).sort(function(a, b){ return a[0] - b[0]; });
+}
 // mesmas funções no servidor (CodigoAulas.gs): pontos de cada curva e conferência das escalas
 function amostrarSeriesFig(o){
   o.series.forEach(function(s){
@@ -1053,6 +1079,7 @@ function amostrarSeriesFig(o){
     if(!s.fn) return;
     var de = Math.max(o.eixo_x.min, isFinite(s.de) ? s.de : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[0][0] : o.eixo_x.min));
     var ate = Math.min(o.eixo_x.max, isFinite(s.ate) ? s.ate : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[s.pontos.length - 1][0] : o.eixo_x.max));
+    if(!(ate > de)){ de = o.eixo_x.min; ate = o.eixo_x.max; if(s.modelo === 'pontos' && s.pontos.length){ de = Math.max(de, s.pontos[0][0]); ate = Math.min(ate, s.pontos[s.pontos.length - 1][0]); } }
     if(!(ate > de)) return;
     for(var k = 0; k <= 200; k++){ var x = de + (ate - de) * k / 200, y = s.fn(x); s.pts.push(isFinite(y) ? [x, y] : null); }
     if(s.mostrar_pontos) s.marcadores = s.modelo === 'pontos' ? s.pontos.slice() : [0.1, 0.25, 0.4, 0.55, 0.7, 0.85].map(function(t){ var x = de + (ate - de) * t; return [x, s.fn(x)]; });
@@ -1104,7 +1131,7 @@ function conferirEscalasFig(o, fmt){
 function figuraPronta(f){
   if(!f || typeof f !== 'object') return null;
   var tipo = String(f.tipo || '').toLowerCase();
-  var o = {tipo: tipo, titulo: String(f.titulo || ''), legenda: String(f.legenda || '')};
+  var o = {tipo: tipo, titulo: String(f.titulo || ''), legenda: String(f.legenda || ''), bruto: f};
   if(tipo === 'tabela'){
     o.cabecalho = (f.cabecalho || []).map(String);
     o.linhas = (f.linhas || []).map(function(l){ return (Array.isArray(l) ? l : (l && l.celulas) || []).map(String); }).filter(function(l){ return l.length; });
@@ -1124,10 +1151,7 @@ function figuraPronta(f){
     var prm = {};
     if(Array.isArray(s.parametros)) s.parametros.forEach(function(p){ if(p && p.nome) prm[p.nome] = nFig(p.valor, NaN); });
     else if(s.parametros && typeof s.parametros === 'object') Object.keys(s.parametros).forEach(function(k){ prm[k] = nFig(s.parametros[k], NaN); });
-    var bruto = s.pontos || s.dados || [];
-    if(!bruto.length && Array.isArray(s.x) && Array.isArray(s.y)) bruto = s.x.map(function(x, k){ return [x, s.y[k]]; });   // também aceita {"x":[…],"y":[…]}
-    var pts = bruto.map(function(p){ return Array.isArray(p) ? [nFig(p[0], NaN), nFig(p[1], NaN)] : [nFig(p && p.x, NaN), nFig(p && p.y, NaN)]; })
-      .filter(function(p){ return isFinite(p[0]) && isFinite(p[1]); }).sort(function(a, b){ return a[0] - b[0]; });
+    var pts = lerPontosFig(s);
     return {nome: String(s.nome || ''), estilo: String(s.estilo || ''), eixo_direito: !!s.eixo_direito && !!o.eixo_y2,
       modelo: String(s.modelo || 'pontos').toLowerCase(), parametros: prm, pontos: pts, de: nFig(s.de, NaN), ate: nFig(s.ate, NaN), mostrar_pontos: !!s.mostrar_pontos};
   });
@@ -1339,7 +1363,8 @@ function htmlQuestaoFolha(q, i, cont, opc){
     } else corpo = d.svg;
     h += '<div class="fFig">' + corpo + '<div class="fLeg"><b>Figura ' + cont.f + '</b> – ' + esc(f.legenda || f.titulo) + '</div></div>';
     // só na tela do gerador: o que o sistema precisou consertar no gráfico (vai também para a IA na revisão)
-    if(opc.avisos && (f.avisos || []).length) h += '<div style="font-family:Arial,sans-serif;font-size:12.5px;color:#8a5a00;background:#fff4d6;border-radius:8px;padding:6px 10px;margin:-4px 0 12px">⚠ ' + f.avisos.map(esc).join('<br>⚠ ') + '<br><span style="color:#555">A figura já sai corrigida assim; se quiser, use "Revisar de novo com IA" para a IA acertar a escala no texto também.</span></div>';
+    if(opc.avisos && (f.avisos || []).length) h += '<div style="font-family:Arial,sans-serif;font-size:12.5px;color:#8a5a00;background:#fff4d6;border-radius:8px;padding:6px 10px;margin:-4px 0 12px">⚠ ' + f.avisos.map(esc).join('<br>⚠ ') + '<br><span style="color:#555">A figura já sai corrigida assim quando dá; se ainda faltar alguma curva, peça o ajuste por escrito ou use "Revisar de novo com IA".</span>' +
+      '<details style="margin-top:4px"><summary style="cursor:pointer">ver os dados que a IA escreveu para esta figura</summary><pre style="white-space:pre-wrap;font-size:11px;max-height:260px;overflow:auto;background:#fff;padding:6px;border-radius:6px">' + esc(JSON.stringify(f.bruto, null, 1)) + '</pre></details></div>';
   });
   var letras = q.itens.length > 1;
   q.itens.forEach(function(it, k){
