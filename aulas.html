@@ -1040,10 +1040,12 @@ function desenharMsgsAluno(){
   el.innerHTML = cabMsgs() + '<div class="caixa"><h2 style="margin-top:0">✉️ Mensagens dos professores</h2>' +
     (grupos.length ? grupos.map(function(m){
       return '<p class="grupoTitulo">' + esc(m.nome) + '</p>' + m.recados.map(function(r){
-        return '<div class="msgItem' + (r.lido ? '' : ' nova') + '">' + (r.lido ? '' : '<span class="tag t-err">nova</span> ') + '<span class="aviso">' + esc(r.em) + ' · fica até ' + esc(String(r.expira || '').slice(0, 5)) + '</span><br>' + esc(r.texto).replace(/\n/g, '<br>') + '</div>';
+        return '<div class="msgItem' + (r.lido ? '' : ' nova') + '">' + (r.lido ? '' : '<span class="tag t-err">nova</span> ') + '<span class="aviso">' + esc(r.em) + ' · fica até ' + esc(String(r.expira || '').slice(0, 5)) + '</span><br>' + esc(r.texto).replace(/\n/g, '<br>') +
+          (r.tipo === 'notas' ? '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" data-vercorrecao>Ver minha correção</button></div>' : '') + '</div>';
       }).join('');
     }).join('') : '<p class="aviso">Nenhuma mensagem no momento.</p>') + '</div>';
   ligarFecharMsgs();
+  el.querySelectorAll('[data-vercorrecao]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); $('caixaProvas').scrollIntoView({behavior: 'smooth', block: 'start'}); }); });
   var porProf = {};
   MINHAS_LISTA.forEach(function(m){ (m.recados || []).forEach(function(r){ if(!r.lido) (porProf[m.professorId] = porProf[m.professorId] || []).push(r.id); }); });
   if(Object.keys(porProf).length) api('marcarRecadosLidos', {itens: Object.keys(porProf).map(function(k){ return {professorId: k, ids: porProf[k]}; })}).then(function(){
@@ -1085,13 +1087,16 @@ function desenharMsgsProf(discPre){
     '<div class="chips"><button type="button" class="chip" data-msgaba="ativas" aria-pressed="' + (MSGS.aba === 'ativas') + '">Ativas (' + nAt + ')</button><button type="button" class="chip" data-msgaba="expiradas" aria-pressed="' + (MSGS.aba === 'expiradas') + '">Expiradas (' + nEx + ')</button></div>' +
     (lista.length ? lista.map(function(x){
       var dias = Math.ceil((x.expiraMs - agora) / 86400000);
-      return '<div class="msgItem' + (x.ativa ? '' : ' expirada') + '"><span class="tag t-azul">' + esc(x.disc) + '</span> <span class="aviso">enviada ' + esc(x.em) + ' · ' +
+      return '<div class="msgItem' + (x.ativa ? '' : ' expirada') + '"><span class="tag t-azul">' + esc(x.disc) + '</span> ' + (x.automatica ? '<span class="tag t-cinza" title="registrada pelo sistema">🤖 automática</span> ' : '') + '<span class="aviso">enviada ' + esc(x.em) + ' · ' +
           (x.ativa ? 'some em <b>' + ddmm(x.expiraMs) + '</b> (' + (dias <= 1 ? 'amanhã' : 'em ' + dias + ' dias') + ')' : 'expirou em ' + ddmm(x.expiraMs)) + '</span>' +
         '<p style="margin:6px 0">' + esc(x.texto).replace(/\n/g, '<br>') + '</p>' +
-        '<span style="font-size:12.5px">' + (x.celulares ? '<span style="color:#1a7a3c">✓ chegou em ' + x.celulares + ' celular(es)</span>' : '<span class="aviso">nenhum celular com avisos</span>') +
+        (x.tipo === 'notas'
+          ? '<span style="font-size:12.5px">✉️ e-mail e aviso para ' + x.celulares + ' aluno(s) · 👁 abriu a correção: <b>' + x.lidos + ' de ' + x.total + '</b></span>' +
+            (x.naoLeram.length ? '<details style="font-size:12.5px"><summary class="link">quem ainda não abriu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : (x.total ? ' <span style="color:#1a7a3c;font-size:12.5px">· todos abriram</span>' : ''))
+          : '<span style="font-size:12.5px">' + (x.celulares ? '<span style="color:#1a7a3c">✓ chegou em ' + x.celulares + ' celular(es)</span>' : '<span class="aviso">nenhum celular com avisos</span>') +
           (x.falhas ? ' · <span style="color:#c62828">⚠ ' + x.falhas + ' falhou(aram)' + (x.erro ? ': ' + esc(x.erro) : '') + '</span>' : '') + (x.email ? ' · ✉️ e-mail' : '') +
           ' · 👁 lido por <b>' + x.lidos + ' de ' + x.total + '</b></span>' +
-        (x.naoLeram.length && x.naoLeram.length < x.total ? '<details style="font-size:12.5px"><summary class="link">quem ainda não leu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : '') +
+          (x.naoLeram.length && x.naoLeram.length < x.total ? '<details style="font-size:12.5px"><summary class="link">quem ainda não leu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : '')) +
         '<div class="botoes" style="margin-top:6px">' + (x.ativa
           ? '<button type="button" class="secundario mini" data-msgmais="' + esc(x.id) + '" data-exp="' + x.expiraMs + '">+7 dias</button><button type="button" class="secundario mini" data-msgdata="' + esc(x.id) + '">mudar data</button><button type="button" class="secundario mini" data-msgexpirar="' + esc(x.id) + '">expirar agora</button>'
           : '<button type="button" class="secundario mini" data-msgreativar="' + esc(x.id) + '">mostrar de novo por 15 dias</button>') +
