@@ -104,6 +104,14 @@
   th,td{padding:8px;border-bottom:1px solid var(--linha);text-align:left;white-space:nowrap}
   th{background:var(--bloco);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--cinza)}
   .qEdit{border:2px solid var(--linha);border-radius:14px;padding:12px 14px;margin-bottom:12px;background:#fbfcfe}
+  .folhaTela{background:#e9edf4;padding:16px;border-radius:12px;overflow-x:auto;margin-top:10px}
+  .folhaTela .folha{max-width:800px;margin:0 auto;padding:34px 44px;box-shadow:0 1px 6px rgba(0,0,0,.18)}
+  .ajQ{font-family:inherit;background:var(--bloco);border:2px dashed var(--linha);border-radius:10px;padding:8px 10px;margin:-6px 0 24px}
+  .ajQ label,.ajQ textarea,.ajQ button{font-family:Arial,Helvetica,sans-serif}
+  .figsEdit{display:flex;flex-direction:column;gap:10px;margin:8px 0 10px}
+  .figEdit{border:1px solid var(--linha);border-radius:10px;padding:8px;background:#fff;text-align:center}
+  .figEdit svg{max-width:100%;height:auto}
+  @media (max-width:700px){ .folhaTela{padding:6px} .folhaTela .folha{padding:18px 14px} .folha .fNome{overflow-wrap:anywhere} }
   .sugIA{display:inline-block;color:#fff;background:#c62828;font-size:11.5px;font-weight:bold;border-radius:6px;padding:2px 8px;margin:0 0 6px;letter-spacing:.02em}
   .comSug{border-color:#c62828!important;background:#fff6f6!important}
   .qrTela,.zoom{position:fixed;inset:0;background:#fff;z-index:100;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
@@ -717,9 +725,12 @@ function listarProvas(){
           'Antes de liberar, os alunos veem só "em correção". Depois, revise cada aluno e use <b>"Liberar nota definitiva"</b> na correção dele. <b>Ocultar</b> esconde de novo para a turma toda.</div></details>' +
         '<button type="button" class="secundario mini" data-qr="' + i + '">QR code</button><button type="button" class="secundario mini" data-excluir="' + i + '">Excluir</button></div></div>';
     }).join('') : '<p class="aviso">Nenhuma prova cadastrada nesta disciplina.</p>';
-    h += '<div class="botoes"><button type="button" id="btNovaProva">+ Nova prova</button></div></div><div id="areaProva"></div>';
+    h += '<div class="botoes"><button type="button" id="btNovaProva">+ Nova prova</button><button type="button" class="secundario" id="btGerarProva">✨ Gerar prova com IA</button></div>' +
+      '<div id="listaGeradas">' + htmlListaGeradas(r.provasGeradas) + '</div></div><div id="areaProva"></div>';
     el.innerHTML = h;
     $('btNovaProva').addEventListener('click', function(){ formProva(null); });
+    $('btGerarProva').addEventListener('click', abrirGeradorNovo);
+    ligarListaGeradas();
     el.querySelectorAll('[data-editar]').forEach(function(b){ b.addEventListener('click', function(){ formProva(r.provas[Number(b.dataset.editar)]); }); });
     el.querySelectorAll('[data-entregas]').forEach(function(b){ b.addEventListener('click', function(){ abrirEntregas(r.provas[Number(b.dataset.entregas)].id); }); });
     if(ABRIR_DIRETO && r.provas.some(function(p){ return p.id === ABRIR_DIRETO.prova; })) abrirEntregas(ABRIR_DIRETO.prova);
@@ -772,7 +783,7 @@ var qsEdit = [];
 function dataInput(ms){ var d = new Date(ms); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
 function horaInput(ms){ var d = new Date(ms); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
 
-function formProva(p){
+function formProva(p, pre){
   var d = dadosDisc.disciplina;
   var etapas = (d.composicao && d.composicao.etapas) || [];
   var opcoes = itensDeProva(etapas);
@@ -782,7 +793,11 @@ function formProva(p){
   var criteriosMarcados = v.criterios || dadosDisc.criteriosPadrao || ['todo', 'separar'];
   var rigorProva = Number(v.rigor || d.rigor || 3);
   var atual = p ? itemDaProva(etapas, p) : livre;
-  qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes, sugestoes:(q.sugestoes || []).slice()}; });
+  qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes, sugestoes:(q.sugestoes || []).slice(), contexto:q.contexto || '', figura:(q.figura || []).slice()}; });
+  // prova gerada pela IA (código PG-…): as questões vêm prontas, com texto comum, figuras, gabarito e critérios
+  var geradaAtual = (p && p.gerada) || '';
+  if(pre && pre.gerada){ qsEdit = linhasDaGerada(pre.gerada.dados); geradaAtual = pre.gerada.codigo; }
+  var geradas = dadosDisc.provasGeradas || [];
   var el = $('areaProva');
   el.innerHTML = '<div class="caixa"><h2>' + (p ? 'Editar prova' : 'Nova prova') + '</h2><div class="campos">' +
     '<div><label class="rot" for="pTit">Título</label><input type="text" id="pTit" value="' + esc(v.titulo) + '"></div>' +
@@ -813,15 +828,34 @@ function formProva(p){
       '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Calibra a IA que corrige esta prova. <b>Padrão</b> é o critério normal (crédito parcial pelos tópicos do gabarito). Mais <b>flexível</b>: crédito parcial mais generoso. Mais <b>rigoroso</b>: crédito integral só com resposta completa e precisa.<br><br>' +
       'Vem preenchido com o rigor da disciplina e vale só para esta prova. <b>As instruções de correção que você escreve têm prioridade</b> (ex.: "aceitar sem unidade" continua valendo). Mudar depois não altera notas já corrigidas; para aplicar, use "Corrigir de novo com IA" nas entregas.</div></details></label>' +
       '<div class="rigorBarra" id="pRigor">' + ['', 'Bem flexível', 'Flexível', 'Padrão', 'Rigoroso', 'Muito rigoroso'].map(function(t, n){ return n ? '<button type="button" data-prig="' + n + '" aria-pressed="' + (rigorProva === n) + '">' + t + '</button>' : ''; }).join('') + '</div></div>' +
-    '<div class="convite">Tem a prova em foto ou PDF? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf" multiple id="pExtrair">Preencher as questões a partir do arquivo</label><div id="msgExtrair"></div></div>' +
+    '<div class="convite">Tem a prova em foto, PDF ou Word? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf,.docx" multiple id="pExtrair">Preencher as questões a partir do arquivo</label>' +
+      (geradas.length ? '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Ou use uma prova gerada pela IA: <select id="pGerSel" style="max-width:340px">' + geradas.map(function(g){ return '<option value="' + esc(g.codigo) + '"' + (g.codigo === geradaAtual ? ' selected' : '') + '>' + esc(g.codigo + ' · ' + g.titulo + ' · ' + g.questoes + ' questões') + '</option>'; }).join('') + '</select><button type="button" class="secundario mini" id="pGerCarregar">Carregar</button></div>' : '') +
+      '<p class="aviso" style="margin:8px 0 0">Arquivo baixado do gerador (com o código PG-… no nome ou impresso na folha): o sistema carrega a versão original, com figuras, gabarito e critérios, sem gastar IA.</p>' +
+      (geradaAtual ? '<p class="aviso" style="margin:4px 0 0">Esta prova vem da prova gerada <b>' + esc(geradaAtual) + '</b>.</p>' : '') + '<div id="msgExtrair"></div></div>' +
     '<h4>Questões <span class="aviso" id="pTotal"></span></h4>' +
     '<p class="aviso">Questão com itens a, b, c: se cada item tem valor próprio, cadastre um por um (Nº 2a, 2b…) para ter nota e retorno por item. ' +
     'Se não, cadastre a questão inteira e separe o gabarito por item (a) …, b) …).</p><div id="qsBox"></div>' +
     '<div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" id="pMaisQ">+ Questão</button></div>' +
+    '<div class="botoes">' + barraImpressao('pf') + '</div>' +
     '<label style="display:flex;gap:8px;align-items:center;margin-top:16px;font-weight:bold"><input type="checkbox" id="pPub"' + (v.publicada ? ' checked' : '') + ' style="width:20px;height:20px"> Publicada (os alunos veem só a data e o horário de envio; as questões nunca aparecem para eles)</label>' +
     '<div id="pErro" class="erro oculto"></div><div class="botoes"><button type="button" id="pSalvar">' + (p ? 'Salvar alterações' : 'Criar prova') + '</button><button type="button" class="secundario" id="pCanc">Cancelar</button></div>' +
     (p && p.entregas ? '<p class="aviso">Esta prova já tem entregas. Se mudar gabarito ou pontos, use "Corrigir de novo com IA" nas entregas para recalcular.</p>' : '') + '</div>';
   desenharQs();
+  ligarImpressao('pf', function(){ lerQs(); return {titulo: $('pTit').value, disciplina: d.nome, codigo: geradaAtual, subtitulo: '', questoes: dadosDasLinhas(qsEdit)}; });
+  function usarGerada(g, m, como){
+    lerQs();
+    qsEdit = linhasDaGerada(g.dados); geradaAtual = g.codigo;
+    desenharQs();
+    m.innerHTML = '<div class="ok">Prova gerada <b>' + esc(g.codigo) + '</b> carregada' + (como ? ' ' + como : '') + ': ' + qsEdit.length + ' item(ns), com texto comum, figuras, gabarito e critérios. Revise e salve.</div>';
+  }
+  var bgc = $('pGerCarregar');
+  if(bgc) bgc.addEventListener('click', function(){
+    lerQs();
+    if(qsEdit.some(function(q){ return String(q.enunciado || '').trim(); }) && bgc.dataset.conf !== '1'){ bgc.dataset.conf = '1'; bgc.textContent = 'Confirmar: trocar as questões daqui'; return; }
+    bgc.disabled = true;
+    api('provaGerada', {codigo: $('pGerSel').value}).then(function(g){ bgc.disabled = false; bgc.dataset.conf = ''; bgc.textContent = 'Carregar'; usarGerada(g, $('msgExtrair'), ''); })
+      .catch(function(e){ bgc.disabled = false; $('msgExtrair').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
   el.querySelectorAll('[data-prig]').forEach(function(b){ b.addEventListener('click', function(){
     rigorProva = Number(b.dataset.prig); el.querySelectorAll('[data-prig]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
   }); });
@@ -829,10 +863,28 @@ function formProva(p){
   $('pCanc').addEventListener('click', function(){ el.innerHTML = ''; });
   $('pExtrair').addEventListener('change', function(){
     var arqs = Array.prototype.slice.call(this.files), m = $('msgExtrair');
-    m.innerHTML = '<p class="carregando">Lendo a prova… (uns 30 segundos)</p>';
-    Promise.all(arqs.map(function(f){ return prepararArquivo(f, false); })).then(function(ps){
-      return api('extrairQuestoes', {fotos: ps.map(function(x){ return {mime:x.mime, dados:x.dados}; })});
-    }).then(function(qs){
+    this.value = '';
+    if(!arqs.length) return;
+    function tentarGerada(cod, como){
+      return api('provaGerada', {codigo: cod}).then(function(g){ usarGerada(g, m, como); return true; }).catch(function(){ return false; });
+    }
+    var codNome = arqs.map(function(f){ return codigoNoTexto(f.name); }).filter(Boolean)[0];
+    m.innerHTML = '<p class="carregando">' + (codNome ? 'Procurando a prova gerada ' + esc(codNome) + '…' : 'Lendo a prova… (uns 30 segundos)') + '</p>';
+    (codNome ? tentarGerada(codNome, 'pelo código no nome do arquivo') : Promise.resolve(false)).then(function(achou){
+      if(achou) return {pronto: true};
+      m.innerHTML = '<p class="carregando">Lendo a prova… (uns 30 segundos)</p>';
+      return partesDosArquivos(arqs).then(function(r){
+        var c2 = codigoNoTexto(r.texto);
+        return (c2 ? tentarGerada(c2, 'pelo código escrito no arquivo') : Promise.resolve(false)).then(function(ok){
+          return ok ? {pronto: true} : api('extrairQuestoes', {fotos: r.partes});
+        });
+      });
+    }).then(function(res){
+      if(res && res.pronto) return;
+      if(res && res.codigo) return tentarGerada(res.codigo, 'pelo código impresso na folha').then(function(ok){ if(!ok) preencher(res.questoes || []); });
+      preencher(Array.isArray(res) ? res : (res && res.questoes) || []);
+    }).catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    function preencher(qs){
       if(!qs.length){ m.innerHTML = '<div class="erro">Não encontrei questões no arquivo.</div>'; return; }
       lerQs();
       var vazias = qsEdit.every(function(q){ return !q.enunciado; });
@@ -842,7 +894,7 @@ function formProva(p){
       var nSug = novas.reduce(function(t, q){ return t + q.sugestoes.length; }, 0);
       m.innerHTML = '<div class="ok">' + qs.length + ' questão(ões) preenchida(s). O que estava no arquivo foi transcrito.</div>' +
         (nSug ? '<div class="erro"><b>' + nSug + ' campo(s) foram sugeridos pela IA</b> porque não estavam no arquivo (valor, gabarito ou critérios). Eles estão marcados em vermelho: revise cada um antes da prova.</div>' : '');
-    }).catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    }
   });
   $('pSalvar').addEventListener('click', function(){
     lerQs();
@@ -853,7 +905,7 @@ function formProva(p){
     api('salvarProva', {prova: {id: p ? p.id : '', disciplinaId: discSel, titulo: $('pTit').value, inicio: new Date(dt + 'T' + hr).getTime(),
       duracao: $('pDur').value, janela: $('pJan').value, item: $('pItem').value, instrucoes: $('pIns').value, rigor: rigorProva,
       criterios: Array.prototype.filter.call(el.querySelectorAll('[data-pcrit]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.pcrit; }),
-      salvarPadrao: $('pPadrao').checked,
+      salvarPadrao: $('pPadrao').checked, gerada: geradaAtual,
       aulas: Array.prototype.filter.call(el.querySelectorAll('[data-paula]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.paula; }),
       publicada: $('pPub').checked, questoes: qsEdit.map(function(q){ q.pontos = String(q.pontos).replace(',', '.'); return q; })}})
       .then(listarProvas).catch(function(e){ bt.disabled = false; $('pErro').textContent = e.message; $('pErro').classList.remove('oculto'); });
@@ -866,7 +918,8 @@ function desenharQs(){
     return '<div class="qEdit" data-q="' + i + '"><div class="linha" style="border:0;padding:0 0 8px"><b>Questão ' + esc(q.rotulo || (i + 1)) + '</b><span class="botoes" style="margin:0">' +
       (i ? '<button type="button" class="secundario mini" data-subir="' + i + '" aria-label="Subir">↑</button>' : '') +
       '<button type="button" class="secundario mini" data-tirarq="' + i + '">Remover</button></span></div>' +
-      '<label class="rot">Enunciado</label><textarea data-c="enunciado">' + esc(q.enunciado) + '</textarea>' +
+      blocoContexto(q, i) +
+      '<label class="rot">' + (String(q.contexto || '').trim() ? 'Enunciado deste item' : 'Enunciado') + '</label><textarea data-c="enunciado">' + esc(q.enunciado) + '</textarea>' +
       '<div class="campos" style="margin:10px 0 0">' +
         '<div><label class="rot">Nº na prova</label><input type="text" data-c="rotulo" value="' + esc(q.rotulo || (i + 1)) + '" placeholder="ex.: 2a" style="max-width:110px"></div>' +
         '<div><label class="rot">Vale (pontos)</label>' + aviso(q, 'pontos') + '<input type="number" min="0" step="0.25" data-c="pontos" value="' + esc(q.pontos) + '"' + marca(q, 'pontos') + '></div>' +
@@ -876,6 +929,13 @@ function desenharQs(){
   }).join('');
   var total = qsEdit.reduce(function(t, q){ return t + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0);
   $('pTotal').textContent = '· total ' + num(total) + ' pontos (a nota da prova é convertida para 0 a 10)';
+  $('qsBox').querySelectorAll('[data-tirafig]').forEach(function(b){ b.addEventListener('click', function(){
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: remover esta figura'; return; }
+    lerQs();
+    var x = b.dataset.tirafig.split(':'), q = qsEdit[Number(x[0])];
+    q.figura = (q.figura || []).filter(function(f, k){ return k !== Number(x[1]); });
+    propagarGrupos(); desenharQs();
+  }); });
   $('qsBox').querySelectorAll('[data-tirarq]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); qsEdit.splice(Number(b.dataset.tirarq), 1); if(!qsEdit.length) qsEdit.push({rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}); desenharQs(); }); });
   $('qsBox').querySelectorAll('[data-subir]').forEach(function(b){ b.addEventListener('click', function(){ lerQs(); var i = Number(b.dataset.subir), t = qsEdit[i]; qsEdit[i] = qsEdit[i - 1]; qsEdit[i - 1] = t; desenharQs(); }); });
   $('qsBox').querySelectorAll('[data-aceitar]').forEach(function(b){ b.addEventListener('click', function(){
@@ -901,6 +961,671 @@ function lerQs(){
     var q = qsEdit[Number(box.dataset.q)];
     box.querySelectorAll('[data-c]').forEach(function(inp){ q[inp.dataset.c] = inp.value; });
   });
+  propagarGrupos();
+}
+// itens da mesma questão (1a, 1b…) compartilham o texto comum e as figuras do primeiro item
+function inicioDoGrupo(i){ return !i || grupoDoRotulo(qsEdit[i].rotulo || (i + 1), i) !== grupoDoRotulo(qsEdit[i - 1].rotulo || i, i - 1); }
+function propagarGrupos(){
+  var ini = null;
+  qsEdit.forEach(function(q, i){
+    if(inicioDoGrupo(i)){ ini = q; return; }
+    if(String(ini.contexto || '').trim() || (ini.figura || []).length || String(q.contexto || '').trim() || (q.figura || []).length){ q.contexto = ini.contexto || ''; q.figura = (ini.figura || []).slice(); }
+  });
+}
+function blocoContexto(q, i){
+  if(!String(q.contexto || '').trim() && !(q.figura || []).length) return '';
+  if(!inicioDoGrupo(i)){
+    var k = i; while(k > 0 && !inicioDoGrupo(k)) k--;
+    return '<p class="aviso" style="margin:0 0 6px">Texto comum e figuras desta questão: no item ' + esc(qsEdit[k].rotulo || (k + 1)) + ', acima.</p>';
+  }
+  return '<label class="rot">Texto comum da questão (vale para todos os itens dela)</label><textarea data-c="contexto">' + esc(q.contexto) + '</textarea>' +
+    ((q.figura || []).length ? '<div class="figsEdit">' + q.figura.map(function(f, k){
+      var h = htmlFiguraSo(f);
+      return h ? '<div class="figEdit"><div class="folha">' + h + '</div><button type="button" class="secundario mini" data-tirafig="' + i + ':' + k + '" style="margin-top:6px">Remover figura</button></div>' : '';
+    }).join('') + '<p class="aviso" style="margin:0">Para mudar uma figura, abra a prova gerada (Provas geradas pela IA) e peça o ajuste por escrito.</p></div>' : '');
+}
+
+/* ===================== GERADOR DE PROVA POR IA =====================
+   A IA monta a prova; os gráficos são calculados e desenhados aqui (a IA só dá o modelo e os
+   parâmetros de cada curva), então os números dos rótulos sempre batem com a curva.
+   Cada prova gerada tem um código (PG-AAAAMMDD-HHMM), impresso na folha e no nome do arquivo. */
+function nFig(v, p){ if(v === '' || v == null) return p; var n = Number(String(v).replace(',', '.')); return isFinite(n) ? n : p; }
+function fmtBR(v, d){
+  if(!isFinite(v)) return '?';
+  if(d === undefined){ var a = Math.abs(v); d = a >= 10 ? 0 : a >= 1 ? 1 : a >= 0.1 ? 2 : 3; }
+  var t = (Math.round(v * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d);
+  if(/^-0(\.0+)?$/.test(t)) t = t.slice(1);
+  return t.replace('.', ',');
+}
+// mesmas contas do servidor (CodigoAulas.gs → MODELOS_CURVA)
+var MODELOS_CURVA = {
+  henderson: {p:['pKa','ionizada'], f:function(x,a){ var ha = 100 / (1 + Math.pow(10, x - a.pKa)); return a.ionizada ? 100 - ha : ha; }},
+  gab: {p:['Xm','C','K'], f:function(x,a){ var k = a.K * x, d = (1 - k) * (1 - k + a.C * k); return d > 0 ? a.Xm * a.C * k / d : NaN; }},
+  bet: {p:['Xm','C'], f:function(x,a){ var d = (1 - x) * (1 + (a.C - 1) * x); return d > 0 ? a.Xm * a.C * x / d : NaN; }},
+  gordon_taylor: {p:['Tg_solido','k','Tg_agua'], f:function(x,a){ var w2 = x / 100, w1 = 1 - w2, d = w1 + a.k * w2; return d ? (w1 * a.Tg_solido + a.k * w2 * a.Tg_agua) / d : NaN; }},
+  primeira_ordem: {p:['C0','k'], f:function(x,a){ return a.C0 * Math.exp(-a.k * x); }},
+  ordem_zero: {p:['C0','k'], f:function(x,a){ return Math.max(0, a.C0 - a.k * x); }},
+  arrhenius: {p:['k_ref','T_ref','Ea'], f:function(x,a){ return a.k_ref * Math.exp(-a.Ea / 8.314e-3 * (1 / (x + 273.15) - 1 / (a.T_ref + 273.15))); }},
+  michaelis: {p:['Vmax','Km'], f:function(x,a){ return a.Km + x > 0 ? a.Vmax * x / (a.Km + x) : NaN; }},
+  sino: {p:['altura','centro','largura','base'], f:function(x,a){ return a.base + a.altura * Math.exp(-Math.pow((x - a.centro) / (a.largura || 1), 2) / 2); }},
+  sigmoide: {p:['minimo','maximo','centro','inclinacao'], f:function(x,a){ return a.minimo + (a.maximo - a.minimo) / (1 + Math.exp(-a.inclinacao * (x - a.centro))); }},
+  limiar: {p:['inicio','coef','expoente'], f:function(x,a){ return x <= a.inicio ? 0 : a.coef * Math.pow(x - a.inicio, a.expoente); }},
+  linear: {p:['a','b'], f:function(x,a){ return a.a + a.b * x; }},
+  exponencial: {p:['a','b'], f:function(x,a){ return a.a * Math.exp(a.b * x); }}
+};
+var OPCIONAIS_CURVA = {ionizada:0, Tg_agua:-135, base:0, expoente:1, inclinacao:1};
+function interpoladorFig(pts){
+  var n = pts.length, xs = pts.map(function(p){ return p[0]; }), ys = pts.map(function(p){ return p[1]; });
+  if(n < 2) return function(){ return NaN; };
+  var d = [], m = [], i;
+  for(i = 0; i < n - 1; i++) d.push((ys[i + 1] - ys[i]) / ((xs[i + 1] - xs[i]) || 1e-9));
+  m[0] = d[0]; m[n - 1] = d[n - 2];
+  for(i = 1; i < n - 1; i++) m[i] = d[i - 1] * d[i] <= 0 ? 0 : (d[i - 1] + d[i]) / 2;
+  for(i = 0; i < n - 1; i++){
+    if(d[i] === 0){ m[i] = 0; m[i + 1] = 0; continue; }
+    var a = m[i] / d[i], b = m[i + 1] / d[i], s = a * a + b * b;
+    if(s > 9){ var t = 3 / Math.sqrt(s); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+  }
+  return function(x){
+    if(x < xs[0] || x > xs[n - 1]) return NaN;
+    var k = 0; while(k < n - 2 && x > xs[k + 1]) k++;
+    var h = xs[k + 1] - xs[k] || 1e-9, t = (x - xs[k]) / h, t2 = t * t, t3 = t2 * t;
+    return (2*t3 - 3*t2 + 1) * ys[k] + (t3 - 2*t2 + t) * h * m[k] + (-2*t3 + 3*t2) * ys[k + 1] + (t3 - t2) * h * m[k + 1];
+  };
+}
+function funcaoDaSerieFig(s){
+  if(s.modelo === 'pontos') return interpoladorFig(s.pontos);
+  var md = MODELOS_CURVA[s.modelo]; if(!md) return null;
+  var a = {}, ok = true;
+  md.p.forEach(function(k){ var v = nFig(s.parametros[k], OPCIONAIS_CURVA[k]); if(v === undefined || !isFinite(v)) ok = false; a[k] = v; });
+  return ok ? function(x){ return md.f(x, a); } : null;
+}
+// Figura pronta para desenhar (com os pontos calculados); null se não der para usar
+function figuraPronta(f){
+  if(!f || typeof f !== 'object') return null;
+  var tipo = String(f.tipo || '').toLowerCase();
+  var o = {tipo: tipo, titulo: String(f.titulo || ''), legenda: String(f.legenda || '')};
+  if(tipo === 'tabela'){
+    o.cabecalho = (f.cabecalho || []).map(String);
+    o.linhas = (f.linhas || []).map(function(l){ return (Array.isArray(l) ? l : (l && l.celulas) || []).map(String); }).filter(function(l){ return l.length; });
+    return o.linhas.length ? o : null;
+  }
+  if(tipo === 'fluxograma'){
+    o.etapas = (f.etapas || []).map(function(e){ return typeof e === 'string' ? {texto: e, condicao: ''} : {texto: String(e && e.texto || ''), condicao: String(e && e.condicao || '')}; }).filter(function(e){ return e.texto; }).slice(0, 10);
+    if(f.retorno && f.retorno.de){ var de = Math.round(nFig(f.retorno.de, 0)), pa = Math.round(nFig(f.retorno.para, 0)); if(de >= 1 && pa >= 1 && de <= o.etapas.length && pa <= o.etapas.length && de !== pa) o.retorno = {de: de, para: pa, rotulo: String(f.retorno.rotulo || '')}; }
+    return o.etapas.length >= 2 ? o : null;
+  }
+  if(tipo !== 'grafico') return null;
+  var ex = f.eixo_x || {}, ey = f.eixo_y || {}, ey2 = f.eixo_y2 && f.eixo_y2.rotulo ? f.eixo_y2 : null;
+  o.eixo_x = {rotulo: String(ex.rotulo || ''), min: nFig(ex.min, NaN), max: nFig(ex.max, NaN)};
+  o.eixo_y = {rotulo: String(ey.rotulo || ''), min: nFig(ey.min, NaN), max: nFig(ey.max, NaN)};
+  o.eixo_y2 = ey2 ? {rotulo: String(ey2.rotulo || ''), min: nFig(ey2.min, NaN), max: nFig(ey2.max, NaN)} : null;
+  o.series = (f.series || []).slice(0, 8).map(function(s){
+    var prm = {};
+    if(Array.isArray(s.parametros)) s.parametros.forEach(function(p){ if(p && p.nome) prm[p.nome] = nFig(p.valor, NaN); });
+    else if(s.parametros && typeof s.parametros === 'object') Object.keys(s.parametros).forEach(function(k){ prm[k] = nFig(s.parametros[k], NaN); });
+    var pts = (s.pontos || []).map(function(p){ return Array.isArray(p) ? [nFig(p[0], NaN), nFig(p[1], NaN)] : [nFig(p && p.x, NaN), nFig(p && p.y, NaN)]; })
+      .filter(function(p){ return isFinite(p[0]) && isFinite(p[1]); }).sort(function(a, b){ return a[0] - b[0]; });
+    return {nome: String(s.nome || ''), estilo: String(s.estilo || ''), eixo_direito: !!s.eixo_direito && !!o.eixo_y2,
+      modelo: String(s.modelo || 'pontos').toLowerCase(), parametros: prm, pontos: pts, de: nFig(s.de, NaN), ate: nFig(s.ate, NaN), mostrar_pontos: !!s.mostrar_pontos};
+  });
+  if(!o.series.length) return null;
+  var xsMin = [], xsMax = [];
+  o.series.forEach(function(s){
+    s.pontos.forEach(function(p){ xsMin.push(p[0]); xsMax.push(p[0]); });
+    if(isFinite(s.de)) xsMin.push(s.de);
+    if(isFinite(s.ate)) xsMax.push(s.ate);
+    else if(s.modelo === 'gab' || s.modelo === 'bet') xsMax.push(1);
+    else if(s.modelo === 'henderson') xsMax.push(14);
+  });
+  if(!isFinite(o.eixo_x.min)) o.eixo_x.min = xsMin.length ? Math.min(0, Math.min.apply(null, xsMin)) : 0;
+  if(!isFinite(o.eixo_x.max)) o.eixo_x.max = xsMax.length ? Math.max.apply(null, xsMax) : 1;
+  if(o.eixo_x.max <= o.eixo_x.min) o.eixo_x.max = o.eixo_x.min + 1;
+  var estilos = ['cheia', 'tracejada', 'traco_ponto', 'pontilhada'];
+  o.series.forEach(function(s, i){
+    if(estilos.indexOf(s.estilo) === -1) s.estilo = estilos[i % estilos.length];
+    var fn = funcaoDaSerieFig(s); s.fn = fn; s.pts = []; s.marcadores = [];
+    if(!fn) return;
+    var de = Math.max(o.eixo_x.min, isFinite(s.de) ? s.de : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[0][0] : o.eixo_x.min));
+    var ate = Math.min(o.eixo_x.max, isFinite(s.ate) ? s.ate : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[s.pontos.length - 1][0] : o.eixo_x.max));
+    for(var k = 0; k <= 200; k++){ var x = de + (ate - de) * k / 200, y = fn(x); s.pts.push(isFinite(y) ? [x, y] : null); }
+    if(s.mostrar_pontos) s.marcadores = s.modelo === 'pontos' ? s.pontos.slice() : [0.1, 0.25, 0.4, 0.55, 0.7, 0.85].map(function(t){ var x = de + (ate - de) * t; return [x, fn(x)]; });
+  });
+  o.series = o.series.filter(function(s){ return s.fn; });
+  if(!o.series.length) return null;
+  function ajustarY(e, dir){
+    if(!e) return;
+    var ys = [];
+    o.series.forEach(function(s){ if(s.eixo_direito === dir) s.pts.forEach(function(p){ if(p) ys.push(p[1]); }); });
+    if(!isFinite(e.min)) e.min = ys.length ? Math.min(0, Math.min.apply(null, ys)) : 0;
+    if(!isFinite(e.max)) e.max = ys.length ? Math.max.apply(null, ys) * 1.08 : 1;
+    if(e.max <= e.min) e.max = e.min + 1;
+  }
+  ajustarY(o.eixo_y, false); ajustarY(o.eixo_y2, true);
+  function serieDe(ref){
+    var r = String(ref == null ? '' : ref).toLowerCase().trim();
+    var s = o.series.filter(function(x){ return x.nome.toLowerCase().trim() === r; })[0];
+    if(!s && /^\d+$/.test(r)) s = o.series[Number(r)] || o.series[Number(r) - 1];
+    return s || (o.series.length === 1 ? o.series[0] : null);
+  }
+  o.marcas = (f.marcas || []).slice(0, 12).map(function(m){
+    var s = serieDe(m.serie), x = nFig(m.x, NaN), y = s ? s.fn(x) : nFig(m.y, NaN), rot = String(m.rotulo || '');
+    return {x: x, y: y, direito: s ? s.eixo_direito : false, texto: rot.replace(/\{y\}/g, fmtBR(y)).replace(/\{x\}/g, fmtBR(x))};
+  }).filter(function(m){ return isFinite(m.x) && isFinite(m.y); });
+  o.faixas = (f.faixas || []).map(function(a){ return {de: nFig(a.de, NaN), ate: nFig(a.ate, NaN), rotulo: String(a.rotulo || '')}; }).filter(function(a){ return isFinite(a.de) && isFinite(a.ate); });
+  o.linhas_v = (f.linhas_v || []).map(function(a){ return {x: nFig(a.x, NaN), rotulo: String(a.rotulo || '')}; }).filter(function(a){ return isFinite(a.x); });
+  o.linhas_h = (f.linhas_h || []).map(function(a){ return {y: nFig(a.y, NaN), rotulo: String(a.rotulo || ''), eixo_direito: !!a.eixo_direito}; }).filter(function(a){ return isFinite(a.y); });
+  return o;
+}
+
+/* ---- desenho (SVG em preto e branco, como numa prova impressa) ---- */
+var TRACO_FIG = {cheia: '', tracejada: '9 5', pontilhada: '2 4', traco_ponto: '10 4 2 4'};
+function larguraTxt(t, tam){ return String(t).length * tam * 0.56; }
+function passoBonito(amp, n){ var b = amp / n, p = Math.pow(10, Math.floor(Math.log10(b))), r = b / p; return (r < 1.5 ? 1 : r < 3 ? 2 : r < 7 ? 5 : 10) * p; }
+function marcasEixo(min, max, n){
+  var p = passoBonito(max - min, n), l = [], v = Math.ceil(min / p - 1e-9) * p;
+  for(; v <= max + p * 1e-6; v += p) l.push(Math.round(v / p) * p);
+  return {l: l, d: Math.max(0, -Math.floor(Math.log10(p) + 1e-9))};
+}
+function svgGrafico(f){
+  var W = 680, ml = 74, mr = f.eixo_y2 ? 74 : 26, mt = f.titulo ? 36 : 14, hPlot = 250;
+  var nomes = f.series.filter(function(s){ return s.nome; }).map(function(s){ return {t: s.nome, s: s}; })
+    .concat(f.faixas.filter(function(a){ return a.rotulo; }).map(function(a){ return {t: a.rotulo, faixa: true}; }));
+  // a legenda vai embaixo do gráfico: nunca cobre as curvas
+  var linhasLeg = [], atual = [], larg = 0;
+  nomes.forEach(function(n){ var w = 40 + larguraTxt(n.t, 12) + 22; if(larg + w > W - 40 && atual.length){ linhasLeg.push(atual); atual = []; larg = 0; } atual.push({n: n, w: w}); larg += w; });
+  if(atual.length) linhasLeg.push(atual);
+  var y0 = mt + hPlot, H = y0 + 52 + linhasLeg.length * 20 + 6, x0 = ml, x1 = W - mr, y1 = mt;
+  var ex = f.eixo_x, ey = f.eixo_y, ey2 = f.eixo_y2;
+  function sx(x){ return x0 + (x - ex.min) / (ex.max - ex.min) * (x1 - x0); }
+  function sy(y, dir){ var e = dir && ey2 ? ey2 : ey; return y0 - (y - e.min) / (e.max - e.min) * (y0 - y1); }
+  var id = 'c' + Math.random().toString(36).slice(2, 8);
+  var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" font-family="Arial, Helvetica, sans-serif">' +
+    '<rect width="' + W + '" height="' + H + '" fill="#fff"/><defs><clipPath id="' + id + '"><rect x="' + x0 + '" y="' + y1 + '" width="' + (x1 - x0) + '" height="' + (y0 - y1) + '"/></clipPath></defs>';
+  if(f.titulo) s += '<text x="' + (W / 2) + '" y="20" text-anchor="middle" font-size="14">' + esc(f.titulo) + '</text>';
+  f.faixas.forEach(function(a){ var xa = sx(Math.max(ex.min, a.de)), xb = sx(Math.min(ex.max, a.ate)); s += '<rect x="' + xa + '" y="' + y1 + '" width="' + Math.max(0, xb - xa) + '" height="' + (y0 - y1) + '" fill="#e4e4e4"/>'; });
+  var mx = marcasEixo(ex.min, ex.max, 7), my = marcasEixo(ey.min, ey.max, 6);
+  mx.l.forEach(function(v){ s += '<line x1="' + sx(v) + '" y1="' + y1 + '" x2="' + sx(v) + '" y2="' + y0 + '" stroke="#ececec"/><line x1="' + sx(v) + '" y1="' + y0 + '" x2="' + sx(v) + '" y2="' + (y0 + 5) + '" stroke="#000"/><text x="' + sx(v) + '" y="' + (y0 + 19) + '" text-anchor="middle" font-size="12">' + fmtBR(v, mx.d) + '</text>'; });
+  my.l.forEach(function(v){ s += '<line x1="' + x0 + '" y1="' + sy(v) + '" x2="' + x1 + '" y2="' + sy(v) + '" stroke="#ececec"/><line x1="' + (x0 - 5) + '" y1="' + sy(v) + '" x2="' + x0 + '" y2="' + sy(v) + '" stroke="#000"/><text x="' + (x0 - 8) + '" y="' + (sy(v) + 4) + '" text-anchor="end" font-size="12">' + fmtBR(v, my.d) + '</text>'; });
+  if(ey2){ var m2 = marcasEixo(ey2.min, ey2.max, 6); m2.l.forEach(function(v){ s += '<line x1="' + x1 + '" y1="' + sy(v, true) + '" x2="' + (x1 + 5) + '" y2="' + sy(v, true) + '" stroke="#000"/><text x="' + (x1 + 8) + '" y="' + (sy(v, true) + 4) + '" font-size="12">' + fmtBR(v, m2.d) + '</text>'; }); }
+  s += '<line x1="' + x0 + '" y1="' + y0 + '" x2="' + x1 + '" y2="' + y0 + '" stroke="#000" stroke-width="1.3"/><line x1="' + x0 + '" y1="' + y1 + '" x2="' + x0 + '" y2="' + y0 + '" stroke="#000" stroke-width="1.3"/>';
+  if(ey2) s += '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x1 + '" y2="' + y0 + '" stroke="#000" stroke-width="1.3"/>';
+  s += '<text x="' + ((x0 + x1) / 2) + '" y="' + (y0 + 40) + '" text-anchor="middle" font-size="13.5">' + esc(ex.rotulo) + '</text>';
+  s += '<text transform="translate(18,' + ((y0 + y1) / 2) + ') rotate(-90)" text-anchor="middle" font-size="13.5">' + esc(ey.rotulo) + '</text>';
+  if(ey2) s += '<text transform="translate(' + (W - 14) + ',' + ((y0 + y1) / 2) + ') rotate(90)" text-anchor="middle" font-size="13.5">' + esc(ey2.rotulo) + '</text>';
+  s += '<g clip-path="url(#' + id + ')">';
+  f.linhas_v.forEach(function(a){ s += '<line x1="' + sx(a.x) + '" y1="' + y1 + '" x2="' + sx(a.x) + '" y2="' + y0 + '" stroke="#555" stroke-dasharray="5 4"/>'; });
+  f.linhas_h.forEach(function(a){ s += '<line x1="' + x0 + '" y1="' + sy(a.y, a.eixo_direito) + '" x2="' + x1 + '" y2="' + sy(a.y, a.eixo_direito) + '" stroke="#555" stroke-dasharray="5 4"/>'; });
+  f.series.forEach(function(se){
+    var seg = [], todos = [];
+    se.pts.forEach(function(p){ if(!p){ if(seg.length) todos.push(seg); seg = []; return; } seg.push(sx(p[0]).toFixed(1) + ',' + sy(Math.max(Math.min(p[1], 1e6), -1e6), se.eixo_direito).toFixed(1)); });
+    if(seg.length) todos.push(seg);
+    todos.forEach(function(sg){ s += '<polyline fill="none" stroke="#000" stroke-width="2.2" stroke-linejoin="round" points="' + sg.join(' ') + '"' + (TRACO_FIG[se.estilo] ? ' stroke-dasharray="' + TRACO_FIG[se.estilo] + '"' : '') + '/>'; });
+    se.marcadores.forEach(function(p){ if(isFinite(p[1])) s += '<circle cx="' + sx(p[0]) + '" cy="' + sy(p[1], se.eixo_direito) + '" r="3.2" fill="#000"/>'; });
+  });
+  s += '</g>';
+  f.linhas_v.forEach(function(a){ if(a.rotulo) s += '<text x="' + (sx(a.x) + 4) + '" y="' + (y1 + 13) + '" font-size="11.5" fill="#333">' + esc(a.rotulo) + '</text>'; });
+  f.linhas_h.forEach(function(a){ if(a.rotulo) s += '<text x="' + (x1 - 4) + '" y="' + (sy(a.y, a.eixo_direito) - 4) + '" text-anchor="end" font-size="11.5" fill="#333">' + esc(a.rotulo) + '</text>'; });
+  // pontos marcados (o número do rótulo foi calculado aqui)
+  var usados = [];
+  f.marcas.forEach(function(m){
+    var cx = sx(m.x), cy = sy(m.y, m.direito);
+    if(cx < x0 - 1 || cx > x1 + 1 || cy < y1 - 1 || cy > y0 + 1) return;
+    s += '<circle cx="' + cx + '" cy="' + cy + '" r="4.6" fill="#000"/>';
+    if(!m.texto) return;
+    var w = larguraTxt(m.texto, 11.5) + 10, h = 18, bx = cx - w / 2, by = cy - 30;
+    if(by < y1 + 2) by = cy + 10;
+    usados.forEach(function(u){ if(Math.abs(u.x - bx) < w && Math.abs(u.y - by) < h) by = by < cy ? by - h - 2 : by + h + 2; });
+    bx = Math.max(x0 + 2, Math.min(x1 - w - 2, bx));
+    usados.push({x: bx, y: by});
+    s += '<rect x="' + bx + '" y="' + by + '" width="' + w + '" height="' + h + '" rx="3" fill="#fff" stroke="#888"/><text x="' + (bx + w / 2) + '" y="' + (by + 13) + '" text-anchor="middle" font-size="11.5">' + esc(m.texto) + '</text>';
+  });
+  linhasLeg.forEach(function(lin, li){
+    var tot = lin.reduce(function(t, x){ return t + x.w; }, 0), x = (W - tot) / 2, y = y0 + 58 + li * 20;
+    lin.forEach(function(it){
+      if(it.n.faixa) s += '<rect x="' + x + '" y="' + (y - 9) + '" width="30" height="11" fill="#e4e4e4" stroke="#bbb"/>';
+      else s += '<line x1="' + x + '" y1="' + (y - 4) + '" x2="' + (x + 30) + '" y2="' + (y - 4) + '" stroke="#000" stroke-width="2.2"' + (TRACO_FIG[it.n.s.estilo] ? ' stroke-dasharray="' + TRACO_FIG[it.n.s.estilo] + '"' : '') + '/>';
+      s += '<text x="' + (x + 38) + '" y="' + y + '" font-size="12">' + esc(it.n.t) + '</text>';
+      x += it.w;
+    });
+  });
+  return {svg: s + '</svg>', w: W, h: H};
+}
+function quebrarTxt(t, n){
+  var l = [], a = '';
+  String(t).split(/\s+/).forEach(function(p){ if((a + ' ' + p).trim().length > n && a){ l.push(a); a = p; } else a = (a + ' ' + p).trim(); });
+  if(a) l.push(a);
+  return l;
+}
+function svgFluxo(f){
+  var W = 680, n = f.etapas.length, porLinha = n <= 5 ? n : Math.ceil(n / 2), gap = 34, bw = (W - 20 - gap * (porLinha - 1)) / porLinha, bh = 62;
+  var linhas = Math.ceil(n / porLinha), topo = f.titulo ? 70 : 44, passoL = bh + 74;
+  var H = topo + (linhas - 1) * passoL + bh + (f.retorno ? 70 : 16);
+  var s = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '" width="' + W + '" height="' + H + '" font-family="Arial, Helvetica, sans-serif">' +
+    '<rect width="' + W + '" height="' + H + '" fill="#fff"/><defs><marker id="seta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#000"/></marker></defs>';
+  if(f.titulo) s += '<text x="' + (W / 2) + '" y="20" text-anchor="middle" font-size="14">' + esc(f.titulo) + '</text>';
+  var cx = [], cy = [], i;
+  f.etapas.forEach(function(e, i){
+    var x = 10 + (i % porLinha) * (bw + gap), y = topo + Math.floor(i / porLinha) * passoL;
+    cx.push(x); cy.push(y);
+    s += '<rect x="' + x + '" y="' + y + '" width="' + bw + '" height="' + bh + '" rx="6" fill="#e9e9e9" stroke="#000" stroke-width="1.6"/>';
+    var ls = quebrarTxt(e.texto, Math.max(8, Math.floor(bw / 8.2))).slice(0, 3);
+    ls.forEach(function(t, k){ s += '<text x="' + (x + bw / 2) + '" y="' + (y + bh / 2 + 5 + (k - (ls.length - 1) / 2) * 16) + '" text-anchor="middle" font-size="13.5">' + esc(t) + '</text>'; });
+  });
+  for(i = 1; i < n; i++){
+    var e = f.etapas[i], cond = e.condicao ? quebrarTxt(e.condicao, 16).slice(0, 2) : [];
+    if(Math.floor(i / porLinha) === Math.floor((i - 1) / porLinha)){
+      var xa = cx[i - 1] + bw, xb = cx[i], ym = cy[i] + bh / 2;
+      s += '<line x1="' + (xa + 2) + '" y1="' + ym + '" x2="' + (xb - 2) + '" y2="' + ym + '" stroke="#000" stroke-width="1.8" marker-end="url(#seta)"/>';
+      cond.forEach(function(t, k){ s += '<text x="' + ((xa + xb) / 2) + '" y="' + (cy[i] - 8 - (cond.length - 1 - k) * 13) + '" text-anchor="middle" font-size="11.5" fill="#333">' + esc(t) + '</text>'; });
+    } else {
+      var xs = cx[i - 1] + bw / 2, ys = cy[i - 1] + bh, xe = cx[i] + bw / 2, ye = cy[i], ymid = ys + 30;
+      s += '<path d="M' + xs + ',' + ys + ' V' + ymid + ' H' + xe + ' V' + (ye - 2) + '" fill="none" stroke="#000" stroke-width="1.8" marker-end="url(#seta)"/>';
+      cond.forEach(function(t, k){ s += '<text x="' + ((xs + xe) / 2) + '" y="' + (ymid - 6 - (cond.length - 1 - k) * 13) + '" text-anchor="middle" font-size="11.5" fill="#333">' + esc(t) + '</text>'; });
+    }
+  }
+  if(f.retorno){
+    var a = f.retorno.de - 1, b = f.retorno.para - 1, ya = cy[a] + bh, yb = cy[b] + bh, base = Math.max(ya, yb) + 46, xa2 = cx[a] + bw / 2, xb2 = cx[b] + bw / 2;
+    s += '<path d="M' + xa2 + ',' + ya + ' C' + xa2 + ',' + base + ' ' + xb2 + ',' + base + ' ' + xb2 + ',' + (yb + 2) + '" fill="none" stroke="#000" stroke-width="1.6" stroke-dasharray="6 4" marker-end="url(#seta)"/>';
+    if(f.retorno.rotulo) s += '<text x="' + ((xa2 + xb2) / 2) + '" y="' + (base + 2) + '" text-anchor="middle" font-size="12" font-style="italic">' + esc(f.retorno.rotulo) + '</text>';
+  }
+  return {svg: s + '</svg>', w: W, h: H};
+}
+
+/* ---- a folha da prova (tela, impressão/PDF e Word usam a mesma montagem) ---- */
+var FOLHA_CSS = '.folha{font-family:"Times New Roman",Times,serif;font-size:15px;line-height:1.45;color:#000;background:#fff}' +
+  '.folha .fCab{text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:13px;font-weight:bold;line-height:1.4}.folha .fCab span{font-weight:normal}' +
+  '.folha .fCod{text-align:right;font-family:Arial,Helvetica,sans-serif;font-size:10.5px;color:#666}' +
+  '.folha .fTit{text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:16px;margin:14px 0 2px;font-weight:bold}' +
+  '.folha .fSub{text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#333;margin-bottom:10px}' +
+  '.folha .fNome{font-family:Arial,Helvetica,sans-serif;font-size:13.5px;margin:12px 0 20px}' +
+  '.folha .fQ{margin:0 0 20px}.folha .fQt{font-family:Arial,Helvetica,sans-serif;font-weight:bold;font-size:14px;margin-bottom:6px}' +
+  '.folha p{margin:0 0 7px;text-align:justify}.folha .fItem{margin:6px 0 4px;text-align:justify}' +
+  '.folha .fFig{text-align:center;margin:10px 0;page-break-inside:avoid;break-inside:avoid}.folha .fFig svg{max-width:100%;height:auto}' +
+  '.folha .fLeg{font-size:13px;margin-top:3px}' +
+  '.folha table.fTab{border-collapse:collapse;margin:6px auto;font-size:13.5px}.folha table.fTab th,.folha table.fTab td{border:1px solid #000;padding:3px 10px;text-align:center}.folha table.fTab th{background:#eee;font-family:inherit;font-weight:bold;text-transform:none;letter-spacing:0;color:#000}.folha table.fTab td{color:#000;font-family:inherit}' +
+  '.folha .fGab{font-family:Arial,Helvetica,sans-serif;font-size:12px;background:#fff8e1;border-left:3px solid #f2a516;padding:5px 9px;margin:4px 0 10px}';
+function cabecalhoFolha(disc){
+  var c = null;
+  try{ c = JSON.parse(localStorage.getItem('prova_cabecalho') || 'null'); }catch(e){}
+  return [c && c[0] ? c[0] : 'UNIVERSIDADE FEDERAL DE CIÊNCIA E INOVAÇÃO DO RIO DE JANEIRO',
+    c && c[1] ? c[1].replace('{disciplina}', disc || '') : 'Departamento de Engenharia de Alimentos · ' + (disc || '')];
+}
+function pontosTxt(p){ p = Math.round((Number(p) || 0) * 100) / 100; var s = (p * 10) % 1 === 0 ? p.toFixed(1) : String(p); return s.replace('.', ',') + (p < 2 ? ' ponto' : ' pontos'); }
+function paragrafosTxt(t){ return String(t || '').split(/\n+/).filter(function(x){ return x.trim(); }).map(function(x){ return '<p>' + esc(x) + '</p>'; }).join(''); }
+// Uma questão da folha. cont guarda a numeração das figuras e, no Word, as imagens a converter.
+function htmlFiguraSo(f){
+  var fp = figuraPronta(f);
+  if(!fp) return '';
+  if(fp.tipo === 'tabela') return '<div class="fLeg">' + esc(fp.legenda || fp.titulo) + '</div><table class="fTab">' + (fp.cabecalho.length ? '<tr>' + fp.cabecalho.map(function(c){ return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>' : '') +
+    fp.linhas.map(function(l){ return '<tr>' + l.map(function(c){ return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table>';
+  return (fp.tipo === 'grafico' ? svgGrafico(fp) : svgFluxo(fp)).svg + '<div class="fLeg">' + esc(fp.legenda || fp.titulo) + '</div>';
+}
+document.head.insertAdjacentHTML('beforeend', '<style>' + FOLHA_CSS + '</style>');
+function htmlQuestaoFolha(q, i, cont, opc){
+  var tot = q.itens.reduce(function(t, it){ return t + (Number(it.pontos) || 0); }, 0);
+  var h = '<div class="fQ"><div class="fQt">QUESTÃO ' + (i + 1) + (q.titulo ? ' — ' + esc(q.titulo) : '') + ' [' + pontosTxt(tot) + ']</div>' + paragrafosTxt(q.texto);
+  (q.figuras || []).map(figuraPronta).filter(Boolean).forEach(function(f){
+    if(f.tipo === 'tabela'){
+      cont.t++;
+      h += '<div class="fFig"><div class="fLeg"><b>Tabela ' + cont.t + '</b> – ' + esc(f.legenda || f.titulo) + '</div><table class="fTab"' + (opc.word ? ' border="1" cellspacing="0" cellpadding="4" align="center"' : '') + '>' +
+        (f.cabecalho.length ? '<tr>' + f.cabecalho.map(function(c){ return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>' : '') +
+        f.linhas.map(function(l){ return '<tr>' + l.map(function(c){ return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('') + '</table></div>';
+      return;
+    }
+    cont.f++;
+    var d = f.tipo === 'grafico' ? svgGrafico(f) : svgFluxo(f), corpo;
+    if(opc.word){
+      var id = 'figura' + cont.f, w = 560;
+      cont.imgs.push({id: id, svg: d.svg, w: d.w, h: d.h});
+      corpo = '<img src="file:///C:/' + id + '.png" width="' + w + '" height="' + Math.round(d.h * w / d.w) + '">';
+    } else corpo = d.svg;
+    h += '<div class="fFig">' + corpo + '<div class="fLeg"><b>Figura ' + cont.f + '</b> – ' + esc(f.legenda || f.titulo) + '</div></div>';
+  });
+  var letras = q.itens.length > 1;
+  q.itens.forEach(function(it, k){
+    h += '<div class="fItem">' + (letras ? '<b>' + 'abcdefgh'.charAt(k) + ')</b> ' : '') + esc(it.enunciado) + ' <i>(' + pontosTxt(it.pontos) + ')</i></div>';
+    if(opc.gabarito) h += '<div class="fGab"><b>Gabarito:</b><br>' + esc(it.gabarito || '—').replace(/\n/g, '<br>') + (it.criterios ? '<br><b>Critérios:</b> ' + esc(it.criterios).replace(/\n/g, '<br>') : '') + '</div>';
+  });
+  return h + '</div>';
+}
+function topoFolha(d){
+  var cab = cabecalhoFolha(d.disciplina);
+  return '<div class="fCab">' + esc(cab[0]) + '<br><span>' + esc(cab[1]) + '</span></div>' + (d.codigo ? '<div class="fCod">' + esc(d.codigo) + '</div>' : '') +
+    '<div class="fTit">' + esc(String(d.titulo || 'Prova').toUpperCase()) + '</div>' + (d.subtitulo ? '<div class="fSub">' + esc(d.subtitulo) + '</div>' : '') +
+    '<div class="fNome">Nome: ______________________________________________________ &nbsp; Data: ____/____/______</div>';
+}
+function folhaProva(d, opc){
+  opc = opc || {};
+  var cont = {f: 0, t: 0, imgs: []};
+  var h = topoFolha(d) + d.questoes.map(function(q, i){ return htmlQuestaoFolha(q, i, cont, opc); }).join('');
+  return {html: h, imgs: cont.imgs};
+}
+function nomeArquivoProva(d, gab){
+  return [d.titulo || 'Prova', d.disciplina, d.codigo, gab ? 'gabarito' : ''].filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 120);
+}
+function imprimirProva(d, gab){
+  var r = folhaProva(d, {gabarito: gab}), w = window.open('', '_blank');
+  if(!w){ erroGeral('O navegador bloqueou a janela de impressão. Permita janelas (pop-ups) deste site e tente de novo.'); return; }
+  w.document.write('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>' + esc(nomeArquivoProva(d, gab)) + '</title><style>body{margin:0;background:#fff}' + FOLHA_CSS +
+    '@page{size:A4;margin:16mm 15mm}.dica{font-family:Arial,sans-serif;font-size:13px;background:#eef3ff;padding:8px 12px;margin-bottom:12px}@media print{.dica{display:none}}</style></head><body>' +
+    '<div class="dica">Para salvar em PDF, escolha <b>Salvar como PDF</b> no destino da impressão.</div><div class="folha">' + r.html + '</div>' +
+    '<script>window.onload=function(){setTimeout(function(){window.print();},400);};<\/script></body></html>');
+  w.document.close();
+}
+function svgParaPng(svg, w, h){
+  return new Promise(function(ok, falha){
+    var img = new Image();
+    img.onload = function(){ var k = 2, c = document.createElement('canvas'); c.width = w * k; c.height = h * k; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height); ok(c.toDataURL('image/png').split(',')[1]); };
+    img.onerror = function(){ falha(new Error('Não deu para converter uma figura para o Word.')); };
+    img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  });
+}
+function b64Texto(t){ return btoa(unescape(encodeURIComponent(t))); }
+function linhas76(b){ return b.replace(/(.{76})/g, '$1\r\n'); }
+function baixarBlob(blob, nome){
+  var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = nome;
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+// Word: arquivo .doc no formato "página da web com imagens" (MHTML), que o Word abre com as figuras
+function baixarWordProva(d, gab){
+  var r = folhaProva(d, {gabarito: gab, word: true});
+  return Promise.all(r.imgs.map(function(x){ return svgParaPng(x.svg, x.w, x.h); })).then(function(pngs){
+    var html = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>' + esc(nomeArquivoProva(d, gab)) + '</title>' +
+      '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml><![endif]-->' +
+      '<style>@page Section1{size:21cm 29.7cm;margin:2cm 1.8cm 2cm 1.8cm}div.Section1{page:Section1}' + FOLHA_CSS + '</style></head><body><div class="Section1"><div class="folha">' + r.html + '</div></div></body></html>';
+    var b = '----=_ProvaPorIA_' + Date.now();
+    var partes = ['MIME-Version: 1.0', 'Content-Type: multipart/related; boundary="' + b + '"; type="text/html"', '', '--' + b,
+      'Content-Type: text/html; charset="utf-8"', 'Content-Transfer-Encoding: base64', 'Content-Location: file:///C:/prova.htm', '', linhas76(b64Texto(html))];
+    pngs.forEach(function(p, i){ partes.push('--' + b, 'Content-Type: image/png', 'Content-Transfer-Encoding: base64', 'Content-Location: file:///C:/' + r.imgs[i].id + '.png', '', linhas76(p)); });
+    partes.push('--' + b + '--', '');
+    baixarBlob(new Blob([partes.join('\r\n')], {type: 'application/msword'}), nomeArquivoProva(d, gab) + '.doc');
+  });
+}
+// Botões de impressão (gerador e cadastro da prova usam os mesmos)
+function barraImpressao(prefixo){
+  return '<span class="botoes" style="margin:0"><button type="button" class="mini" id="' + prefixo + 'Imp">🖨 Imprimir / PDF</button>' +
+    '<button type="button" class="secundario mini" id="' + prefixo + 'Word">⬇ Baixar Word</button>' +
+    '<label style="display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="' + prefixo + 'Gab" style="width:16px;height:16px"> com gabarito e critérios</label>' +
+    '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div><b>Imprimir / PDF</b> abre a folha pronta; para PDF, escolha "Salvar como PDF" no destino da impressão. <b>Baixar Word</b> baixa um arquivo .doc com as figuras, para editar no Word (no Word, "Salvar como" .docx). ' +
+      'O código da prova (PG-…) sai no canto da folha e no nome do arquivo: subindo esse arquivo no cadastro da prova, o sistema carrega a versão original, sem gastar IA.<br><br><b>Cabeçalho da folha:</b> <button type="button" class="link" data-mudacab>mudar</button></div></details></span>';
+}
+function ligarImpressao(prefixo, dadosFn){
+  $(prefixo + 'Imp').addEventListener('click', function(){ imprimirProva(dadosFn(), $(prefixo + 'Gab').checked); });
+  $(prefixo + 'Word').addEventListener('click', function(){
+    var b = this; b.disabled = true;
+    baixarWordProva(dadosFn(), $(prefixo + 'Gab').checked).catch(function(e){ erroGeral(e.message); }).then(function(){ b.disabled = false; });
+  });
+  document.querySelectorAll('[data-mudacab]').forEach(function(b){ if(b.dataset.ligado) return; b.dataset.ligado = '1'; b.addEventListener('click', function(){
+    var atual = cabecalhoFolha('{disciplina}');
+    var l1 = prompt('Linha 1 do cabeçalho da folha:', atual[0]); if(l1 === null) return;
+    var l2 = prompt('Linha 2 do cabeçalho ({disciplina} vira o nome da disciplina):', atual[1]); if(l2 === null) return;
+    try{ localStorage.setItem('prova_cabecalho', JSON.stringify([l1, l2])); }catch(e){}
+  }); });
+}
+
+/* ---- Word (.docx): lido aqui no navegador (texto + imagens) para a IA ler ---- */
+function carregarJSZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  return new Promise(function(ok, falha){
+    var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload = function(){ ok(window.JSZip); }; s.onerror = function(){ falha(new Error('Não deu para abrir o arquivo do Word agora. Salve como PDF e envie de novo.')); };
+    document.head.appendChild(s);
+  });
+}
+function lerDocx(f){
+  return carregarJSZip().then(function(JSZip){ return JSZip.loadAsync(f); }).then(function(zip){
+    var doc = zip.file('word/document.xml'), rels = zip.file('word/_rels/document.xml.rels');
+    if(!doc) throw new Error('"' + f.name + '" não parece um arquivo do Word (.docx).');
+    return Promise.all([doc.async('string'), rels ? rels.async('string') : '']).then(function(x){
+      var xml = x[0], mapa = {};
+      String(x[1]).replace(/<Relationship [^>]*?Id="([^"]+)"[^>]*?Target="([^"]+)"/g, function(m, id, alvo){ mapa[id] = 'word/' + alvo.replace(/^\.?\//, ''); return m; });
+      String(x[1]).replace(/<Relationship [^>]*?Target="([^"]+)"[^>]*?Id="([^"]+)"/g, function(m, alvo, id){ if(!mapa[id]) mapa[id] = 'word/' + alvo.replace(/^\.?\//, ''); return m; });
+      var figs = [], n = 0;
+      var texto = xml.replace(/<a:blip [^>]*?r:embed="([^"]+)"[^>]*\/?>/g, function(m, id){ n++; figs.push(mapa[id]); return '[[FIGURA ' + n + ']]'; })
+        .replace(/<\/w:p>/g, '\n').replace(/<w:tab\/>/g, '\t').replace(/<\/w:tc>/g, ' | ').replace(/<[^>]+>/g, '')
+        .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&')
+        .replace(/\[\[FIGURA (\d+)\]\]/g, '[FIGURA $1]').replace(/\n{3,}/g, '\n\n').trim();
+      var imgs = figs.map(function(caminho, i){
+        var arq = caminho && zip.file(caminho);
+        if(!arq || !/\.(png|jpe?g|gif|bmp)$/i.test(caminho)) return Promise.resolve(null);
+        return arq.async('blob').then(function(b){ return prepararArquivo(new File([b], 'figura' + (i + 1) + '.png', {type: /\.jpe?g$/i.test(caminho) ? 'image/jpeg' : 'image/png'}), false); }).catch(function(){ return null; });
+      });
+      return Promise.all(imgs).then(function(l){
+        return {texto: texto, partes: [{mime: 'text/plain', dados: b64Texto('TEXTO DO ARQUIVO "' + f.name + '" (as imagens enviadas são as figuras, na ordem das marcas [FIGURA n]):\n\n' + texto)}]
+          .concat(l.filter(Boolean).slice(0, 12).map(function(p){ return {mime: p.mime, dados: p.dados}; }))};
+      });
+    });
+  });
+}
+// Fotos, PDF e Word viram as partes que vão para a IA
+function partesDosArquivos(arqs){
+  return Promise.all(arqs.map(function(f){
+    if(/\.docx$/i.test(f.name) || f.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') return lerDocx(f);
+    if(/\.doc$/i.test(f.name)) return Promise.reject(new Error('"' + f.name + '" está no formato antigo do Word (.doc). No Word, salve como .docx ou PDF e envie de novo.'));
+    return prepararArquivo(f, false).then(function(p){ return {texto: '', partes: [{mime: p.mime, dados: p.dados}]}; });
+  })).then(function(l){ return {texto: l.map(function(x){ return x.texto; }).join('\n'), partes: [].concat.apply([], l.map(function(x){ return x.partes; }))}; });
+}
+var RE_CODIGO_PROVA = /PG-?(\d{8})-?(\d{4})([A-Z])?/i;
+function codigoNoTexto(t){ var m = String(t || '').match(RE_CODIGO_PROVA); return m ? 'PG-' + m[1] + '-' + m[2] + (m[3] ? m[3].toUpperCase() : '') : ''; }
+
+/* ---- prova gerada ↔ questões do cadastro da prova ---- */
+function linhasDaGerada(dados){
+  var l = [];
+  (dados.questoes || []).forEach(function(q, k){
+    q.itens.forEach(function(it, j){
+      l.push({rotulo: String(k + 1) + (q.itens.length > 1 ? 'abcdefgh'.charAt(j) : ''), assunto: q.titulo, enunciado: it.enunciado, pontos: it.pontos,
+        gabarito: it.gabarito, instrucoes: it.criterios, contexto: q.texto, figura: (q.figuras || []).slice(), sugestoes: []});
+    });
+  });
+  return l;
+}
+function grupoDoRotulo(r, i){ var m = String(r || '').match(/^\s*(\d+)/); return m ? m[1] : '#' + i; }
+// questões do cadastro → estrutura da folha (itens com o mesmo número formam uma questão)
+function dadosDasLinhas(linhas){
+  var qs = [], ult = null;
+  linhas.filter(function(q){ return String(q.enunciado || '').trim(); }).forEach(function(q, i){
+    var g = grupoDoRotulo(q.rotulo, i);
+    if(!ult || ult.g !== g){ ult = {g: g, titulo: q.assunto || '', texto: q.contexto || '', figuras: q.figura || [], itens: []}; qs.push(ult); }
+    ult.itens.push({enunciado: q.enunciado, pontos: Number(String(q.pontos).replace(',', '.')) || 0, gabarito: q.gabarito || '', criterios: q.instrucoes || ''});
+  });
+  return qs;
+}
+
+/* ---- tela do gerador ---- */
+var GER = null;   // prova gerada aberta: {codigo, titulo, dados, historico, temAnterior, cfg, provaId, disciplina}
+function lerCfgGerador(){ try{ return JSON.parse(localStorage.getItem('gerador_cfg_' + discSel) || 'null') || {}; }catch(e){ return {}; } }
+function gravarCfgGerador(c){ try{ localStorage.setItem('gerador_cfg_' + discSel, JSON.stringify(c)); }catch(e){} }
+function marcaCaixa(attr, valor, marcado, texto){
+  return '<label style="display:flex;gap:8px;align-items:flex-start;font-size:14px;cursor:pointer;margin:3px 0"><input type="checkbox" ' + attr + '="' + esc(valor) + '"' + (marcado ? ' checked' : '') + ' style="width:17px;height:17px;margin-top:2px;flex:none"> <span>' + texto + '</span></label>';
+}
+function abrirGeradorNovo(){
+  var c = lerCfgGerador(), el = $('areaProva'), dd = dadosDisc;
+  var grupos = {};
+  (dd.temasDisc || []).forEach(function(t){ (grupos[t.grupo || 'Outros assuntos'] = grupos[t.grupo || 'Outros assuntos'] || []).push(t); });
+  var temasSel = c.temas || [], aulasSel = c.aulas || [];
+  var modelosDisc = (dd.modelosProva || []);
+  el.innerHTML = '<div class="caixa"><h2>✨ Gerar prova com IA</h2>' +
+    '<p class="aviso">A IA monta a prova no estilo das suas provas (material para analisar, itens com valor, gabarito e critérios) e uma segunda chamada revisa tudo: conceitos, dados, gráficos e contas. Os gráficos são calculados pelo sistema. Depois você pede ajustes por escrito, imprime ou baixa em PDF e Word.</p>' +
+    '<div class="campos"><div><label class="rot" for="gTit">Título da prova</label><input type="text" id="gTit" value="' + esc(c.titulo || 'Prova') + '"></div>' +
+      '<div><label class="rot" for="gN">Nº de questões</label><input type="number" id="gN" min="1" max="10" value="' + esc(c.n || 5) + '"></div>' +
+      '<div><label class="rot" for="gTot">Total de pontos</label><input type="number" id="gTot" min="1" max="100" step="0.5" value="' + esc(c.total || 10) + '"></div>' +
+      '<div><label class="rot" for="gDif">Dificuldade</label><select id="gDif">' + [['facil', 'Mais fácil'], ['media', 'Média'], ['dificil', 'Mais difícil']].map(function(o){ return '<option value="' + o[0] + '"' + ((c.dificuldade || 'media') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
+      '<div><label class="rot" for="gFig">Gráficos e figuras</label><select id="gFig">' + [['nenhuma', 'Sem figuras'], ['poucas', 'Poucas (1–2)'], ['padrao', 'Como nas minhas provas (3–4)'], ['muitas', 'Em quase todas']].map(function(o){ return '<option value="' + o[0] + '"' + ((c.figuras || 'padrao') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
+    '<label class="rot">Assuntos que caem</label>' +
+      (Object.keys(grupos).length ? Object.keys(grupos).map(function(g){
+        return '<details' + (grupos[g].some(function(t){ return temasSel.indexOf(t.id) !== -1; }) ? ' open' : '') + ' style="margin:4px 0"><summary style="cursor:pointer;font-weight:bold;font-size:14px">' + esc(g) + ' <span class="aviso">(' + grupos[g].length + ')</span></summary><div style="padding:4px 0 4px 10px">' +
+          grupos[g].map(function(t){ return marcaCaixa('data-gtema', t.id, temasSel.indexOf(t.id) !== -1, esc(t.nome)); }).join('') + '</div></details>';
+      }).join('') : '<p class="aviso" style="margin:0">Esta disciplina ainda não tem assuntos organizados (eles aparecem depois das aulas gravadas). Use as aulas abaixo ou escreva os assuntos.</p>') +
+    ((dd.aulasDisc || []).length ? '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:bold;font-size:14px">Ou escolha pelas aulas <span class="aviso">(' + dd.aulasDisc.length + ')</span></summary><div style="padding:4px 0 4px 10px">' +
+      dd.aulasDisc.map(function(a){ var tema = String(a.tema || '').replace(/^\s*aula\s*\d+\s*[-–:·.]\s*/i, ''); return marcaCaixa('data-gaula', a.id, aulasSel.indexOf(a.id) !== -1, '<b>Aula ' + a.numero + '</b>' + (tema ? ' · ' + esc(tema) : '')); }).join('') + '</div></details>' : '') +
+    '<label class="rot" for="gLivre" style="margin-top:8px">Outros assuntos (texto livre, opcional)</label><textarea id="gLivre" style="min-height:50px" placeholder="ex.: Água em alimentos: umidade × Aw, isotermas, transição vítrea">' + esc(c.assuntosLivres || '') + '</textarea>' +
+    '<div style="margin-top:10px">' + marcaCaixa('id', 'gCalc', c.calculo !== false, 'Uma questão de cálculo') + marcaCaixa('id', 'gAfirm', c.afirmacao !== false, 'Uma afirmação errada para o aluno julgar e justificar') + marcaCaixa('id', 'gItens', c.itens !== false, 'Questões com itens a), b) com valor próprio') + '</div>' +
+    '<label class="rot" style="margin-top:10px">A IA se baseia em</label>' +
+      marcaCaixa('id', 'gUsaAulas', c.usarAulas !== false, 'Aulas gravadas (atas e resumos)') +
+      marcaCaixa('id', 'gUsaApost', c.usarApostila !== false && !!dd.temApostila, dd.temApostila ? 'Apostila: ' + esc(dd.temApostila) : '<span class="aviso">Apostila (nenhuma cadastrada: Aula por IA → Estudo dirigido)</span>') +
+      marcaCaixa('id', 'gUsaBanco', c.usarBanco !== false, 'Banco de provas: as provas já cadastradas nesta disciplina e as provas antigas abaixo (modelo de estilo)') +
+      '<div id="gModelos" style="padding-left:26px"></div>' +
+    '<label class="rot" for="gObs" style="margin-top:10px">Observações para a IA (opcional)</label><textarea id="gObs" style="min-height:50px" placeholder="ex.: uma questão sobre transição vítrea no leite em pó; evitar questões sobre caramelização">' + esc(c.obs || '') + '</textarea>' +
+    '<div class="botoes"><button type="button" id="gGerar">Gerar prova</button><button type="button" class="secundario" id="gCanc">Cancelar</button>' +
+      '<span class="aviso">Usa 2 chamadas da IA (gera e revisa) e leva de 2 a 4 minutos.</span></div><div id="gMsg"></div></div>';
+  desenharModelos(c.modelos || null);
+  $('gCanc').addEventListener('click', function(){ el.innerHTML = ''; });
+  $('gGerar').addEventListener('click', function(){
+    var b = this, m = $('gMsg');
+    var cfg = {titulo: $('gTit').value, n: $('gN').value, total: $('gTot').value, dificuldade: $('gDif').value, figuras: $('gFig').value,
+      temas: Array.prototype.filter.call(el.querySelectorAll('[data-gtema]'), function(x){ return x.checked; }).map(function(x){ return x.dataset.gtema; }),
+      aulas: Array.prototype.filter.call(el.querySelectorAll('[data-gaula]'), function(x){ return x.checked; }).map(function(x){ return x.dataset.gaula; }),
+      assuntosLivres: $('gLivre').value, calculo: $('gCalc').checked, afirmacao: $('gAfirm').checked, itens: $('gItens').checked,
+      usarAulas: $('gUsaAulas').checked, usarApostila: $('gUsaApost').checked, usarBanco: $('gUsaBanco').checked,
+      modelos: Array.prototype.filter.call(el.querySelectorAll('[data-gmodelo]'), function(x){ return x.checked; }).map(function(x){ return x.dataset.gmodelo; }),
+      obs: $('gObs').value};
+    if(!cfg.temas.length && !cfg.aulas.length && !cfg.assuntosLivres.trim() && !(dd.aulasDisc || []).length){ m.innerHTML = '<div class="erro">Marque os assuntos ou escreva o que cai na prova.</div>'; return; }
+    gravarCfgGerador(cfg);
+    b.disabled = true;
+    m.innerHTML = '<p class="carregando">1 de 2 · A IA está montando a prova… (1 a 2 minutos)</p>';
+    api('gerarProvaIA', {disciplinaId: discSel, cfg: cfg}).then(function(g){
+      GER = g;
+      m.innerHTML = '<p class="carregando">2 de 2 · Revisando conceitos, dados, gráficos e contas… (1 a 2 minutos)</p>';
+      return api('revisarProvaGerada', {codigo: g.codigo}).then(function(rv){ GER = rv.prova; desenharGerador({revisao: rv.feitos}); })
+        .catch(function(e){ desenharGerador({erro: 'A prova foi gerada, mas a revisão falhou (' + e.message + '). Use "Revisar de novo com IA" quando quiser.'}); });
+    }).then(atualizarListaGeradas).catch(function(e){ b.disabled = false; m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  el.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+// provas antigas no banco (cada uma é lida pela IA uma vez, ao enviar)
+function desenharModelos(sel){
+  var box = $('gModelos'); if(!box) return;
+  var l = dadosDisc.modelosProva || [];
+  box.innerHTML = (l.length ? l.map(function(m){
+    var marcado = sel ? sel.indexOf(m.id) !== -1 : m.disciplinaId === discSel;
+    return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' + marcaCaixa('data-gmodelo', m.id, marcado, esc(m.nome) + ' <span class="aviso">· ' + esc(m.disciplina || '') + ' · ' + esc(String(m.criado).slice(0, 10)) + '</span>') +
+      '<button type="button" class="secundario mini" data-tiramodelo="' + esc(m.id) + '">Tirar</button></div>';
+  }).join('') : '<p class="aviso" style="margin:2px 0">Nenhuma prova antiga no banco ainda.</p>') +
+    '<label class="arquivo" style="margin-top:6px"><input type="file" accept="image/*,application/pdf,.docx" multiple id="gModeloArq">+ Adicionar prova antiga ao banco (PDF, Word ou fotos)</label><div id="gModeloMsg"></div>';
+  box.querySelectorAll('[data-tiramodelo]').forEach(function(b){ b.addEventListener('click', function(){
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: tirar do banco'; return; }
+    b.disabled = true;
+    api('removerModeloProva', {id: b.dataset.tiramodelo}).then(function(l){ dadosDisc.modelosProva = l; desenharModelos(marcadosAgora()); }).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+  }); });
+  $('gModeloArq').addEventListener('change', function(){
+    var arqs = Array.prototype.slice.call(this.files), m = $('gModeloMsg');
+    if(!arqs.length) return;
+    m.innerHTML = '<p class="carregando">Lendo a prova antiga… (uns 30 segundos; é lida uma vez só)</p>';
+    partesDosArquivos(arqs).then(function(r){
+      return api('enviarModeloProva', {disciplinaId: discSel, nome: arqs[0].name.replace(/\.[^.]+$/, ''), fotos: r.partes});
+    }).then(function(l){ var antes = marcadosAgora(); dadosDisc.modelosProva = l; desenharModelos(antes ? antes.concat([l[l.length - 1].id]) : null); $('gModeloMsg').innerHTML = '<div class="ok">Prova guardada no banco.</div>'; })
+      .catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+function marcadosAgora(){ var l = document.querySelectorAll('[data-gmodelo]'); return l.length ? Array.prototype.filter.call(l, function(x){ return x.checked; }).map(function(x){ return x.dataset.gmodelo; }) : null; }
+
+function abrirGerada(codigo){
+  var el = $('areaProva');
+  el.innerHTML = '<div class="caixa"><p class="carregando">Abrindo a prova gerada…</p></div>';
+  api('provaGerada', {codigo: codigo}).then(function(g){ GER = g; desenharGerador({}); }).catch(function(e){ el.innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+function dadosFolhaGER(){ return {titulo: GER.titulo, disciplina: GER.disciplina || (dadosDisc && dadosDisc.disciplina.nome), subtitulo: GER.dados.subtitulo, codigo: GER.codigo, questoes: GER.dados.questoes}; }
+function desenharGerador(aviso){
+  aviso = aviso || {};
+  var el = $('areaProva'), d = GER.dados, total = d.questoes.reduce(function(t, q){ return t + q.itens.reduce(function(s, it){ return s + (Number(it.pontos) || 0); }, 0); }, 0);
+  var alvo = Number(GER.cfg && GER.cfg.total) || 10, cont = {f: 0, t: 0, imgs: []};
+  var usada = GER.provaId && (dadosDisc.provas || []).filter(function(p){ return p.id === GER.provaId; })[0];
+  el.innerHTML = '<div class="caixa"><h2>Prova gerada <span class="tag t-azul" style="font-size:12px">' + esc(GER.codigo) + '</span></h2>' +
+    '<p class="aviso">Criada em ' + esc(GER.criado) + (GER.atualizado && GER.atualizado !== GER.criado ? ' · última mudança ' + esc(GER.atualizado) : '') + (usada ? ' · usada na prova <b>' + esc(usada.titulo) + '</b>' : '') + '</p>' +
+    (aviso.erro ? '<div class="erro">' + esc(aviso.erro) + '</div>' : '') +
+    (aviso.revisao ? '<div class="ok"><b>Revisão da IA:</b> ' + (aviso.revisao.length ? '<ul style="margin:4px 0 0;padding-left:20px">' + aviso.revisao.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>' : 'nada precisou mudar.') + '</div>' : '') +
+    (aviso.ajuste ? '<div class="ok"><b>Ajuste feito:</b> ' + (aviso.ajuste.length ? '<ul style="margin:4px 0 0;padding-left:20px">' + aviso.ajuste.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>' : 'pronto.') + '</div>' : '') +
+    '<div class="campos" style="margin-bottom:8px"><div class="campoLargo"><label class="rot" for="gvTit">Título da prova</label><input type="text" id="gvTit" value="' + esc(GER.titulo) + '"></div></div>' +
+    '<div class="botoes" style="margin-top:0">' + barraImpressao('gv') + '</div>' +
+    '<div class="botoes"><button type="button" id="gvUsar">' + (usada ? 'Usar de novo no cadastro de uma prova' : 'Usar no cadastro de uma prova') + '</button>' +
+      '<button type="button" class="secundario mini" id="gvRevisar">Revisar de novo com IA</button>' +
+      (GER.temAnterior ? '<button type="button" class="secundario mini" id="gvDesfazer">↩ Desfazer a última mudança</button>' : '') +
+      '<button type="button" class="secundario mini" id="gvNova">Gerar outra prova</button>' +
+      '<button type="button" class="secundario mini" id="gvFechar">Fechar</button></div>' +
+    '<div class="convite" style="margin-top:14px"><label class="rot" for="gvAjGeral">Ajuste na prova inteira</label><textarea id="gvAjGeral" style="min-height:54px" placeholder="ex.: troque a questão de amido por uma de cristalização de açúcares; deixe a prova um pouco mais curta"></textarea>' +
+      '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" id="gvAjGeralBt">Pedir ajuste à IA</button><span class="aviso">1 chamada da IA (uns 30 a 90 segundos).</span></div></div>' +
+    '<p class="aviso">Total: <b' + (Math.abs(total - alvo) > 0.01 ? ' style="color:#c62828"' : '') + '>' + num(total) + ' pontos</b>' + (Math.abs(total - alvo) > 0.01 ? ' (o previsto era ' + num(alvo) + ': peça um ajuste para redistribuir)' : '') + '</p>' +
+    '<div id="gvMsg"></div>' +
+    '<div class="folhaTela"><div class="folha">' + topoFolha(dadosFolhaGER()) +
+      d.questoes.map(function(q, i){
+        return htmlQuestaoFolha(q, i, cont, {gabarito: true}) +
+          '<div class="ajQ"><label class="rot" for="gvAj' + i + '">Ajuste na questão ' + (i + 1) + '</label><textarea id="gvAj' + i + '" style="min-height:44px" placeholder="ex.: troque o produto por iogurte; o gráfico deve mostrar 3 temperaturas; o item b está ambíguo"></textarea>' +
+          '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" data-ajq="' + i + '">Pedir ajuste à IA</button>' +
+          (i ? '<button type="button" class="secundario mini" data-subirq="' + i + '">↑ Subir</button>' : '') +
+          '<button type="button" class="secundario mini" data-tiraq="' + i + '">Remover questão</button></div></div>';
+      }).join('') + '</div></div>' +
+    ((GER.historico || []).length ? '<details style="margin-top:12px"><summary class="link" style="cursor:pointer">Histórico de mudanças (' + GER.historico.length + ')</summary><ul style="font-size:13px">' +
+      GER.historico.slice().reverse().map(function(h){ return '<li><b>' + esc(h.em || '') + '</b> · ' + esc(h.o || '') + (h.pedido ? ': “' + esc(h.pedido) + '”' : '') + ((h.feitos || []).length ? '<br><span class="aviso">' + h.feitos.map(esc).join(' · ') + '</span>' : '') + '</li>'; }).join('') + '</ul></details>' : '') +
+    '</div>';
+  ligarImpressao('gv', dadosFolhaGER);
+  $('gvTit').addEventListener('change', function(){
+    var t = this.value.trim(); if(!t) return;
+    api('salvarProvaGerada', {codigo: GER.codigo, dados: GER.dados, titulo: t}).then(function(g){ GER = g; atualizarListaGeradas(); }).catch(function(e){ erroGeral(e.message); });
+  });
+  $('gvFechar').addEventListener('click', function(){ el.innerHTML = ''; });
+  $('gvNova').addEventListener('click', abrirGeradorNovo);
+  $('gvUsar').addEventListener('click', function(){ formProva(null, {gerada: GER}); });
+  var bd = $('gvDesfazer');
+  if(bd) bd.addEventListener('click', function(){ bd.disabled = true; api('desfazerProvaGerada', {codigo: GER.codigo}).then(function(g){ GER = g; desenharGerador({}); }).catch(function(e){ bd.disabled = false; erroGeral(e.message); }); });
+  $('gvRevisar').addEventListener('click', function(){
+    var b = this; b.disabled = true; $('gvMsg').innerHTML = '<p class="carregando">Revisando conceitos, dados, gráficos e contas… (1 a 2 minutos)</p>';
+    api('revisarProvaGerada', {codigo: GER.codigo}).then(function(rv){ GER = rv.prova; desenharGerador({revisao: rv.feitos}); }).catch(function(e){ b.disabled = false; $('gvMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  function pedirAjuste(indice, texto, b, msgEl){
+    if(String(texto).trim().length < 3){ msgEl.innerHTML = '<div class="erro">Escreva o ajuste que você quer.</div>'; return; }
+    el.querySelectorAll('button').forEach(function(x){ x.disabled = true; });
+    msgEl.innerHTML = '<p class="carregando">A IA está fazendo o ajuste… (30 a 90 segundos)</p>';
+    api('ajustarProvaGerada', {codigo: GER.codigo, indice: indice, pedido: texto}).then(function(r){ GER = r.prova; desenharGerador({ajuste: r.feitos}); atualizarListaGeradas(); })
+      .catch(function(e){ el.querySelectorAll('button').forEach(function(x){ x.disabled = false; }); msgEl.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  }
+  $('gvAjGeralBt').addEventListener('click', function(){ pedirAjuste(-1, $('gvAjGeral').value, this, $('gvMsg')); });
+  el.querySelectorAll('[data-ajq]').forEach(function(b){ b.addEventListener('click', function(){
+    var i = Number(b.dataset.ajq), box = b.closest('.ajQ'), m = box.querySelector('.ajMsg') || box.appendChild(document.createElement('div'));
+    m.className = 'ajMsg';
+    pedirAjuste(i, $('gvAj' + i).value, b, m);
+  }); });
+  function salvarMudanca(nova, b){
+    b.disabled = true;
+    api('salvarProvaGerada', {codigo: GER.codigo, dados: nova, titulo: GER.titulo}).then(function(g){ GER = g; desenharGerador({}); atualizarListaGeradas(); }).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+  }
+  el.querySelectorAll('[data-tiraq]').forEach(function(b){ b.addEventListener('click', function(){
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: remover a questão ' + (Number(b.dataset.tiraq) + 1); return; }
+    var nova = {subtitulo: d.subtitulo, questoes: d.questoes.filter(function(q, k){ return k !== Number(b.dataset.tiraq); })};
+    if(!nova.questoes.length){ erroGeral('A prova precisa de pelo menos uma questão.'); return; }
+    salvarMudanca(nova, b);
+  }); });
+  el.querySelectorAll('[data-subirq]').forEach(function(b){ b.addEventListener('click', function(){
+    var i = Number(b.dataset.subirq), qs = d.questoes.slice(), t = qs[i]; qs[i] = qs[i - 1]; qs[i - 1] = t;
+    salvarMudanca({subtitulo: d.subtitulo, questoes: qs}, b);
+  }); });
+  el.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+// a lista "Provas geradas" lá em cima acompanha as mudanças
+function atualizarListaGeradas(){
+  api('provasDisciplina', {disciplinaId: discSel}).then(function(r){
+    dadosDisc.provasGeradas = r.provasGeradas;
+    var box = $('listaGeradas'); if(box) box.innerHTML = htmlListaGeradas(r.provasGeradas);
+    ligarListaGeradas();
+  }).catch(function(){});
+}
+function htmlListaGeradas(l){
+  if(!l || !l.length) return '';
+  return '<details style="margin-top:12px"' + (l.length <= 3 ? ' open' : '') + '><summary style="cursor:pointer;font-weight:bold">Provas geradas pela IA (' + l.length + ')</summary>' +
+    l.map(function(g){
+      var p = g.provaId && (dadosDisc.provas || []).filter(function(x){ return x.id === g.provaId; })[0];
+      return '<div class="linha"><div><b>' + esc(g.titulo) + '</b> <span class="tag t-azul">' + esc(g.codigo) + '</span>' + (p ? ' <span class="tag t-ok">usada em ' + esc(p.titulo) + '</span>' : '') +
+        '<div class="aviso">' + esc(g.criado) + ' · ' + g.questoes + ' questão(ões)</div></div>' +
+        '<span class="botoes" style="margin:0"><button type="button" class="mini" data-abrirger="' + esc(g.codigo) + '">Abrir</button><button type="button" class="secundario mini" data-excluirger="' + esc(g.codigo) + '">Excluir</button></span></div>';
+    }).join('') + '</details>';
+}
+function ligarListaGeradas(){
+  document.querySelectorAll('[data-abrirger]').forEach(function(b){ if(b.dataset.ligado) return; b.dataset.ligado = '1'; b.addEventListener('click', function(){ abrirGerada(b.dataset.abrirger); }); });
+  document.querySelectorAll('[data-excluirger]').forEach(function(b){ if(b.dataset.ligado) return; b.dataset.ligado = '1'; b.addEventListener('click', function(){
+    if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: excluir ' + b.dataset.excluirger; return; }
+    b.disabled = true;
+    api('excluirProvaGerada', {codigo: b.dataset.excluirger}).then(function(){ if(GER && GER.codigo === b.dataset.excluirger){ GER = null; $('areaProva').innerHTML = ''; } atualizarListaGeradas(); }).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+  }); });
 }
 
 /* ---- entregas ---- */
