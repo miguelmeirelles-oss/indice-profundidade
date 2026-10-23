@@ -998,7 +998,7 @@ function blocoContexto(q, i){
 function nFig(v, p){ if(v === '' || v == null) return p; var n = Number(String(v).replace(',', '.')); return isFinite(n) ? n : p; }
 function fmtBR(v, d){
   if(!isFinite(v)) return '?';
-  if(d === undefined){ var a = Math.abs(v); d = a >= 10 ? 0 : a >= 1 ? 1 : a >= 0.1 ? 2 : 3; }
+  if(d === undefined){ var a = Math.abs(v); d = a === 0 || a >= 10 ? 0 : a >= 1 ? 1 : a >= 0.1 ? 2 : 3; }
   var t = (Math.round(v * Math.pow(10, d)) / Math.pow(10, d)).toFixed(d);
   if(/^-0(\.0+)?$/.test(t)) t = t.slice(1);
   return t.replace('.', ',');
@@ -1046,6 +1046,60 @@ function funcaoDaSerieFig(s){
   md.p.forEach(function(k){ var v = nFig(s.parametros[k], OPCIONAIS_CURVA[k]); if(v === undefined || !isFinite(v)) ok = false; a[k] = v; });
   return ok ? function(x){ return md.f(x, a); } : null;
 }
+// mesmas funções no servidor (CodigoAulas.gs): pontos de cada curva e conferência das escalas
+function amostrarSeriesFig(o){
+  o.series.forEach(function(s){
+    s.pts = []; s.marcadores = [];
+    if(!s.fn) return;
+    var de = Math.max(o.eixo_x.min, isFinite(s.de) ? s.de : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[0][0] : o.eixo_x.min));
+    var ate = Math.min(o.eixo_x.max, isFinite(s.ate) ? s.ate : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[s.pontos.length - 1][0] : o.eixo_x.max));
+    if(!(ate > de)) return;
+    for(var k = 0; k <= 200; k++){ var x = de + (ate - de) * k / 200, y = s.fn(x); s.pts.push(isFinite(y) ? [x, y] : null); }
+    if(s.mostrar_pontos) s.marcadores = s.modelo === 'pontos' ? s.pontos.slice() : [0.1, 0.25, 0.4, 0.55, 0.7, 0.85].map(function(t){ var x = de + (ate - de) * t; return [x, s.fn(x)]; });
+  });
+}
+// Curvas fora dos eixos (a IA às vezes erra a unidade, ex.: valores de 0 a 1 num eixo de 0 a 100): o sistema
+// corrige a escala e anota o aviso, que aparece para o professor e vai para a IA na revisão e nos ajustes.
+function conferirEscalasFig(o, fmt){
+  var temPts = function(s){ return s.pts.some(function(p){ return p; }); };
+  // curva com x em % (0 a 100) num eixo de 0 a 1 (ex.: UR × Aw): converte só aquela curva
+  o.series.forEach(function(s){
+    if(!s.fn || temPts(s) || s.pontos.length < 2) return;
+    var mx = Math.max.apply(null, s.pontos.map(function(p){ return p[0]; }));
+    if(o.eixo_x.max <= 1.05 && mx > 1.5 && mx <= 100.5){
+      s.pontos = s.pontos.map(function(p){ return [p[0] / 100, p[1]]; }); s.fn = funcaoDaSerieFig(s);
+      o.avisos.push('A curva "' + s.nome + '" tinha x de 0 a 100 num eixo de 0 a 1; o sistema converteu (÷100).');
+    }
+  });
+  amostrarSeriesFig(o);
+  if(o.series.every(function(s){ return !s.fn || (!temPts(s) && s.pontos.length >= 2); })){
+    var px = [];
+    o.series.forEach(function(s){ s.pontos.forEach(function(p){ px.push(p[0]); }); });
+    var mn = Math.min.apply(null, px), mx = Math.max.apply(null, px);
+    if(mx > mn){
+      o.avisos.push('Os pontos das curvas (x de ' + fmt(mn) + ' a ' + fmt(mx) + ') estavam fora do eixo x (' + fmt(o.eixo_x.min) + ' a ' + fmt(o.eixo_x.max) + '); o sistema ajustou o eixo x.');
+      o.eixo_x.min = Math.min(o.eixo_x.min, mn); o.eixo_x.max = Math.max(o.eixo_x.max, mx);
+      amostrarSeriesFig(o);
+    }
+  }
+  o.series.forEach(function(s){ if(s.fn && !temPts(s)) o.avisos.push('A curva "' + s.nome + '" não pôde ser desenhada (pontos insuficientes ou fora da faixa do eixo x).'); });
+  [[o.eixo_y, false], [o.eixo_y2, true]].forEach(function(par){
+    var e = par[0];
+    if(!e) return;
+    var ys = [];
+    o.series.forEach(function(s){ if(s.eixo_direito === par[1]) s.pts.forEach(function(p){ if(p) ys.push(p[1]); }); });
+    if(!ys.length) return;
+    var dmin = Math.min.apply(null, ys), dmax = Math.max.apply(null, ys), faixa = e.max - e.min;
+    if(!(dmax > dmin)) return;
+    var dentro = ys.filter(function(y){ return y >= e.min - faixa * 0.02 && y <= e.max + faixa * 0.02; }).length;
+    var ocupa = (Math.min(dmax, e.max) - Math.max(dmin, e.min)) / faixa;
+    if(dentro < ys.length * 0.5 || ocupa < 0.1){
+      var nmin = dmin >= 0 ? 0 : dmin * 1.08, nmax = dmax > 0 ? dmax * 1.08 : dmax + (dmax - dmin) * 0.1;
+      o.avisos.push('A escala do eixo y' + (par[1] ? ' da direita' : '') + ' (' + fmt(e.min) + ' a ' + fmt(e.max) + ') não combinava com as curvas (valores de ' + fmt(dmin) + ' a ' + fmt(dmax) + '); o sistema ajustou para ' + fmt(nmin) + ' a ' + fmt(nmax) + '.');
+      e.min = nmin; e.max = nmax;
+    }
+  });
+}
 // Figura pronta para desenhar (com os pontos calculados); null se não der para usar
 function figuraPronta(f){
   if(!f || typeof f !== 'object') return null;
@@ -1070,7 +1124,9 @@ function figuraPronta(f){
     var prm = {};
     if(Array.isArray(s.parametros)) s.parametros.forEach(function(p){ if(p && p.nome) prm[p.nome] = nFig(p.valor, NaN); });
     else if(s.parametros && typeof s.parametros === 'object') Object.keys(s.parametros).forEach(function(k){ prm[k] = nFig(s.parametros[k], NaN); });
-    var pts = (s.pontos || []).map(function(p){ return Array.isArray(p) ? [nFig(p[0], NaN), nFig(p[1], NaN)] : [nFig(p && p.x, NaN), nFig(p && p.y, NaN)]; })
+    var bruto = s.pontos || s.dados || [];
+    if(!bruto.length && Array.isArray(s.x) && Array.isArray(s.y)) bruto = s.x.map(function(x, k){ return [x, s.y[k]]; });   // também aceita {"x":[…],"y":[…]}
+    var pts = bruto.map(function(p){ return Array.isArray(p) ? [nFig(p[0], NaN), nFig(p[1], NaN)] : [nFig(p && p.x, NaN), nFig(p && p.y, NaN)]; })
       .filter(function(p){ return isFinite(p[0]) && isFinite(p[1]); }).sort(function(a, b){ return a[0] - b[0]; });
     return {nome: String(s.nome || ''), estilo: String(s.estilo || ''), eixo_direito: !!s.eixo_direito && !!o.eixo_y2,
       modelo: String(s.modelo || 'pontos').toLowerCase(), parametros: prm, pontos: pts, de: nFig(s.de, NaN), ate: nFig(s.ate, NaN), mostrar_pontos: !!s.mostrar_pontos};
@@ -1088,17 +1144,11 @@ function figuraPronta(f){
   if(!isFinite(o.eixo_x.max)) o.eixo_x.max = xsMax.length ? Math.max.apply(null, xsMax) : 1;
   if(o.eixo_x.max <= o.eixo_x.min) o.eixo_x.max = o.eixo_x.min + 1;
   var estilos = ['cheia', 'tracejada', 'traco_ponto', 'pontilhada'];
-  o.series.forEach(function(s, i){
-    if(estilos.indexOf(s.estilo) === -1) s.estilo = estilos[i % estilos.length];
-    var fn = funcaoDaSerieFig(s); s.fn = fn; s.pts = []; s.marcadores = [];
-    if(!fn) return;
-    var de = Math.max(o.eixo_x.min, isFinite(s.de) ? s.de : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[0][0] : o.eixo_x.min));
-    var ate = Math.min(o.eixo_x.max, isFinite(s.ate) ? s.ate : (s.modelo === 'pontos' && s.pontos.length ? s.pontos[s.pontos.length - 1][0] : o.eixo_x.max));
-    for(var k = 0; k <= 200; k++){ var x = de + (ate - de) * k / 200, y = fn(x); s.pts.push(isFinite(y) ? [x, y] : null); }
-    if(s.mostrar_pontos) s.marcadores = s.modelo === 'pontos' ? s.pontos.slice() : [0.1, 0.25, 0.4, 0.55, 0.7, 0.85].map(function(t){ var x = de + (ate - de) * t; return [x, fn(x)]; });
-  });
+  o.avisos = [];
+  o.series.forEach(function(s, i){ if(estilos.indexOf(s.estilo) === -1) s.estilo = estilos[i % estilos.length]; s.fn = funcaoDaSerieFig(s); });
   o.series = o.series.filter(function(s){ return s.fn; });
   if(!o.series.length) return null;
+  amostrarSeriesFig(o);
   function ajustarY(e, dir){
     if(!e) return;
     var ys = [];
@@ -1108,6 +1158,7 @@ function figuraPronta(f){
     if(e.max <= e.min) e.max = e.min + 1;
   }
   ajustarY(o.eixo_y, false); ajustarY(o.eixo_y2, true);
+  conferirEscalasFig(o, fmtBR);
   function serieDe(ref){
     var r = String(ref == null ? '' : ref).toLowerCase().trim();
     var s = o.series.filter(function(x){ return x.nome.toLowerCase().trim() === r; })[0];
@@ -1287,6 +1338,8 @@ function htmlQuestaoFolha(q, i, cont, opc){
       corpo = '<img src="file:///C:/' + id + '.png" width="' + w + '" height="' + Math.round(d.h * w / d.w) + '">';
     } else corpo = d.svg;
     h += '<div class="fFig">' + corpo + '<div class="fLeg"><b>Figura ' + cont.f + '</b> – ' + esc(f.legenda || f.titulo) + '</div></div>';
+    // só na tela do gerador: o que o sistema precisou consertar no gráfico (vai também para a IA na revisão)
+    if(opc.avisos && (f.avisos || []).length) h += '<div style="font-family:Arial,sans-serif;font-size:12.5px;color:#8a5a00;background:#fff4d6;border-radius:8px;padding:6px 10px;margin:-4px 0 12px">⚠ ' + f.avisos.map(esc).join('<br>⚠ ') + '<br><span style="color:#555">A figura já sai corrigida assim; se quiser, use "Revisar de novo com IA" para a IA acertar a escala no texto também.</span></div>';
   });
   var letras = q.itens.length > 1;
   q.itens.forEach(function(it, k){
@@ -1559,7 +1612,7 @@ function desenharGerador(aviso){
     '<div id="gvMsg"></div>' +
     '<div class="folhaTela"><div class="folha">' + topoFolha(dadosFolhaGER()) +
       d.questoes.map(function(q, i){
-        return htmlQuestaoFolha(q, i, cont, {gabarito: true}) +
+        return htmlQuestaoFolha(q, i, cont, {gabarito: true, avisos: true}) +
           '<div class="ajQ"><label class="rot" for="gvAj' + i + '">Ajuste na questão ' + (i + 1) + '</label><textarea id="gvAj' + i + '" style="min-height:44px" placeholder="ex.: troque o produto por iogurte; o gráfico deve mostrar 3 temperaturas; o item b está ambíguo"></textarea>' +
           '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" data-ajq="' + i + '">Pedir ajuste à IA</button>' +
           (i ? '<button type="button" class="secundario mini" data-subirq="' + i + '">↑ Subir</button>' : '') +
