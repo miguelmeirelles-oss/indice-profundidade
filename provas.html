@@ -794,7 +794,7 @@ function formProva(p, pre){
   var rigorProva = Number(v.rigor || d.rigor || 3);
   var atual = p ? itemDaProva(etapas, p) : livre;
   qsEdit = (v.questoes.length ? v.questoes : [{rotulo:'', assunto:'', enunciado:'', pontos:'', gabarito:'', instrucoes:''}]).map(function(q){ return {id:q.id, rotulo:q.rotulo, assunto:q.assunto, enunciado:q.enunciado, pontos:q.pontos, gabarito:q.gabarito, instrucoes:q.instrucoes, sugestoes:(q.sugestoes || []).slice(), contexto:q.contexto || '', figura:(q.figura || []).slice()}; });
-  // prova gerada pela IA (código PG-…): as questões vêm prontas, com texto comum, figuras, gabarito e critérios
+  // prova gerada pela IA (código "Disciplina 2026-2 P1"): as questões vêm prontas, com texto comum, figuras, gabarito e critérios
   var geradaAtual = (p && p.gerada) || '';
   if(pre && pre.gerada){ qsEdit = linhasDaGerada(pre.gerada.dados); geradaAtual = pre.gerada.codigo; }
   var geradas = dadosDisc.provasGeradas || [];
@@ -830,7 +830,7 @@ function formProva(p, pre){
       '<div class="rigorBarra" id="pRigor">' + ['', 'Bem flexível', 'Flexível', 'Padrão', 'Rigoroso', 'Muito rigoroso'].map(function(t, n){ return n ? '<button type="button" data-prig="' + n + '" aria-pressed="' + (rigorProva === n) + '">' + t + '</button>' : ''; }).join('') + '</div></div>' +
     '<div class="convite">Tem a prova em foto, PDF ou Word? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf,.docx" multiple id="pExtrair">Preencher as questões a partir do arquivo</label>' +
       (geradas.length ? '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Ou use uma prova gerada pela IA: <select id="pGerSel" style="max-width:340px">' + geradas.map(function(g){ return '<option value="' + esc(g.codigo) + '"' + (g.codigo === geradaAtual ? ' selected' : '') + '>' + esc(g.codigo + ' · ' + g.titulo + ' · ' + g.questoes + ' questões') + '</option>'; }).join('') + '</select><button type="button" class="secundario mini" id="pGerCarregar">Carregar</button></div>' : '') +
-      '<p class="aviso" style="margin:8px 0 0">Arquivo baixado do gerador (com o código PG-… no nome ou impresso na folha): o sistema carrega a versão original, com figuras, gabarito e critérios, sem gastar IA.</p>' +
+      '<p class="aviso" style="margin:8px 0 0">Arquivo baixado do gerador (com o código da prova no nome ou impresso na folha, ex.: "' + esc(d.nome) + ' 2026-2 P1"): o sistema carrega a versão original, com figuras, gabarito e critérios, sem gastar IA.</p>' +
       (geradaAtual ? '<p class="aviso" style="margin:4px 0 0">Esta prova vem da prova gerada <b>' + esc(geradaAtual) + '</b>.</p>' : '') + '<div id="msgExtrair"></div></div>' +
     '<h4>Questões <span class="aviso" id="pTotal"></span></h4>' +
     '<p class="aviso">Questão com itens a, b, c: se cada item tem valor próprio, cadastre um por um (Nº 2a, 2b…) para ter nota e retorno por item. ' +
@@ -865,25 +865,31 @@ function formProva(p, pre){
     var arqs = Array.prototype.slice.call(this.files), m = $('msgExtrair');
     this.value = '';
     if(!arqs.length) return;
+    var lerComIA = false;
     function tentarGerada(cod, como){
-      return api('provaGerada', {codigo: cod}).then(function(g){ usarGerada(g, m, como); return true; }).catch(function(){ return false; });
+      if(!cod || lerComIA) return Promise.resolve(false);
+      return api('provaGerada', {codigo: cod}).then(function(g){
+        usarGerada(g, m, como);
+        m.insertAdjacentHTML('beforeend', '<p class="aviso" style="margin:6px 0 0">Não era essa? <button type="button" class="link" id="pLerIA">Ler o arquivo com a IA</button></p>');
+        $('pLerIA').addEventListener('click', function(){ lerComIA = true; m.innerHTML = '<p class="carregando">Lendo a prova… (uns 30 segundos)</p>'; lerArquivo(); });
+        return true;
+      }).catch(function(){ return false; });
     }
-    var codNome = arqs.map(function(f){ return codigoNoTexto(f.name); }).filter(Boolean)[0];
-    m.innerHTML = '<p class="carregando">' + (codNome ? 'Procurando a prova gerada ' + esc(codNome) + '…' : 'Lendo a prova… (uns 30 segundos)') + '</p>';
-    (codNome ? tentarGerada(codNome, 'pelo código no nome do arquivo') : Promise.resolve(false)).then(function(achou){
-      if(achou) return {pronto: true};
-      m.innerHTML = '<p class="carregando">Lendo a prova… (uns 30 segundos)</p>';
-      return partesDosArquivos(arqs).then(function(r){
-        var c2 = codigoNoTexto(r.texto);
-        return (c2 ? tentarGerada(c2, 'pelo código escrito no arquivo') : Promise.resolve(false)).then(function(ok){
-          return ok ? {pronto: true} : api('extrairQuestoes', {fotos: r.partes});
-        });
+    m.innerHTML = '<p class="carregando">Abrindo o arquivo…</p>';
+    codigoNoTexto(arqs.map(function(f){ return f.name.replace(/\.[^.]+$/, ''); }).join('\n')).then(function(cod){ return tentarGerada(cod, 'pelo código no nome do arquivo'); })
+      .then(function(achou){ if(!achou) lerArquivo(); });
+    function lerArquivo(){
+    m.innerHTML = '<p class="carregando">Lendo a prova… (uns 30 segundos)</p>';
+    partesDosArquivos(arqs).then(function(r){
+      return codigoNoTexto(r.texto).then(function(c2){ return tentarGerada(c2, 'pelo código escrito no arquivo'); }).then(function(ok){
+        return ok ? {pronto: true} : api('extrairQuestoes', {fotos: r.partes});
       });
     }).then(function(res){
       if(res && res.pronto) return;
       if(res && res.codigo) return tentarGerada(res.codigo, 'pelo código impresso na folha').then(function(ok){ if(!ok) preencher(res.questoes || []); });
       preencher(Array.isArray(res) ? res : (res && res.questoes) || []);
     }).catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    }
     function preencher(qs){
       if(!qs.length){ m.innerHTML = '<div class="erro">Não encontrei questões no arquivo.</div>'; return; }
       lerQs();
@@ -988,7 +994,7 @@ function blocoContexto(q, i){
 /* ===================== GERADOR DE PROVA POR IA =====================
    A IA monta a prova; os gráficos são calculados e desenhados aqui (a IA só dá o modelo e os
    parâmetros de cada curva), então os números dos rótulos sempre batem com a curva.
-   Cada prova gerada tem um código (PG-AAAAMMDD-HHMM), impresso na folha e no nome do arquivo. */
+   Cada prova gerada tem um código legível ("Disciplina 2026-2 P1"), impresso na folha e no nome do arquivo. */
 function nFig(v, p){ if(v === '' || v == null) return p; var n = Number(String(v).replace(',', '.')); return isFinite(n) ? n : p; }
 function fmtBR(v, d){
   if(!isFinite(v)) return '?';
@@ -1291,7 +1297,7 @@ function htmlQuestaoFolha(q, i, cont, opc){
 }
 function topoFolha(d){
   var cab = cabecalhoFolha(d.disciplina);
-  return '<div class="fCab">' + esc(cab[0]) + '<br><span>' + esc(cab[1]) + '</span></div>' + (d.codigo ? '<div class="fCod">' + esc(d.codigo) + '</div>' : '') +
+  return '<div class="fCab">' + esc(cab[0]) + '<br><span>' + esc(cab[1]) + '</span></div>' + (d.codigo ? '<div class="fCod">Código: ' + esc(d.codigo) + '</div>' : '') +
     '<div class="fTit">' + esc(String(d.titulo || 'Prova').toUpperCase()) + '</div>' + (d.subtitulo ? '<div class="fSub">' + esc(d.subtitulo) + '</div>' : '') +
     '<div class="fNome">Nome: ______________________________________________________ &nbsp; Data: ____/____/______</div>';
 }
@@ -1302,7 +1308,7 @@ function folhaProva(d, opc){
   return {html: h, imgs: cont.imgs};
 }
 function nomeArquivoProva(d, gab){
-  return [d.titulo || 'Prova', d.disciplina, d.codigo, gab ? 'gabarito' : ''].filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 120);
+  return (d.codigo ? [d.codigo, gab ? 'gabarito' : ''] : [d.titulo || 'Prova', d.disciplina, gab ? 'gabarito' : '']).filter(Boolean).join(' - ').replace(/[\\/:*?"<>|]+/g, ' ').slice(0, 140);
 }
 function imprimirProva(d, gab){
   var r = folhaProva(d, {gabarito: gab}), w = window.open('', '_blank');
@@ -1348,7 +1354,7 @@ function barraImpressao(prefixo){
     '<button type="button" class="secundario mini" id="' + prefixo + 'Word">⬇ Baixar Word</button>' +
     '<label style="display:inline-flex;gap:6px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="' + prefixo + 'Gab" style="width:16px;height:16px"> com gabarito e critérios</label>' +
     '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div><b>Imprimir / PDF</b> abre a folha pronta; para PDF, escolha "Salvar como PDF" no destino da impressão. <b>Baixar Word</b> baixa um arquivo .doc com as figuras, para editar no Word (no Word, "Salvar como" .docx). ' +
-      'O código da prova (PG-…) sai no canto da folha e no nome do arquivo: subindo esse arquivo no cadastro da prova, o sistema carrega a versão original, sem gastar IA.<br><br><b>Cabeçalho da folha:</b> <button type="button" class="link" data-mudacab>mudar</button></div></details></span>';
+      'O código da prova (ex.: "Química e Bioquímica de Alimentos 2026-2 P1") sai no canto da folha e é o nome do arquivo: subindo esse arquivo no cadastro da prova, o sistema carrega a versão original, sem gastar IA.<br><br><b>Cabeçalho da folha:</b> <button type="button" class="link" data-mudacab>mudar</button></div></details></span>';
 }
 function ligarImpressao(prefixo, dadosFn){
   $(prefixo + 'Imp').addEventListener('click', function(){ imprimirProva(dadosFn(), $(prefixo + 'Gab').checked); });
@@ -1406,8 +1412,8 @@ function partesDosArquivos(arqs){
     return prepararArquivo(f, false).then(function(p){ return {texto: '', partes: [{mime: p.mime, dados: p.dados}]}; });
   })).then(function(l){ return {texto: l.map(function(x){ return x.texto; }).join('\n'), partes: [].concat.apply([], l.map(function(x){ return x.partes; }))}; });
 }
-var RE_CODIGO_PROVA = /PG-?(\d{8})-?(\d{4})([A-Z])?/i;
-function codigoNoTexto(t){ var m = String(t || '').match(RE_CODIGO_PROVA); return m ? 'PG-' + m[1] + '-' + m[2] + (m[3] ? m[3].toUpperCase() : '') : ''; }
+// código de prova gerada escrito no nome ou no texto do arquivo (o servidor confere com as provas geradas)
+function codigoNoTexto(t){ return String(t || '').trim() ? api('codigoNoArquivo', {texto: String(t).slice(0, 20000)}).catch(function(){ return ''; }) : Promise.resolve(''); }
 
 /* ---- prova gerada ↔ questões do cadastro da prova ---- */
 function linhasDaGerada(dados){
@@ -1434,6 +1440,8 @@ function dadosDasLinhas(linhas){
 
 /* ---- tela do gerador ---- */
 var GER = null;   // prova gerada aberta: {codigo, titulo, dados, historico, temAnterior, cfg, provaId, disciplina}
+// semestre "2 - 2026" vira "2026-2" (igual ao código feito no servidor)
+function semestreCodigo(v){ var m = String(v || '').match(/(\d)\s*-\s*(\d{4})/); return m ? m[2] + '-' + m[1] : String(v || ''); }
 function lerCfgGerador(){ try{ return JSON.parse(localStorage.getItem('gerador_cfg_' + discSel) || 'null') || {}; }catch(e){ return {}; } }
 function gravarCfgGerador(c){ try{ localStorage.setItem('gerador_cfg_' + discSel, JSON.stringify(c)); }catch(e){} }
 function marcaCaixa(attr, valor, marcado, texto){
@@ -1447,7 +1455,8 @@ function abrirGeradorNovo(){
   var modelosDisc = (dd.modelosProva || []);
   el.innerHTML = '<div class="caixa"><h2>✨ Gerar prova com IA</h2>' +
     '<p class="aviso">A IA monta a prova no estilo das suas provas (material para analisar, itens com valor, gabarito e critérios) e uma segunda chamada revisa tudo: conceitos, dados, gráficos e contas. Os gráficos são calculados pelo sistema. Depois você pede ajustes por escrito, imprime ou baixa em PDF e Word.</p>' +
-    '<div class="campos"><div><label class="rot" for="gTit">Título da prova</label><input type="text" id="gTit" value="' + esc(c.titulo || 'Prova') + '"></div>' +
+    '<div class="campos"><div><label class="rot" for="gTit">Qual prova</label><select id="gTit">' + ['P1', 'P2', 'P3', 'P4', 'Prova final', '2ª chamada'].map(function(o){ return '<option' + ((c.titulo || 'P1') === o ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>' +
+      '<p class="aviso" style="margin:4px 0 0">O código fica "' + esc(dd.disciplina.nome + ' ' + semestreCodigo(dd.disciplina.semestre)) + ' <span id="gCodEx">' + esc(c.titulo || 'P1') + '</span> v1"; cada nova versão da mesma prova vira v2, v3…</p></div>' +
       '<div><label class="rot" for="gN">Nº de questões</label><input type="number" id="gN" min="1" max="10" value="' + esc(c.n || 5) + '"></div>' +
       '<div><label class="rot" for="gTot">Total de pontos</label><input type="number" id="gTot" min="1" max="100" step="0.5" value="' + esc(c.total || 10) + '"></div>' +
       '<div><label class="rot" for="gDif">Dificuldade</label><select id="gDif">' + [['facil', 'Mais fácil'], ['media', 'Média'], ['dificil', 'Mais difícil']].map(function(o){ return '<option value="' + o[0] + '"' + ((c.dificuldade || 'media') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
@@ -1471,6 +1480,7 @@ function abrirGeradorNovo(){
       '<span class="aviso">Usa 2 chamadas da IA (gera e revisa) e leva de 2 a 4 minutos.</span></div><div id="gMsg"></div></div>';
   desenharModelos(c.modelos || null);
   $('gCanc').addEventListener('click', function(){ el.innerHTML = ''; });
+  $('gTit').addEventListener('change', function(){ $('gCodEx').textContent = this.value; });
   $('gGerar').addEventListener('click', function(){
     var b = this, m = $('gMsg');
     var cfg = {titulo: $('gTit').value, n: $('gN').value, total: $('gTot').value, dificuldade: $('gDif').value, figuras: $('gFig').value,
