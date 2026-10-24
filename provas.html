@@ -838,7 +838,7 @@ function formProva(p, pre){
     '<div class="convite">Tem a prova em foto, PDF ou Word? <label class="arquivo" style="margin-left:6px"><input type="file" accept="image/*,application/pdf,.docx" multiple id="pExtrair">Preencher as questões a partir do arquivo</label>' +
       (geradas.length ? '<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">Ou use uma prova gerada pela IA: <select id="pGerSel" style="max-width:340px">' + geradas.map(function(g){ return '<option value="' + esc(g.codigo) + '"' + (g.codigo === geradaAtual ? ' selected' : '') + '>' + esc(g.codigo + ' · ' + g.titulo + ' · ' + g.questoes + ' questões') + '</option>'; }).join('') + '</select><button type="button" class="secundario mini" id="pGerCarregar">Carregar</button></div>' : '') +
       '<p class="aviso" style="margin:8px 0 0">Arquivo baixado do gerador (com o código da prova no nome ou impresso na folha, ex.: "' + esc(d.nome) + ' 2026-2 P1"): o sistema carrega a versão original, com figuras, gabarito e critérios, sem gastar IA.</p>' +
-      (geradaAtual ? '<p class="aviso" style="margin:4px 0 0">Esta prova vem da prova gerada <b>' + esc(geradaAtual) + '</b>.</p>' : '') + '<div id="msgExtrair"></div></div>' +
+      (geradaAtual ? '<p class="aviso" style="margin:4px 0 0">Esta prova vem da prova gerada <b>' + esc(geradaAtual) + '</b>: o que você mudar aqui (gabarito, enunciado, valores) fica também na prova gerada, e o que mudar lá (ajustes e revisão da IA) vem para cá.</p>' : '') + '<div id="msgExtrair"></div></div>' +
     '<h4>Questões <span class="aviso" id="pTotal"></span></h4>' +
     '<p class="aviso">Questão com itens a, b, c: se cada item tem valor próprio, cadastre um por um (Nº 2a, 2b…) para ter nota e retorno por item. ' +
     'Se não, cadastre a questão inteira e separe o gabarito por item (a) …, b) …).</p><div id="qsBox"></div>' +
@@ -846,7 +846,7 @@ function formProva(p, pre){
     '<div class="botoes">' + barraImpressao('pf') + '</div>' +
     '<label style="display:flex;gap:8px;align-items:center;margin-top:16px;font-weight:bold"><input type="checkbox" id="pPub"' + (v.publicada ? ' checked' : '') + ' style="width:20px;height:20px"> Publicada (os alunos veem só a data e o horário de envio; as questões nunca aparecem para eles)</label>' +
     '<div id="pErro" class="erro oculto"></div><div class="botoes"><button type="button" id="pSalvar">' + (p ? 'Salvar alterações' : 'Criar prova') + '</button><button type="button" class="secundario" id="pCanc">Cancelar</button></div>' +
-    (p && p.entregas ? '<p class="aviso">Esta prova já tem entregas. Se mudar gabarito ou pontos, use "Corrigir de novo com IA" nas entregas para recalcular.</p>' : '') + '</div>';
+    (p && p.entregas ? '<div class="erro"><b>⚠ Atenção:</b> esta prova já tem ' + p.entregas + ' entrega(s). Qualquer alteração nas questões, no gabarito ou nos pontos pode mudar as notas dos alunos. Se mudar, use "Corrigir todas de novo" nas entregas e confira as notas antes de liberar.</div>' : '') + '</div>';
   desenharQs();
   ligarImpressao('pf', function(){ lerQs(); return {titulo: $('pTit').value, disciplina: d.nome, codigo: geradaAtual, subtitulo: '', questoes: dadosDasLinhas(qsEdit)}; });
   function usarGerada(g, m, como){
@@ -1631,8 +1631,11 @@ function desenharGerador(aviso){
   var el = $('areaProva'), d = GER.dados, total = d.questoes.reduce(function(t, q){ return t + q.itens.reduce(function(s, it){ return s + (Number(it.pontos) || 0); }, 0); }, 0);
   var alvo = Number(GER.cfg && GER.cfg.total) || 10, cont = {f: 0, t: 0, imgs: []};
   var usada = GER.provaId && (dadosDisc.provas || []).filter(function(p){ return p.id === GER.provaId; })[0];
+  var sinc = GER.sinc; GER.sinc = null;
   el.innerHTML = '<div class="caixa"><h2>Prova gerada <span class="tag t-azul" style="font-size:12px">' + esc(GER.codigo) + '</span></h2>' +
-    '<p class="aviso">Criada em ' + esc(GER.criado) + (GER.atualizado && GER.atualizado !== GER.criado ? ' · última mudança ' + esc(GER.atualizado) : '') + (usada ? ' · usada na prova <b>' + esc(usada.titulo) + '</b>' : '') + '</p>' +
+    '<p class="aviso">Criada em ' + esc(GER.criado) + (GER.atualizado && GER.atualizado !== GER.criado ? ' · última mudança ' + esc(GER.atualizado) : '') + (usada ? ' · usada na prova <b>' + esc(usada.titulo) + '</b> (o que você mudar aqui vai também para ela)' : '') + '</p>' +
+    (sinc ? (sinc.aplicada ? '<div class="ok">✓ A prova cadastrada <b>' + esc(sinc.prova) + '</b> também foi atualizada (enunciados, gabarito e critérios).' + (sinc.entregas ? ' Nas entregas, use "Corrigir todas de novo" para recalcular as notas com o gabarito novo.' : '') + '</div>'
+      : '<div class="erro">A prova cadastrada <b>' + esc(sinc.prova) + '</b> já tem ' + sinc.entregas + ' entrega(s), então ela <b>não</b> foi mudada sozinha. <b>⚠ Atenção:</b> qualquer alteração nas questões, no gabarito ou nos pontos de uma prova já aplicada pode mudar as notas dos alunos (e as correções já feitas e as vistas deixam de bater com o texto novo). <button type="button" class="mini" id="gvAplicar">Aplicar nela mesmo assim</button> Se aplicar, nas entregas use "Corrigir todas de novo" e confira as notas.</div>') : '') +
     (aviso.erro ? '<div class="erro">' + esc(aviso.erro) + '</div>' : '') +
     (aviso.revisao ? '<div class="ok"><b>Revisão da IA:</b> ' + (aviso.revisao.length ? '<ul style="margin:4px 0 0;padding-left:20px">' + aviso.revisao.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>' : 'nada precisou mudar.') + '</div>' : '') +
     (aviso.ajuste ? '<div class="ok"><b>Ajuste feito:</b> ' + (aviso.ajuste.length ? '<ul style="margin:4px 0 0;padding-left:20px">' + aviso.ajuste.map(function(a){ return '<li>' + esc(a) + '</li>'; }).join('') + '</ul>' : 'pronto.') + '</div>' : '') +
@@ -1664,6 +1667,12 @@ function desenharGerador(aviso){
     api('salvarProvaGerada', {codigo: GER.codigo, dados: GER.dados, titulo: t}).then(function(g){ GER = g; atualizarListaGeradas(); }).catch(function(e){ erroGeral(e.message); });
   });
   $('gvFechar').addEventListener('click', function(){ el.innerHTML = ''; });
+  var bap = $('gvAplicar');
+  if(bap) bap.addEventListener('click', function(){
+    if(bap.dataset.conf !== '1'){ bap.dataset.conf = '1'; bap.textContent = 'Confirmar: trocar as questões (as notas dos alunos podem mudar)'; return; }
+    bap.disabled = true;
+    api('aplicarGeradaNaProva', {codigo: GER.codigo}).then(function(s){ GER.sinc = s; desenharGerador({}); }).catch(function(e){ bap.disabled = false; erroGeral(e.message); });
+  });
   $('gvNova').addEventListener('click', abrirGeradorNovo);
   $('gvUsar').addEventListener('click', function(){ formProva(null, {gerada: GER}); });
   var bd = $('gvDesfazer');
@@ -1751,6 +1760,10 @@ function abrirEntregas(provaId){
       (r.prova.resultadosAgendados ? '<div class="convite">⏳ <b>Liberação agendada:</b> a correção aparece para a turma automaticamente em <b>' + esc(r.prova.liberaEm) + '</b> (fim do prazo de envio). Até lá os alunos veem só “em correção”.</div>'
         : r.prova.resultadosLiberados ? '<div class="ok">Correção liberada para a turma em ' + esc(r.prova.resultadosEm) + ': cada aluno vê a nota provisória e a correção, e pode pedir vista. Revise cada um e use "Liberar nota definitiva" na correção dele.</div>'
         : '<div class="convite">Correção <b>oculta</b> da turma: os alunos veem só “em correção”. Revise o que quiser e, quando terminar, use “Liberar correção para a turma” na lista de provas: aí cada aluno recebe a nota provisória.</div>') +
+      '<details class="convite"><summary style="cursor:pointer;font-weight:bold">📝 Ocorrências da prova' + (String(r.prova.ocorrencias || '').trim() ? ' <span class="tag t-azul">anotadas</span>' : '') + ' <span class="aviso" style="font-weight:normal">(problemas e dúvidas durante a aplicação)</span></summary>' +
+        '<p class="aviso" style="margin:6px 0">Anote o que deu problema nesta prova, por exemplo: "as questões 2 e 4 cobravam o mesmo tema", "os itens a e b tinham respostas quase iguais", "o enunciado da 3 gerou dúvida". Fica guardado nesta prova, e o <b>gerador de provas</b> evita esses problemas nas próximas.</p>' +
+        '<textarea id="ocTexto" style="min-height:70px" placeholder="ex.: muitos alunos perguntaram se a Aw da tabela era a do produto final">' + esc(r.prova.ocorrencias || '') + '</textarea>' +
+        '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" id="ocSalvar">Salvar ocorrências</button><span class="aviso" id="ocMsg"></span></div></details>' +
       resumoVistos(r) +
       '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
@@ -1766,6 +1779,11 @@ function abrirEntregas(provaId){
       '</div><div id="msgRecorr"></div></div><div id="areaEntrega"></div>';
     el.innerHTML = h;
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
+    $('ocSalvar').addEventListener('click', function(){
+      var b = this; b.disabled = true; $('ocMsg').textContent = 'Salvando…';
+      api('salvarOcorrencias', {provaId: provaId, texto: $('ocTexto').value}).then(function(){ b.disabled = false; $('ocMsg').textContent = '✓ Salvo. O gerador de provas vai levar isso em conta.'; })
+        .catch(function(e){ b.disabled = false; $('ocMsg').textContent = ''; erroGeral(e.message); });
+    });
     if(ABRIR_DIRETO && ABRIR_DIRETO.prova === provaId){ var ent = ABRIR_DIRETO.entrega; ABRIR_DIRETO = null; try{ history.replaceState(null, '', location.pathname); }catch(x){} abrirEntrega(ent); }
     var btR = $('btRecorrTodas');
     if(btR) btR.addEventListener('click', function(){
