@@ -1586,18 +1586,21 @@ function abrirGeradorNovo(){
 // provas antigas no banco (cada uma é lida pela IA uma vez, ao enviar)
 function desenharModelos(sel){
   var box = $('gModelos'); if(!box) return;
-  var l = dadosDisc.modelosProva || [];
-  box.innerHTML = (l.length ? l.map(function(m){
+  var l = dadosDisc.modelosProva || [], aberta = !!(box.querySelector('details[open]'));
+  var nMarc = l.filter(function(m){ return sel ? sel.indexOf(m.id) !== -1 : m.disciplinaId === discSel; }).length;
+  // a lista fica recolhida; clicando, abre para marcar ou tirar
+  box.innerHTML = (l.length ? '<details' + (aberta ? ' open' : '') + ' style="margin:2px 0 4px"><summary style="cursor:pointer;font-size:14px">Provas antigas no banco: <b>' + l.length + '</b> · <span id="gModeloConta">' + nMarc + '</span> marcada(s) para esta prova <span class="aviso">(clique para ver e marcar)</span></summary><div style="padding:6px 0 0">' + l.map(function(m){
     var marcado = sel ? sel.indexOf(m.id) !== -1 : m.disciplinaId === discSel;
     return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' + marcaCaixa('data-gmodelo', m.id, marcado, esc(m.nome) + ' <span class="aviso">· ' + esc(m.disciplina || '') + ' · ' + esc(String(m.criado).slice(0, 10)) + '</span>') +
       '<button type="button" class="secundario mini" data-tiramodelo="' + esc(m.id) + '">Tirar</button></div>';
-  }).join('') : '<p class="aviso" style="margin:2px 0">Nenhuma prova antiga no banco ainda.</p>') +
+  }).join('') + '</div></details>' : '<p class="aviso" style="margin:2px 0">Nenhuma prova antiga no banco ainda.</p>') +
     '<label class="arquivo" style="margin-top:6px"><input type="file" accept="image/*,application/pdf,.docx" multiple id="gModeloArq">+ Adicionar prova antiga ao banco (PDF, Word ou fotos)</label><div id="gModeloMsg"></div>';
   box.querySelectorAll('[data-tiramodelo]').forEach(function(b){ b.addEventListener('click', function(){
     if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'Confirmar: tirar do banco'; return; }
     b.disabled = true;
     api('removerModeloProva', {id: b.dataset.tiramodelo}).then(function(l){ dadosDisc.modelosProva = l; desenharModelos(marcadosAgora()); }).catch(function(e){ b.disabled = false; erroGeral(e.message); });
   }); });
+  box.querySelectorAll('[data-gmodelo]').forEach(function(c){ c.addEventListener('change', function(){ var n = $('gModeloConta'); if(n) n.textContent = (marcadosAgora() || []).length; }); });
   $('gModeloArq').addEventListener('change', function(){
     var arqs = Array.prototype.slice.call(this.files), m = $('gModeloMsg');
     if(!arqs.length) return;
