@@ -725,14 +725,14 @@ function listarProvas(){
           'Antes de liberar, os alunos veem só "em correção". Depois, revise cada aluno e use <b>"Liberar nota definitiva"</b> na correção dele. <b>Ocultar</b> esconde de novo para a turma toda.</div></details>' +
         '<button type="button" class="secundario mini" data-qr="' + i + '">QR code</button><button type="button" class="secundario mini" data-excluir="' + i + '">Excluir</button></div></div>';
     }).join('') : '<p class="aviso">Nenhuma prova cadastrada nesta disciplina.</p>';
-    // passo a passo (aberto enquanto a disciplina não tem prova; depois fica recolhido)
-    h += '<details class="convite" style="margin-top:14px"' + (r.provas.length ? '' : ' open') + '><summary style="cursor:pointer;font-weight:bold">Como montar e corrigir uma prova aqui</summary>' +
+    // passo a passo (recolhido; abre com um clique)
+    h += '<details class="convite" style="margin-top:14px"><summary style="cursor:pointer;font-weight:bold">Como montar e corrigir uma prova aqui</summary>' +
       '<ol style="margin:8px 0 6px;padding-left:20px;font-size:14px;line-height:1.5">' +
         '<li><b>✨ Gerar prova com IA:</b> escolha os assuntos e o formato; a IA monta a prova no estilo das suas (com gráficos, tabelas, gabarito e critérios) e outra chamada revisa tudo. Peça ajustes por escrito e imprima ou baixe em PDF e Word.</li>' +
         '<li><b>+ Nova prova:</b> cadastre data, horário e o que a prova vale; em “Ou use uma prova gerada pela IA”, carregue a prova (ou suba o arquivo baixado: o código no nome traz tudo de volta).</li>' +
         '<li><b>Depois da prova:</b> em “Entregas”, envie as fotos das folhas de cada aluno; a IA corrige com o seu gabarito, você revisa e libera a nota (provisória ou definitiva).</li></ol>' +
       '<p class="aviso" style="margin:0;font-size:13px"><b>Por que vale a pena:</b> prova pronta em minutos, no seu padrão; gráficos calculados pelo sistema (os números sempre batem com a curva); a correção já conhece o gabarito, o texto e as figuras de cada questão; notas, vistas e avisos aos alunos ficam organizados; e o banco de provas cresce a cada semestre.</p></details>';
-    h += '<div class="botoes"><button type="button" id="btGerarProva">✨ 1. Gerar prova com IA</button><button type="button" class="secundario" id="btNovaProva">+ 2. Nova prova</button></div>' +
+    h += '<div class="botoes"><button type="button" id="btNovaProva">+ Nova prova</button><button type="button" class="secundario" id="btGerarProva">✨ Gerar prova com IA</button></div>' +
       '<div id="listaGeradas">' + htmlListaGeradas(r.provasGeradas) + '</div></div><div id="areaProva"></div>';
     el.innerHTML = h;
     $('btNovaProva').addEventListener('click', function(){ formProva(null); });
