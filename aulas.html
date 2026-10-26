@@ -1595,10 +1595,11 @@ function nota10(n){ return n === null || n === undefined ? '—' : Number(n).toF
 // Composição da nota final (aulas + provas), para o aluno.
 function composicaoAluno(r){
   var c = r.composicao; if(!c || !c.meu) return '';
-  return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:8px"><span class="grande">' + nota10(c.meu.final) + '</span><span class="aviso">média final de 10' +
-    (c.meu.parcial ? ' · <span class="tag t-warn">parcial</span>' : '') + '</span></div>' +
+  var mf = c.meu.mediaFinal !== null && c.meu.mediaFinal !== undefined && c.meu.situacao !== 'aprovado';
+  return '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-top:8px"><span class="grande">' + nota10(mf ? c.meu.mediaFinal : c.meu.final) + '</span><span class="aviso">' + (mf ? 'média final (com a prova final)' : 'média do semestre') + ' de 10' +
+    (c.meu.parcial ? ' · <span class="tag t-warn">parcial</span>' : '') + '</span>' + (c.meu.situacao ? ' ' + tagSituacao(c.meu) : '') + '</div>' +
     tabelaNotaAluno(c) +
-    '<div class="calc" style="margin-top:10px">Média final = ' + formulaFinal(c, c.meu) + '</div>' +
+    '<div class="calc" style="margin-top:10px">Média do semestre = ' + formulaFinal(c, c.meu) + '</div>' + linhaSituacao(c, c.meu, true) +
     '<p class="aviso" style="margin-top:6px">Cada célula mostra os pontos que você já tem nesse item, no valor que ele tem na etapa. Embaixo, a nota de 0 a 10 que deu esses pontos. ' +
     '* = provisória · ! = abaixo da presença mínima. A média fica parcial enquanto faltar alguma nota.</p>';
 }
@@ -1638,8 +1639,15 @@ function tabelaNotaAluno(c){
     });
     h += '<td><span class="nota n' + classe(n.nota * 10) + '">' + nota10(n.nota) + '</span><br><span class="aviso">de 10' + (n.parcial ? ' · parcial' : '') + '</span></td></tr>';
   });
-  h += '<tr class="linhaFinal"><td><b>Média final</b></td><td colspan="' + tipos.length + '"><span class="aviso">' + (iguais ? 'média das etapas' : 'média ponderada das etapas') + '</span></td>' +
-    '<td><span class="nota n' + classe(c.meu.final * 10) + '">' + nota10(c.meu.final) + '</span></td></tr></table></div>';
+  h += '<tr class="linhaFinal"><td><b>Média do semestre</b></td><td colspan="' + tipos.length + '"><span class="aviso">' + (iguais ? 'média das etapas' : 'média ponderada das etapas') + '</span></td>' +
+    '<td><span class="nota n' + classe(c.meu.final * 10) + '">' + nota10(c.meu.final) + '</span></td></tr>';
+  var pf = c.meu.pf || {nota: null};
+  if(c.meu.precisaFinal || pf.nota !== null){
+    h += '<tr><td><b>Prova final</b></td><td colspan="' + tipos.length + '"><span class="aviso">' + (pf.nota === null ? (pf.situacao || 'ainda sem nota') + ' · precisa de ' + nota10(c.meu.precisaNaFinal) : 'média final = (semestre + final) ÷ 2') + '</span></td>' +
+      '<td>' + (pf.nota === null ? '<span class="aviso">—</span>' : '<span class="nota n' + classe(pf.nota * 10) + '">' + nota10(pf.nota) + (pf.provisoria ? '*' : '') + '</span>') + '</td></tr>';
+    if(c.meu.mediaFinal !== null && c.meu.mediaFinal !== undefined) h += '<tr class="linhaFinal"><td><b>Média final</b></td><td colspan="' + tipos.length + '"><span class="aviso">(semestre + final) ÷ 2</span></td><td><span class="nota n' + classe(c.meu.mediaFinal * 10) + '">' + nota10(c.meu.mediaFinal) + '</span></td></tr>';
+  }
+  h += '</table></div>';
   return h;
 }
 
@@ -3007,16 +3015,24 @@ function abrirNotas(){
       return t;
     }).join('');
 
-    // resumo final
-    h += '<div class="caixa"><h2>Média final</h2><div class="tabelaBox"><table><thead><tr><th>Aluno</th>' + cp.etapas.map(function(et){ return '<th>' + esc(et.nome) + '</th>'; }).join('') +
-      '<th>Média final</th></tr></thead><tbody>' + r.alunos.map(function(al, i){
-        var f = cp.porAluno[al.id];
+    // resumo final: média do semestre, situação (regra da instituição), prova final e média final
+    var R = cp.regra || {direta: 7, final: 5};
+    h += '<div class="caixa"><h2>Média e situação</h2><div class="tabelaBox"><table><thead><tr><th>Aluno</th>' + cp.etapas.map(function(et){ return '<th>' + esc(et.nome) + '</th>'; }).join('') +
+      '<th>Média do semestre</th><th>Situação</th><th>Prova final</th><th>Média final</th></tr></thead><tbody>' + r.alunos.map(function(al, i){
+        var f = cp.porAluno[al.id], pf = f.pf || {nota: null, automatica: null};
+        var dicaPF = [pf.situacao, pf.ajustada && pf.automatica !== null ? 'automática: ' + nota10(pf.automatica) : '', f.precisaFinal ? 'precisa de ' + nota10(f.precisaNaFinal) + ' para passar' : ''].filter(Boolean).join(' · ');
         return '<tr class="linhaAluno" data-al="' + i + '"><td>' + esc(al.nome) + '</td>' + f.etapas.map(function(n){
           return '<td><span class="cel c' + classe(n.nota * 10) + '">' + nota10(n.nota) + (n.parcial ? '*' : '') + '</span></td>';
-        }).join('') + '<td><span class="nota n' + classe(f.final * 10) + '">' + nota10(f.final) + (f.parcial ? '*' : '') + '</span></td></tr>';
-      }).join('') + '</tbody></table></div><p class="aviso" style="margin-top:8px">Média final = ' +
-      (pesosIguais(cp.etapas) ? '(' + cp.etapas.map(function(e){ return esc(e.nome); }).join(' + ') + ') ÷ ' + cp.etapas.length : 'média ponderada pelos pesos das etapas') +
-      ' · * parcial: ainda falta alguma nota ou há nota provisória. Clique num aluno para ver o cálculo e as respostas das aulas.</p><div id="detAl"></div></div>';
+        }).join('') + '<td><span class="nota n' + classe(f.final * 10) + '">' + nota10(f.final) + (f.parcial ? '*' : '') + '</span></td>' +
+          '<td>' + tagSituacao(f) + '</td>' +
+          '<td>' + (f.precisaFinal || pf.nota !== null ? '<input type="number" min="0" max="10" step="0.1" class="notaInp notaPF" data-item="PF" data-aluno="' + esc(al.id) + '" data-auto="' + (pf.automatica === null || pf.automatica === undefined ? '' : pf.automatica) + '" data-orig="' + (pf.nota === null ? '' : pf.nota) + '" value="' + (pf.nota === null ? '' : pf.nota) + '" placeholder="—" title="' + esc(dicaPF) + '" aria-label="' + esc('Prova final de ' + al.nome) + '">' +
+            (pf.provisoria ? '<span class="tag t-warn" title="provisória">*</span>' : '') + (pf.ajustada ? '<span class="tag t-azul" title="nota lançada/ajustada por você">✎</span>' : '') : '<span class="aviso">—</span>') + '</td>' +
+          '<td>' + (f.mediaFinal !== null && f.mediaFinal !== undefined ? '<span class="nota n' + classe(f.mediaFinal * 10) + '">' + nota10(f.mediaFinal) + (f.parcial || pf.provisoria ? '*' : '') + '</span>' : '<span class="aviso">—</span>') + '</td></tr>';
+      }).join('') + '</tbody></table></div>' +
+      '<div class="botoes"><button type="button" class="mini" id="btSalvarPF">Salvar notas da prova final</button><span class="aviso" id="msgPF"></span></div>' +
+      '<p class="aviso" style="margin-top:8px">Média do semestre = ' + (pesosIguais(cp.etapas) ? '(' + cp.etapas.map(function(e){ return esc(e.nome); }).join(' + ') + ') ÷ ' + cp.etapas.length : 'média ponderada pelos pesos das etapas') +
+      '. <b>Aprovado</b> com média ≥ ' + nota10(R.direta) + '. Abaixo disso, <b>prova final</b>: média final = (média do semestre + prova final) ÷ 2, precisa de ' + nota10(R.final) + ' para passar. ' +
+      'A nota da final pode ser digitada aqui ou vir de uma prova do Prova por IA cadastrada como "Prova final". * parcial: ainda falta alguma nota ou há nota provisória. Clique num aluno para ver o cálculo e as respostas das aulas.</p><div id="detAl"></div></div>';
     c.innerHTML = h;
 
     c.querySelectorAll('.notaInp').forEach(function(inp){ inp.addEventListener('input', function(){
@@ -3037,7 +3053,18 @@ function abrirNotas(){
       api('salvarNotasItens', {disciplinaId: notasDisc, notas: notas}).then(abrirNotas)
         .catch(function(e){ b.disabled = false; msg.textContent = e.message; });
     }); });
-    c.querySelectorAll('[data-al]').forEach(function(tr){ tr.addEventListener('click', function(){ detalheAluno(r, r.alunos[Number(tr.dataset.al)]); }); });
+    c.querySelectorAll('[data-al]').forEach(function(tr){ tr.addEventListener('click', function(ev){ if(ev.target.closest('input')) return; detalheAluno(r, r.alunos[Number(tr.dataset.al)]); }); });
+    $('btSalvarPF').addEventListener('click', function(){
+      var b = this, msg = $('msgPF');
+      var notas = Array.prototype.filter.call(c.querySelectorAll('.notaPF'), function(inp){ return String(inp.value) !== String(inp.dataset.orig); }).map(function(inp){
+        var v = String(inp.value).replace(',', '.');
+        if(v !== '' && inp.dataset.auto !== '' && Number(v) === Number(inp.dataset.auto)) v = '';
+        return {itemId: 'PF', alunoId: inp.dataset.aluno, nota: v};
+      });
+      if(!notas.length){ msg.textContent = 'Nenhuma nota alterada.'; return; }
+      b.disabled = true; msg.textContent = 'Salvando…';
+      api('salvarNotasItens', {disciplinaId: notasDisc, notas: notas}).then(abrirNotas).catch(function(e){ b.disabled = false; msg.textContent = e.message; });
+    });
 
     // exercícios em aula, aula por aula
     $('notasAulas').innerHTML = '<div class="caixa"><details><summary class="link">Exercícios em aula, aula por aula (notas de 0 a 10)</summary>' +
@@ -3058,7 +3085,7 @@ function abrirNotas(){
 function detalheAluno(r, al){
   var cp = r.composicao, f = cp.porAluno[al.id];
   $('detAl').innerHTML = '<div class="detalhe"><h3>' + esc(al.nome) + '</h3>' + cp.etapas.map(function(et, k){ return linhasEtapa(et, f.etapas[k]); }).join('') +
-    '<div class="calc" style="margin-top:10px">Média final = ' + formulaFinal(cp, f) + '</div>' +
+    '<div class="calc" style="margin-top:10px">Média do semestre = ' + formulaFinal(cp, f) + '</div>' + linhaSituacao(cp, f, false) +
     '<div class="botoes"><button type="button" class="mini" id="btRespostas">Ver respostas das aulas e revisar notas</button></div><div id="respAluno"></div></div>';
   $('btRespostas').addEventListener('click', function(){ abrirRespostasAluno(al); });
   $('detAl').scrollIntoView({behavior:'smooth', block:'nearest'});
@@ -3078,6 +3105,24 @@ function linhasEtapa(et, n){
     '<div class="cfg" style="max-width:640px">' + (linhas.join('') || '<span class="aviso">sem itens com valor</span><span></span>') + '</div>';
 }
 
+// Situação pela regra da instituição (média ≥ 7 passa; senão prova final e (média + final) ÷ 2 ≥ 5)
+function tagSituacao(f){
+  var p = f.parcial ? '*' : '';
+  if(f.situacao === 'aprovado') return '<span class="tag t-ok">aprovado' + p + '</span>';
+  if(f.situacao === 'aprovado na final') return '<span class="tag t-ok">aprovado na final' + p + '</span>';
+  if(f.situacao === 'reprovado') return '<span class="tag t-err">reprovado' + p + '</span>';
+  if(f.situacao === 'prova final') return '<span class="tag t-warn">prova final' + p + '</span><br><span class="aviso">precisa de ' + nota10(f.precisaNaFinal) + '</span>';
+  return '';
+}
+function linhaSituacao(cp, f, paraAluno){
+  if(!f.situacao) return '';
+  var R = cp.regra || {direta: 7, final: 5}, pf = f.pf || {nota: null};
+  var t;
+  if(f.situacao === 'aprovado') t = (paraAluno ? '✓ Aprovado(a): ' : 'Aprovado: ') + 'média do semestre ' + nota10(f.final) + ' (mínimo ' + nota10(R.direta) + ' para passar direto).';
+  else if(f.situacao === 'prova final') t = 'Média do semestre ' + nota10(f.final) + ', abaixo de ' + nota10(R.direta) + ': ' + (paraAluno ? 'você faz' : 'faz') + ' a <b>prova final</b> e precisa de pelo menos <b>' + nota10(f.precisaNaFinal) + '</b> nela para passar (média final = (semestre + final) ÷ 2 ≥ ' + nota10(R.final) + ').' + (pf.situacao ? ' Prova final: ' + esc(pf.situacao) + '.' : '');
+  else t = 'Média final = (' + nota10(f.final) + ' + ' + nota10(pf.nota) + ') ÷ 2 = <b>' + nota10(f.mediaFinal) + '</b>: ' + (f.situacao === 'reprovado' ? 'reprovado (precisava de ' + nota10(R.final) + ').' : 'aprovado na prova final.');
+  return '<div class="calc" style="margin-top:6px">' + t + (f.parcial ? ' <span class="aviso">(parcial: ainda falta alguma nota ou há nota provisória)</span>' : '') + '</div>';
+}
 function formulaFinal(cp, f){
   var iguais = pesosIguais(cp.etapas);
   var partes = cp.etapas.map(function(et, k){ return et.nome + ' ' + nota10(f.etapas[k].nota) + (iguais ? '' : ' × ' + nota10(et.peso)); });

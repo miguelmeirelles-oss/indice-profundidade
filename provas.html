@@ -771,18 +771,22 @@ function listarProvas(){
 
 // prova sem etapa (ou de etapa removida) conta na primeira
 // itens do tipo prova da composição; prova antiga sem item vai para o primeiro item de prova da etapa
+// a prova final não pertence a nenhuma etapa: entra na média final = (semestre + final) ÷ 2
+var OPCAO_FINAL = {etapa: {id: '', nome: 'Prova final'}, item: {id: 'PF', tipo: 'prova', nome: 'Prova final', valor: 10}, final: true};
 function itensDeProva(etapas){
   var l = [];
   etapas.forEach(function(e){ (e.itens || []).forEach(function(it){ if(it.tipo === 'prova') l.push({etapa: e, item: it}); }); });
+  l.push(OPCAO_FINAL);
   return l;
 }
 function itemDaProva(etapas, p){
-  var l = itensDeProva(etapas);
+  if(p && p.item === 'PF') return OPCAO_FINAL;
+  var l = itensDeProva(etapas).filter(function(x){ return !x.final; });
   return l.filter(function(x){ return x.item.id === p.item; })[0] || l.filter(function(x){ return x.etapa.id === p.etapa; })[0] || l[0] || null;
 }
 function rotuloItem(etapas, p){
   var x = itemDaProva(etapas, p);
-  return x ? x.etapa.nome + ' · ' + x.item.nome + ' (vale ' + nota10(x.item.valor) + ')' : 'sem item de prova na composição';
+  return x ? (x.final ? 'Prova final (média final = (semestre + final) ÷ 2)' : x.etapa.nome + ' · ' + x.item.nome + ' (vale ' + nota10(x.item.valor) + ')') : 'sem item de prova na composição';
 }
 
 /* ---- cadastrar ou editar prova ---- */
@@ -795,7 +799,7 @@ function formProva(p, pre){
   var etapas = (d.composicao && d.composicao.etapas) || [];
   var opcoes = itensDeProva(etapas);
   // sugere o primeiro item de prova que ainda não tem prova cadastrada
-  var livre = opcoes.filter(function(x){ return !dadosDisc.provas.some(function(pp){ var y = itemDaProva(etapas, pp); return y && y.item.id === x.item.id; }); })[0] || opcoes[0];
+  var livre = opcoes.filter(function(x){ return !x.final && !dadosDisc.provas.some(function(pp){ var y = itemDaProva(etapas, pp); return y && y.item.id === x.item.id; }); })[0] || opcoes[0];
   var v = p || {titulo: livre ? livre.item.nome : 'Prova', item: livre ? livre.item.id : '', inicio: 0, duracao: 120, janela: 120, instrucoes: dadosDisc.instrucoesPadrao || '', publicada: true, questoes: [], rigor: d.rigor || 3};
   var criteriosMarcados = v.criterios || dadosDisc.criteriosPadrao || ['todo', 'separar'];
   var rigorProva = Number(v.rigor || d.rigor || 3);
@@ -813,7 +817,7 @@ function formProva(p, pre){
     '<div><label class="rot" for="pDur">Duração (min)</label><input type="number" id="pDur" min="10" value="' + v.duracao + '"></div>' +
     '<div><label class="rot" for="pJan">Envio das fotos até (min após o fim)</label><input type="number" id="pJan" min="0" value="' + v.janela + '"></div>' +
     '<div class="campoLargo"><label class="rot" for="pItem">Vale como</label>' + (opcoes.length ? '<select id="pItem">' + opcoes.map(function(x){
-      return '<option value="' + esc(x.item.id) + '"' + (atual && atual.item.id === x.item.id ? ' selected' : '') + '>' + esc(x.etapa.nome + ' · ' + x.item.nome + ' (vale ' + nota10(x.item.valor) + ' na etapa)') + '</option>';
+      return '<option value="' + esc(x.item.id) + '"' + (atual && atual.item.id === x.item.id ? ' selected' : '') + '>' + esc(x.final ? 'Prova final (fora das etapas: média final = (semestre + final) ÷ 2)' : x.etapa.nome + ' · ' + x.item.nome + ' (vale ' + nota10(x.item.valor) + ' na etapa)') + '</option>';
     }).join('') + '</select>' : '<p class="erro" style="margin:0">A composição da nota desta disciplina não tem nenhum item do tipo Prova. Acrescente em Aula por IA → Disciplinas → Editar.</p><input type="hidden" id="pItem" value="">') +
       '<p class="aviso" style="margin:6px 0 0">A prova é corrigida de 0 a 10; o peso vem da composição da nota.</p></div>' +
     // critérios prontos para marcar (os dois primeiros vêm marcados) + orientações livres
