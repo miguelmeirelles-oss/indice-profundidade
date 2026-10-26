@@ -1095,10 +1095,12 @@ function desenharMsgsProf(discPre){
         '<p style="margin:6px 0">' + esc(x.texto).replace(/\n/g, '<br>') + '</p>' +
         (x.tipo === 'notas'
           ? '<span style="font-size:12.5px">✉️ e-mail e aviso para ' + x.celulares + ' aluno(s) · 👁 abriu a correção: <b>' + x.lidos + ' de ' + x.total + '</b></span>' +
+            ((x.leram || []).length ? '<details style="font-size:12.5px"><summary class="link">quem abriu (' + x.leram.length + ')</summary>' + x.leram.map(esc).join(', ') + '</details>' : '') +
             (x.naoLeram.length ? '<details style="font-size:12.5px"><summary class="link">quem ainda não abriu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : (x.total ? ' <span style="color:#1a7a3c;font-size:12.5px">· todos abriram</span>' : ''))
           : '<span style="font-size:12.5px">' + (x.celulares ? '<span style="color:#1a7a3c">✓ chegou em ' + x.celulares + ' celular(es)</span>' : '<span class="aviso">nenhum celular com avisos</span>') +
           (x.falhas ? ' · <span style="color:#c62828">⚠ ' + x.falhas + ' falhou(aram)' + (x.erro ? ': ' + esc(x.erro) : '') + '</span>' : '') + (x.email ? ' · ✉️ e-mail' : '') +
           ' · 👁 lido por <b>' + x.lidos + ' de ' + x.total + '</b></span>' +
+          ((x.leram || []).length ? '<details style="font-size:12.5px"><summary class="link">quem leu (' + x.leram.length + ')</summary>' + x.leram.map(esc).join(', ') + '</details>' : '') +
           (x.naoLeram.length && x.naoLeram.length < x.total ? '<details style="font-size:12.5px"><summary class="link">quem ainda não leu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : '')) +
         '<div class="botoes" style="margin-top:6px">' + (x.ativa
           ? '<button type="button" class="secundario mini" data-msgmais="' + esc(x.id) + '" data-exp="' + x.expiraMs + '">+7 dias</button><button type="button" class="secundario mini" data-msgdata="' + esc(x.id) + '">mudar data</button><button type="button" class="secundario mini" data-msgexpirar="' + esc(x.id) + '">expirar agora</button>'
