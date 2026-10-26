@@ -458,6 +458,9 @@
           <div><label class="rot" for="inscBusca">Nome ou e-mail do aluno</label><input type="text" id="inscBusca" autocomplete="off" placeholder="digite ao menos 2 letras"></div>
         </div>
         <div id="inscResultados"></div><div id="inscMsg"></div>
+        <div class="convite" style="margin:14px 0 0"><b>Aluno ainda sem conta?</b> Cadastre só o nome completo para já lançar faltas, provas e notas. Quando ele criar a conta e pedir inscrição, é só vincular (o sistema sugere pelo nome) e tudo passa para a conta dele.
+          <div class="campos" style="margin:8px 0 0"><div class="campoLargo"><label class="rot" for="semNome">Nome completo do aluno</label><input type="text" id="semNome" autocomplete="off" placeholder="ex.: João da Silva Santos"></div></div>
+          <div class="botoes" style="margin-top:6px"><button type="button" class="mini" id="semCadastrar">+ Cadastrar aluno sem conta</button><span class="aviso">na disciplina escolhida acima</span></div><div id="semMsg"></div></div>
       </div>
       <div class="caixa"><h2>Pedidos pendentes</h2><div id="listaPend"></div></div>
       <div class="caixa"><h2>Alunos inscritos</h2><div id="listaAprov"></div></div>
@@ -3912,6 +3915,16 @@ function prepararInscreverAluno(){
   if(atual) sel.value = atual;
   if(sel.dataset.ligado) return;
   sel.dataset.ligado = '1';
+  $('semCadastrar').addEventListener('click', function(){
+    var b = this, nome = $('semNome').value.trim();
+    if(!$('inscDisc').value){ $('semMsg').innerHTML = '<div class="erro">Escolha a disciplina.</div>'; return; }
+    if(nome.split(/\s+/).length < 2){ $('semMsg').innerHTML = '<div class="erro">Escreva o nome completo (nome e sobrenome).</div>'; return; }
+    b.disabled = true;
+    api('cadastrarSemConta', {disciplinaId: $('inscDisc').value, nome: nome}).then(function(t){
+      b.disabled = false; $('semNome').value = ''; $('semMsg').innerHTML = '<div class="ok">' + esc(t) + '</div>';
+      carregarInscricoes(); carregarResumo();
+    }).catch(function(e){ b.disabled = false; $('semMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
   $('inscBusca').addEventListener('input', function(){
     clearTimeout(inscTimer);
     var termo = this.value.trim();
@@ -3945,7 +3958,8 @@ function carregarInscricoes(){
   api('inscricoes').then(function(r){
     var b = $('badgeInsc'); b.textContent = r.pendentes.length; b.classList.toggle('oculto', !r.pendentes.length);
     $('listaPend').innerHTML = r.pendentes.length ? r.pendentes.map(function(i){
-      return '<div class="linha"><div><b>' + esc(i.aluno) + '</b> <span class="aviso">' + esc(i.email) + '</span><div class="aviso">' + esc(i.disciplina) + ' · pediu em ' + esc(i.pedidoEm) + '</div></div>' +
+      return '<div class="linha"><div><b>' + esc(i.aluno) + '</b> <span class="aviso">' + esc(i.email) + '</span><div class="aviso">' + esc(i.disciplina) + ' · pediu em ' + esc(i.pedidoEm) + '</div>' +
+          (i.sugestaoSem ? '<div style="font-size:13px;margin-top:4px">🔗 Parece ser o aluno sem conta <b>' + esc(i.sugestaoSem.nome) + '</b> <button type="button" class="mini" data-vincsem="' + esc(i.sugestaoSem.id) + '" data-conta="' + esc(i.id) + '">Vincular</button></div>' : '') + '</div>' +
         '<div class="botoes" style="margin:0"><button type="button" class="mini" data-dec="aprovada" data-id="' + esc(i.id) + '">Aprovar</button><button type="button" class="secundario mini" data-dec="recusada" data-id="' + esc(i.id) + '">Recusar</button></div></div>';
     }).join('') : '<p class="aviso">Nenhum pedido esperando aprovação.</p>';
     var grupos = {};
@@ -3956,9 +3970,25 @@ function carregarInscricoes(){
         var portal = !i.temLista ? '' : i.portal
           ? '<br><span class="aviso">portal: ' + esc(i.portal) + '</span> <select data-vinc="' + esc(i.id) + '" style="width:auto;max-width:220px;padding:3px 6px;font-size:12px"><option value="">trocar…</option>' + i.livres.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>'
           : '<br><span class="aviso" style="color:#c62828">não encontrado na lista do portal</span> <select data-vinc="' + esc(i.id) + '" style="width:auto;max-width:220px;padding:3px 6px;font-size:12px"><option value="">ligar ao nome…</option>' + i.livres.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>';
-        return '<div class="linha"><span>' + esc(i.aluno) + ' <span class="aviso">' + esc(i.email) + '</span>' + portal + '</span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
+        var semConta = !i.semConta ? '' : (i.contas || []).length
+          ? '<br><span style="font-size:13px">vincular à conta: <select data-vsel="' + esc(i.id) + '" style="width:auto;max-width:260px;padding:3px 6px;font-size:12px">' + (i.contas[0].nota ? '' : '<option value="">escolha…</option>') +
+              i.contas.map(function(c){ return '<option value="' + esc(c.id) + '">' + esc(c.nome + ' · ' + c.email + (c.situacao === 'pendente' ? ' (pedido)' : '')) + '</option>'; }).join('') + '</select> <button type="button" class="mini" data-vincsem="' + esc(i.id) + '">Vincular</button></span>'
+          : '<br><span class="aviso">quando ele criar a conta e pedir inscrição, aparece aqui para vincular</span>';
+        var vinculo = i.vinculo ? '<br><span style="font-size:12.5px">🔗 vinculado do cadastro sem conta “' + esc(i.vinculo.nome) + '” em ' + esc(i.vinculo.em) + ' <button type="button" class="link" style="font-size:12.5px" data-desvinc="' + esc(i.vinculo.id) + '">desfazer vínculo</button></span>' : '';
+        return '<div class="linha"><span>' + esc(i.aluno) + ' ' + (i.semConta ? '<span class="tag t-warn">sem login</span>' : '<span class="aviso">' + esc(i.email) + '</span>') + portal + semConta + vinculo + '</span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
       }).join('');
     }).join('') : '<p class="aviso">Nenhum aluno inscrito ainda.</p>';
+    document.querySelectorAll('#pInsc [data-desvinc]').forEach(function(b){ b.addEventListener('click', function(){
+      if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'confirmar: devolver faltas, provas e notas ao cadastro sem conta'; return; }
+      b.disabled = true;
+      api('desfazerVinculo', {id: b.dataset.desvinc}).then(function(t){ $('inscMsg').innerHTML = '<div class="ok">' + esc(t) + '</div>'; carregarInscricoes(); carregarResumo(); })
+        .catch(function(e){ b.disabled = false; erroGeral(e.message); });
+    }); });
+    document.querySelectorAll('#pInsc [data-vincsem]').forEach(function(b){ b.addEventListener('click', function(){
+      var conta = b.dataset.conta || (function(){ var s = document.querySelector('#pInsc [data-vsel="' + b.dataset.vincsem + '"]'); return s ? s.value : ''; })();
+      if(!conta){ erroGeral('Escolha a conta do aluno na lista.'); return; }
+      prepararVinculo(b, b.dataset.vincsem, conta);
+    }); });
     document.querySelectorAll('#pInsc [data-vinc]').forEach(function(s){ s.addEventListener('change', function(){
       if(!s.value) return; s.disabled = true;
       api('vincularPortal', {inscricaoId: s.dataset.vinc, nomePortal: s.value}).then(carregarInscricoes).catch(function(e){ s.disabled = false; erroGeral(e.message); });
@@ -3978,6 +4008,30 @@ function carregarInscricoes(){
       });
     });
   }).catch(function(e){ $('listaPend').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; $('listaAprov').innerHTML = ''; });
+}
+
+// Vínculo do aluno sem conta: mostra o que vai para a conta dele e pede confirmação
+function prepararVinculo(bt, semId, contaId){
+  var linha = bt.closest('.linha'), box = linha.nextElementSibling && linha.nextElementSibling.classList.contains('vincBox') ? linha.nextElementSibling : null;
+  if(!box){ box = document.createElement('div'); box.className = 'vincBox convite'; box.style.margin = '6px 0 12px'; linha.after(box); }
+  box.innerHTML = '<p class="carregando" style="margin:0">Conferindo o que será transferido…</p>';
+  bt.disabled = true;
+  api('vincularSemConta', {semId: semId, contaId: contaId}).then(function(r){
+    bt.disabled = false;
+    box.innerHTML = '<b>Vincular “' + esc(r.de) + '” à conta de ' + esc(r.para) + '</b> <span class="aviso">' + esc(r.email) + '</span>' +
+      '<p style="margin:6px 0;font-size:14px">' + (r.itens.length ? 'Vai para a conta dele: ' + r.itens.map(esc).join('; ') + '.' : 'Ainda não há faltas, provas nem notas lançadas no cadastro sem conta.') + '</p>' +
+      (r.conflitos.length ? '<p class="aviso" style="margin:0 0 6px;color:#8a5a00">⚠ ' + r.conflitos.map(esc).join('<br>⚠ ') + '</p>' : '') +
+      '<p class="aviso" style="margin:0 0 6px">Vai tudo: faltas, provas e correções, notas e desempenho. Se a mesma aula tiver presença numa conta e falta na outra, vale a presença. Se vincular errado, dá para desfazer depois (na lista de inscritos).</p>' +
+      '<div class="botoes" style="margin:0"><button type="button" class="mini" data-confvinc>Confirmar vínculo</button><button type="button" class="secundario mini" data-cancvinc>Cancelar</button></div>';
+    box.querySelector('[data-cancvinc]').addEventListener('click', function(){ box.remove(); });
+    box.querySelector('[data-confvinc]').addEventListener('click', function(){
+      var c = this; c.disabled = true;
+      api('vincularSemConta', {semId: semId, contaId: contaId, confirmar: true}).then(function(t){
+        box.innerHTML = '<div class="ok" style="margin:0">' + esc(t) + '</div>';
+        setTimeout(function(){ carregarInscricoes(); carregarResumo(); }, 1500);
+      }).catch(function(e){ c.disabled = false; erroGeral(e.message); });
+    });
+  }).catch(function(e){ bt.disabled = false; box.remove(); erroGeral(e.message); });
 }
 
 /* ================= CHAVES ================= */

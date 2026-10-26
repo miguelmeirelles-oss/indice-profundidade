@@ -1906,6 +1906,24 @@ function ligarCamposProva(el, entregaId, e, soma){
   });
 }
 
+var NOMES_RIGOR_TELA = ['', 'Bem flexível', 'Flexível', 'Padrão', 'Rigoroso', 'Muito rigoroso'];
+// Testes de rigor guardados: nota atual × nota simulada, questão por questão, e o que mudou
+function htmlSimulacoes(sims){
+  var l = Object.keys(sims || {}).map(function(k){ return sims[k]; }).sort(function(a, b){ return a.rigor - b.rigor; });
+  if(!l.length) return '';
+  return l.map(function(s){
+    var dif = s.base === null || s.base === undefined ? null : Math.round((s.nota - s.base) * 10) / 10;
+    var qs = Object.keys(s.questoes || {}).map(function(id){ return s.questoes[id]; });
+    return '<div class="detalhe" style="margin-top:10px"><p style="margin:0 0 6px;font-size:15px"><b>' + esc(s.nome) + ':</b> nota <span class="nota n' + classe10(s.nota) + '">' + nota10(s.nota) + '</span>' +
+        (dif !== null ? ' <span class="aviso">(atual, ' + esc(s.baseRigor) + ': ' + nota10(s.base) + ' · ' + (dif > 0 ? '+' : '') + String(dif).replace('.', ',') + ')</span>' : '') + ' <span class="aviso">· teste de ' + esc(s.em) + '</span></p>' +
+      (s.resumo ? '<p class="fb" style="margin:0 0 8px"><b>O que mudou:</b> ' + esc(s.resumo) + '</p>' : '') +
+      '<div class="tabelaBox"><table><thead><tr><th>Questão</th><th>Atual</th><th>' + esc(s.nome) + '</th><th>O que foi diferente</th></tr></thead><tbody>' +
+        qs.map(function(q){
+          var d = Math.round((q.pontos - q.atual) * 100) / 100;
+          return '<tr><td>' + esc(q.rotulo) + ' <span class="aviso">(vale ' + num(q.max) + ')</span></td><td>' + num(q.atual) + '</td><td><b' + (d > 0 ? ' style="color:#1a7a3c"' : d < 0 ? ' style="color:#c62828"' : '') + '>' + num(q.pontos) + '</b></td><td style="font-size:12.5px">' + esc(q.mudou) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>';
+  }).join('');
+}
 function abrirEntrega(entregaId){
   var el = $('areaEntrega');
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando a prova e as fotos…</p></div>';
@@ -1943,6 +1961,11 @@ function abrirEntrega(entregaId){
           '<button type="button" class="secundario mini salvarCampo oculto" data-salvacampo="professor">Salvar comentário</button></div></div>' +
         '<div data-vistabox>' + htmlVistaProf(q) + '</div></div>';
     }).join('');
+    // teste de rigor: só para comparar, a nota oficial não muda
+    if(e.status === 'corrigida') h += '<details class="convite" style="margin-top:12px"' + (Object.keys(e.simulacoes || {}).length ? ' open' : '') + '><summary style="cursor:pointer;font-weight:bold">🧪 Testar outro rigor <span class="aviso" style="font-weight:normal">(não muda a nota nem a correção)</span></summary>' +
+      '<p class="aviso" style="margin:6px 0">Corrige de novo com outro rigor, só para comparar. Usa a mesma leitura da folha que a IA já fez (1 chamada, só texto). A nota e a correção atuais continuam valendo. Rigor desta prova: <b>' + esc(NOMES_RIGOR_TELA[Number(e.prova.rigor) || 3]) + '</b>.</p>' +
+      '<div class="rigorBarra">' + [1, 2, 3, 4, 5].map(function(n){ return '<button type="button" data-simrig="' + n + '"' + (n === (Number(e.prova.rigor) || 3) ? ' disabled title="é o rigor atual desta prova"' : '') + '>' + NOMES_RIGOR_TELA[n] + '</button>'; }).join('') + '</div>' +
+      '<div id="simMsg"></div><div id="simRes">' + htmlSimulacoes(e.simulacoes) + '</div></details>';
     h += '<div class="detalhe"><p class="fb" style="margin-top:0"><b>Visão geral da IA:</b> ' + esc(e.geral.comentario) + '</p>' + (e.geral.fortes ? '<p class="fb"><b>Pontos fortes:</b> ' + esc(e.geral.fortes) + '</p>' : '') + (e.geral.estudar ? '<p class="fb"><b>O que estudar:</b> ' + esc(e.geral.estudar) + '</p>' : '') + '</div>' +
       '<label class="rot" style="margin-top:12px" for="eGeral">Seu comentário geral para o aluno (opcional)</label><textarea id="eGeral" data-salvo="' + esc(e.geral.professor) + '">' + esc(e.geral.professor) + '</textarea>' +
       '<button type="button" class="secundario mini salvarCampo oculto" id="eGeralSalvar">Salvar comentário</button>' +
@@ -1958,6 +1981,16 @@ function abrirEntrega(entregaId){
       '<div id="eMsg"></div></div>';
     el.innerHTML = h;
     el.querySelectorAll('.fotosGrandes img').forEach(function(img){ img.addEventListener('click', function(){ ampliar(img.src); }); });
+    el.querySelectorAll('[data-simrig]').forEach(function(b){ b.addEventListener('click', function(){
+      var n = Number(b.dataset.simrig);
+      el.querySelectorAll('[data-simrig]').forEach(function(x){ x.disabled = true; });
+      $('simMsg').innerHTML = '<p class="carregando">Corrigindo de novo como "' + esc(NOMES_RIGOR_TELA[n]) + '"… (uns 30 segundos)</p>';
+      api('simularRigor', {entregaId: entregaId, rigor: n}).then(function(s){
+        e.simulacoes = e.simulacoes || {}; e.simulacoes[n] = s;
+        $('simMsg').innerHTML = ''; $('simRes').innerHTML = htmlSimulacoes(e.simulacoes);
+      }).catch(function(x){ $('simMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; })
+        .then(function(){ el.querySelectorAll('[data-simrig]').forEach(function(x){ x.disabled = Number(x.dataset.simrig) === (Number(e.prova.rigor) || 3); }); });
+    }); });
     function soma(){
       var t = 0, m = 0;
       el.querySelectorAll('[data-qid]').forEach(function(box){ m += Number(box.dataset.max); t += Number(String(box.querySelector('[data-pts]').value).replace(',', '.')) || 0; });
