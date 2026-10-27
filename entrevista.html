@@ -302,7 +302,7 @@ function inicio(){
 }
 function limitesTxt(){
   var L = INI.limites, U = INI.usadas;
-  return 'Hoje: ' + U.conversas + ' de ' + L.conversasDia + ' conversas por voz · ' + U.briefings + ' de ' + L.briefingsDia + ' pesquisas de empresa.';
+  return 'Hoje: ' + (U.minutos || 0) + ' de ' + L.minutosDia + ' min de conversa por voz · ' + U.briefings + ' de ' + L.briefingsDia + ' pesquisas de empresa.';
 }
 function desenharInicio(){
   ATUAL = null;
@@ -361,7 +361,7 @@ function abrirTreino(r){
         '<div><label class="rot" for="cVoz">Voz da IA</label><select id="cVoz"><option>Kore</option><option>Puck</option><option>Charon</option><option>Aoede</option><option>Fenrir</option></select></div></div>' +
       '<div class="botoes" style="margin-top:0"><button type="button" id="btFalar">🎙 Começar a conversa</button><button type="button" class="secundario" id="btEncerrar" disabled>Encerrar</button>' +
         '<span id="estado"><span class="bola"></span>desligado</span><span id="tempo" class="aviso"></span></div>' +
-      '<div id="nivelMic"><div></div></div><p class="aviso" style="margin:6px 0 0">Use fone de ouvido. Fale normalmente: dá para interromper a IA como numa conversa. Cada conversa vai até uns 40 minutos, sem cortes. ' + esc(limitesTxt()) + '</p>' +
+      '<div id="nivelMic"><div></div></div><p class="aviso" style="margin:6px 0 0">Use fone de ouvido. Fale normalmente: dá para interromper a IA como numa conversa. Cada conversa vai até 40 minutos, sem cortes; por dia você tem 2 horas de conversa por voz. ' + esc(limitesTxt()) + '</p>' +
       '<div id="msgConv"></div><div id="conversa"></div></div>' +
     '<div class="caixa naoImprime" id="caixaConvs"></div>' +
     '<div id="relatorioBox"></div>';
@@ -438,6 +438,7 @@ function transcricaoAtual(){
     return (m.classList.contains('ia') ? (modoAtual === 'mentor' ? 'ESPECIALISTA' : 'ENTREVISTADOR') : 'ESTUDANTE') + ': ' + m.querySelector('span').textContent.trim();
   }).join('\n');
 }
+var duracaoMin = 40, fimPrevisto = 0;
 var tokenVoz = null, alcaRetomada = '', trocando = false, tentativasRetomar = 0, wsPendente = null;
 function comecarVoz(){
   var b = $('btFalar'); b.disabled = true; $('msgConv').innerHTML = ''; $('conversa').innerHTML = ''; ultimaFala = {ia: null, eu: null}; salvou = false;
@@ -446,7 +447,7 @@ function comecarVoz(){
     streamMic = s;
     return api('entrevistaToken', {id: ATUAL.id, modo: modoAtual, voz: $('cVoz').value});
   }).then(function(t){
-    INI.usadas.conversas = INI.limites.conversasDia - t.restantes;
+    INI.usadas.minutos = t.minutosUsados; duracaoMin = t.duracaoMin || 40;
     tokenVoz = t; alcaRetomada = ''; trocando = false; tentativasRetomar = 0;
     ctxSom = new AudioContext({sampleRate: 24000}); ctxMic = new AudioContext();
     conectar(true);
@@ -470,7 +471,7 @@ function conectar(primeira){
       if(m.setupComplete){
         var velha = ws; ws = nova; wsPendente = null; trocando = false; tentativasRetomar = 0;
         if(primeira){
-          ligarMicrofone(); estado('ouvindo você… pode falar', 'on'); t0 = Date.now(); relogio = setInterval(mostrarTempo, 1000);
+          ligarMicrofone(); estado('ouvindo você… pode falar', 'on'); t0 = Date.now(); fimPrevisto = t0 + duracaoMin * 60000; relogio = setInterval(mostrarTempo, 1000);
           $('btEncerrar').disabled = false;
           nova.send(JSON.stringify({clientContent: {turns: [{role: 'user', parts: [{text: 'Olá, pode começar.'}]}], turnComplete: true}}));
         } else {
@@ -521,7 +522,16 @@ function ligarMicrofone(){
     fonteMic.connect(noMic);
   });
 }
-function mostrarTempo(){ var s = Math.round((Date.now() - t0) / 1000); var e = $('tempo'); if(e) e.textContent = Math.floor(s / 60) + ' min ' + (s % 60) + ' s'; }
+function mostrarTempo(){
+  var s = Math.round((Date.now() - t0) / 1000), e = $('tempo');
+  if(e) e.textContent = Math.floor(s / 60) + ' min ' + (s % 60) + ' s · esta conversa vai até ' + duracaoMin + ' min';
+  // acabou o tempo desta conversa (40 min ou o que sobrava das 2 h do dia): encerra e guarda
+  if(fimPrevisto && Date.now() >= fimPrevisto){
+    fimPrevisto = 0;
+    $('msgConv').innerHTML = '<div class="convite" style="margin-top:10px">⏳ ' + (duracaoMin < 40 ? 'Acabou o seu tempo de conversa por voz de hoje (2 horas). Ele volta amanhã.' : 'A conversa chegou ao tempo máximo (40 min). Se quiser, comece outra.') + ' Ela foi guardada: já dá para gerar o relatório.</div>';
+    encerrarVoz();
+  }
+}
 // encerra e guarda a conversa (para o relatório)
 function encerrarVoz(semFechar){
   var segundos = t0 ? Math.round((Date.now() - t0) / 1000) : 0;
@@ -536,7 +546,8 @@ function encerrarVoz(semFechar){
   var txt = $('conversa') ? transcricaoAtual() : '';
   if(!salvou && ATUAL && txt.length > 40){
     salvou = true;
-    api('entrevistaSalvarConversa', {id: ATUAL.id, modo: modoAtual, transcricao: txt, segundos: segundos}).then(function(){
+    api('entrevistaSalvarConversa', {id: ATUAL.id, modo: modoAtual, transcricao: txt, segundos: segundos}).then(function(res){
+      if(res && res.minutos !== undefined) INI.usadas.minutos = res.minutos;
       return api('entrevistaVer', {id: ATUAL.id});
     }).then(function(r){ ATUAL.conversas = r.conversas; desenharConversas(); $('caixaConvs').scrollIntoView({behavior: 'smooth'}); })
       .catch(function(e){ erroGeral('A conversa não foi guardada: ' + e.message); });
