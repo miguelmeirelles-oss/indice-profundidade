@@ -2018,7 +2018,7 @@ function abrirEntrega(entregaId){
           '<p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (marcarIlegivel(q.transcricao) || '<i>nada</i>') + '</p>' +
           (q.duvidas ? '<p class="fb" style="color:#9b1c1c"><b>Trechos com dúvida:</b> ' + esc(q.duvidas) + '</p>' : '') +
           '<label class="rot" style="margin-top:8px">Arrumar a leitura (escreva o que o aluno escreveu de fato)</label><textarea data-transc style="min-height:60px">' + esc(q.transcricao) + '</textarea>' +
-          '<div class="botoes" style="margin-top:6px"><button type="button" class="secundario mini" data-recorr>Corrigir esta questão de novo com esta leitura</button><span class="aviso">1 chamada leve da IA, só texto</span></div><div data-recmsg></div></details>' +
+          '<div class="botoes" style="margin-top:6px"><button type="button" class="secundario mini" data-recorr>Corrigir esta questão de novo com esta leitura</button><span class="aviso">1 chamada da IA de prova, só texto</span></div><div data-recmsg></div></details>' +
         '<div data-fbia>' + htmlFbIA(q) + '</div>' +
         '<div class="campos" style="margin:10px 0 0"><div><label class="rot">Pontos</label><input type="number" min="0" max="' + q.max + '" step="0.25" data-pts value="' + (q.pontos === null ? '' : q.pontos) + '"></div>' +
         '<div class="campoLargo"><label class="rot">Seu comentário para o aluno (opcional)</label><textarea data-com data-salvo="' + esc(q.professor) + '" style="min-height:50px">' + esc(q.professor) + '</textarea>' +
