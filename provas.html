@@ -1564,7 +1564,7 @@ function abrirGeradorNovo(){
     '<label class="rot" style="margin-top:10px">A IA se baseia em</label>' +
       marcaCaixa('id', 'gUsaAulas', c.usarAulas !== false, 'Aulas gravadas (atas e resumos)') +
       marcaCaixa('id', 'gUsaApost', c.usarApostila !== false && !!dd.temApostila, dd.temApostila ? 'Apostila: ' + esc(dd.temApostila) : '<span class="aviso">Apostila (nenhuma cadastrada: Aula por IA → Estudo dirigido)</span>') +
-      marcaCaixa('id', 'gUsaBanco', c.usarBanco !== false, 'Banco de provas: as provas já cadastradas nesta disciplina e as provas antigas abaixo (modelo de estilo)') +
+      marcaCaixa('id', 'gUsaBanco', c.usarBanco !== false, 'Banco de provas desta disciplina: as provas já cadastradas nela e as provas antigas abaixo (modelo de estilo)') +
       '<div id="gModelos" style="padding-left:26px"></div>' +
     '<label class="rot" for="gObs" style="margin-top:10px">Observações para a IA (opcional)</label><textarea id="gObs" style="min-height:50px" placeholder="ex.: uma questão sobre transição vítrea no leite em pó; evitar questões sobre caramelização">' + esc(c.obs || '') + '</textarea>' +
     '<div class="botoes"><button type="button" id="gGerar">Gerar prova</button><button type="button" class="secundario" id="gCanc">Cancelar</button>' +
@@ -1597,12 +1597,13 @@ function abrirGeradorNovo(){
 // provas antigas no banco (cada uma é lida pela IA uma vez, ao enviar)
 function desenharModelos(sel){
   var box = $('gModelos'); if(!box) return;
-  var l = dadosDisc.modelosProva || [], aberta = !!(box.querySelector('details[open]'));
+  // cada disciplina tem o seu banco: só aparecem as provas antigas enviadas nesta disciplina
+  var l = (dadosDisc.modelosProva || []).filter(function(m){ return m.disciplinaId === discSel; }), aberta = !!(box.querySelector('details[open]'));
   var nMarc = l.filter(function(m){ return sel ? sel.indexOf(m.id) !== -1 : m.disciplinaId === discSel; }).length;
   // a lista fica recolhida; clicando, abre para marcar ou tirar
   box.innerHTML = (l.length ? '<details' + (aberta ? ' open' : '') + ' style="margin:2px 0 4px"><summary style="cursor:pointer;font-size:14px">Provas antigas no banco: <b>' + l.length + '</b> · <span id="gModeloConta">' + nMarc + '</span> marcada(s) para esta prova <span class="aviso">(clique para ver e marcar)</span></summary><div style="padding:6px 0 0">' + l.map(function(m){
     var marcado = sel ? sel.indexOf(m.id) !== -1 : m.disciplinaId === discSel;
-    return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' + marcaCaixa('data-gmodelo', m.id, marcado, esc(m.nome) + ' <span class="aviso">· ' + esc(m.disciplina || '') + ' · ' + esc(String(m.criado).slice(0, 10)) + '</span>') +
+    return '<div style="display:flex;gap:8px;align-items:center;justify-content:space-between">' + marcaCaixa('data-gmodelo', m.id, marcado, esc(m.nome) + ' <span class="aviso">· ' + esc(String(m.criado).slice(0, 10)) + '</span>') +
       '<button type="button" class="secundario mini" data-tiramodelo="' + esc(m.id) + '">Tirar</button></div>';
   }).join('') + '</div></details>' : '<p class="aviso" style="margin:2px 0">Nenhuma prova antiga no banco ainda.</p>') +
     '<label class="arquivo" style="margin-top:6px"><input type="file" accept="image/*,application/pdf,.docx" multiple id="gModeloArq">+ Adicionar prova antiga ao banco (PDF, Word ou fotos)</label><div id="gModeloMsg"></div>';
