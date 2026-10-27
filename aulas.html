@@ -356,6 +356,10 @@
     border:1px solid var(--linha,#d9dee8);border-left:4px solid var(--menu);border-radius:8px;box-shadow:0 8px 24px rgba(14,42,92,.18);
     padding:10px 12px;font-size:13px;line-height:1.5;font-weight:normal;text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
 </style>
+<style>
+  input[type=number]{-moz-appearance:textfield;appearance:textfield}
+  input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -1285,6 +1289,21 @@ function pausarLeitura(){
 function fimLeitura(){ pausarLeitura(); LEITURA = null; }
 document.addEventListener('visibilitychange', function(){ if(!LEITURA) return; if(document.hidden) pausarLeitura(); else LEITURA.t0 = Date.now(); });
 window.addEventListener('pagehide', pausarLeitura);
+// Resultado do teste de rigor para o aluno: nota simulada, o que mudou e questão por questão
+function htmlTesteRigorAluno(sims){
+  return Object.keys(sims || {}).map(function(k){ return sims[k]; }).sort(function(a, b){ return a.rigor - b.rigor; }).map(function(s){
+    var dif = s.base === null || s.base === undefined ? null : Math.round((s.nota - s.base) * 10) / 10;
+    var qs = Object.keys(s.questoes || {}).map(function(id){ return s.questoes[id]; });
+    return '<div class="detalhe" style="margin-top:10px"><p style="margin:0 0 6px;font-size:15px"><b>' + esc(s.nome) + ':</b> nota <b>' + n10(s.nota) + '</b>' +
+        (dif !== null ? ' <span class="aviso">(a sua nota: ' + n10(s.base) + ' · ' + (dif > 0 ? '+' : '') + String(dif).replace('.', ',') + ')</span>' : '') + '</p>' +
+      (s.resumo ? '<p style="margin:0 0 8px;font-size:14px"><b>O que pesaria mais:</b> ' + esc(s.resumo) + '</p>' : '') +
+      '<div class="tabelaBox"><table><thead><tr><th>Questão</th><th>Sua nota</th><th>' + esc(s.nome) + '</th><th>O que mudou</th></tr></thead><tbody>' +
+        qs.map(function(q){
+          var d = Math.round((q.pontos - q.atual) * 100) / 100;
+          return '<tr><td>' + esc(q.rotulo) + ' <span class="aviso">(vale ' + nPt(q.max) + ')</span></td><td>' + nPt(q.atual) + '</td><td><b' + (d < 0 ? ' style="color:#c62828"' : d > 0 ? ' style="color:#1a7a3c"' : '') + '>' + nPt(q.pontos) + '</b></td><td style="font-size:12.5px">' + esc(q.mudou) + '</td></tr>';
+        }).join('') + '</tbody></table></div></div>';
+  }).join('');
+}
 function abrirProvaAluno(i){
   var it = PROVAS_ALUNO[i], e = it.entrega, el = $('alunoDetalhe');
   fimLeitura(); LEITURA = {it: it, t0: Date.now()}; enviarLeitura(true, 0, it);
@@ -1293,7 +1312,7 @@ function abrirProvaAluno(i){
   var h = '<div class="caixa"><button type="button" class="link" data-voltar>&#8592; voltar</button>' +
     '<h2 style="margin-top:8px">' + esc(it.prova.titulo) + ' · ' + esc(it.disciplina) + '</h2>' +
     '<div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:6px 0 10px"><span style="font-size:30px;font-weight:bold">' + n10(e.notaFinal) + '</span><span class="aviso">de 10 · ' + nPt(obt) + ' de ' + nPt(total) + ' pontos · ' +
-      (e.confirmada ? 'nota definitiva, revisada pelo professor' : 'nota provisória') + '</span></div>' +
+      (e.confirmada ? 'nota definitiva, revisada pelo professor' : 'nota provisória') + (e.rigorNome ? ' · corrigida no rigor <b>' + esc(e.rigorNome) + '</b>' : '') + '</span></div>' +
     (e.confirmada ? '' : '<div class="convite" style="margin:0 0 10px">⏳ <b>Esta nota é provisória:</b> o professor ainda vai revisar a correção.' + (e.vistaPode ? ' Se algo foi lido ou corrigido errado, peça <b>vista de prova até ' + esc(e.vistaAte) + '</b>, no fim desta página.' : '') + '</div>');
   if(e.geral.professor) h += '<div class="detalhe"><b>Comentário do professor:</b> ' + esc(e.geral.professor) + '</div>';
   if(e.geral.comentario) h += '<div class="detalhe"><p style="margin:0"><b>Visão geral:</b> ' + esc(e.geral.comentario) + '</p>' +
@@ -1307,6 +1326,14 @@ function abrirProvaAluno(i){
       '<details style="margin-top:6px"><summary class="link" style="font-size:13px">O que a IA leu da sua resposta</summary><p style="white-space:pre-line;font-size:14px;margin-top:6px">' + (esc(q.transcricao) || '<i>nada: em branco ou não encontrada</i>') + '</p></details>' +
       (q.vista ? '<div class="recado"><b>Sua vista:</b> ' + esc(q.vista.texto) + '<br>' + (q.vista.resposta ? '<b>Resposta do professor:</b> ' + esc(q.vista.resposta) : '<span class="aviso">aguardando o professor</span>') + '</div>' : '') + '</div>';
   }).join('');
+  if(false){   // teste de rigor do aluno desativado (gastava chamadas da IA de prova)
+    var acima = [2, 3, 4, 5].filter(function(n){ return n > e.rigor; });
+    h += '<details class="convite" style="margin-top:14px"' + (Object.keys(e.simulacoes || {}).length ? ' open' : '') + '><summary style="cursor:pointer;font-weight:bold">🧪 Curiosidade: e se a correção fosse mais rigorosa?</summary>' +
+      (acima.length ? '<p class="aviso" style="margin:6px 0">Sua prova foi corrigida no rigor <b>' + esc(e.rigorNome) + '</b>. Veja como ficaria a sua nota com um professor mais exigente, e o que pesaria mais. <b>É só para você ver: a sua nota não muda.</b></p>' +
+        '<div class="botoes" style="margin-top:4px">' + acima.map(function(n){ return '<button type="button" class="secundario mini" data-rigaluno="' + n + '">' + ['', 'Bem flexível', 'Flexível', 'Padrão', 'Rigoroso', 'Muito rigoroso'][n] + '</button>'; }).join('') + '</div><div id="rigMsg"></div>'
+        : '<p class="aviso" style="margin:6px 0">Sua prova já foi corrigida no rigor mais alto (Muito rigoroso).</p>') +
+      '<div id="rigRes">' + htmlTesteRigorAluno(e.simulacoes) + '</div></details>';
+  }
   if(e.revisaoPedida) h += '<div class="ok">Outro ponto enviado ao professor: "' + esc(e.revisaoPedida) + '".</div>';
   var enviou = e.questoes.some(function(q){ return q.vista; });
   if(enviou && !e.confirmada) h += '<div class="ok">Vista enviada. O professor vai revisar e responder em cada questão.</div>';
@@ -1321,6 +1348,16 @@ function abrirProvaAluno(i){
   } else if(!e.confirmada && e.vistaAte) h += '<p class="aviso">O prazo para pedir vista terminou em ' + esc(e.vistaAte) + '.</p>';
   el.innerHTML = h + '</div>';
   el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarListaAluno(); });
+  el.querySelectorAll('[data-rigaluno]').forEach(function(b){ b.addEventListener('click', function(){
+    var n = Number(b.dataset.rigaluno);
+    el.querySelectorAll('[data-rigaluno]').forEach(function(x){ x.disabled = true; });
+    $('rigMsg').innerHTML = '<p class="carregando">Corrigindo de novo com mais rigor… (uns 30 segundos)</p>';
+    api('simularRigorAluno', {professorId: it.professorId, entregaId: e.id, rigor: n}).then(function(s){
+      e.simulacoes = e.simulacoes || {}; e.simulacoes[n] = s;
+      $('rigMsg').innerHTML = ''; $('rigRes').innerHTML = htmlTesteRigorAluno(e.simulacoes);
+    }).catch(function(x){ $('rigMsg').innerHTML = '<div class="erro">' + esc(x.message) + '</div>'; })
+      .then(function(){ el.querySelectorAll('[data-rigaluno]').forEach(function(x){ x.disabled = false; }); });
+  }); });
   var bt = $('btVista');
   if(bt) bt.addEventListener('click', function(){
     var itens = {};
@@ -4269,6 +4306,11 @@ document.addEventListener('toggle', function(ev){
   var r = cx.getBoundingClientRect(), sobra = r.right - (window.innerWidth - 8);
   if(sobra > 0) cx.style.left = (-10 - sobra) + 'px';
 }, true);
+</script>
+<script>
+// campos de número só por digitação: a rodinha do mouse e as setas do teclado não mudam o valor
+document.addEventListener('wheel', function(ev){ var a = document.activeElement; if(a && a.type === 'number' && a === ev.target) a.blur(); }, {passive: true});
+document.addEventListener('keydown', function(ev){ if(ev.target && ev.target.type === 'number' && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) ev.preventDefault(); });
 </script>
 </body>
 </html>

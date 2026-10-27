@@ -216,6 +216,10 @@
     border:1px solid var(--linha,#d9dee8);border-left:4px solid var(--menu);border-radius:8px;box-shadow:0 8px 24px rgba(14,42,92,.18);
     padding:10px 12px;font-size:13px;line-height:1.5;font-weight:normal;text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
 </style>
+<style>
+  input[type=number]{-moz-appearance:textfield;appearance:textfield}
+  input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+</style>
 </head>
 <body>
 <div class="wrap">
@@ -2174,6 +2178,11 @@ document.addEventListener('toggle', function(ev){
   var r = cx.getBoundingClientRect(), sobra = r.right - (window.innerWidth - 8);
   if(sobra > 0) cx.style.left = (-10 - sobra) + 'px';
 }, true);
+</script>
+<script>
+// campos de número só por digitação: a rodinha do mouse e as setas do teclado não mudam o valor
+document.addEventListener('wheel', function(ev){ var a = document.activeElement; if(a && a.type === 'number' && a === ev.target) a.blur(); }, {passive: true});
+document.addEventListener('keydown', function(ev){ if(ev.target && ev.target.type === 'number' && (ev.key === 'ArrowUp' || ev.key === 'ArrowDown')) ev.preventDefault(); });
 </script>
 </body>
 </html>
