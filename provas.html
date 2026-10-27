@@ -1766,9 +1766,16 @@ function abrirEntregas(provaId){
         : r.prova.resultadosLiberados ? '<div class="ok">Correção liberada para a turma em ' + esc(r.prova.resultadosEm) + ': cada aluno vê a nota provisória e a correção, e pode pedir vista. Revise cada um e use "Liberar nota definitiva" na correção dele.</div>'
         : '<div class="convite">Correção <b>oculta</b> da turma: os alunos veem só “em correção”. Revise o que quiser e, quando terminar, use “Liberar correção para a turma” na lista de provas: aí cada aluno recebe a nota provisória.</div>') +
       '<details class="convite"><summary style="cursor:pointer;font-weight:bold">📝 Ocorrências da prova' + (String(r.prova.ocorrencias || '').trim() ? ' <span class="tag t-azul">anotadas</span>' : '') + ' <span class="aviso" style="font-weight:normal">(problemas e dúvidas durante a aplicação)</span></summary>' +
-        '<p class="aviso" style="margin:6px 0">Anote o que deu problema nesta prova, por exemplo: "as questões 2 e 4 cobravam o mesmo tema", "os itens a e b tinham respostas quase iguais", "o enunciado da 3 gerou dúvida". Fica guardado nesta prova, e o <b>gerador de provas</b> evita esses problemas nas próximas.</p>' +
+        '<p class="aviso" style="margin:6px 0">Anote o que deu problema nesta prova, por exemplo: "a unidade da questão 2 estava errada (era g/L)", "a turma toda entendeu o item 3b como …", "as questões 2 e 4 cobravam o mesmo tema". ' +
+          '<b>Na correção</b>, a IA usa isto para que um erro da prova <b>não prejudique o aluno</b> (só a favor dele, nunca para tirar pontos). E o <b>gerador de provas</b> evita esses problemas nas próximas.</p>' +
         '<textarea id="ocTexto" style="min-height:70px" placeholder="ex.: muitos alunos perguntaram se a Aw da tabela era a do produto final">' + esc(r.prova.ocorrencias || '') + '</textarea>' +
         '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" id="ocSalvar">Salvar ocorrências</button><span class="aviso" id="ocMsg"></span></div></details>' +
+      (r.prova.ocorrPendente ? (function(){
+        var n = r.alunos.filter(function(a){ return a.entrega && a.entrega.status === 'corrigida'; }).length;
+        return '<div class="erro" id="ocPend"><b>⚠ Ocorrências novas:</b> ' + n + ' prova(s) já foram corrigidas sem considerar as ocorrências anotadas. Para que o erro da prova não prejudique ninguém, corrija de novo. ' +
+          '<span class="aviso" style="color:inherit">(Corrigir de novo refaz a correção da IA de todas as entregas: ajustes feitos à mão e notas definitivas destas provas voltam para a correção nova.)</span>' +
+          '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" id="ocRecorr">Corrigir de novo com as ocorrências</button><button type="button" class="secundario mini" id="ocDispensa">Não precisa</button></div></div>';
+      })() : '') +
       resumoVistos(r) +
       '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
@@ -1784,9 +1791,22 @@ function abrirEntregas(provaId){
       '</div><div id="msgRecorr"></div></div><div id="areaEntrega"></div>';
     el.innerHTML = h;
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
+    var bOR = $('ocRecorr'), bOD = $('ocDispensa');
+    if(bOR) bOR.addEventListener('click', function(){
+      if(bOR.dataset.conf !== '1'){ bOR.dataset.conf = '1'; bOR.textContent = 'Confirmar: corrigir todas de novo'; return; }
+      bOR.disabled = true; bOD.disabled = true; recorrigirTodas(provaId, false);
+    });
+    if(bOD) bOD.addEventListener('click', function(){
+      bOD.disabled = true;
+      api('dispensarRecorrecao', {provaId: provaId}).then(function(){ var x = $('ocPend'); if(x) x.remove(); }).catch(function(e){ bOD.disabled = false; erroGeral(e.message); });
+    });
     $('ocSalvar').addEventListener('click', function(){
       var b = this; b.disabled = true; $('ocMsg').textContent = 'Salvando…';
-      api('salvarOcorrencias', {provaId: provaId, texto: $('ocTexto').value}).then(function(){ b.disabled = false; $('ocMsg').textContent = '✓ Salvo. O gerador de provas vai levar isso em conta.'; })
+      api('salvarOcorrencias', {provaId: provaId, texto: $('ocTexto').value}).then(function(res){
+        b.disabled = false;
+        if(res && res.pendente) abrirEntregas(provaId);   // mostra o aviso para corrigir de novo
+        else $('ocMsg').textContent = '✓ Salvo. A correção e o gerador de provas vão levar isso em conta.';
+      })
         .catch(function(e){ b.disabled = false; $('ocMsg').textContent = ''; erroGeral(e.message); });
     });
     if(ABRIR_DIRETO && ABRIR_DIRETO.prova === provaId){ var ent = ABRIR_DIRETO.entrega; ABRIR_DIRETO = null; try{ history.replaceState(null, '', location.pathname); }catch(x){} abrirEntrega(ent); }
