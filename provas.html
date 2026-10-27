@@ -686,12 +686,18 @@ function abrirProf(){
     resumo = r;
     var ds = r.disciplinas.filter(function(d){ return d.ativa; });
     if(!ds.length){ $('profTopo').innerHTML = '<div class="caixa"><p>Crie uma disciplina no <a href="aulas.html">Aula por IA</a> para cadastrar provas.</p></div>'; $('profCorpo').innerHTML = ''; return; }
-    if(!discSel || !ds.some(function(d){ return d.id === discSel; })) discSel = ds[0].id;
+    // abre só com os nomes das disciplinas: as provas carregam quando o professor clica numa
+    if(discSel && !ds.some(function(d){ return d.id === discSel; })) discSel = '';
     $('profTopo').innerHTML = '<div class="caixa"><div class="chips">' + ds.map(function(d){
       return '<button type="button" class="chip" data-disc="' + esc(d.id) + '" aria-pressed="' + (d.id === discSel) + '">' + esc(d.nome) + ' · ' + esc(d.semestre) + '</button>'; }).join('') + '</div>' +
       (r.temChave ? '' : '<div class="convite" style="margin:12px 0 0">Cadastre sua chave do Gemini em Aula por IA → Configurações para a IA corrigir as provas.</div>') + '</div>';
-    $('profTopo').querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){ discSel = b.dataset.disc; abrirProf(); }); });
-    listarProvas();
+    $('profTopo').querySelectorAll('[data-disc]').forEach(function(b){ b.addEventListener('click', function(){
+      discSel = b.dataset.disc;
+      $('profTopo').querySelectorAll('[data-disc]').forEach(function(x){ x.setAttribute('aria-pressed', String(x === b)); });
+      listarProvas();
+    }); });
+    if(discSel) listarProvas();
+    else $('profCorpo').innerHTML = '<div class="caixa"><p class="aviso" style="margin:0">Escolha uma disciplina acima para ver as provas.</p></div>';
   }).catch(function(e){ $('profTopo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
