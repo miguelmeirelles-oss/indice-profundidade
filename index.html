@@ -339,6 +339,8 @@ if (/[?&]voltar=extensao\b/.test(location.search)) document.documentElement.clas
           <span>Aulas</span><span class="seta">&#10230;</span></button>
         <button class="pill claro" onclick="location.href='provas.html'">
           <span>Provas</span><span class="seta">&#10230;</span></button>
+        <button class="pill claro" onclick="location.href='entrevista.html'">
+          <span>Treino de entrevista</span><span class="seta">&#10230;</span></button>
         <button class="pill claro oculto" id="btProf" onclick="abrirProfessor()">
           <span>Mapa dos alunos</span><span class="seta">&#10230;</span></button>
         <button class="pill claro oculto" id="btConta" onclick="abrirConta()">
@@ -781,7 +783,7 @@ api('config').then(function(c){
 
 // Vindo do aulas.html sem login: abre a tela de entrar e, depois de logar,
 // devolve o aluno para lá.
-var destinoVolta = (location.search.match(/[?&]voltar=(aulas|provas|extensao|ponte)\b/) || [])[1] || '';   // extensao = Sistema de Extensão
+var destinoVolta = (location.search.match(/[?&]voltar=(aulas|provas|extensao|ponte|entrevista)\b/) || [])[1] || '';   // extensao = Sistema de Extensão
 var voltarParaAulas = !!destinoVolta;
 // index.html?conta=1 (link "minha conta" do Aula por IA e do Prova por IA): abre direto a página da conta
 var querConta = /[?&]conta=1\b/.test(location.search);
