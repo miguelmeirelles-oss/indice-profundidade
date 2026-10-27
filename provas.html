@@ -619,7 +619,7 @@ function correcaoAluno(it, i){
     return '<div class="convite">Sua prova está em correção. A nota e a correção aparecem aqui quando o professor liberar a correção; você recebe um e-mail e um aviso no celular.</div>';
   }
   if(e.status === 'pendente' || e.status === 'corrigindo'){
-    return '<div class="convite">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A correção está na fila' + (e.erro === 'cota' ? ' (a cota de IA do dia acabou; ela é feita sozinha assim que a cota voltar)' : e.erro === 'sem_questoes' ? ' e começa quando o professor terminar de cadastrar a prova' : '') +
+    return '<div class="convite">Recebemos ' + e.paginas + ' página(s) em ' + esc(e.enviadaEm) + '. A correção está na fila' + (e.erro === 'cota' ? ' (a cota de IA do dia acabou; ela é feita sozinha às 6h da manhã)' : e.erro === 'sem_questoes' ? ' e começa quando o professor terminar de cadastrar a prova' : '') +
       '. Você recebe um e-mail quando ficar pronta.</div><div class="botoes" style="margin-top:0"><button type="button" class="secundario mini" onclick="abrirAluno()">Atualizar</button></div>';
   }
   if(e.status === 'erro') return '<div class="erro">A correção automática não funcionou. O professor foi avisado e vai corrigir.</div>';
@@ -1595,7 +1595,7 @@ function abrirGeradorNovo(){
     api('gerarProvaIA', {disciplinaId: discSel, cfg: cfg}).then(function(g){
       GER = g;
       m.innerHTML = '<p class="carregando">2 de 2 · Revisando conceitos, dados, gráficos e contas… (1 a 2 minutos)</p>';
-      return api('revisarProvaGerada', {codigo: g.codigo}).then(function(rv){ GER = rv.prova; desenharGerador({revisao: rv.feitos}); })
+      return api('revisarProvaGerada', {codigo: g.codigo, criacao: true}).then(function(rv){ GER = rv.prova; desenharGerador({revisao: rv.feitos}); })
         .catch(function(e){ desenharGerador({erro: 'A prova foi gerada, mas a revisão falhou (' + e.message + '). Use "Revisar de novo com IA" quando quiser.'}); });
     }).then(atualizarListaGeradas).catch(function(e){ b.disabled = false; m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
@@ -1794,14 +1794,17 @@ function abrirEntregas(provaId){
           '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
           '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
       }).join('') + '</tbody></table></div><div id="envioProf"></div><div class="botoes"><button type="button" class="secundario mini" id="btAtualEnt">Atualizar</button>' +
-      (r.alunos.some(function(a){ return a.entrega; }) ? '<button type="button" class="secundario mini" id="btRecorrTodas">Corrigir todas de novo com o gabarito atual</button>' : '') +
+      (r.alunos.some(function(a){ return a.entrega; }) ? '<button type="button" class="secundario mini" id="btRecorrTodas">Corrigir todas de novo (usa a leitura já feita)</button>' +
+        '<button type="button" class="secundario mini" id="btRelerTodas">Reler as fotos e corrigir de novo</button>' +
+        '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div><b>Corrigir todas de novo</b> refaz só a avaliação, com o gabarito, o rigor e as ocorrências atuais, usando a leitura da folha que a IA já fez (e que você pode ter arrumado). É o jeito mais estável: a mesma resposta dá a mesma nota. ' +
+          '<b>Reler as fotos</b> lê as folhas de novo do zero; use se a leitura estava ruim. Nos dois casos, os ajustes feitos à mão e as notas definitivas voltam para a correção nova.</div></details>' : '') +
       '</div><div id="msgRecorr"></div></div><div id="areaEntrega"></div>';
     el.innerHTML = h;
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
     var bOR = $('ocRecorr'), bOD = $('ocDispensa');
     if(bOR) bOR.addEventListener('click', function(){
       if(bOR.dataset.conf !== '1'){ bOR.dataset.conf = '1'; bOR.textContent = 'Confirmar: corrigir todas de novo'; return; }
-      bOR.disabled = true; bOD.disabled = true; recorrigirTodas(provaId, false);
+      bOR.disabled = true; bOD.disabled = true; recorrigirPelaLeitura(provaId, r);
     });
     if(bOD) bOD.addEventListener('click', function(){
       bOD.disabled = true;
@@ -1817,11 +1820,15 @@ function abrirEntregas(provaId){
         .catch(function(e){ b.disabled = false; $('ocMsg').textContent = ''; erroGeral(e.message); });
     });
     if(ABRIR_DIRETO && ABRIR_DIRETO.prova === provaId){ var ent = ABRIR_DIRETO.entrega; ABRIR_DIRETO = null; try{ history.replaceState(null, '', location.pathname); }catch(x){} abrirEntrega(ent); }
-    var btR = $('btRecorrTodas');
+    var btR = $('btRecorrTodas'), btL = $('btRelerTodas');
     if(btR) btR.addEventListener('click', function(){
-      if(btR.dataset.conf !== '1'){
-        btR.dataset.conf = '1';
-        btR.textContent = 'Confirmar: recorrigir todas (os ajustes feitos à mão e as confirmações serão perdidos)';
+      if(btR.dataset.conf !== '1'){ btR.dataset.conf = '1'; btR.textContent = 'Confirmar: corrigir todas de novo (ajustes à mão e notas definitivas voltam para a correção nova)'; return; }
+      recorrigirPelaLeitura(provaId, r);
+    });
+    if(btL) btL.addEventListener('click', function(){
+      if(btL.dataset.conf !== '1'){
+        btL.dataset.conf = '1';
+        btL.textContent = 'Confirmar: reler as fotos e recorrigir todas (os ajustes feitos à mão e as confirmações serão perdidos)';
         return;
       }
       recorrigirTodas(provaId, false);
@@ -1833,6 +1840,27 @@ function abrirEntregas(provaId){
 }
 
 // Recorrige tudo com o gabarito atual; o que não couber de uma vez continua com um clique.
+// Corrige de novo, uma entrega por vez, usando a leitura já feita (sem reler as fotos)
+function recorrigirPelaLeitura(provaId, r){
+  var msg = $('msgRecorr'), ids = r.alunos.filter(function(a){ return a.entrega && a.entrega.status === 'corrigida'; }).map(function(a){ return {id: a.entrega.id, nome: a.nome}; });
+  ['btRecorrTodas', 'btRelerTodas', 'ocRecorr'].forEach(function(k){ var b = $(k); if(b) b.disabled = true; });
+  if(!ids.length){ msg.innerHTML = '<div class="erro">Nenhuma entrega corrigida para corrigir de novo.</div>'; return; }
+  var feitas = 0, semLeitura = [];
+  function proxima(i){
+    if(i >= ids.length){
+      abrirEntregas(provaId); atualizarTopoProvas();
+      setTimeout(function(){ var m = $('msgRecorr'); if(m) m.innerHTML = '<div class="ok">' + feitas + ' de ' + ids.length + ' entrega(s) corrigida(s) de novo com a leitura já feita.' + (semLeitura.length ? ' Sem leitura (use "Reler as fotos"): ' + semLeitura.map(esc).join(', ') + '.' : '') + ' Revise e confirme as notas.</div>'; }, 800);
+      return;
+    }
+    msg.innerHTML = '<p class="carregando">Corrigindo de novo… ' + (i + 1) + ' de ' + ids.length + ' (' + esc(ids[i].nome) + ')</p>';
+    api('recorrigirPelaLeitura', {entregaId: ids[i].id}).then(function(){ feitas++; proxima(i + 1); }).catch(function(e){
+      if(/SEM_LEITURA/.test(e.message)){ semLeitura.push(ids[i].nome); proxima(i + 1); return; }
+      msg.innerHTML = '<div class="erro">Parou em ' + esc(ids[i].nome) + ' (' + feitas + ' de ' + ids.length + ' feitas): ' + esc(e.message) + '</div>';
+      ['btRecorrTodas', 'btRelerTodas'].forEach(function(k){ var b = $(k); if(b) b.disabled = false; });
+    });
+  }
+  proxima(0);
+}
 function recorrigirTodas(provaId, continuar){
   var msg = $('msgRecorr'), bt = $('btRecorrTodas');
   if(bt) bt.disabled = true;
@@ -1872,7 +1900,11 @@ function envioPeloProfessor(aluno, provaId){
 function corConf(n){ return n >= 85 ? '#1a7a3c' : n >= 60 ? '#b07d00' : '#c62828'; }
 function marcarIlegivel(t){ return esc(t).replace(/\[(ilegível|ilegivel)[^\]]*\]/gi, function(m){ return '<span class="ilegivel">' + m + '</span>'; }); }
 function htmlFbIA(q){
-  return (q.acertos ? '<p class="fb"><b>Acertos:</b> ' + esc(q.acertos) + '</p>' : '') + (q.faltou ? '<p class="fb"><b>Faltou:</b> ' + esc(q.faltou) + '</p>' : '') + (q.melhorar ? '<p class="fb"><b>Melhorar:</b> ' + esc(q.melhorar) + '</p>' : '');
+  var sit = {atendeu: '✓', parcial: '◐', nao: '✗'}, cor = {atendeu: '#1a7a3c', parcial: '#b07d00', nao: '#c62828'};
+  var top = (q.topicos || []).length ? '<div class="fb" style="margin-bottom:4px"><b>Tópicos do gabarito:</b>' + q.topicos.map(function(t){
+    return '<div style="font-size:13px;margin-left:8px"><b style="color:' + cor[t.situacao] + '">' + sit[t.situacao] + '</b> ' + esc(t.topico) + (t.essencial ? '' : ' <span class="aviso">(detalhe)</span>') + '</div>';
+  }).join('') + '</div>' : '';
+  return top + (q.acertos ? '<p class="fb"><b>Acertos:</b> ' + esc(q.acertos) + '</p>' : '') + (q.faltou ? '<p class="fb"><b>Faltou:</b> ' + esc(q.faltou) + '</p>' : '') + (q.melhorar ? '<p class="fb"><b>Melhorar:</b> ' + esc(q.melhorar) + '</p>' : '');
 }
 function htmlVistaProf(q){
   var v = q.vista; if(!v) return '';
@@ -1961,7 +1993,7 @@ function abrirEntrega(entregaId){
   el.innerHTML = '<div class="caixa"><p class="carregando">Carregando a prova e as fotos…</p></div>';
   api('verEntrega', {entregaId: entregaId}).then(function(e){
     var h = '<div class="caixa"><h2>' + esc(e.alunoNome) + ' · ' + esc(e.prova.titulo) + '</h2>' +
-      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + '' + ' · ' + tagEntrega(e, 'fechada') + ' · <span id="eEnvio">' + tagEnvio(e, e.prova.resultadosLiberados) + '</span>' + (e.visto && e.visto.vezes ? ' · 👁 o aluno abriu ' + e.visto.vezes + '× (' + tempoTxt(e.visto.seg) + '; 1ª vez ' + esc(e.visto.primeiro) + ', última ' + esc(e.visto.ultimo) + ')' : e.status === 'corrigida' && e.prova.resultadosLiberados ? ' · o aluno ainda não abriu a correção' : '') + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + '</p>';
+      '<p class="aviso">Enviada em ' + esc(e.enviadaEm) + '' + ' · ' + tagEntrega(e, 'fechada') + ' · <span id="eEnvio">' + tagEnvio(e, e.prova.resultadosLiberados) + '</span>' + (e.visto && e.visto.vezes ? ' · 👁 o aluno abriu ' + e.visto.vezes + '× (' + tempoTxt(e.visto.seg) + '; 1ª vez ' + esc(e.visto.primeiro) + ', última ' + esc(e.visto.ultimo) + ')' : e.status === 'corrigida' && e.prova.resultadosLiberados ? ' · o aluno ainda não abriu a correção' : '') + (e.erro && e.erro !== 'cota' ? ' · erro: ' + esc(e.erro) : '') + (e.modeloIA ? ' · corrigida por <b>' + esc(e.modeloIA) + '</b>' + (/lite/i.test(e.modeloIA) ? ' <span class="tag t-warn" title="modelo mais simples">modelo simples</span>' : '') : '') + '</p>';
     if(e.revisaoPedida) h += '<div class="convite"><b>O aluno pediu revisão:</b> ' + esc(e.revisaoPedida) + '</div>';
     h += '<details open><summary class="link">Fotos (' + e.fotos.length + ')</summary><div class="fotosGrandes">' + e.fotos.map(function(f, i){
       return f.mime === 'application/pdf' ? '<a class="link" download="prova.pdf" href="data:application/pdf;base64,' + f.dados + '">Abrir PDF ' + (i + 1) + '</a>' : '<img src="data:' + f.mime + ';base64,' + f.dados + '" alt="Página ' + (i + 1) + '">';
