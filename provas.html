@@ -941,7 +941,8 @@ function desenharQs(){
         '<div><label class="rot">Nº na prova</label><input type="text" data-c="rotulo" value="' + esc(q.rotulo || (i + 1)) + '" placeholder="ex.: 2a" style="max-width:110px"></div>' +
         '<div><label class="rot">Vale (pontos)</label>' + aviso(q, 'pontos') + '<input type="number" min="0" step="0.25" data-c="pontos" value="' + esc(q.pontos) + '"' + marca(q, 'pontos') + '></div>' +
         '<div class="campoLargo"><label class="rot">Assunto (é só isso que o aluno vê)</label><input type="text" data-c="assunto" value="' + esc(q.assunto) + '" placeholder="ex.: Atividade de água e crescimento microbiano (em branco: a IA escreve)"></div></div>' +
-      '<label class="rot" style="margin-top:10px">Gabarito em tópicos</label>' + aviso(q, 'gabarito') + '<textarea data-c="gabarito"' + marca(q, 'gabarito') + ' placeholder="ex.:\n- cita redução da aw\n- relaciona com crescimento microbiano\n- dá um exemplo industrial">' + esc(q.gabarito) + '</textarea>' +
+      '<label class="rot" style="margin-top:10px">Gabarito em tópicos</label>' + aviso(q, 'gabarito') + '<textarea data-c="gabarito"' + marca(q, 'gabarito') + ' placeholder="ex.:\n- cita redução da aw\n- relaciona com crescimento microbiano\n- (detalhe) dá um exemplo industrial">' + esc(q.gabarito) + '</textarea>' +
+        '<p class="aviso" style="margin:2px 0 0">Comece com <b>(detalhe)</b> o tópico só complementar: a falta dele tira no máximo uma pequena parte da questão.</p>' +
       '<label class="rot" style="margin-top:10px">Instruções de correção (opcional)</label>' + aviso(q, 'instrucoes') + '<textarea data-c="instrucoes"' + marca(q, 'instrucoes') + ' style="min-height:50px" placeholder="ex.: sem exemplo vale no máximo metade">' + esc(q.instrucoes) + '</textarea></div>';
   }).join('');
   var total = qsEdit.reduce(function(t, q){ return t + (Number(String(q.pontos).replace(',', '.')) || 0); }, 0);
