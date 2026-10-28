@@ -1861,10 +1861,10 @@ function recorrigirPelaLeitura(provaId, r){
     api('recorrigirPelaLeitura', {entregaId: ids[i].id}).then(function(){ feitas++; proxima(i + 1); }).catch(function(e){
       if(/SEM_LEITURA/.test(e.message)){ semLeitura.push(ids[i].nome); proxima(i + 1); return; }
       // instabilidade do Google (503/500, ocupado por minuto): espera e tenta a mesma de novo, até 4 vezes
-      if(/sobrecarregad|ocupada|indispon/i.test(e.message) && tentativa < 4){
+      if(/sobrecarregad|ocupada|indispon/i.test(e.message) && !/cota do dia/i.test(e.message) && tentativa < 2){
         tentativa++;
-        msg.innerHTML = '<p class="carregando">O Google está instável agora (não é erro do sistema). Tentando ' + esc(ids[i].nome) + ' de novo em 30 s… (tentativa ' + (tentativa + 1) + ' de 5; ' + feitas + ' de ' + ids.length + ' feitas)</p>';
-        setTimeout(function(){ proxima(i); }, 30000);
+        msg.innerHTML = '<p class="carregando">O Google está instável agora (não é erro do sistema). Tentando ' + esc(ids[i].nome) + ' de novo em 2 min… (tentativa ' + (tentativa + 1) + ' de 3; ' + feitas + ' de ' + ids.length + ' feitas)</p>';
+        setTimeout(function(){ proxima(i); }, 120000);
         return;
       }
       msg.innerHTML = '<div class="erro">Parou em ' + esc(ids[i].nome) + ' (' + feitas + ' de ' + ids.length + ' feitas): ' + esc(e.message) + '</div>';
