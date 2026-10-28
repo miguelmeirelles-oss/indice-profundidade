@@ -1849,8 +1849,9 @@ function recorrigirPelaLeitura(provaId, r){
   var msg = $('msgRecorr'), ids = r.alunos.filter(function(a){ return a.entrega && a.entrega.status === 'corrigida'; }).map(function(a){ return {id: a.entrega.id, nome: a.nome}; });
   ['btRecorrTodas', 'btRelerTodas', 'ocRecorr'].forEach(function(k){ var b = $(k); if(b) b.disabled = true; });
   if(!ids.length){ msg.innerHTML = '<div class="erro">Nenhuma entrega corrigida para corrigir de novo.</div>'; return; }
-  var feitas = 0, semLeitura = [];
+  var feitas = 0, semLeitura = [], tentativa = 0;
   function proxima(i){
+    if(i !== proxima.ultima){ proxima.ultima = i; tentativa = 0; }
     if(i >= ids.length){
       abrirEntregas(provaId); atualizarTopoProvas();
       setTimeout(function(){ var m = $('msgRecorr'); if(m) m.innerHTML = '<div class="ok">' + feitas + ' de ' + ids.length + ' entrega(s) corrigida(s) de novo com a leitura já feita.' + (semLeitura.length ? ' Sem leitura (use "Reler as fotos"): ' + semLeitura.map(esc).join(', ') + '.' : '') + ' Revise e confirme as notas.</div>'; }, 800);
@@ -1859,6 +1860,13 @@ function recorrigirPelaLeitura(provaId, r){
     msg.innerHTML = '<p class="carregando">Corrigindo de novo… ' + (i + 1) + ' de ' + ids.length + ' (' + esc(ids[i].nome) + ')</p>';
     api('recorrigirPelaLeitura', {entregaId: ids[i].id}).then(function(){ feitas++; proxima(i + 1); }).catch(function(e){
       if(/SEM_LEITURA/.test(e.message)){ semLeitura.push(ids[i].nome); proxima(i + 1); return; }
+      // instabilidade do Google (503/500, ocupado por minuto): espera e tenta a mesma de novo, até 4 vezes
+      if(/sobrecarregad|ocupada|indispon/i.test(e.message) && tentativa < 4){
+        tentativa++;
+        msg.innerHTML = '<p class="carregando">O Google está instável agora (não é erro do sistema). Tentando ' + esc(ids[i].nome) + ' de novo em 30 s… (tentativa ' + (tentativa + 1) + ' de 5; ' + feitas + ' de ' + ids.length + ' feitas)</p>';
+        setTimeout(function(){ proxima(i); }, 30000);
+        return;
+      }
       msg.innerHTML = '<div class="erro">Parou em ' + esc(ids[i].nome) + ' (' + feitas + ' de ' + ids.length + ' feitas): ' + esc(e.message) + '</div>';
       ['btRecorrTodas', 'btRelerTodas'].forEach(function(k){ var b = $(k); if(b) b.disabled = false; });
     });
