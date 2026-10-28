@@ -2811,8 +2811,8 @@ function desenharCompositor(){
     c.revisao = c.revF + c.revA ? Q.revSel.filter(function(x){ return x.id; }) : [];
     if(c.revF + c.revA && c.revisao.length < c.revF + c.revA){ this.disabled = false; $('qMsg').innerHTML = '<div class="erro">Escolha o tema de cada questão de revisão (ou diminua a quantidade de revisão).</div>'; return; }
     api('gerarQuestoes', {aulaId: a.id, cfg: c}).then(function(r){
-      Q.propostas = r.questoes.map(function(q){ q.ok = false; return q; });
-      desenharRevisao();
+      Q.propostas = r.questoes.map(function(q){ q.ok = false; return q; }); Q.avisos = r.avisos || [];
+      desenharRevisao(); conferirPropostas(a.id);
     }).catch(function(e){ $('qGerar').disabled = false; $('qMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
 }
@@ -2865,12 +2865,45 @@ function buscarSugestaoRevisao(){
   }).catch(function(e){ Q.sug = {erro: e.message, todos: []}; var box = $('qRevisao'); if(box) box.innerHTML = htmlRevisao(); });
 }
 
+// conferência em segundo plano: o professor já pode revisar; questão com erro técnico é trocada sozinha
+// (se ele ainda não aprovou nem está editando) ou ganha um aviso com a opção de trocar
+function conferirPropostas(aulaId){
+  Q.conferindo = true; desenharRevisao();
+  api('conferirQuestoes', {aulaId: aulaId, ids: Q.propostas.map(function(q){ return q.id; })}).then(function(r){
+    var trocas = [];
+    r.itens.forEach(function(it){
+      var i = -1; Q.propostas.forEach(function(q, k){ if(q.id === it.id) i = k; });
+      if(i < 0) return;
+      var q = Q.propostas[i];
+      if(it.ok){ q.conf = {ok: true}; return; }
+      q.conf = {ok: false, problema: it.problema, sub: it.substituta || null};
+      if(it.substituta && !q.ok && !q.editando) trocas.push(i);
+    });
+    var cadeia = Promise.resolve();
+    trocas.forEach(function(i){ cadeia = cadeia.then(function(){ return usarSubstituta(i, true); }); });
+    return cadeia;
+  }).catch(function(){ /* a conferência é um extra: se falhar, segue como antes */ })
+    .then(function(){ Q.conferindo = false; if(Q.propostas && !Q.propostas.some(function(q){ return q.editando; })) desenharRevisao(); });   // editando: o aviso aparece ao salvar/cancelar (não apaga o que ele digitou)
+}
+function usarSubstituta(i, sozinha){
+  var q = Q.propostas[i], s = q.conf && q.conf.sub;
+  if(!s) return Promise.resolve();
+  return api('editarQuestao', {questaoId: q.id, campos: {enunciado: s.enunciado, alternativas: s.alternativas, gabarito: s.gabarito, explicacoes: s.explicacoes}}).then(function(nq){
+    nq.ok = false; nq.conf = {ok: false, trocada: true, problema: q.conf.problema, sozinha: sozinha}; Q.propostas[i] = nq;
+  });
+}
 function desenharRevisao(){
   var nOk = Q.propostas.filter(function(q){ return q.ok; }).length;
-  var h = '<div class="caixa"><h2>Revisar antes de liberar</h2>';
+  var h = '<div class="caixa"><h2>Revisar antes de liberar</h2>' + (Q.conferindo ? '<p class="carregando" style="margin:0 0 10px">Conferindo pergunta e gabarito com o conhecimento técnico atual… pode ir revisando.</p>' : '');
+  // pontos da aula que a IA achou imprecisos: não viraram questão; o professor decide se corrige com a turma
+  if((Q.avisos || []).length) h += '<div class="convite" style="margin:0 0 12px"><b>⚠️ Pontos da aula que a IA não usou nas questões</b> <span class="aviso">(pareceram imprecisos, desatualizados ou erro de transcrição; confira e, se for o caso, comente com a turma)</span>' +
+    Q.avisos.map(function(a){ return '<p style="margin:8px 0 0;font-size:14px"><b>Na aula:</b> ' + esc(a.dito) + '<br><b>O correto:</b> ' + esc(a.correto) + '</p>'; }).join('') + '</div>';
   Q.propostas.forEach(function(q, i){
     h += '<div class="questaoRev' + (q.ok ? ' aprovada' : '') + '" data-i="' + i + '"><span class="tag t-azul">' + (q.tipo === 'fechada' ? 'Fechada' : 'Aberta') + ' ' + (i + 1) + '</span> ' +
-      (q.revisao ? '<span class="tag t-warn">revisão' + (q.temaNome ? ': ' + esc(q.temaNome) : '') + '</span> ' : '') + (q.ok ? '<span class="tag t-ok">aprovada</span>' : '');
+      (q.revisao ? '<span class="tag t-warn">revisão' + (q.temaNome ? ': ' + esc(q.temaNome) : '') + '</span> ' : '') + (q.ok ? '<span class="tag t-ok">aprovada</span>' : '') + (q.conf && q.conf.ok ? ' <span class="tag t-ok">✓ conferida</span>' : '');
+    if(q.conf && !q.conf.ok) h += q.conf.trocada
+      ? '<div class="convite" style="margin:8px 0 0;font-size:14px">🔁 <b>Trocada pela conferência' + (q.conf.sozinha ? '' : ' (a seu pedido)') + ':</b> a versão anterior tinha um problema: ' + esc(q.conf.problema) + '</div>'
+      : '<div class="erro" style="margin:8px 0 0;font-size:14px">⚠️ <b>A conferência apontou:</b> ' + esc(q.conf.problema) + (q.conf.sub ? ' <button type="button" class="secundario mini" data-acao="substituta">Trocar pela questão corrigida</button>' : '') + '</div>';
     if(q.editando){
       h += '<label class="rot" style="margin-top:10px">Enunciado</label><textarea data-e="enun">' + esc(q.enunciado) + '</textarea>';
       if(q.tipo === 'fechada'){
@@ -2897,6 +2930,7 @@ function desenharRevisao(){
     card.querySelectorAll('[data-acao]').forEach(function(b){ b.addEventListener('click', function(){
       var ac = b.dataset.acao;
       if(ac === 'ok'){ q.ok = !q.ok; desenharRevisao(); }
+      else if(ac === 'substituta'){ b.disabled = true; usarSubstituta(i, false).then(desenharRevisao).catch(function(e){ b.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); }
       else if(ac === 'editar'){ q.editando = true; desenharRevisao(); }
       else if(ac === 'cancelarEd'){ q.editando = false; desenharRevisao(); }
       else if(ac === 'salvar'){
