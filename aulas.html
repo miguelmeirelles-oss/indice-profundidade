@@ -1409,7 +1409,7 @@ function abrirEstudo(m){
   api('estudoInicio', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
     var h = cabEstudo(m) + '<div class="caixa"><h2>📚 Estudo dirigido · ' + esc(m.nome) + '</h2>';
     if(r.prova) h += '<div class="ajudaEst" style="margin-top:0"><b>🎯 Próxima prova: ' + esc(r.prova.titulo) + ' · ' + esc(String(r.prova.data).split(' ')[0]) + '</b> (' + (r.prova.dias === 0 ? 'hoje' : 'em ' + r.prova.dias + ' dia' + (r.prova.dias > 1 ? 's' : '')) + ')' +
-      (r.prova.aulas.length ? ' — cai: aula' + (r.prova.aulas.length > 1 ? 's ' : ' ') + r.prova.aulas.join(', ') + '. As questões focam nesses assuntos.' : '') + '</div>';
+      (r.prova.foco ? (r.prova.aulas.length ? ' — cai: aula' + (r.prova.aulas.length > 1 ? 's ' : ' ') + r.prova.aulas.join(', ') + '.' : '') + ' As questões são só dos assuntos que caem nesta prova.' : ' — o professor não marcou os assuntos: as questões são de todas as aulas já dadas.') + '</div>';
     else h += '<p class="aviso" style="margin-top:0">Sem prova marcada: as questões são das aulas já dadas.</p>';
     h += '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:10px 0">' +
       '<div><span class="aviso">questões feitas</span><div class="numEst">' + r.questoes + '</div></div>' +
