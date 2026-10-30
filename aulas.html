@@ -2865,8 +2865,8 @@ function buscarSugestaoRevisao(){
   }).catch(function(e){ Q.sug = {erro: e.message, todos: []}; var box = $('qRevisao'); if(box) box.innerHTML = htmlRevisao(); });
 }
 
-// conferência em segundo plano: o professor já pode revisar; questão com erro técnico é trocada sozinha
-// (se ele ainda não aprovou nem está editando) ou ganha um aviso com a opção de trocar
+// conferência em segundo plano: o professor já pode revisar; questão com erro técnico ganha um aviso
+// com a opção de trocar pela corrigida (nunca troca sozinha)
 function conferirPropostas(aulaId){
   Q.conferindo = true; desenharRevisao();
   api('conferirQuestoes', {aulaId: aulaId, ids: Q.propostas.map(function(q){ return q.id; })}).then(function(r){
@@ -2877,7 +2877,7 @@ function conferirPropostas(aulaId){
       var q = Q.propostas[i];
       if(it.ok){ q.conf = {ok: true}; return; }
       q.conf = {ok: false, problema: it.problema, sub: it.substituta || null};
-      if(it.substituta && !q.ok && !q.editando) trocas.push(i);
+      // não troca sozinha: só avisa e oferece a corrigida
     });
     var cadeia = Promise.resolve();
     trocas.forEach(function(i){ cadeia = cadeia.then(function(){ return usarSubstituta(i, true); }); });
