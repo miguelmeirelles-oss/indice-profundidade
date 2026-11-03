@@ -1904,14 +1904,15 @@ function recorrigirPelaLeitura(provaId, r){
     msg.innerHTML = '<p class="carregando">Corrigindo de novo… ' + (i + 1) + ' de ' + ids.length + ' (' + esc(ids[i].nome) + ')</p>';
     api('recorrigirPelaLeitura', {entregaId: ids[i].id}).then(function(){ feitas++; proxima(i + 1); }).catch(function(e){
       if(/SEM_LEITURA/.test(e.message)){ semLeitura.push(ids[i].nome); proxima(i + 1); return; }
-      // instabilidade do Google (503/500, ocupado por minuto): espera e tenta a mesma de novo, até 4 vezes
+      // instabilidade do Google (503/500, ocupado por minuto): espera 2 min e tenta a mesma de novo, até 2 vezes
       if(/sobrecarregad|ocupada|indispon/i.test(e.message) && !/cota do dia/i.test(e.message) && tentativa < 2){
         tentativa++;
         msg.innerHTML = '<p class="carregando">O Google está instável agora (não é erro do sistema). Tentando ' + esc(ids[i].nome) + ' de novo em 2 min… (tentativa ' + (tentativa + 1) + ' de 3; ' + feitas + ' de ' + ids.length + ' feitas)</p>';
         setTimeout(function(){ proxima(i); }, 120000);
         return;
       }
-      msg.innerHTML = '<div class="erro">Parou em ' + esc(ids[i].nome) + ' (' + feitas + ' de ' + ids.length + ' feitas): ' + esc(e.message) + '</div>';
+      msg.innerHTML = '<div class="erro">Parou em ' + esc(ids[i].nome) + ' (' + feitas + ' de ' + ids.length + ' feitas): ' + esc(e.message) +
+        '<br><b>Esta recorreção não continua sozinha.</b> Quem ficou de fora continua com a correção anterior (nada se perdeu). Para terminar, clique de novo em "Corrigir todas de novo" mais tarde' + (/cota/i.test(e.message) ? ' (depois das 6h da manhã)' : ' (em uns 15 minutos)') + '.</div>';
       ['btRecorrTodas', 'btRelerTodas'].forEach(function(k){ var b = $(k); if(b) b.disabled = false; });
     });
   }
@@ -1945,7 +1946,7 @@ function envioPeloProfessor(aluno, provaId){
     api('enviarProvaProfessor', {provaId: provaId, alunoId: aluno.alunoId, fotos: sel.paginas().map(function(p){ return {mime:p.mime, dados:p.dados}; })})
       .then(function(id){
         msg.innerHTML = '<p class="carregando">Fotos salvas. Corrigindo com a IA… (até 2 minutos)</p>';
-        return api('corrigirEntregaProf', {entregaId: id}).then(function(){ return id; }, function(e){ msg.innerHTML = '<div class="erro">Fotos salvas, mas a correção falhou agora: ' + esc(e.message) + ' Ela fica na fila e é feita sozinha depois.</div>'; return id; });
+        return api('corrigirEntregaProf', {entregaId: id}).then(function(){ return id; }, function(e){ msg.innerHTML = '<div class="erro">Fotos salvas, mas a correção falhou agora: ' + esc(e.message) + ' Ela fica na fila de correção e o sistema tenta de novo sozinho, de hora em hora (se foi a cota do dia, às 6h da manhã).</div>'; return id; });
       })
       .then(function(id){ abrirEntregas(provaId); setTimeout(function(){ abrirEntrega(id); }, 600); })
       .catch(function(e){ bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
