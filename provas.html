@@ -721,6 +721,7 @@ function listarProvas(){
     h += r.provas.length ? r.provas.map(function(p, i){
       var sit = r.agora < p.inicio ? '<span class="tag t-cinza">agendada</span>' : r.agora <= p.fimProva ? '<span class="tag t-err">em andamento</span>' : r.agora <= p.fimEnvio ? '<span class="tag t-warn">envio aberto</span>' : '<span class="tag t-ok">encerrada</span>';
       return '<div class="linha"><div><b>' + esc(p.titulo) + '</b> ' + (p.publicada ? sit : '<span class="tag t-cinza">rascunho</span>') +
+        ((p.alunos || []).length ? ' <span class="tag t-warn" title="só estes alunos veem e fazem esta prova">só ' + (p.alunos.length === 1 ? esc(((dadosDisc.alunosDisc || []).filter(function(a){ return a.id === p.alunos[0]; })[0] || {nome: '1 aluno'}).nome) : p.alunos.length + ' alunos') + '</span>' : '') +
         (p.revisoes ? ' <span class="badge" title="pedidos de revisão">' + p.revisoes + '</span>' : '') +
         '<span data-taglib="' + esc(p.id) + '">' + (p.resultadosLiberados ? ' ' + tagLiberadas(p) : p.resultadosAgendados ? ' <span class="tag t-warn">⏳ libera sozinha em ' + esc(p.liberaEm) + '</span>' : (p.entregas ? ' <span class="tag t-warn">correção oculta da turma</span>' : '')) + '</span>' +
         '<div class="aviso">' + dataHora(p.inicio) + ' · ' + p.duracao + ' min + ' + p.janela + ' min para envio (até ' + hora(p.fimEnvio) + ') · vale como <b>' + esc(rotuloItem(etapas, p)) + '</b> · ' + (p.questoes.length ? p.questoes.length + ' questão(ões), ' + num(p.totalPontos) + ' pontos' : '<span class="tag t-warn">sem questões ainda</span>') +
@@ -799,6 +800,43 @@ function rotuloItem(etapas, p){
   return x ? (x.final ? 'Prova final (média final = (semestre + final) ÷ 2)' : x.etapa.nome + ' · ' + x.item.nome + ' (vale ' + nota10(x.item.valor) + ')') : 'sem item de prova na composição';
 }
 
+/* ---- prova só para alguns alunos (2ª chamada) ---- */
+var quemSel = [];
+function quemFazAlguns(){ var r = document.querySelector('input[name="pQuem"]:checked'); return !!(r && r.value === 'alguns'); }
+function quemFazMarcados(){ return quemFazAlguns() ? quemSel.slice() : []; }
+function desenharQuemFaz(){
+  var box = $('pQuemBox'); if(!box) return;
+  if(!quemFazAlguns()){ box.innerHTML = ''; return; }
+  var al = dadosDisc.alunosDisc || [];
+  box.innerHTML = '<div class="convite" style="margin:6px 0 0"><p class="aviso" style="margin:0 0 6px">Só os marcados veem esta prova em "Minhas provas", recebem o lembrete da véspera e aparecem nas entregas. A nota vai para o item escolhido em "Vale como" (P1, P2…) só deles; para a turma nada muda.</p>' +
+    (al.length ? al.map(function(a){ return '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:2px 0"><input type="checkbox" data-quem="' + esc(a.id) + '"' + (quemSel.indexOf(a.id) !== -1 ? ' checked' : '') + ' style="width:17px;height:17px"> ' + esc(a.nome) + (a.semConta ? ' <span class="aviso">(sem conta)</span>' : '') + '</label>'; }).join('') : '<p class="aviso">Nenhum aluno na turma ainda.</p>') +
+    '<p class="aviso" style="margin:8px 0 2px">O aluno não está na lista? Cadastre aqui (sem conta; depois dá para vincular à conta dele):</p>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap"><input type="text" id="pQuemNovo" placeholder="nome completo do aluno" style="flex:1;min-width:200px"><button type="button" class="secundario mini" id="pQuemAdd">Cadastrar e marcar</button></div><div id="pQuemMsg"></div></div>';
+  box.querySelectorAll('[data-quem]').forEach(function(c){ c.addEventListener('change', function(){
+    var id = c.dataset.quem, i = quemSel.indexOf(id);
+    if(c.checked && i === -1) quemSel.push(id); else if(!c.checked && i !== -1) quemSel.splice(i, 1);
+  }); });
+  $('pQuemAdd').addEventListener('click', function(){
+    var nome = $('pQuemNovo').value.trim(), bt = this; if(!nome) return;
+    bt.disabled = true; $('pQuemMsg').innerHTML = '<p class="carregando">Cadastrando…</p>';
+    api('cadastrarSemConta', {disciplinaId: discSel, nome: nome}).then(function(){ return api('provasDisciplina', {disciplinaId: discSel}); }).then(function(r){
+      dadosDisc.alunosDisc = r.alunosDisc;
+      var k = nome.toLowerCase().replace(/\s+/g, ' ');
+      r.alunosDisc.forEach(function(a){ if(a.nome.toLowerCase().replace(/\s+/g, ' ') === k && quemSel.indexOf(a.id) === -1) quemSel.push(a.id); });
+      desenharQuemFaz();
+    }).catch(function(e){ bt.disabled = false; $('pQuemMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+function ligarQuemFaz(v){
+  quemSel = (v.alunos || []).slice();
+  document.querySelectorAll('input[name="pQuem"]').forEach(function(r){ r.addEventListener('change', function(){
+    var t = $('pTit');
+    if(quemFazAlguns() && t && !/chamada/i.test(t.value)) t.value = t.value.trim() + ' · 2ª chamada';
+    desenharQuemFaz();
+  }); });
+  desenharQuemFaz();
+}
+
 /* ---- cadastrar ou editar prova ---- */
 var qsEdit = [];
 function dataInput(ms){ var d = new Date(ms); return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
@@ -830,6 +868,10 @@ function formProva(p, pre){
       return '<option value="' + esc(x.item.id) + '"' + (atual && atual.item.id === x.item.id ? ' selected' : '') + '>' + esc(x.final ? 'Prova final (fora das etapas: média final = (semestre + final) ÷ 2)' : x.etapa.nome + ' · ' + x.item.nome + ' (vale ' + nota10(x.item.valor) + ' na etapa)') + '</option>';
     }).join('') + '</select>' : '<p class="erro" style="margin:0">A composição da nota desta disciplina não tem nenhum item do tipo Prova. Acrescente em Aula por IA → Disciplinas → Editar.</p><input type="hidden" id="pItem" value="">') +
       '<p class="aviso" style="margin:6px 0 0">A prova é corrigida de 0 a 10; o peso vem da composição da nota.</p></div>' +
+    '<div class="campoLargo"><label class="rot">Quem faz esta prova</label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:3px 0"><input type="radio" name="pQuem" value="todos"' + ((v.alunos || []).length ? '' : ' checked') + ' style="width:17px;height:17px"> A turma toda</label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:3px 0"><input type="radio" name="pQuem" value="alguns"' + ((v.alunos || []).length ? ' checked' : '') + ' style="width:17px;height:17px"> Só alguns alunos (2ª chamada)</label>' +
+      '<div id="pQuemBox"></div></div>' +
     // critérios prontos para marcar (os dois primeiros vêm marcados) + orientações livres
     '<div class="campoLargo"><label class="rot">Critérios de correção ' +
       '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Regras prontas que a IA segue ao corrigir esta prova. Marque as que valem. Para o que for específico desta prova, use as instruções gerais logo abaixo. Com "usar como padrão", a próxima prova desta disciplina já vem com estes critérios e instruções.</div></details></label>' +
@@ -861,6 +903,7 @@ function formProva(p, pre){
     '<label style="display:flex;gap:8px;align-items:center;margin-top:16px;font-weight:bold"><input type="checkbox" id="pPub"' + (v.publicada ? ' checked' : '') + ' style="width:20px;height:20px"> Publicada (os alunos veem só a data e o horário de envio; as questões nunca aparecem para eles)</label>' +
     '<div id="pErro" class="erro oculto"></div><div class="botoes"><button type="button" id="pSalvar">' + (p ? 'Salvar alterações' : 'Criar prova') + '</button><button type="button" class="secundario" id="pCanc">Cancelar</button></div>' +
     (p && p.entregas ? '<div class="erro"><b>⚠ Atenção:</b> esta prova já tem ' + p.entregas + ' entrega(s). Qualquer alteração nas questões, no gabarito ou nos pontos pode mudar as notas dos alunos. Se mudar, use "Corrigir todas de novo" nas entregas e confira as notas antes de liberar.</div>' : '') + '</div>';
+  ligarQuemFaz(v);
   desenharQs();
   ligarImpressao('pf', function(){ lerQs(); return {titulo: $('pTit').value, disciplina: d.nome, codigo: geradaAtual, subtitulo: '', questoes: dadosDasLinhas(qsEdit)}; });
   function usarGerada(g, m, como){
@@ -933,6 +976,7 @@ function formProva(p, pre){
       duracao: $('pDur').value, janela: $('pJan').value, item: $('pItem').value, instrucoes: $('pIns').value, rigor: rigorProva,
       criterios: Array.prototype.filter.call(el.querySelectorAll('[data-pcrit]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.pcrit; }),
       salvarPadrao: $('pPadrao').checked, gerada: geradaAtual,
+      restrita: quemFazAlguns(), alunos: quemFazMarcados(),
       aulas: Array.prototype.filter.call(el.querySelectorAll('[data-paula]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.paula; }),
       publicada: $('pPub').checked, questoes: qsEdit.map(function(q){ q.pontos = String(q.pontos).replace(',', '.'); return q; })}})
       .then(listarProvas).catch(function(e){ bt.disabled = false; $('pErro').textContent = e.message; $('pErro').classList.remove('oculto'); });
@@ -1557,7 +1601,7 @@ function abrirGeradorNovo(){
   var modelosDisc = (dd.modelosProva || []);
   el.innerHTML = '<div class="caixa"><h2>✨ Gerar prova com IA</h2>' +
     '<p class="aviso">A IA monta a prova no estilo das suas provas (material para analisar, itens com valor, gabarito e critérios) e uma segunda chamada revisa tudo: conceitos, dados, gráficos e contas. Os gráficos são calculados pelo sistema. Depois você pede ajustes por escrito, imprime ou baixa em PDF e Word.</p>' +
-    '<div class="campos"><div><label class="rot" for="gTit">Qual prova</label><select id="gTit">' + ['P1', 'P2', 'P3', 'P4', 'Prova final', '2ª chamada'].map(function(o){ return '<option' + ((c.titulo || 'P1') === o ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>' +
+    '<div class="campos"><div><label class="rot" for="gTit">Qual prova</label><select id="gTit">' + ['P1', 'P2', 'P3', 'P4', 'Prova final', 'P1 2ª chamada', 'P2 2ª chamada', '2ª chamada'].map(function(o){ return '<option' + ((c.titulo || 'P1') === o ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>' +
       '<p class="aviso" style="margin:4px 0 0">O código fica "' + esc(dd.disciplina.nome + ' ' + semestreCodigo(dd.disciplina.semestre)) + ' <span id="gCodEx">' + esc(c.titulo || 'P1') + '</span> v1"; cada nova versão da mesma prova vira v2, v3…</p></div>' +
       '<div><label class="rot" for="gN">Nº de questões</label><input type="number" id="gN" min="1" max="10" value="' + esc(c.n || 5) + '"></div>' +
       '<div><label class="rot" for="gTot">Total de pontos</label><input type="number" id="gTot" min="1" max="100" step="0.5" value="' + esc(c.total || 10) + '"></div>' +
