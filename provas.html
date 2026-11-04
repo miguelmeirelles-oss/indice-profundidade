@@ -744,7 +744,7 @@ function listarProvas(){
         '<li><b>Depois da prova:</b> em “Entregas”, envie as fotos das folhas de cada aluno; a IA corrige com o seu gabarito, você revisa e libera a nota (provisória ou definitiva).</li></ol>' +
       '<p class="aviso" style="margin:0;font-size:13px"><b>Por que vale a pena:</b> prova pronta em minutos, no seu padrão; gráficos calculados pelo sistema (os números sempre batem com a curva); a correção já conhece o gabarito, o texto e as figuras de cada questão; notas, vistas e avisos aos alunos ficam organizados; e o banco de provas cresce a cada semestre.</p></details>';
     h += '<div class="botoes"><button type="button" id="btNovaProva">+ Nova prova</button><button type="button" class="secundario" id="btGerarProva">✨ Gerar prova com IA</button></div>' +
-      '<div id="listaGeradas">' + htmlListaGeradas(r.provasGeradas) + '</div></div><div id="areaProva"></div>';
+      '<div id="listaGeradas">' + htmlListaGeradas(r.provasGeradas) + '</div></div><div id="areaProva"></div><div id="enviosProf"></div>';
     el.innerHTML = h;
     $('btNovaProva').addEventListener('click', function(){ formProva(null); });
     $('btGerarProva').addEventListener('click', abrirGeradorNovo);
@@ -1841,7 +1841,7 @@ function abrirEntregas(provaId){
           '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
           '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
           '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
-      }).join('') + '</tbody></table></div><div id="envioProf"></div><div class="botoes"><button type="button" class="secundario mini" id="btAtualEnt">Atualizar</button>' +
+      }).join('') + '</tbody></table></div><div class="botoes"><button type="button" class="secundario mini" id="btAtualEnt">Atualizar</button>' +
       (r.alunos.some(function(a){ return a.entrega; }) ? '<button type="button" class="secundario mini" id="btRecorrTodas">Corrigir todas de novo (usa a leitura já feita)</button>' +
         '<button type="button" class="secundario mini" id="btRelerTodas">Reler as fotos e corrigir de novo</button>' +
         '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div><b>Corrigir todas de novo</b> refaz só a avaliação, com o gabarito, o rigor e as ocorrências atuais, usando a leitura da folha que a IA já fez (e que você pode ter arrumado). É o jeito mais estável: a mesma resposta dá a mesma nota. ' +
@@ -1934,22 +1934,47 @@ function recorrigirTodas(provaId, continuar){
   }).catch(function(e){ if(bt) bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 
+// Cada envio tem a sua caixa, fora da lista de entregas: enquanto a IA corrige um aluno, dá para escolher
+// e enviar as fotos do próximo; quando a correção termina, a caixa avisa (não recarrega a página por cima)
 function envioPeloProfessor(aluno, provaId){
-  var box = $('envioProf');
-  box.innerHTML = '<div class="detalhe"><h3>Enviar fotos por ' + esc(aluno.nome) + '</h3>' + (aluno.entrega ? '<p class="aviso">As fotos novas substituem as que já foram enviadas, e a prova é corrigida de novo.</p>' : '') +
-    '<div data-sel></div><div class="botoes"><button type="button" data-ok disabled>Enviar e corrigir</button><button type="button" class="secundario" data-canc>Cancelar</button></div><div data-msg></div></div>';
+  var cont = $('enviosProf'); if(!cont) return;
+  var chave = provaId + '|' + aluno.alunoId;
+  var ja = Array.prototype.filter.call(cont.querySelectorAll('[data-envio]'), function(x){ return x.dataset.envio === chave; })[0];
+  if(ja){ ja.scrollIntoView({behavior: 'smooth', block: 'center'}); return; }
+  var box = document.createElement('div');
+  box.className = 'detalhe'; box.dataset.envio = chave;
+  box.innerHTML = '<h3>Enviar fotos por ' + esc(aluno.nome) + ' <span class="aviso" style="font-weight:normal">· ' + esc((provaAtual && provaAtual.id === provaId ? provaAtual.titulo : '')) + '</span></h3>' + (aluno.entrega ? '<p class="aviso">As fotos novas substituem as que já foram enviadas, e a prova é corrigida de novo.</p>' : '') +
+    '<div data-sel></div><div class="botoes" data-bts><button type="button" data-ok disabled>Enviar e corrigir</button><button type="button" class="secundario" data-canc>Cancelar</button></div><div data-msg></div>';
+  cont.appendChild(box);
+  box.scrollIntoView({behavior: 'smooth', block: 'center'});
   var bt = box.querySelector('[data-ok]'), msg = box.querySelector('[data-msg]');
   var sel = seletorFotos(box.querySelector('[data-sel]'), true, function(pg){ bt.disabled = !pg.length; });
-  box.querySelector('[data-canc]').addEventListener('click', function(){ box.innerHTML = ''; });
+  box.querySelector('[data-canc]').addEventListener('click', function(){ box.remove(); });
+  var fim = function(html, id){
+    box.querySelector('[data-sel]').innerHTML = ''; box.querySelector('[data-bts]').innerHTML = '';
+    msg.innerHTML = html + '<div class="botoes" style="margin-top:6px">' + (id ? '<button type="button" class="mini" data-abrirc>Abrir a correção</button>' : '') + '<button type="button" class="secundario mini" data-fechar>Fechar</button></div>';
+    msg.querySelector('[data-fechar]').addEventListener('click', function(){ box.remove(); });
+    var ab = msg.querySelector('[data-abrirc]');
+    if(ab) ab.addEventListener('click', function(){
+      box.remove();
+      if(provaAtual && provaAtual.id === provaId && $('areaEntrega')) abrirEntrega(id);
+      else { abrirEntregas(provaId); setTimeout(function(){ abrirEntrega(id); }, 1500); }
+    });
+    // a lista só é atualizada se ninguém estiver olhando uma correção aberta
+    if(provaAtual && provaAtual.id === provaId && $('areaEntrega') && !$('areaEntrega').innerHTML.trim()) abrirEntregas(provaId);
+  };
   bt.addEventListener('click', function(){
-    bt.disabled = true; msg.innerHTML = '<p class="carregando">Enviando…</p>';
+    bt.disabled = true; box.querySelector('[data-canc]').disabled = true; msg.innerHTML = '<p class="carregando">Enviando…</p>';
     api('enviarProvaProfessor', {provaId: provaId, alunoId: aluno.alunoId, fotos: sel.paginas().map(function(p){ return {mime:p.mime, dados:p.dados}; })})
       .then(function(id){
-        msg.innerHTML = '<p class="carregando">Fotos salvas. Corrigindo com a IA… (até 2 minutos)</p>';
-        return api('corrigirEntregaProf', {entregaId: id}).then(function(){ return id; }, function(e){ msg.innerHTML = '<div class="erro">Fotos salvas, mas a correção falhou agora: ' + esc(e.message) + ' Ela fica na fila de correção e o sistema tenta de novo sozinho, de hora em hora (se foi a cota do dia, às 6h da manhã).</div>'; return id; });
-      })
-      .then(function(id){ abrirEntregas(provaId); setTimeout(function(){ abrirEntrega(id); }, 600); })
-      .catch(function(e){ bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+        box.querySelector('[data-sel]').innerHTML = ''; box.querySelector('[data-bts]').innerHTML = '';
+        msg.innerHTML = '<p class="carregando">Fotos salvas. Corrigindo com a IA… (até 2 minutos). Pode já enviar as fotos do próximo aluno.</p>';
+        return api('corrigirEntregaProf', {entregaId: id}).then(function(r){
+          fim('<div class="ok">✓ <b>' + esc(aluno.nome) + '</b>: corrigida' + (r && r.notaFinal !== null && r.notaFinal !== undefined ? ', nota provisória ' + nota10(r.notaFinal) : '') + '.</div>', id);
+        }, function(e){
+          fim('<div class="erro"><b>' + esc(aluno.nome) + '</b>: fotos salvas, mas a correção falhou agora: ' + esc(e.message) + ' Ela fica na fila de correção e o sistema tenta de novo sozinho, de hora em hora (se foi a cota do dia, às 6h da manhã).</div>', id);
+        });
+      }, function(e){ bt.disabled = false; box.querySelector('[data-canc]').disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
 }
 
