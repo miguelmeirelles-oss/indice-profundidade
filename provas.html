@@ -324,6 +324,26 @@ function api(acao, dados, tentativa){
   .catch(function(e){ if(e instanceof TypeError){ var x = new Error('Sem conexão com o servidor. Verifique sua internet e tente de novo.'); x.rede = true; throw x; } throw e; });
 }
 
+/* Resumo ao entrar: o que as tarefas automáticas fizeram (terminou, parou pela cota e quando volta, falhou).
+   Some ao clicar em "Entendido"; continua guardado em Mensagens → Para você. */
+function mostrarAvisosSistema(){
+  api('avisosSistema', {}).then(function(r){
+    if(!r.avisos.length || document.getElementById('avisosSis')) return;
+    var box = document.createElement('div');
+    box.id = 'avisosSis'; box.className = 'convite'; box.setAttribute('role', 'status'); box.style.margin = '0 0 14px';
+    box.innerHTML = '<b>🔔 Enquanto você esteve fora</b>' + (r.total > r.avisos.length ? ' <span class="aviso">(' + r.avisos.length + ' mais recentes de ' + r.total + ')</span>' : '') +
+      r.avisos.map(function(a){ return '<p style="margin:8px 0 0;font-size:14px"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) + '</p>'; }).join('') +
+      '<div class="botoes" style="margin-top:10px"><button type="button" class="mini" id="avisosSisOk">Entendido</button><span class="aviso">continuam guardados em Mensagens → Para você</span></div>';
+    var ref = document.getElementById('erroGeral'); ref.parentNode.insertBefore(box, ref);
+    document.getElementById('avisosSisOk').addEventListener('click', function(){
+      this.disabled = true;
+      api('marcarAvisosLidos', {ids: r.avisos.map(function(a){ return a.id; })}).then(function(){
+        box.remove();
+        if(typeof AVISOS_PROF !== 'undefined'){ AVISOS_PROF = Math.max(0, AVISOS_PROF - r.avisos.length); if(typeof atualizarSeloMsgs === 'function') atualizarSeloMsgs(); }
+      }).catch(function(e){ box.querySelector('#avisosSisOk').disabled = false; erroGeral(e.message); });
+    });
+  }).catch(function(){});
+}
 function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
 // Sem login: vai direto para a tela de entrar (com trava de 15 s contra idas e voltas).
 function mostrarLogin(){
@@ -354,6 +374,7 @@ function iniciar(){
       '<a href="aulas.html">Aula por IA</a> · <a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){ e.preventDefault(); desligarAvisosAoSair(token); try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
     $('btMensagens').classList.remove('oculto');
+    if(r.professor) mostrarAvisosSistema();
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
@@ -1831,6 +1852,7 @@ function abrirEntregas(provaId){
           '<span class="aviso" style="color:inherit">(Corrigir de novo refaz a correção da IA de todas as entregas: ajustes feitos à mão e notas definitivas destas provas voltam para a correção nova.)</span>' +
           '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" id="ocRecorr">Corrigir de novo com as ocorrências</button><button type="button" class="secundario mini" id="ocDispensa">Não precisa</button></div></div>';
       })() : '') +
+      (r.recorrFila ? '<div class="convite">🔄 <b>Corrigindo de novo no servidor:</b> faltam ' + r.recorrFila + ' prova(s). Uma por vez, uns 30 segundos cada. <b>Pode fechar a página ou desligar o computador:</b> o servidor continua sozinho. Se a cota do modelo forte acabar, ele continua depois das 6h da manhã. Esta lista se atualiza sozinha a cada minuto.</div>' : '') +
       resumoVistos(r) +
       '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
@@ -1848,11 +1870,14 @@ function abrirEntregas(provaId){
           '<b>Reler as fotos</b> lê as folhas de novo do zero; use se a leitura estava ruim. Nos dois casos, os ajustes feitos à mão e as notas definitivas voltam para a correção nova.</div></details>' : '') +
       '</div><div id="msgRecorr"></div></div><div id="areaEntrega"></div>';
     el.innerHTML = h;
+    if(r.recorrFila) setTimeout(function(){
+      if(provaAtual && provaAtual.id === provaId && $('areaEntrega') && !$('areaEntrega').innerHTML.trim()) abrirEntregas(provaId);
+    }, 60000);
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
     var bOR = $('ocRecorr'), bOD = $('ocDispensa');
     if(bOR) bOR.addEventListener('click', function(){
       if(bOR.dataset.conf !== '1'){ bOR.dataset.conf = '1'; bOR.textContent = 'Confirmar: corrigir todas de novo'; return; }
-      bOR.disabled = true; bOD.disabled = true; recorrigirPelaLeitura(provaId, r);
+      bOR.disabled = true; bOD.disabled = true; agendarRecorrecao(provaId);
     });
     if(bOD) bOD.addEventListener('click', function(){
       bOD.disabled = true;
@@ -1871,7 +1896,7 @@ function abrirEntregas(provaId){
     var btR = $('btRecorrTodas'), btL = $('btRelerTodas');
     if(btR) btR.addEventListener('click', function(){
       if(btR.dataset.conf !== '1'){ btR.dataset.conf = '1'; btR.textContent = 'Confirmar: corrigir todas de novo (ajustes à mão e notas definitivas voltam para a correção nova)'; return; }
-      recorrigirPelaLeitura(provaId, r);
+      agendarRecorrecao(provaId);
     });
     if(btL) btL.addEventListener('click', function(){
       if(btL.dataset.conf !== '1'){
@@ -1889,6 +1914,18 @@ function abrirEntregas(provaId){
 
 // Recorrige tudo com o gabarito atual; o que não couber de uma vez continua com um clique.
 // Corrige de novo, uma entrega por vez, usando a leitura já feita (sem reler as fotos)
+// "Corrigir todas de novo": vai para a fila do servidor, que continua mesmo com a página fechada
+function agendarRecorrecao(provaId){
+  var msg = $('msgRecorr');
+  ['btRecorrTodas', 'btRelerTodas', 'ocRecorr'].forEach(function(k){ var b = $(k); if(b) b.disabled = true; });
+  msg.innerHTML = '<p class="carregando">Colocando na fila…</p>';
+  api('agendarRecorrecao', {provaId: provaId}).then(function(x){
+    abrirEntregas(provaId); atualizarTopoProvas();
+  }).catch(function(e){
+    msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>';
+    ['btRecorrTodas', 'btRelerTodas'].forEach(function(k){ var b = $(k); if(b) b.disabled = false; });
+  });
+}
 function recorrigirPelaLeitura(provaId, r){
   var msg = $('msgRecorr'), ids = r.alunos.filter(function(a){ return a.entrega && a.entrega.status === 'corrigida'; }).map(function(a){ return {id: a.entrega.id, nome: a.nome}; });
   ['btRecorrTodas', 'btRelerTodas', 'ocRecorr'].forEach(function(k){ var b = $(k); if(b) b.disabled = true; });

@@ -617,6 +617,26 @@ function api(acao, dados, tentativa){
   });
 }
 
+/* Resumo ao entrar: o que as tarefas automáticas fizeram (terminou, parou pela cota e quando volta, falhou).
+   Some ao clicar em "Entendido"; continua guardado em Mensagens → Para você. */
+function mostrarAvisosSistema(){
+  api('avisosSistema', {}).then(function(r){
+    if(!r.avisos.length || document.getElementById('avisosSis')) return;
+    var box = document.createElement('div');
+    box.id = 'avisosSis'; box.className = 'convite'; box.setAttribute('role', 'status'); box.style.margin = '0 0 14px';
+    box.innerHTML = '<b>🔔 Enquanto você esteve fora</b>' + (r.total > r.avisos.length ? ' <span class="aviso">(' + r.avisos.length + ' mais recentes de ' + r.total + ')</span>' : '') +
+      r.avisos.map(function(a){ return '<p style="margin:8px 0 0;font-size:14px"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) + '</p>'; }).join('') +
+      '<div class="botoes" style="margin-top:10px"><button type="button" class="mini" id="avisosSisOk">Entendido</button><span class="aviso">continuam guardados em Mensagens → Para você</span></div>';
+    var ref = document.getElementById('erroGeral'); ref.parentNode.insertBefore(box, ref);
+    document.getElementById('avisosSisOk').addEventListener('click', function(){
+      this.disabled = true;
+      api('marcarAvisosLidos', {ids: r.avisos.map(function(a){ return a.id; })}).then(function(){
+        box.remove();
+        if(typeof AVISOS_PROF !== 'undefined'){ AVISOS_PROF = Math.max(0, AVISOS_PROF - r.avisos.length); if(typeof atualizarSeloMsgs === 'function') atualizarSeloMsgs(); }
+      }).catch(function(e){ box.querySelector('#avisosSisOk').disabled = false; erroGeral(e.message); });
+    });
+  }).catch(function(){});
+}
 function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
 // Sem login: vai direto para a tela de entrar (o Avaliador devolve para cá depois).
 // A trava de 15 s evita ficar pulando entre as páginas se algo der errado; aí mostra o cartão.
@@ -649,7 +669,7 @@ function iniciar(){
       location.href = 'index.html';
     });
     $('btMensagens').classList.remove('oculto');
-    if(r.professor) api('contarAvisosProf', {}).then(function(c){ AVISOS_PROF = c.naoLidos || 0; atualizarSeloMsgs(); }).catch(function(){});
+    if(r.professor) api('contarAvisosProf', {}).then(function(c){ AVISOS_PROF = c.naoLidos || 0; atualizarSeloMsgs(); if(c.naoLidos) mostrarAvisosSistema(); }).catch(function(){});
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
     try{ if(new URLSearchParams(location.search).get('msgs')){ history.replaceState(null, '', location.pathname); setTimeout(function(){ abrirMensagens(); }, 300); } }catch(x){}
@@ -1073,7 +1093,7 @@ function desenharMsgsProf(discPre){
   var h = cabMsgs() + (av.length ? '<div class="caixa"><h2 style="margin-top:0">🔔 Para você' + (novosAv ? ' <span class="tag t-err">' + novosAv + ' novo(s)</span>' : '') + '</h2>' +
       av.slice(0, 10).map(function(a){
         return '<div class="msgItem' + (a.lido ? '' : ' nova') + '"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) +
-          (a.link ? '<div class="botoes" style="margin-top:6px"><a class="botaoLink" href="' + esc(a.link) + '">Abrir a correção</a></div>' : '') + '</div>';
+          (a.link ? '<div class="botoes" style="margin-top:6px"><a class="botaoLink" href="' + esc(a.link) + '">' + (a.tipo === 'sistema' ? 'Abrir' : 'Abrir a correção') + '</a></div>' : '') + '</div>';
       }).join('') + (av.length > 10 ? '<p class="aviso">Mostrando os 10 mais recentes.</p>' : '') + '</div>' : '') +
     '<div class="caixa"><h2 style="margin-top:0">✉️ Escrever mensagem</h2>' +
     '<p class="aviso" style="margin:0 0 6px">' + (r.ligado ? 'Vai para os celulares com avisos ligados e fica no app até expirar.' : 'Os avisos no celular ainda não estão configurados: a mensagem fica no app até expirar.') + '</p>' +
