@@ -1852,7 +1852,8 @@ function abrirEntregas(provaId){
           '<span class="aviso" style="color:inherit">(Corrigir de novo refaz a correção da IA de todas as entregas: ajustes feitos à mão e notas definitivas destas provas voltam para a correção nova.)</span>' +
           '<div class="botoes" style="margin-top:8px"><button type="button" class="mini" id="ocRecorr">Corrigir de novo com as ocorrências</button><button type="button" class="secundario mini" id="ocDispensa">Não precisa</button></div></div>';
       })() : '') +
-      (r.recorrFila ? '<div class="convite">🔄 <b>Corrigindo de novo no servidor:</b> faltam ' + r.recorrFila + ' prova(s). Uma por vez, uns 30 segundos cada. <b>Pode fechar a página ou desligar o computador:</b> o servidor continua sozinho. Se a cota do modelo forte acabar, ele continua depois das 6h da manhã. Esta lista se atualiza sozinha a cada minuto.</div>' : '') +
+      (r.recorrFila ? '<div class="convite">🔄 <b>Corrigindo de novo no servidor:</b> faltam ' + r.recorrFila + ' prova(s). Uma por vez, uns 30 segundos cada. <b>Pode fechar a página ou desligar o computador:</b> o servidor continua sozinho. Se a cota do modelo forte acabar, ele continua depois das 6h da manhã. Esta lista se atualiza sozinha a cada minuto.' +
+        '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="btPararRecorr">Cancelar a recorreção</button><span class="aviso">as que já foram feitas ficam com a correção nova; as outras continuam com a anterior</span></div></div>' : '') +
       resumoVistos(r) +
       '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
@@ -1874,6 +1875,15 @@ function abrirEntregas(provaId){
       if(provaAtual && provaAtual.id === provaId && $('areaEntrega') && !$('areaEntrega').innerHTML.trim()) abrirEntregas(provaId);
     }, 60000);
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
+    var bPR = $('btPararRecorr');
+    if(bPR) bPR.addEventListener('click', function(){
+      if(bPR.dataset.conf !== '1'){ bPR.dataset.conf = '1'; bPR.textContent = 'Confirmar: cancelar as que ainda faltam'; return; }
+      bPR.disabled = true;
+      api('pararRecorrecao', {provaId: provaId}).then(function(x){
+        abrirEntregas(provaId); atualizarTopoProvas();
+        setTimeout(function(){ var m = $('msgRecorr'); if(m) m.innerHTML = '<div class="ok">Recorreção cancelada: ' + x.canceladas + ' prova(s) que ainda faltavam não serão corrigidas de novo (continuam com a correção anterior).</div>'; }, 1200);
+      }).catch(function(e){ bPR.disabled = false; erroGeral(e.message); });
+    });
     var bOR = $('ocRecorr'), bOD = $('ocDispensa');
     if(bOR) bOR.addEventListener('click', function(){
       if(bOR.dataset.conf !== '1'){ bOR.dataset.conf = '1'; bOR.textContent = 'Confirmar: corrigir todas de novo'; return; }
