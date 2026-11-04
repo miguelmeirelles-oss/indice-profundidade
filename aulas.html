@@ -4089,6 +4089,9 @@ function buscarParaInscrever(termo){
   }).catch(function(e){ box.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
 
+// filtro de disciplina dos alunos inscritos: começa em "todas" ao abrir a página e
+// se mantém quando a lista recarrega (ex.: depois de inscrever ou cadastrar um aluno)
+var filtroInscr = '';
 function carregarInscricoes(){
   try{ prepararInscreverAluno(); }catch(e){}
   $('listaPend').innerHTML = $('listaAprov').innerHTML = '<p class="carregando">Carregando…</p>';
@@ -4102,8 +4105,12 @@ function carregarInscricoes(){
     var grupos = {};
     r.aprovados.forEach(function(i){ (grupos[i.disciplina] = grupos[i.disciplina] || []).push(i); });
     var nomes = Object.keys(grupos).sort();
-    $('listaAprov').innerHTML = nomes.length ? nomes.map(function(n){
-      return '<p class="grupoTitulo">' + esc(n) + ' · ' + grupos[n].length + ' aluno(s)</p>' + grupos[n].map(function(i){
+    if(nomes.indexOf(filtroInscr) === -1) filtroInscr = '';
+    var filtro = nomes.length > 1 ? '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px"><label class="rot" for="filtroInscr" style="margin:0">Filtrar disciplina</label>' +
+      '<select id="filtroInscr" style="width:auto;max-width:100%"><option value="">Todas (' + r.aprovados.length + ' aluno(s))</option>' +
+      nomes.map(function(n){ return '<option value="' + esc(n) + '"' + (n === filtroInscr ? ' selected' : '') + '>' + esc(n) + ' (' + grupos[n].length + ')</option>'; }).join('') + '</select></div>' : '';
+    $('listaAprov').innerHTML = filtro + (nomes.length ? nomes.map(function(n){
+      return '<div data-grupo="' + esc(n) + '"' + (filtroInscr && n !== filtroInscr ? ' style="display:none"' : '') + '><p class="grupoTitulo">' + esc(n) + ' · ' + grupos[n].length + ' aluno(s)</p>' + grupos[n].map(function(i){
         var portal = !i.temLista ? '' : i.portal
           ? '<br><span class="aviso">portal: ' + esc(i.portal) + '</span> <select data-vinc="' + esc(i.id) + '" style="width:auto;max-width:220px;padding:3px 6px;font-size:12px"><option value="">trocar…</option>' + i.livres.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>'
           : '<br><span class="aviso" style="color:#c62828">não encontrado na lista do portal</span> <select data-vinc="' + esc(i.id) + '" style="width:auto;max-width:220px;padding:3px 6px;font-size:12px"><option value="">ligar ao nome…</option>' + i.livres.map(function(n){ return '<option value="' + esc(n) + '">' + esc(n) + '</option>'; }).join('') + '</select>';
@@ -4113,8 +4120,13 @@ function carregarInscricoes(){
           : '<br><span class="aviso">quando ele criar a conta e pedir inscrição, aparece aqui para vincular</span>';
         var vinculo = i.vinculo ? '<br><span style="font-size:12.5px">🔗 vinculado do cadastro sem conta “' + esc(i.vinculo.nome) + '” em ' + esc(i.vinculo.em) + ' <button type="button" class="link" style="font-size:12.5px" data-desvinc="' + esc(i.vinculo.id) + '">desfazer vínculo</button></span>' : '';
         return '<div class="linha"><span>' + esc(i.aluno) + ' ' + (i.semConta ? '<span class="tag t-warn">sem login</span>' : '<span class="aviso">' + esc(i.email) + '</span>') + portal + semConta + vinculo + '</span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
-      }).join('');
-    }).join('') : '<p class="aviso">Nenhum aluno inscrito ainda.</p>';
+      }).join('') + '</div>';
+    }).join('') : '<p class="aviso">Nenhum aluno inscrito ainda.</p>');
+    var fs = $('filtroInscr');
+    if(fs) fs.addEventListener('change', function(){
+      filtroInscr = fs.value;
+      document.querySelectorAll('#listaAprov [data-grupo]').forEach(function(g){ g.style.display = !filtroInscr || g.dataset.grupo === filtroInscr ? '' : 'none'; });
+    });
     document.querySelectorAll('#pInsc [data-desvinc]').forEach(function(b){ b.addEventListener('click', function(){
       if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'confirmar: devolver faltas, provas e notas ao cadastro sem conta'; return; }
       b.disabled = true;
