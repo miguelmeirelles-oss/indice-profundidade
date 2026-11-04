@@ -1855,17 +1855,20 @@ function abrirEntregas(provaId){
       (r.recorrFila ? '<div class="convite">🔄 <b>Corrigindo de novo no servidor:</b> faltam ' + r.recorrFila + ' prova(s). Uma por vez, uns 30 segundos cada. <b>Pode fechar a página ou desligar o computador:</b> o servidor continua sozinho. Se a cota do modelo forte acabar, ele continua depois das 6h da manhã. Esta lista se atualiza sozinha a cada minuto.' +
         '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="btPararRecorr">Cancelar a recorreção</button><span class="aviso">as que já foram feitas ficam com a correção nova; as outras continuam com a anterior</span></div></div>' : '') +
       resumoVistos(r) +
-      '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
+      '<div class="tabelaBox"><table><thead><tr><th title="marque para corrigir de novo só estas"></th><th>Aluno</th><th>Situação</th><th>Enviado ao aluno</th><th>Visto pelo aluno</th><th>Nota IA</th><th>Nota final</th><th></th></tr></thead><tbody>' +
       r.alunos.map(function(a, i){
         var e = a.entrega;
-        return '<tr><td>' + esc(a.nome) + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + (e && e.vistaAberta ? ' <span class="tag t-warn" title="questões contestadas ainda sem resposta">vista: ' + e.vistaAberta + '</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + '' : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
+        return '<tr><td>' + (e && e.status === 'corrigida' && !e.naFilaRecorr ? '<input type="checkbox" data-marcarecorr="' + esc(e.id) + '" style="width:17px;height:17px" aria-label="corrigir de novo">' : '') + '</td><td>' + esc(a.nome) +
+          (e && e.corrigidaEm ? '<br><span class="aviso" style="font-size:11.5px">corrigida ' + esc(e.corrigidaEm) + (e.modeloIA ? ' · ' + esc(e.modeloIA) : '') + '</span>' : '') +
+          (e && e.naFilaRecorr ? ' <span class="tag t-azul">na fila</span>' : '') + (e && e.revisaoPedida && !e.confirmada ? ' <span class="badge" title="pediu revisão">!</span>' : '') + (e && e.vistaAberta ? ' <span class="tag t-warn" title="questões contestadas ainda sem resposta">vista: ' + e.vistaAberta + '</span>' : '') + '</td><td>' + (e ? tagEntrega(e, 'fechada') + '' : '<span class="tag t-cinza">sem entrega</span>') + '</td>' +
           '<td>' + (e ? tagEnvio(e, r.prova.resultadosLiberados) : '—') + '</td>' +
           '<td style="font-size:12.5px">' + textoVisto(e) + '</td>' +
           '<td>' + (e ? nota10(e.notaIa) : '—') + '</td><td>' + (e && e.notaFinal !== null ? '<span class="nota n' + classe10(e.notaFinal) + '">' + nota10(e.notaFinal) + '</span>' : '—') + '</td>' +
           '<td><span class="botoes" style="margin:0;flex-wrap:nowrap">' + (e ? '<button type="button" class="mini" data-abrir="' + esc(e.id) + '">Abrir</button>' : '') +
           '<button type="button" class="secundario mini" data-enviarpor="' + i + '">' + (e ? 'Trocar fotos' : 'Enviar fotos') + '</button></span></td></tr>';
       }).join('') + '</tbody></table></div><div class="botoes"><button type="button" class="secundario mini" id="btAtualEnt">Atualizar</button>' +
-      (r.alunos.some(function(a){ return a.entrega; }) ? '<button type="button" class="secundario mini" id="btRecorrTodas">Corrigir todas de novo (usa a leitura já feita)</button>' +
+      (r.alunos.some(function(a){ return a.entrega; }) ? '<button type="button" class="secundario mini" id="btRecorrMarcadas" disabled>Corrigir de novo só as marcadas</button>' +
+        '<button type="button" class="secundario mini" id="btRecorrTodas">Corrigir todas de novo (usa a leitura já feita)</button>' +
         '<button type="button" class="secundario mini" id="btRelerTodas">Reler as fotos e corrigir de novo</button>' +
         '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div><b>Corrigir todas de novo</b> refaz só a avaliação, com o gabarito, o rigor e as ocorrências atuais, usando a leitura da folha que a IA já fez (e que você pode ter arrumado). É o jeito mais estável: a mesma resposta dá a mesma nota. ' +
           '<b>Reler as fotos</b> lê as folhas de novo do zero; use se a leitura estava ruim. Nos dois casos, os ajustes feitos à mão e as notas definitivas voltam para a correção nova.</div></details>' : '') +
@@ -1875,6 +1878,19 @@ function abrirEntregas(provaId){
       if(provaAtual && provaAtual.id === provaId && $('areaEntrega') && !$('areaEntrega').innerHTML.trim()) abrirEntregas(provaId);
     }, 60000);
     $('btAtualEnt').addEventListener('click', function(){ abrirEntregas(provaId); atualizarTopoProvas(); });
+    // corrigir de novo só as marcadas (ex.: continuar de onde parou: veja a hora "corrigida" de cada uma)
+    var bRM = $('btRecorrMarcadas');
+    var marcadas = function(){ return Array.prototype.filter.call(el.querySelectorAll('[data-marcarecorr]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.marcarecorr; }); };
+    el.querySelectorAll('[data-marcarecorr]').forEach(function(c){ c.addEventListener('change', function(){
+      var n = marcadas().length; bRM.disabled = !n; bRM.dataset.conf = ''; bRM.textContent = n ? 'Corrigir de novo só as marcadas (' + n + ')' : 'Corrigir de novo só as marcadas';
+    }); });
+    if(bRM) bRM.addEventListener('click', function(){
+      var ids = marcadas(); if(!ids.length) return;
+      if(bRM.dataset.conf !== '1'){ bRM.dataset.conf = '1'; bRM.textContent = 'Confirmar: corrigir de novo ' + ids.length + ' prova(s) com o rigor e o gabarito atuais'; return; }
+      bRM.disabled = true;
+      api('agendarRecorrecao', {provaId: provaId, ids: ids}).then(function(){ abrirEntregas(provaId); atualizarTopoProvas(); })
+        .catch(function(e){ bRM.disabled = false; erroGeral(e.message); });
+    });
     var bPR = $('btPararRecorr');
     if(bPR) bPR.addEventListener('click', function(){
       if(bPR.dataset.conf !== '1'){ bPR.dataset.conf = '1'; bPR.textContent = 'Confirmar: cancelar as que ainda faltam'; return; }
