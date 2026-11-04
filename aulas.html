@@ -4119,7 +4119,7 @@ function carregarInscricoes(){
               i.contas.map(function(c){ return '<option value="' + esc(c.id) + '">' + esc(c.nome + ' · ' + c.email + (c.situacao === 'pendente' ? ' (pedido)' : '')) + '</option>'; }).join('') + '</select> <button type="button" class="mini" data-vincsem="' + esc(i.id) + '">Vincular</button></span>'
           : '<br><span class="aviso">quando ele criar a conta e pedir inscrição, aparece aqui para vincular</span>';
         var vinculo = i.vinculo ? '<br><span style="font-size:12.5px">🔗 vinculado do cadastro sem conta “' + esc(i.vinculo.nome) + '” em ' + esc(i.vinculo.em) + ' <button type="button" class="link" style="font-size:12.5px" data-desvinc="' + esc(i.vinculo.id) + '">desfazer vínculo</button></span>' : '';
-        return '<div class="linha"><span>' + esc(i.aluno) + ' ' + (i.semConta ? '<span class="tag t-warn">sem login</span>' : '<span class="aviso">' + esc(i.email) + '</span>') + portal + semConta + vinculo + '</span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
+        return '<div class="linha"><span><span data-nomebox="' + esc(i.id) + '">' + esc(i.aluno) + ' <button type="button" class="link" style="font-size:12.5px" data-renomear="' + esc(i.id) + '" data-nome="' + esc(i.aluno) + '" title="corrigir o nome">✎ editar nome</button></span> ' + (i.semConta ? '<span class="tag t-warn">sem login</span>' : '<span class="aviso">' + esc(i.email) + '</span>') + portal + semConta + vinculo + '</span><button type="button" class="secundario mini" data-dec="removida" data-id="' + esc(i.id) + '">Remover</button></div>';
       }).join('') + '</div>';
     }).join('') : '<p class="aviso">Nenhum aluno inscrito ainda.</p>');
     var fs = $('filtroInscr');
@@ -4127,6 +4127,19 @@ function carregarInscricoes(){
       filtroInscr = fs.value;
       document.querySelectorAll('#listaAprov [data-grupo]').forEach(function(g){ g.style.display = !filtroInscr || g.dataset.grupo === filtroInscr ? '' : 'none'; });
     });
+    // corrigir o nome do aluno (vale em todas as disciplinas, provas e notas; a conta dele não muda)
+    document.querySelectorAll('#pInsc [data-renomear]').forEach(function(b){ b.addEventListener('click', function(){
+      var box = document.querySelector('#pInsc [data-nomebox="' + b.dataset.renomear + '"]');
+      box.innerHTML = '<input type="text" value="' + esc(b.dataset.nome) + '" style="width:auto;min-width:240px;padding:4px 8px;font-size:14px"> <button type="button" class="mini">Salvar</button> <button type="button" class="secundario mini">Cancelar</button>';
+      var inp = box.querySelector('input'), bts = box.querySelectorAll('button');
+      inp.focus();
+      bts[1].addEventListener('click', carregarInscricoes);
+      bts[0].addEventListener('click', function(){
+        bts[0].disabled = true;
+        api('renomearAluno', {id: b.dataset.renomear, nome: inp.value}).then(function(t){ $('inscMsg').innerHTML = '<div class="ok">' + esc(t) + '</div>'; carregarInscricoes(); carregarResumo(); })
+          .catch(function(e){ bts[0].disabled = false; erroGeral(e.message); });
+      });
+    }); });
     document.querySelectorAll('#pInsc [data-desvinc]').forEach(function(b){ b.addEventListener('click', function(){
       if(b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'confirmar: devolver faltas, provas e notas ao cadastro sem conta'; return; }
       b.disabled = true;
