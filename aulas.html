@@ -3326,10 +3326,9 @@ function abrirHistorico(){
   carregarLinhaTempo();
   carregarPainelApostila();
   carregarRevisao(false);
+  // o Diário do portal sempre começa fechado; carrega quando o professor abre
   var dd = $('histDiario');
-  try{ if(localStorage.getItem('diario_aberto') === '1'){ dd.open = true; carregarDiario(); } }catch(e){}
   dd.addEventListener('toggle', function(){
-    try{ localStorage.setItem('diario_aberto', dd.open ? '1' : '0'); }catch(e){}
     if(dd.open && !dd.dataset.carregado) carregarDiario();
   });
 }
@@ -3398,7 +3397,13 @@ function desenharDiario(){
           return esc(f.nome) + (f.portal && f.portal.toLowerCase() !== f.nome.toLowerCase() ? ' <span class="aviso">(portal: ' + esc(f.portal) + ')</span>' : '');
         }).join(' · ') + ' <span class="aviso">→ F em ' + per.join(' e ') + '</span>' : '<span class="aviso">ninguém faltou ✓</span>') + (r.semConta.length ? ' <span class="aviso">· +' + r.semConta.length + ' sem conta: confira</span>' : '') + '</span>' +
         (a.faltas.length ? '<button type="button" class="secundario mini" data-dcopiar="faltas">📋</button>' : '') +
-        '<label class="chk"><input type="checkbox" data-dok="faltasOk"' + (a.faltasOk ? ' checked' : '') + '> lançado</label></div></div>';
+        '<label class="chk"><input type="checkbox" data-dok="faltasOk"' + (a.faltasOk ? ' checked' : '') + '> lançado</label></div>' +
+      // o que a extensão fez no portal da última vez (e quem ficou sem marcar)
+      (a.portal ? '<div class="diaLinha"><span class="rotDia">Portal</span><span style="font-size:13px">' +
+        '<span class="aviso">extensão em ' + esc(a.portal.em) + ':</span> ' + esc([a.portal.freq, a.portal.cont].filter(Boolean).join(' · ')) +
+        ((a.portal.semMarcar || []).length ? '<br><b style="color:#b35c00">⚠ Não marcado no portal: ' + a.portal.semMarcar.map(esc).join(', ') + '</b> <span class="aviso">(sem chamada aqui: marque à mão no portal)</span>' +
+          ' <button type="button" class="secundario mini" data-dportalok="1">✓ Já marquei no portal</button>' : '') +
+        '</span></div>' : '') + '</div>';
   });
   if(!r.aulas.length) h += '<p class="aviso">Nenhuma aula ainda.</p>';
   el.innerHTML = h;
@@ -3435,6 +3440,16 @@ function desenharDiario(){
       card.classList.toggle('feito', a.conteudoOk && a.faltasOk);
       api('salvarDiario', {aulaId: a.id, campos: campos}).catch(function(e){ c.checked = !c.checked; a[campo] = c.checked; erroGeral(e.message); });
     }); });
+    // "já marquei no portal": tira o aviso de quem ficou sem marcar e dá o check de faltas lançadas
+    var bPok = card.querySelector('[data-dportalok]');
+    if(bPok) bPok.addEventListener('click', function(){
+      bPok.disabled = true;
+      api('salvarDiario', {aulaId: a.id, campos: {faltasOk: true, portal: {resolvido: true}}}).then(function(){
+        a.faltasOk = true; a.portal.semMarcar = [];
+        a.portal.freq = String(a.portal.freq || '') + ' · ✓ completado à mão agora';
+        desenharDiario();
+      }).catch(function(e){ bPok.disabled = false; erroGeral(e.message); });
+    });
   });
 }
 
