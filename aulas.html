@@ -2712,6 +2712,43 @@ function desenharEncerrada(){
   mostrarAreaQ();
 }
 
+/* ---- Testar a calibragem das questões da aula (na edição da disciplina) ---- */
+function ligarCalibragem(d){
+  var sel = $('calAula');
+  api('aulasDaDisciplina', {disciplinaId: d.id}).then(function(l){
+    var ok = l.filter(function(a){ return a.blocosFeitos > 0; });
+    sel.innerHTML = ok.length ? ok.map(function(a){ return '<option value="' + esc(a.id) + '">Aula ' + a.numero + (a.tema ? ' · ' + esc(a.tema.slice(0, 60)) : '') + '</option>'; }).join('') : '<option value="">nenhuma aula transcrita ainda</option>';
+  }).catch(function(){ sel.innerHTML = '<option value="">não deu para carregar as aulas</option>'; });
+  $('calTestar').addEventListener('click', function(){
+    var bt = this, res = $('calRes'); if(!sel.value) return;
+    bt.disabled = true; res.innerHTML = '<p class="carregando">Gerando, simulando respostas e corrigindo… (1 a 3 minutos)</p>';
+    api('testarCalibragem', {disciplinaId: d.id, aulaId: sel.value, cfg: {orientacoes: $('fOri').value, orientCorrecao: $('fOriCorr').value, rigor: (function(){ var b = document.querySelector('#fRigor [data-rig][aria-pressed="true"]'); return b ? Number(b.dataset.rig) : ''; })()}}).then(function(r){
+      bt.disabled = false;
+      var dg = r.diagnostico || {}, cor = function(n){ return n === null ? '' : n >= 80 ? '#1a7a3c' : n >= 50 ? '#b07d00' : '#c62828'; };
+      var h = '<div class="' + (dg.coerente ? 'ok' : dg.coerente === false ? 'erro' : 'convite') + '" style="margin-top:10px"><b>' + (dg.coerente ? '✓ Régua coerente' : dg.coerente === false ? '⚠ Precisa de ajuste' : 'Diagnóstico') + '</b> · ' + esc(r.aula) + ' · rigor ' + esc(r.rigor) + '<br>' + esc(dg.resumo || '') +
+        ((dg.problemas || []).length ? '<ul style="margin:6px 0 0 18px">' + dg.problemas.map(function(p){ return '<li>' + esc(p) + '</li>'; }).join('') + '</ul>' : '') + '</div>';
+      h += '<details style="margin-top:8px"><summary class="link">Questões geradas no teste (' + r.questoes.length + ')</summary>' + r.questoes.map(function(q, i){
+        return '<p style="margin:6px 0;font-size:14px"><b>' + (i + 1) + ') ' + (q.tipo === 'aberta' ? 'Aberta' : 'Fechada') + ':</b> ' + esc(q.enunciado) +
+          (q.tipo === 'fechada' ? '<br>' + q.alternativas.map(function(a, k){ return (k === q.correta ? '✓ ' : '· ') + esc(a); }).join('<br>') : '<br><span class="aviso">esperado: ' + esc(q.esperado) + '</span>') + '</p>';
+      }).join('') + '</details>';
+      h += r.correcoes.map(function(q){
+        return '<div class="detalhe" style="margin-top:8px"><p style="margin:0 0 6px;font-size:14px"><b>' + esc(q.enunciado) + '</b></p><div class="tabelaBox"><table><thead><tr><th>Resposta simulada</th><th>Nota</th><th>Comentário que o aluno receberia</th></tr></thead><tbody>' +
+          q.respostas.map(function(x){ return '<tr><td style="font-size:13px"><b>' + esc(x.tipo) + '</b><br>' + esc(x.resposta) + '</td><td><b style="color:' + cor(x.nota) + '">' + (x.nota === null ? '—' : x.nota) + '</b></td><td style="font-size:13px">' + esc(x.comentario) + '</td></tr>'; }).join('') +
+          '</tbody></table></div></div>';
+      }).join('');
+      if(dg.sugestao_geracao || dg.sugestao_correcao) h += '<div class="convite" style="margin-top:8px"><b>Redação sugerida</b>' +
+        (dg.sugestao_geracao ? '<p style="margin:6px 0 2px"><b>Para gerar:</b> ' + esc(dg.sugestao_geracao) + '</p><button type="button" class="secundario mini" data-calusar="fOri">usar no campo de gerar</button>' : '') +
+        (dg.sugestao_correcao ? '<p style="margin:8px 0 2px"><b>Para corrigir:</b> ' + esc(dg.sugestao_correcao) + '</p><button type="button" class="secundario mini" data-calusar="fOriCorr">usar no campo de corrigir</button>' : '') +
+        '<p class="aviso" style="margin:6px 0 0">Usar só preenche o campo. Teste de novo e, se gostar, clique em Salvar a disciplina.</p></div>';
+      res.innerHTML = h;
+      res.querySelectorAll('[data-calusar]').forEach(function(b){ b.addEventListener('click', function(){
+        $(b.dataset.calusar).value = b.dataset.calusar === 'fOri' ? dg.sugestao_geracao : dg.sugestao_correcao;
+        b.textContent = '✓ colocado no campo (falta salvar)';
+      }); });
+    }).catch(function(e){ bt.disabled = false; res.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+
 /* ---- teste de 30 segundos ---- */
 function testarGravacao(){
   var cx = $('caixaTeste'), stream, A, rec, partes = [], t0, timer;
@@ -3909,6 +3946,11 @@ function abrirForm(d){
       '<span><b>Explicar as alternativas para o aluno</b> ' + ajuda('Nas fechadas, a IA escreve uma frase curta para <b>cada alternativa</b> dizendo por que ela está certa ou errada. O aluno vê essas explicações em "Minhas matérias" <b>depois que a questão fecha</b>, junto com a resposta certa. Você também vê na hora de revisar e pode editar a questão.<br><br>' +
         'Sai na mesma chamada da IA que cria a questão: <b>não gasta chamada a mais</b> (só deixa a resposta da IA um pouco maior). Se você editar as alternativas ou o gabarito, as explicações daquela questão são apagadas para não ficarem erradas.') + '</span></label>' +
       '<label class="rot" for="fOri" style="margin-top:8px">Orientações fixas para a IA gerar as questões</label><textarea id="fOri" placeholder="ex.: nível técnico de graduação; sem pegadinhas">' + esc(v.orientacoes) + '</textarea>' +
+      '<label class="rot" for="fOriCorr" style="margin-top:8px">Orientações para a IA corrigir as abertas da aula (opcional) ' + ajuda('Entram por cima das regras padrão da correção (o aluno acabou de assistir e responde em 2 a 3 linhas). Ex.: "aceitar resposta de 2 linhas se captou a ideia; não exigir nome científico; descontar se confundir pasteurização com esterilização". Não valem para a prova nem para o estudo dirigido.') + '</label>' +
+      '<textarea id="fOriCorr" placeholder="ex.: aceitar resposta curta se captou a ideia; não exigir o nome do microrganismo">' + esc(v.orient_correcao || '') + '</textarea>' +
+      (d ? '<details class="convite" style="margin-top:8px"><summary style="cursor:pointer;font-weight:bold">🧪 Testar a calibragem</summary>' +
+        '<p class="aviso" style="margin:6px 0">Usa as orientações escritas acima (mesmo sem salvar) e a mesma IA da aula: gera questões de uma aula já gravada, simula 4 respostas de aluno para cada aberta (errada, curta com a ideia principal, parcial e completa), corrige cada uma e mostra se a régua está coerente, os problemas e uma redação sugerida. Nada vai para os alunos. Gasta umas 10 a 12 chamadas do Lite e leva 1 a 3 minutos.</p>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select id="calAula" style="width:auto;max-width:100%"><option value="">carregando as aulas…</option></select><button type="button" class="mini" id="calTestar">Testar</button></div><div id="calRes"></div></details>' : '') +
       '<details style="margin-top:12px"' + (v.glossario.length ? '' : ' open') + '><summary class="link">Glossário · ' + v.glossario.length + ' termo(s)</summary>' +
       '<textarea id="fGlo" style="margin-top:8px;min-height:120px" placeholder="ex.: atividade de água, HTST, valor F, Maillard">' + esc(v.glossario.join(', ')) + '</textarea>' +
       '<p class="aviso" style="margin:6px 0 0">Termos técnicos separados por vírgula. Ajudam a IA a transcrever a aula corretamente.</p></details></div>' +
@@ -3948,6 +3990,7 @@ function abrirForm(d){
   ['fPeso', 'fFechAula', 'fRevF', 'fAbAula', 'fRevA'].forEach(function(id){ $(id).addEventListener('input', atualizaPeso); }); atualizaPeso();
   $('fMaisEtapa').addEventListener('click', function(){ lerEtapas(); var n = etapasEdit.length + 1; etapasEdit.push({id:'', nome:'P' + n, peso:1, fim:'', itens:itensNovos(n)}); desenharEtapas(); });
   $('fCancelar').addEventListener('click', function(){ f.classList.add('oculto'); });
+  if(d && $('calTestar')) ligarCalibragem(d);
   $('fSalvar').addEventListener('click', function(){
     lerEtapas();
     var bt = $('fSalvar'); bt.disabled = true; $('fErro').classList.add('oculto');
@@ -3955,7 +3998,7 @@ function abrirForm(d){
       id: d ? d.id : '', nome: $('fNome').value, semestre: $('fSemN').value + ' - ' + $('fSemAno').value, tempos: $('fTempos').value,
       prazo_padrao: $('fPrazo').value, presenca_min: $('fPres').value, qtd_fechadas: (Number($('fFechAula').value) || 0) + (Number($('fRevF').value) || 0),
       qtd_abertas: (Number($('fAbAula').value) || 0) + (Number($('fRevA').value) || 0), peso_fechadas: $('fPeso').value, tempo_resposta: $('fTempoResp').value, tempo_aberta: $('fTempoAb').value,
-      descartar_piores: $('fDescartar').checked, apostila_auto: $('fApostilaAuto').checked, orientacoes: $('fOri').value, glossario: $('fGlo').value,
+      descartar_piores: $('fDescartar').checked, apostila_auto: $('fApostilaAuto').checked, orientacoes: $('fOri').value, orient_correcao: $('fOriCorr').value, glossario: $('fGlo').value,
       rigor: rigorForm, rev_fechadas: $('fRevF').value, rev_abertas: $('fRevA').value, rev_janela: $('fRevJ').value, explicar_alts: $('fExplicar').checked,
       composicao: {etapas: etapasEdit}, material_url: $('fMaterial').value
     }}).then(function(){ f.classList.add('oculto'); carregarResumo(); })
