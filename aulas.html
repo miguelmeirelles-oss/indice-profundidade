@@ -1089,12 +1089,16 @@ function desenharMsgsProf(discPre){
   var lista = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && (MSGS.aba === 'ativas' ? x.ativa : !x.ativa); });
   var nAt = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && x.ativa; }).length;
   var nEx = r.recados.filter(function(x){ return (!MSGS.filtro || x.discId === MSGS.filtro) && !x.ativa; }).length;
-  var av = r.avisos || [], novosAv = av.filter(function(a){ return !a.lido; }).length;
-  var h = cabMsgs() + (av.length ? '<div class="caixa"><h2 style="margin-top:0">🔔 Para você' + (novosAv ? ' <span class="tag t-err">' + novosAv + ' novo(s)</span>' : '') + '</h2>' +
+  var todosAv = r.avisos || [], arqAv = todosAv.filter(function(a){ return a.arquivado; });
+  var av = MSGS.avArq ? arqAv : todosAv.filter(function(a){ return !a.arquivado; }), novosAv = av.filter(function(a){ return !a.lido && !a.arquivado; }).length;
+  var h = cabMsgs() + (av.length || arqAv.length ? '<div class="caixa"><h2 style="margin-top:0">🔔 Para você' + (novosAv ? ' <span class="tag t-err">' + novosAv + ' novo(s)</span>' : '') + '</h2>' +
       av.slice(0, 10).map(function(a){
         return '<div class="msgItem' + (a.lido ? '' : ' nova') + '"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) +
-          (a.link ? '<div class="botoes" style="margin-top:6px"><a class="botaoLink" href="' + esc(a.link) + '">' + (a.tipo === 'sistema' ? 'Abrir' : 'Abrir a correção') + '</a></div>' : '') + '</div>';
-      }).join('') + (av.length > 10 ? '<p class="aviso">Mostrando os 10 mais recentes.</p>' : '') + '</div>' : '') +
+          '<div class="botoes" style="margin-top:6px">' + (a.link ? '<a class="botaoLink" href="' + esc(a.link) + '">' + (a.tipo === 'sistema' ? 'Abrir' : 'Abrir a correção') + '</a>' : '') +
+          '<button type="button" class="link" style="font-size:12.5px" data-avapagar="' + esc(a.id) + '">apagar</button></div></div>';
+      }).join('') + (av.length ? '' : '<p class="aviso">' + (MSGS.avArq ? 'Nenhum aviso arquivado.' : 'Nenhum aviso recente.') + '</p>') + '<p class="aviso" style="margin-top:8px">' + (av.length > 10 ? 'Mostrando os 10 mais recentes. ' : '') + (MSGS.avArq ? 'Arquivados: avisos com mais de 7 dias (ficam aqui por 90 dias). ' : 'Depois de 7 dias cada aviso vai para os arquivados. ') +
+        '<button type="button" class="link" style="font-size:12.5px" data-avarq="1">' + (MSGS.avArq ? 'voltar aos avisos recentes' : 'ver arquivados (' + arqAv.length + ')') + '</button>' +
+        (av.length ? ' · <button type="button" class="link" style="font-size:12.5px" data-avapagar="todos">apagar ' + (MSGS.avArq ? 'os arquivados' : 'todos') + '</button>' : '') + '</p></div>' : '') +
     '<div class="caixa"><h2 style="margin-top:0">✉️ Escrever mensagem</h2>' +
     '<p class="aviso" style="margin:0 0 6px">' + (r.ligado ? 'Vai para os celulares com avisos ligados e fica no app até expirar.' : 'Os avisos no celular ainda não estão configurados: a mensagem fica no app até expirar.') + '</p>' +
     '<label class="rot">Para</label><div style="display:flex;flex-wrap:wrap;gap:6px 16px">' + discs.map(function(d){
@@ -1134,6 +1138,16 @@ function desenharMsgsProf(discPre){
     }).join('') : '<p class="aviso">' + (MSGS.aba === 'ativas' ? 'Nenhuma mensagem ativa.' : 'Nenhuma mensagem expirada.') + '</p>') + '</div>';
   el.innerHTML = h;
   ligarFecharMsgs();
+  el.querySelectorAll('[data-avarq]').forEach(function(b){ b.addEventListener('click', function(){ MSGS.avArq = !MSGS.avArq; desenharMsgsProf(); }); });
+  el.querySelectorAll('[data-avapagar]').forEach(function(b){ b.addEventListener('click', function(){
+    var todos = b.dataset.avapagar === 'todos', alvo = todos ? av.map(function(a){ return a.id; }) : [b.dataset.avapagar];
+    if(todos && b.dataset.conf !== '1'){ b.dataset.conf = '1'; b.textContent = 'confirmar: apagar todos os avisos'; return; }
+    b.disabled = true;
+    api('apagarAvisoProf', {ids: alvo}).then(function(){
+      r.avisos = (r.avisos || []).filter(function(a){ return alvo.indexOf(a.id) === -1; });
+      desenharMsgsProf();
+    }).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+  }); });
   if(novosAv) api('marcarAvisosProfLidos', {}).then(function(){ av.forEach(function(a){ a.lido = true; }); AVISOS_PROF = 0; atualizarSeloMsgs(); }).catch(function(){});
   // escrever
   var eg = $('msgEmojis');
