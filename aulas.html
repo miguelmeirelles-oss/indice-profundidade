@@ -1110,7 +1110,7 @@ function desenharMsgsProf(discPre){
     '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:8px 0"><label class="rot" for="msgExpira" style="margin:0">Some da tela dos alunos</label>' +
       '<select id="msgExpira" style="width:auto">' + [[1, 'em 1 dia'], [3, 'em 3 dias'], [7, 'em 7 dias'], [15, 'em 15 dias (padrão)'], [30, 'em 30 dias'], ['data', 'numa data que eu escolher']].map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === 15 ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
       '<input type="date" id="msgData" class="oculto" style="width:auto"></div>' +
-    '<label style="display:flex;gap:8px;align-items:center;font-size:14px;cursor:pointer;margin:0 0 6px"><input type="checkbox" id="msgEmail" style="width:17px;height:17px"> Mandar também por e-mail</label>' +
+''+
     '<div class="botoes" style="margin-top:4px"><button type="button" id="msgEnviar">Enviar</button></div><div id="msgEnvMsg"></div></div>';
   // lista
   h += '<div class="caixa"><h2 style="margin-top:0">Enviadas</h2>' +
@@ -1123,7 +1123,7 @@ function desenharMsgsProf(discPre){
           (x.ativa ? 'some em <b>' + ddmm(x.expiraMs) + '</b> (' + (dias <= 1 ? 'amanhã' : 'em ' + dias + ' dias') + ')' : 'expirou em ' + ddmm(x.expiraMs)) + '</span>' +
         '<p style="margin:6px 0">' + esc(x.texto).replace(/\n/g, '<br>') + '</p>' +
         (x.tipo === 'notas'
-          ? '<span style="font-size:12.5px">✉️ e-mail e aviso para ' + x.celulares + ' aluno(s) · 👁 abriu a correção: <b>' + x.lidos + ' de ' + x.total + '</b></span>' +
+          ? '<span style="font-size:12.5px">📱 aviso para ' + x.celulares + ' aluno(s) · 👁 abriu a correção: <b>' + x.lidos + ' de ' + x.total + '</b></span>' +
             ((x.leram || []).length ? '<details style="font-size:12.5px"><summary class="link">quem abriu (' + x.leram.length + ')</summary>' + x.leram.map(esc).join(', ') + '</details>' : '') +
             (x.naoLeram.length ? '<details style="font-size:12.5px"><summary class="link">quem ainda não abriu (' + x.naoLeram.length + ')</summary>' + x.naoLeram.map(esc).join(', ') + '</details>' : (x.total ? ' <span style="color:#1a7a3c;font-size:12.5px">· todos abriram</span>' : ''))
           : '<span style="font-size:12.5px">' + (x.celulares ? '<span style="color:#1a7a3c">✓ chegou em ' + x.celulares + ' celular(es)</span>' : '<span class="aviso">nenhum celular com avisos</span>') +
@@ -1172,7 +1172,7 @@ function desenharMsgsProf(discPre){
     var alunos = discs.filter(function(d){ return ids.indexOf(d.id) !== -1; }).reduce(function(a, d){ return a + d.alunos; }, 0);
     if(bt.dataset.conf !== '1'){ bt.dataset.conf = '1'; bt.textContent = 'Confirmar: enviar para ' + alunos + ' aluno(s)'; return; }
     bt.disabled = true; bt.textContent = 'Enviando…';
-    api('enviarMensagem', {disciplinaIds: ids, texto: t, porEmail: $('msgEmail').checked, expira: expira}).then(function(n){
+    api('enviarMensagem', {disciplinaIds: ids, texto: t, porEmail: false, expira: expira}).then(function(n){
       MSGS.r = n; MSGS.aba = 'ativas'; desenharMsgsProf();
       var e = n.enviado;
       $('msgEnvMsg').innerHTML = '<div class="ok">Enviada a ' + e.alunos + ' aluno(s): chegou em ' + e.celulares + ' celular(es)' + (e.emails ? ' e ' + e.emails + ' e-mail(s)' : '') + '. Some da tela dos alunos em ' + ddmm(expira) + '.</div>' +
