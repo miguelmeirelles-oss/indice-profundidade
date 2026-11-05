@@ -3353,6 +3353,21 @@ function desenharDiario(){
   var r = DIARIO.r, el = $('diarioCorpo');
   var feitas = r.aulas.filter(function(a){ return a.conteudoOk && a.faltasOk; }).length;
   var h = '';
+  // como instalar e usar a extensão que preenche a frequência no Portal do Professor (fica fechado)
+  h += '<details class="convite" style="margin:0 0 10px"><summary style="cursor:pointer;font-weight:bold">🧩 Preencher frequência e conteúdo no portal sozinho (extensão do Chrome)</summary>' +
+    '<p style="margin:8px 0 4px;font-size:14px">Uma extensão do Chrome marca presenças e faltas e escreve o conteúdo ministrado no Portal do Professor, com a chamada e o tema daqui. <b>Você confere e clica em Salvar</b> no portal; a senha do portal nunca passa pelo Aula por IA.</p>' +
+    '<p style="margin:8px 0 2px;font-size:14px"><b>Instalar (uma vez em cada computador que você usa para lançar):</b></p><ol style="margin:0 0 0 20px;font-size:14px">' +
+      '<li><a class="link" href="extensao-portal.zip" download>Baixe a extensão (arquivo .zip)</a> e descompacte numa pasta que não vá apagar (ex.: Documentos\\extensao-portal).</li>' +
+      '<li>No Chrome, digite na barra de endereço <b>chrome://extensions</b> e ligue o <b>Modo do desenvolvedor</b> (canto superior direito).</li>' +
+      '<li>Clique em <b>Carregar sem compactação</b> e escolha a pasta descompactada.</li>' +
+      '<li>Abra o <b>Aula por IA</b> neste mesmo Chrome, já logado: é assim que a extensão fica conectada à sua conta. Se um dia ela pedir, é só abrir o Aula por IA de novo.</li></ol>' +
+    '<p style="margin:8px 0 2px;font-size:14px"><b>Usar, em cada aula:</b></p><ol style="margin:0 0 0 20px;font-size:14px">' +
+      '<li>No portal, abra a frequência da aula (a setinha verde da agenda da turma).</li>' +
+      '<li>No topo aparece a caixa azul <b>Aula por IA</b>: clique em <b>Preencher com a chamada do Aula por IA</b>.</li>' +
+      '<li>As faltas ficam com borda vermelha. Quem a extensão não conseguiu marcar fica com <b>borda laranja</b> (sem chamada aqui): marque à mão.</li>' +
+      '<li>Confira e clique em <b>Salvar</b> do portal. A aula fica com "faltas lançadas" aqui no Diário.</li>' +
+      '<li><b>Conteúdo ministrado:</b> na agenda da turma, clique em <b>Sem Registro</b> da aula. Na janela aparece <b>Preencher com o tema da aula</b>: a extensão acha a aula pela data da janela, escreve o tema; confira e clique em <b>Salvar</b>. A aula fica com "conteúdo lançado" aqui.</li></ol>' +
+    '<p class="aviso" style="margin:8px 0 0">Presença marca P1 e P2; falta marca os dois. Falta justificada (já preenchida pelo portal) não é mexida. Aula que não existe no Aula por IA (ex.: antes de usar o sistema): ela avisa e não marca nada. A disciplina é achada pelo nome: se no portal o nome for muito diferente do daqui, ela avisa.</p></details>';
   // lista da turma do portal (colada uma vez no início do semestre) e avisos do cruzamento
   h += '<details class="listaPortal"' + (r.lista.length ? '' : ' open') + '><summary class="link" style="font-size:13.5px">' + (r.lista.length ? 'Lista da turma no portal · ' + r.lista.length + ' aluno(s) · editar' : '➕ Colar a lista da turma do portal (uma vez no início do semestre)') + '</summary>' +
     '<p class="aviso" style="margin:6px 0">Cole os nomes como aparecem no portal, <b>um por linha</b>. Serve para avisar quem está no portal e não tem conta aqui (a presença dessas pessoas você confere na sala).</p>' +
