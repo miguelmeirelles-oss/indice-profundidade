@@ -9,96 +9,117 @@ function erroGeral(m){ var e = $('erroGeral'); if(!e) return; e.textContent = m 
 /* =====================================================================================
    PROMPT para a IA externa (Claude etc.): o professor cola junto com o material das aulas
    ===================================================================================== */
+// REGRAS v2 (06/11/2026), escritas pelo Claude que monta as aulas, a pedido do professor
 var PROMPT_TRILHA = [
-'Você vai montar uma AULA EM TRILHA para a plataforma "Aula por IA". É uma aula interativa que o estudante assiste sozinho: a plataforma desenha slides com gráficos que se animam, uma voz de IA lê a sua "fala" de cada passo, e o estudante pode pausar e tirar dúvidas por voz com outra IA (que usa o seu "contexto_ia" como base).',
-'',
-'MATERIAL: logo abaixo vem primeiro um resumo da disciplina (orientações e regras do professor, próxima prova, onde a turma está indo mal, glossário e a apostila de referência dele) e depois, aula por aula, a ata, a apostila gerada, as questões que ele fez em sala e a transcrição da fala dele. No fim, a PASTA DO GOOGLE DRIVE da disciplina com a lista dos arquivos (slides, apostilas). Se você tiver acesso ao Google Drive do professor, abra os arquivos que correspondem às aulas marcadas e use-os (os slides são a melhor base para os gráficos e os números). Se não tiver acesso, diga ao professor quais arquivos da lista ele deve anexar na conversa antes de você continuar.',
-'',
-'REGRAS DE CONTEÚDO (as mais importantes):',
-'1. FIDELIDADE: siga a aula do professor: a mesma sequência, os mesmos conceitos, exemplos e números que ele usou. Você pode explicar de outro jeito, mais claro, mas NÃO acrescente conteúdo que a aula não deu e NÃO mude conceitos.',
-'2. A transcrição foi feita automaticamente do áudio: palavras técnicas podem ter saído erradas (ex.: "mylar" = Maillard). Interprete pelo contexto. Se algo parecer um erro de conceito do professor, NÃO "corrija" por conta própria: deixe esse trecho de fora e avise no campo "fonte".',
-'3. Valores que você precisar inventar só para desenhar (parâmetros de curva, um limite de exemplo) devem ser coerentes com a aula e marcados como "(ilustrativo)" no rótulo ou nos pontos.',
-'4. "fala" é para ser OUVIDA: frases curtas e naturais, como o professor falando, 2 a 5 frases por passo (no máximo ~700 caracteres). Sem símbolos nem siglas soltas: escreva "atividade de água" e não "Aw", "trinta por cento" e não "30%", "graus Celsius" e não "°C". Os "pontos" (texto na tela) podem usar símbolos.',
-'5. Cada bloco é um trecho da aula com UM gráfico (ou nenhum). Use de 6 a 12 passos por bloco; cada passo mostra uma coisa nova no gráfico (uma curva, uma região, uma seta, um ponto andando…).',
-'6. "contexto_ia" (800 a 3000 caracteres): resumo fiel do que a aula ensina naquele bloco, com os exemplos e números usados. É a base da IA que tira as dúvidas, então escreva tudo o que ela precisa saber para não contradizer a aula.',
-'7. Feche cada bloco com uma "checagem" (múltipla escolha que exige entender, não decorar) e uma "pergunta_falada" (o estudante responde falando).',
-'8. No fim de cada bloco o estudante faz a avaliação de profundidade do "Estudar com IA" sobre o assunto do bloco. Em "subtopico_id", ponha o id do assunto do CATÁLOGO DO ESTUDAR COM IA (no fim deste prompt) que melhor corresponde ao bloco; se nenhum servir, deixe vazio.',
-'9. Em "tema_id", ponha o id do SUBTEMA DA DISCIPLINA (lista no fim deste prompt) do assunto do bloco: as questões abertas do estudo dirigido no fim do bloco saem desse subtema. Se nenhum servir, deixe vazio.',
-'',
-'REGRAS DO GRÁFICO (a plataforma desenha; você só descreve):',
-'- Coordenadas SEMPRE nas unidades dos eixos (ex.: x de 0 a 1 para atividade de água), nunca em pixels.',
-'- Curvas são calculadas a partir de um modelo e parâmetros. Modelos: "gab" {m0, c, k (k<1)}; "bet" {m0, c} (só até x≈0,5); "linear" {a, b}: y=a+b·x; "exponencial" {a, b}: y=a·e^(b·x); "sino" {altura, centro, largura} (curva em sino, ex.: velocidade de reação com máximo); "pontos" {pontos: [[x,y],…]} para qualquer curva lida de um slide (liga os pontos; com "marcadores": true mostra só as bolinhas, como dados experimentais).',
-'- Confira as contas: a curva inteira (de "de" até "ate") precisa caber entre y.min e y.max.',
-'- A MAIORIA DOS ESTUDANTES VAI ASSISTIR NO CELULAR (tela estreita). A plataforma ajusta o tamanho sozinha, mas: rótulos bem curtos (até ~22 caracteres), no máximo 3 ou 4 anotações visíveis ao mesmo tempo (use "limpar" e recomece quando o gráfico ficar cheio), "pontos" curtos (até ~90 caracteres) e títulos de passo curtos (até ~40 caracteres).',
-'- Rótulos curtos. Ponha a ORIGEM das setas ("de") num espaço vazio do gráfico, longe das curvas: o rótulo da seta fica na origem. A ponta ("para") encosta no que ela aponta (para apontar uma curva, calcule o y da curva naquele x).',
-'- As séries começam escondidas; aparecem com a ação "serie" (desenhada aos poucos). Use "limpar" no início de um passo para apagar as anotações anteriores e começar de novo (as curvas também somem; mostre de novo as que precisar).',
-'- Cada passo herda o que os passos anteriores do bloco desenharam (até um "limpar").',
-'- Cores: azul, laranja, verde, vermelho, roxo, cinza, ambar.',
-'',
-'AÇÕES de cada passo (campo "acoes"; "atraso" opcional em milissegundos, contado do começo do passo):',
-'  {"tipo":"serie","serie":"id"}  desenha a curva',
-'  {"tipo":"destacar","serie":"id"}  engrossa uma curva e apaga as outras',
-'  {"tipo":"regiao","de":x1,"ate":x2,"rotulo":"I","cor":"azul"}  faixa vertical sombreada',
-'  {"tipo":"seta","de":[x,y],"para":[x,y],"rotulo":"texto","cor":"vermelho"}',
-'  {"tipo":"ponto","x":x,"serie":"id","rotulo":"texto"}  ponto sobre a curva (ou "y" no lugar de "serie")',
-'  {"tipo":"ponto_movel","serie":"id","de":x1,"ate":x2,"rotulo":"texto","duracao":3000}  ponto que anda pela curva mostrando os valores',
-'  {"tipo":"linha_v","x":x,"rotulo":"texto"}  /  {"tipo":"linha_h","y":y,"rotulo":"texto"}  linha tracejada de referência',
-'  {"tipo":"distancia","serie_a":"id","serie_b":"id","x":x,"rotulo":"texto"}  marca a diferença entre duas curvas num x',
-'  {"tipo":"texto","x":x,"y":y,"texto":"texto"}  texto solto',
-'  {"tipo":"limpar"}',
-'',
-'CENA ANIMADA (opcional; use quando a explicação for de moléculas ou do que acontece dentro do alimento, e o gráfico para números): o bloco pode ter "cena": {"elementos": [...]} e cada passo "cena_acoes": [...]. A plataforma desenha numa lousa escura, com coordenadas x de 0 a 100 (esquerda → direita) e y de 0 a 60 (topo → base). Os elementos começam invisíveis; a cena acumula de um passo para o outro dentro do bloco até um "limpar_cena".',
-'  Elementos (id, tipo, x, y; opcionais: rotulo, tamanho; w e h para caixa/estrutura). Tipos: agua (molécula), ion (rotulo "Na⁺", "Cl⁻"…), acucar, particula, gordura, bacteria, caixa (recipiente/objeto, ex.: lata, embalagem), estrutura (matriz de alimento, ex.: queijo).',
-'  Ações (todas aceitam "atraso" em ms): aparecer/sumir {elemento}; mover {elemento, para:[x,y], duracao}; destacar {elemento}; danificar {alvo, rotulo}; aguas {grupo, n, area:[x1,y1,x2,y2] ou dentro:id, agitacao 0 a 1} (moléculas de água soltas se mexendo); solutos {especie: ion|acucar|particula|gordura, n, area|dentro, agitacao}; agitar {grupo, agitacao}; pontes {alvo, n, distancia} (águas ligadas por pontes de H em volta); hidratar {alvo, camadas 1 ou 2, n, rotulo} (as águas livres formam a camada de hidratação); congelar {area|dentro, nucleos:[[x,y]], raio, evitar_raio, duracao} (a água vira cristal a partir dos núcleos; com evitar_raio sobra um bolsão líquido em volta dos solutos; sem ele os solutos são expulsos); derreter {centro:[x,y], raio, duracao}; desidratar {alvo, n} (a água sai e a célula murcha); coletar {especie, para:[x,y]}; rotulo {x, y, texto, cor}; circulo {x, y, r, rotulo, cor}; linha {de:[x,y], para:[x,y], cor}; seta {de, para, rotulo, cor}; limpar_cena.',
-'  Cores da cena: azul, laranja, verde, vermelho, roxo, cinza, ambar, rosa. Rótulos curtos (até ~25 caracteres). Poucas coisas novas por passo, sincronizadas com a fala pelo "atraso". A cena é esquemática: diga na "fonte" que está fora de escala.',
-'',
-'REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre ao professor o ROTEIRO de cada aula em trilha: uma tabela por bloco com o nº do passo, o título, o que a voz diz (resumido) e o que aparece ou se anima no gráfico. Se a sua interface permitir conteúdo visual (por exemplo um artifact em HTML/SVG), mostre também uma prévia simples do gráfico de cada passo. Pergunte se ele quer mudar algo, ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).',
-'',
-'DIVIDIR EM AULAS CURTAS (LOTE): se o material tiver várias aulas ou vários assuntos, divida em AULAS EM TRILHA CURTAS, uma por assunto, na ordem do curso: cada uma com 1 a 3 blocos (uns 10 a 15 minutos de estudo). Nesse caso devolva {"formato": "aula-trilha/1", "trilhas": [ trilha1, trilha2, … ]}, cada trilha no formato abaixo. Se a resposta for ficar longa demais, devolva só algumas trilhas por vez (um JSON completo por resposta) e diga quais assuntos ainda faltam; o professor pede "continue".',
-'',
-'FORMATO DA RESPOSTA: devolva SÓ o JSON (sem comentários, sem texto antes ou depois), num bloco de código ou num arquivo .json. Formato de UMA trilha:',
-'{',
-'  "formato": "aula-trilha/1",',
-'  "titulo": "título curto da aula em trilha",',
-'  "tema": "assuntos cobertos",',
-'  "fonte": "de quais aulas/slides veio; avisos sobre trechos deixados de fora",',
-'  "blocos": [',
-'    {',
-'      "id": "b1",',
-'      "titulo": "título do bloco",',
-'      "contexto_ia": "resumo fiel do que a aula ensina neste bloco…",',
-'      "subtopico_id": "id do assunto no catálogo do Estudar com IA (ou vazio)",',
-'      "tema_id": "id do subtema da disciplina (ou vazio)",',
-'      "grafico": {',
-'        "x": {"rotulo": "Atividade de água (Aw)", "min": 0, "max": 1, "passo": 0.1},',
-'        "y": {"rotulo": "Umidade (g/100 g ss)", "min": 0, "max": 40, "passo": 10},',
-'        "series": [',
-'          {"id": "ads", "nome": "adsorção", "modelo": "gab", "params": {"m0": 5, "c": 12, "k": 0.9}, "de": 0.02, "ate": 0.95, "cor": "azul"}',
-'        ]',
-'      },',
-'      "passos": [',
-'        {"titulo": "título do passo", "fala": "o que a voz diz…", "pontos": ["ponto-chave que aparece na tela"],',
-'         "acoes": [{"tipo": "serie", "serie": "ads"}, {"tipo": "seta", "de": [0.3, 25], "para": [0.5, 8.3], "rotulo": "sobe devagar", "atraso": 1500}]}',
-'      ],',
-'      "checagem": {"tipo": "multipla", "pergunta": "…", "alternativas": ["…", "…", "…"], "correta": 1, "explicacao": "por que a certa é a certa"},',
-'      "pergunta_falada": {"pergunta": "…", "esperado": "o que uma boa resposta contém"}',
-'    }',
-'  ]',
-'}',
-'("correta" conta do 0: a primeira alternativa é 0.)',
-'',
-'============================== MATERIAL DAS AULAS =============================='
+"Você vai montar uma AULA EM TRILHA para a plataforma \"Aula por IA\". É uma aula interativa que o estudante assiste sozinho, no formato de vídeo vertical (celular): a plataforma desenha em cima um gráfico que se anima e embaixo uma CENA de moléculas animadas, uma voz de IA lê a sua \"fala\" de cada passo com legenda, e o estudante pode pausar e tirar dúvidas por voz com outra IA (que usa o seu \"contexto_ia\" como base).",
+"",
+"MATERIAL: logo abaixo vem primeiro um resumo da disciplina (orientações e regras do professor, próxima prova, onde a turma está indo mal, glossário e a apostila de referência dele) e depois, aula por aula, a ata, a apostila gerada, as questões que ele fez em sala e a transcrição da fala dele. No fim, a PASTA DO GOOGLE DRIVE da disciplina com a lista dos arquivos (slides, apostilas). Se você tiver acesso ao Google Drive do professor, abra os arquivos que correspondem às aulas marcadas e use-os (os slides e as apostilas são a melhor base para a ORDEM das aulas, para os conceitos, para os gráficos e para os números). Se não tiver acesso, diga ao professor quais arquivos da lista ele deve anexar na conversa antes de você continuar.",
+"",
+"══════════════════════════════════════════════════════════════",
+"REGRA PRINCIPAL (vale acima de todas as outras)",
+"══════════════════════════════════════════════════════════════",
+"NUNCA coloque um erro no vídeo. Se o professor falou algo errado ou impreciso na aula (conceito trocado, explicação incompleta que leva a uma ideia errada, número \"chutado\" ou impossível, lapso de fala), NÃO reproduza o erro e NÃO deixe o trecho de fora: CORRIJA. Ensine o conceito certo, mantendo a sequência da aula, os exemplos e o jeito de explicar do professor. Toda correção deve ser registrada no campo \"fonte\", em \"AJUSTES FEITOS EM RELAÇÃO À FALA\", dizendo o que ele falou e como ficou. Na dúvida entre \"erro do professor\" e \"erro da transcrição\", interprete pelo contexto, pelos slides e pela apostila; se continuar em dúvida, corrija e avise no campo \"fonte\" para ele conferir.",
+"",
+"REGRAS DE CONTEÚDO:",
+"1. FIDELIDADE: siga a aula do professor: a mesma sequência, os mesmos conceitos, exemplos e números que ele usou. Você pode explicar de outro jeito, mais claro, e pode completar uma explicação que ficou pela metade, mas não acrescente assuntos que a aula não deu. A exceção é a REGRA PRINCIPAL: o que estiver errado é corrigido.",
+"2. A transcrição foi feita automaticamente do áudio: palavras técnicas podem ter saído erradas (ex.: \"mylar\" = Maillard; \"sorvato\" = sorbato). Interprete pelo contexto e pelo glossário. Trechos fora do assunto (conversas paralelas, avisos da turma) ficam de fora.",
+"3. Valores que você precisar criar só para desenhar (parâmetros de curva, um limite de exemplo) devem ser coerentes com a aula e com a literatura e marcados como \"(ilustrativo)\" no rótulo ou nos pontos. Quando existir valor real conhecido (ex.: ponto de congelamento de uma salmoura), use o valor real aproximado.",
+"4. \"fala\" é para ser OUVIDA: frases curtas e naturais, como o professor falando, 2 a 5 frases por passo (no máximo ~700 caracteres). Sem símbolos nem siglas soltas: escreva \"atividade de água\" e não \"Aw\", \"trinta por cento\" e não \"30%\", \"graus Celsius\" e não \"°C\". Os \"pontos\" (texto na tela) podem usar símbolos.",
+"5. UM BLOCO POR TRILHA: cada aula em trilha (cada arquivo JSON) tem UM ÚNICO bloco, sobre um assunto, com 6 a 12 passos (uns 5 a 8 minutos). Assuntos diferentes viram trilhas diferentes, nunca blocos juntos no mesmo arquivo. Cada passo mostra uma coisa nova no gráfico e/ou na cena.",
+"6. \"contexto_ia\" (800 a 3000 caracteres): resumo fiel e CORRETO do que a aula ensina naquele bloco, com os exemplos e números usados (já corrigidos). É a base da IA que tira as dúvidas, então escreva tudo o que ela precisa saber para não contradizer a aula nem repetir um erro.",
+"7. Feche o bloco com uma \"checagem\" (múltipla escolha que exige entender, não decorar) e uma \"pergunta_falada\" (o estudante responde falando).",
+"8. No fim do bloco o estudante faz a avaliação de profundidade do \"Estudar com IA\" sobre o assunto. Em \"subtopico_id\", ponha o id do assunto do CATÁLOGO DO ESTUDAR COM IA (no fim deste prompt) que melhor corresponde ao bloco; se nenhum servir, deixe vazio.",
+"9. Em \"tema_id\", ponha o id do SUBTEMA DA DISCIPLINA (lista no fim deste prompt) do assunto do bloco: as questões abertas do estudo dirigido no fim do bloco saem desse subtema. Se nenhum servir, deixe vazio.",
+"10. VISUAL: toda trilha leva \"visual\": {\"fundo\": \"branco\"}. Use as cores pelo nome (a plataforma escolhe o tom com contraste para o fundo branco).",
+"",
+"REGRAS DO GRÁFICO (a plataforma desenha; você só descreve). O gráfico é opcional: se o trecho da aula não tiver gráfico, omita \"grafico\" e a parte de cima da tela mostra os \"pontos\" do passo em letras grandes.",
+"- Coordenadas SEMPRE nas unidades dos eixos (ex.: x de 0 a 1 para atividade de água), nunca em pixels.",
+"- Curvas são calculadas a partir de um modelo e parâmetros. Modelos: \"gab\" {m0, c, k (k<1)}; \"bet\" {m0, c} (só até x≈0,5); \"linear\" {a, b}: y=a+b·x; \"exponencial\" {a, b}: y=a·e^(b·x); \"sino\" {altura, centro, largura}; \"pontos\" {pontos: [[x,y],…]} para qualquer curva lida de um slide (com \"marcadores\": true mostra só as bolinhas). Opcional por série: \"rotulo_x\" (em que x o nome da curva aparece).",
+"- Confira as contas: a curva inteira (de \"de\" até \"ate\") precisa caber entre y.min e y.max.",
+"- A MAIORIA DOS ESTUDANTES VAI ASSISTIR NO CELULAR: rótulos bem curtos (até ~22 caracteres), no máximo 3 ou 4 anotações visíveis ao mesmo tempo (use \"limpar\"), \"pontos\" curtos (até ~90 caracteres) e títulos de passo curtos (até ~40 caracteres).",
+"- Ponha a ORIGEM das setas (\"de\") num espaço vazio do gráfico, longe das curvas: o rótulo da seta fica na origem. A ponta (\"para\") encosta no que ela aponta.",
+"- As séries começam escondidas; aparecem com a ação \"serie\". \"limpar\" apaga tudo (mostre de novo as curvas que precisar). Cada passo herda o que os anteriores desenharam (até um \"limpar\").",
+"- Cores: azul, laranja, verde, vermelho, roxo, cinza, ambar.",
+"",
+"AÇÕES DO GRÁFICO (campo \"acoes\" do passo; \"atraso\" opcional em milissegundos, contado do começo do passo):",
+"  {\"tipo\":\"serie\",\"serie\":\"id\"}  ·  {\"tipo\":\"destacar\",\"serie\":\"id\"}",
+"  {\"tipo\":\"regiao\",\"de\":x1,\"ate\":x2,\"rotulo\":\"I\",\"cor\":\"azul\"}",
+"  {\"tipo\":\"seta\",\"de\":[x,y],\"para\":[x,y],\"rotulo\":\"texto\",\"cor\":\"vermelho\"}",
+"  {\"tipo\":\"ponto\",\"x\":x,\"serie\":\"id\",\"rotulo\":\"texto\"}  (ou \"y\" no lugar de \"serie\")",
+"  {\"tipo\":\"ponto_movel\",\"serie\":\"id\",\"de\":x1,\"ate\":x2,\"rotulo\":\"texto\",\"duracao\":3000}",
+"  {\"tipo\":\"linha_v\",\"x\":x,\"rotulo\":\"texto\"}  ·  {\"tipo\":\"linha_h\",\"y\":y,\"rotulo\":\"texto\"}",
+"  {\"tipo\":\"distancia\",\"serie_a\":\"id\",\"serie_b\":\"id\",\"x\":x,\"rotulo\":\"texto\"}",
+"  {\"tipo\":\"texto\",\"x\":x,\"y\":y,\"texto\":\"texto\"}  ·  {\"tipo\":\"limpar\"}",
+"",
+"CENA DE MOLÉCULAS (parte de baixo da tela; mostre o que a fala está explicando, como num desenho animado do fenômeno):",
+"- Declare no bloco: \"cena\": {\"elementos\": [ … ]}. Coordenadas da cena: x de 0 a 100 (esquerda → direita), y de 0 a 60 (topo → base). Elementos começam escondidos.",
+"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\".",
+"- Em cada passo, \"cena_acoes\" (mesma regra de \"atraso\"; cada passo herda a cena dos anteriores até um \"limpar_cena\"):",
+"  {\"tipo\":\"aparecer\",\"elemento\":\"id\"} · {\"tipo\":\"sumir\",\"elemento\":\"id\"} · {\"tipo\":\"mover\",\"elemento\":\"id\",\"para\":[x,y],\"duracao\":1500}",
+"  {\"tipo\":\"destacar\",\"elemento\":\"id\"} · {\"tipo\":\"danificar\",\"alvo\":\"id\",\"rotulo\":\"texto\"} · {\"tipo\":\"vagar\",\"elemento\":\"id\",\"agitacao\":0.1}",
+"  {\"tipo\":\"aguas\",\"grupo\":\"w\",\"n\":30,\"area\":[x1,y1,x2,y2] ou \"dentro\":\"id\",\"agitacao\":0.6}  moléculas de água livres se agitando",
+"  {\"tipo\":\"solutos\",\"especie\":\"ion|acucar|particula|gordura|o2\",\"n\":6,\"area\":[…]}  partículas soltas",
+"  {\"tipo\":\"agitar\",\"grupo\":\"w\",\"agitacao\":0.1}  muda a agitação (ex.: esfriar)",
+"  {\"tipo\":\"pontes\",\"alvo\":\"id\",\"n\":4}  pontes de hidrogênio em volta de uma molécula",
+"  {\"tipo\":\"hidratar\",\"alvo\":\"id\",\"camadas\":1|2,\"n\":12,\"grupo\":\"w\",\"rotulo\":\"camada de hidratação\"}  a água livre migra e forma a camada (chamar de novo com n maior faz a camada crescer)",
+"  {\"tipo\":\"congelar\",\"nucleos\":[[x,y],…],\"raio\":r,\"area\":[…] ou \"dentro\":\"id\",\"evitar_raio\":6,\"duracao\":5000}  cristal de gelo cresce a partir dos núcleos; com \"evitar_raio\" deixa bolsões líquidos em volta dos solutos; sem ele, empurra os solutos para fora",
+"  {\"tipo\":\"derreter\",\"centro\":[x,y],\"raio\":12,\"duracao\":3000} · {\"tipo\":\"evaporar\",\"duracao\":3000} (sai toda a água menos a ligada)",
+"  {\"tipo\":\"desidratar\",\"alvo\":\"id\",\"n\":8}  água sai de dentro de uma célula · {\"tipo\":\"prender\",\"grupo\":\"w\",\"dentro\":\"id\"}  água capturada por uma rede",
+"  {\"tipo\":\"coletar\",\"especie\":\"particula\",\"para\":[x,y]}",
+"  {\"tipo\":\"rotulo\",\"x\":x,\"y\":y,\"texto\":\"texto\",\"cor\":\"azul\"} · {\"tipo\":\"circulo\",\"x\":x,\"y\":y,\"r\":6,\"rotulo\":\"texto\"} · {\"tipo\":\"seta\",\"de\":[x,y],\"para\":[x,y],\"rotulo\":\"texto\"} · {\"tipo\":\"linha\",\"de\":[x,y],\"para\":[x,y]} · {\"tipo\":\"limpar_cena\"}",
+"- Para comparar dois casos, divida a cena ao meio com uma \"linha\" em x=50 e rótulos no topo de cada lado. Rótulos da cena também curtos (até ~30 caracteres). As cenas são esquemáticas (fora de escala); diga isso no campo \"fonte\".",
+"",
+"REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre a LISTA de trilhas na ordem do curso (ordem dos PDFs das aulas e da apostila no Google Drive, não a ordem das gravações), com o assunto de cada uma e de quais aulas gravadas vem. Depois de aprovada, mostre o ROTEIRO de cada trilha (tabela com nº do passo, título, o que a voz diz, o que aparece no gráfico e o que acontece na cena) e, se a sua interface permitir conteúdo visual, uma PRÉVIA animada no formato vertical. Liste as correções feitas (REGRA PRINCIPAL). Ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).",
+"",
+"LOTE: se o material tiver vários assuntos, faça várias trilhas curtas (uma por assunto, um bloco cada), na ordem do curso, e devolva um arquivo .json por trilha. Se a resposta for ficar longa demais, entregue algumas trilhas por vez e diga quais ainda faltam; o professor pede \"continue\".",
+"",
+"FORMATO DE CADA ARQUIVO (devolva SÓ o JSON, sem comentários):",
+"{",
+"  \"formato\": \"aula-trilha/1\",",
+"  \"titulo\": \"título curto da aula em trilha\",",
+"  \"tema\": \"assuntos cobertos\",",
+"  \"visual\": {\"fundo\": \"branco\"},",
+"  \"fonte\": \"de quais aulas/slides veio. AJUSTES FEITOS EM RELAÇÃO À FALA: … As cenas de moléculas são esquemáticas (fora de escala).\",",
+"  \"blocos\": [",
+"    {",
+"      \"id\": \"b1\",",
+"      \"titulo\": \"título do bloco\",",
+"      \"contexto_ia\": \"resumo fiel e correto do que a aula ensina neste bloco…\",",
+"      \"subtopico_id\": \"id do catálogo do Estudar com IA (ou vazio)\",",
+"      \"tema_id\": \"id do subtema da disciplina (ou vazio)\",",
+"      \"grafico\": {",
+"        \"x\": {\"rotulo\": \"Atividade de água (Aw)\", \"min\": 0, \"max\": 1, \"passo\": 0.1},",
+"        \"y\": {\"rotulo\": \"Umidade (g/100 g ss)\", \"min\": 0, \"max\": 40, \"passo\": 10},",
+"        \"series\": [",
+"          {\"id\": \"ads\", \"nome\": \"adsorção\", \"modelo\": \"gab\", \"params\": {\"m0\": 5, \"c\": 12, \"k\": 0.9}, \"de\": 0.02, \"ate\": 0.95, \"cor\": \"azul\"}",
+"        ]",
+"      },",
+"      \"cena\": {\"elementos\": [{\"id\": \"na\", \"tipo\": \"ion\", \"x\": 50, \"y\": 30, \"rotulo\": \"Na⁺\"}]},",
+"      \"passos\": [",
+"        {\"titulo\": \"título do passo\", \"fala\": \"o que a voz diz…\", \"pontos\": [\"ponto-chave que aparece na tela\"],",
+"         \"acoes\": [{\"tipo\": \"serie\", \"serie\": \"ads\"}],",
+"         \"cena_acoes\": [{\"tipo\": \"aguas\", \"grupo\": \"w\", \"n\": 30}, {\"tipo\": \"aparecer\", \"elemento\": \"na\"}, {\"tipo\": \"hidratar\", \"alvo\": \"na\", \"camadas\": 2, \"n\": 14, \"atraso\": 2000}]}",
+"      ],",
+"      \"checagem\": {\"tipo\": \"multipla\", \"pergunta\": \"…\", \"alternativas\": [\"…\", \"…\", \"…\"], \"correta\": 0, \"explicacao\": \"por que a certa é a certa\"},",
+"      \"pergunta_falada\": {\"pergunta\": \"…\", \"esperado\": \"o que uma boa resposta contém\"}",
+"    }",
+"  ]",
+"}",
+"(\"correta\" conta do 0: a primeira alternativa é 0. \"blocos\" sempre com UM bloco.)",
+"",
+"============================== MATERIAL DAS AULAS =============================="
 ].join('\n');
 
 // pedido de AJUSTE de uma aula já pronta (o professor anota o que mudar em cada passo)
 function promptAjuste(trilha, notas){
-  var ini = PROMPT_TRILHA.indexOf('REGRAS DE CONTEÚDO'), fim = PROMPT_TRILHA.indexOf('============================== MATERIAL DAS AULAS');
+  var ini = PROMPT_TRILHA.indexOf('REGRA PRINCIPAL'); if(ini < 0) ini = PROMPT_TRILHA.indexOf('REGRAS DE CONTEÚDO');
+  var fim = PROMPT_TRILHA.indexOf('============================== MATERIAL DAS AULAS');
   return [
     'Você vai AJUSTAR uma AULA EM TRILHA já pronta da plataforma "Aula por IA" (aula interativa: slides com gráficos que se animam, narrada por voz de IA, com dúvidas por voz).',
     'Abaixo vêm as regras do formato (as mesmas de quando a aula foi criada), o JSON ATUAL da aula e os AJUSTES que o professor pediu, passo a passo.',
     'Faça SÓ o que foi pedido e mantenha o resto igual: os mesmos ids de blocos e a mesma ordem dos passos (assim a narração já gravada continua valendo onde a fala não mudou).',
     'Primeiro mostre ao professor, em poucas linhas, o que você vai mudar em cada passo (se a sua interface permitir, mostre também uma prévia visual do gráfico dos passos alterados). Depois devolva o JSON COMPLETO da aula ajustada, num bloco de código ou arquivo .json.',
-    '', PROMPT_TRILHA.slice(ini, fim).replace(/\n?REVISÃO COM O PROFESSOR[^\n]*\n/, '\n').replace(/\n?DIVIDIR EM AULAS CURTAS[^\n]*\n/, '\n'),
+    '', PROMPT_TRILHA.slice(ini, fim).replace(/\n?REVISÃO COM O PROFESSOR[^\n]*\n/, '\n').replace(/\n?DIVIDIR EM AULAS CURTAS[^\n]*\n/, '\n').replace(/\n?LOTE:[^\n]*\n/, '\n'),
     '============================== AJUSTES PEDIDOS PELO PROFESSOR ==============================', notas,
     '', '============================== JSON ATUAL DA AULA ==============================', JSON.stringify(trilha, null, 1)
   ].join('\n');
@@ -146,8 +167,8 @@ function desenharLista(){
     h += (discsOrd.length > 1 ? '<div class="t-blocos">' + discsOrd.map(function(d){ return '<button class="t-chip' + (d === filtro ? ' t-atual' : '') + '" data-trfiltro="' + esc(d) + '">' + esc(nomeDisc(d)) + ' (' + discsCom[d] + ')</button>'; }).join('') + '</div>' : '') +
       '<div class="botoes" style="margin:4px 0 10px"><input type="text" id="tr_buscaTrilha" placeholder="🔎 buscar aula…" style="flex:1 1 200px;max-width:340px"><button class="mini secundario" id="tr_btAbrirTodos">abrir todos</button><button class="mini secundario" id="tr_btFecharTodos">fechar todos</button></div>' +
       '<div id="tr_listaTrilhasProf"></div>' +
-      '<div class="convite" style="margin-top:12px"><b>🎙 Voz da IA em segundo plano</b><div class="aviso">O servidor grava sozinho: pode fechar o site. A cota grátis de voz é pequena (umas 10 falas por modelo por dia); se acabar, ele continua no dia seguinte e te avisa no celular quando terminar.</div>' +
-      '<div class="botoes" style="margin-top:8px"><label>Voz: <select id="tr_vozLote">' + L.vozes.map(function(v){ return '<option>' + v + '</option>'; }).join('') + '</select></label><button class="mini" id="tr_btGravarTodas">Gravar a voz de todas as aulas que faltam</button><span id="tr_msgLote" class="aviso"></span></div></div>';
+      '<details class="convite" style="margin-top:12px"><summary class="link"><b>🌙 Voz de leitura em segundo plano</b> (todas as aulas de uma vez; a voz é mais neutra que a da conversa)</summary><div class="aviso">Para a voz natural, abra a aula e use <b>🎙 Gravar com a voz da conversa</b>. Aqui o servidor grava sozinho (pode fechar o site), com a cota pequena de voz (umas 10 falas por modelo por dia); se acabar, continua no dia seguinte e te avisa no celular.</div>' +
+      '<div class="botoes" style="margin-top:8px"><label>Voz: <select id="tr_vozLote">' + L.vozes.map(function(v){ return '<option>' + v + '</option>'; }).join('') + '</select></label><button class="mini secundario" id="tr_btGravarTodas">Gravar a voz de todas as aulas que faltam</button><span id="tr_msgLote" class="aviso"></span></div></details>';
   } else h += '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
   h += '</div>';
   h += '<div class="caixa"><h2>Criar uma aula em trilha</h2>' +
@@ -260,7 +281,7 @@ function ligarBotoesListaProf(){
       return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; });
     }).catch(function(e){ $('msgLote').textContent = ''; erroGeral(e.message); });
   };
-  document.querySelectorAll('[data-trgravar]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; gravarFundo({ids: [b.getAttribute('data-trgravar')], voz: $('vozLote').value}); }); });
+  document.querySelectorAll('[data-trgravar]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trgravar'), true); }); });
   document.querySelectorAll('[data-trapagar]').forEach(function(b){ b.addEventListener('click', function(){
     var t = L.trilhas.filter(function(x){ return x.id === b.getAttribute('data-trapagar'); })[0];
     if(!confirm('Apagar "' + t.titulo + '"? A pasta dela vai para a lixeira do seu Drive (dá para recuperar por 30 dias).')) return;
@@ -398,7 +419,7 @@ function abrirPlayer(t){
       (tr.video ? '<select id="tr_selVel" title="velocidade"><option value="0.75">0,75×</option><option value="1">1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option></select>' : '<select id="tr_selVel" title="velocidade"><option value="0.9">0,9×</option><option value="1">1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select>') +
       '<button class="mini vermelho" id="tr_btDuvida">✋ Tenho uma dúvida</button>' +
     '</div>' +
-    (MODO === 'prof' && !t.previa && !tr.video && !temNarracaoIA() ? '<div class="convite" id="tr_avisoNarr" style="margin-top:10px">🔈 Esta aula ainda está com a <b>voz do navegador</b> (robótica). Grave uma vez com a <b>voz da IA</b> (as mesmas vozes do Gemini); depois ela toca para todos. Dá para gravar em segundo plano e fechar o site. <button class="mini" id="tr_btIrNarr">🎙 Gravar com a voz da IA</button></div>' : '') +
+    (MODO === 'prof' && !t.previa && !tr.video && !temNarracaoIA() ? '<div class="convite" id="tr_avisoNarr" style="margin-top:10px">🔈 Esta aula ainda está com a <b>voz do navegador</b> (robótica). Grave uma vez com a <b>voz da conversa</b> (a mesma voz natural da dúvida por voz); depois ela toca para todos. <button class="mini" id="tr_btIrNarr">🎙 Gravar com a voz da IA</button></div>' : '') +
     '<div id="tr_duvidaBox" class="t-duvidaBox oculto"></div>' +
     '<div class="t-texto"><div><b>Pontos-chave</b><ul class="t-pontos" id="tr_pontos"></ul></div>' +
       '<div><b>O que a voz está dizendo</b><div class="t-legenda" id="tr_legenda"></div><div id="tr_avisoVoz" class="convite oculto"></div></div></div>' +
@@ -810,16 +831,26 @@ function desenharCorrecaoTrilha(txt){
    Coordenadas: x de 0 a 100, y de 0 a 60. Só lê dados (o servidor já filtrou tipos e números). */
 var Cena = (function () {
   const NS = "http://www.w3.org/2000/svg";
-  const PAL = {
-    agua: "#7cc4ff", gelo: "#dff4ff", H: "#ffffff",
+  const PAL_ESCURO = {
+    fundo: "#262626", agua: "#7cc4ff", gelo: "#dff4ff", geloBorda: "#dff4ff", H: "#ffffff", Hb: "none", ligacao: "#dff4ff",
     ion: "#f2b84b", ionMenos: "#b9a5ff", acucar: "#ff9fc7", particula: "#e9826f",
-    gordura: "#f5d76e", bacteria: "#7ddc9a", caixa: "#e8e2d0", estrutura: "#f2c79b",
+    gordura: "#f5d76e", bacteria: "#7ddc9a", bactBorda: "#3f8f5c", bactSeca: "#5fae7a", bactDano: "#6a3b3b",
+    caixa: "#e8e2d0", caixaFundo: "#ffffff12", estrutura: "#f2c79b", cadeia: "#e6c27a", o2: "#ff8a8a",
     giz: "#f4f1e8", dano: "#ff6b6b",
     azul: "#7cc4ff", laranja: "#ffb070", verde: "#8fe3b0", vermelho: "#ff8a8a",
     roxo: "#c7a6ff", cinza: "#bdbdbd", ambar: "#ffd479", rosa: "#ff9fc7"
   };
-  const RAIO = { agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8 };
-  const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1 };
+  const PAL_CLARO = {
+    fundo: "#ffffff", agua: "#2b7fd4", gelo: "#cfe8fa", geloBorda: "#2b7fd4", H: "#ffffff", Hb: "#5d6b78", ligacao: "#2b7fd4",
+    ion: "#f0a91e", ionMenos: "#8b6be0", acucar: "#d6337a", particula: "#c9472f",
+    gordura: "#d9a90f", bacteria: "#3fb46a", bactBorda: "#1f7a42", bactSeca: "#2d8a50", bactDano: "#8a3a3a",
+    caixa: "#6b6a64", caixaFundo: "#0000000a", estrutura: "#b8742d", cadeia: "#a8741a", o2: "#d62828",
+    giz: "#1d1d1b", dano: "#d62828",
+    azul: "#1f6fd1", laranja: "#d9650b", verde: "#1a8a47", vermelho: "#d62828",
+    roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a"
+  };
+  const RAIO = { agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6 };
+  const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
   function mk(tag, at, par) { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); if (par) par.appendChild(e); return e; }
@@ -827,6 +858,7 @@ var Cena = (function () {
   function dist(a, b, c, d) { return Math.hypot(a - c, b - d); }
 
   function criar(raiz, def, opt) {
+    const PAL = opt.tema === "claro" ? PAL_CLARO : PAL_ESCURO;
     def = def || { elementos: [] };
     const K = opt.largura / 100, X0 = opt.x, Y0 = opt.y;
     const root = mk("g", { transform: `translate(${X0},${Y0}) scale(${K})` }, raiz);
@@ -856,17 +888,33 @@ var Cena = (function () {
       }
       else if (t === "acucar") { hexagono(g, RAIO.acucar * tam, PAL.acucar); if (d.rotulo) rot(g, 0, RAIO.acucar * tam + 4, d.rotulo, 3.4); }
       else if (t === "particula") { mk("circle", { r: RAIO.particula * tam, fill: PAL.particula }, g); }
+      else if (t === "cadeia") {
+        const n = d.unidades || 4, cor = PAL[d.cor] || PAL.cadeia, r = 1.25 * tam, dx = 2.3 * tam;
+        let pth = ""; for (let i = 0; i < n; i++) { const x = (i - (n - 1) / 2) * dx, y = (i % 2 ? .9 : -.9) * tam; pth += (i ? "L" : "M") + x.toFixed(2) + "," + y.toFixed(2); }
+        mk("path", { d: pth, stroke: cor, "stroke-width": .5, fill: "none" }, g);
+        for (let i = 0; i < n; i++) { const gg = mk("g", { transform: `translate(${((i - (n - 1) / 2) * dx).toFixed(2)},${((i % 2 ? .9 : -.9) * tam).toFixed(2)})` }, g); hexagono(gg, r, cor); }
+        if (d.rotulo) rot(g, 0, 4.6 * tam, d.rotulo, 3.3);
+      }
+      else if (t === "rede") {
+        const w = d.w || 30, h = d.h || 24, cor = PAL[d.cor] || PAL.cadeia;
+        mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: 2, fill: cor + "10", stroke: "none" }, g);
+        let pth = "";
+        for (let k = 0; k < 5; k++) { const y = -h / 2 + h * (k + .5) / 5; pth += `M${-w / 2},${y.toFixed(1)}`; for (let x = -w / 2; x <= w / 2; x += 3) pth += `L${x.toFixed(1)},${(y + Math.sin(x * .6 + k) * 1.4).toFixed(1)}`; }
+        for (let k = 0; k < 6; k++) { const x = -w / 2 + w * (k + .5) / 6; pth += `M${x.toFixed(1)},${-h / 2}`; for (let y = -h / 2; y <= h / 2; y += 3) pth += `L${(x + Math.sin(y * .7 + k) * 1.3).toFixed(1)},${y.toFixed(1)}`; }
+        mk("path", { d: pth, stroke: cor, "stroke-width": .45, fill: "none", "stroke-opacity": .8 }, g);
+        if (d.rotulo) rot(g, 0, -h / 2 - 1.8, d.rotulo, 3.4);
+      }
       else if (t === "gordura") { mk("circle", { r: RAIO.gordura * tam, fill: PAL.gordura, opacity: .9 }, g); }
       else if (t === "bacteria") {
         const w = 10 * tam, h = 5.4 * tam;
-        e.corpo = mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: h / 2, fill: e.dano ? "#6a3b3b" : PAL.bacteria, stroke: e.dano ? PAL.dano : "#3f8f5c", "stroke-width": .5 }, g);
+        e.corpo = mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: h / 2, fill: e.dano ? PAL.bactDano : PAL.bacteria, stroke: e.dano ? PAL.dano : PAL.bactBorda, "stroke-width": .5 }, g);
         if (e.dano) mk("path", { d: `M${-w / 4},${-h / 2} l1.4,2 l-1.6,1.4 l1.8,2`, stroke: PAL.dano, "stroke-width": .6, fill: "none" }, g);
         if (d.rotulo) rot(g, 0, h / 2 + 3.6, d.rotulo, 3.2);
       }
       else if (t === "caixa" || t === "estrutura") {
         const w = d.w || 20, h = d.h || 14;
         const est = t === "estrutura";
-        mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: est ? 3 : 1.2, fill: est ? "#f2c79b14" : "#ffffff12", stroke: e.dano ? PAL.dano : (est ? PAL.estrutura : PAL.caixa), "stroke-width": .55, "stroke-dasharray": e.dano ? "2.2 1.6" : "none" }, g);
+        mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: est ? 3 : 1.2, fill: est ? PAL.estrutura + "14" : PAL.caixaFundo, stroke: e.dano ? PAL.dano : (est ? PAL.estrutura : PAL.caixa), "stroke-width": .55, "stroke-dasharray": e.dano ? "2.2 1.6" : "none" }, g);
         if (e.dano) for (let i = 0; i < 4; i++) { const px = rnd(-w / 2.4, w / 2.4), py = (i % 2 ? -1 : 1) * h / 2; mk("path", { d: `M${px},${py} l${rnd(-1.5, 1.5)},${-Math.sign(py) * 2} l${rnd(-1.5, 1.5)},${-Math.sign(py) * 1.8}`, stroke: PAL.dano, "stroke-width": .5, fill: "none" }, g); }
         if (d.rotulo) rot(g, 0, est ? -h / 2 - 1.8 : h / 2 - 1.8, d.rotulo, 3.3);
       }
@@ -876,18 +924,18 @@ var Cena = (function () {
       mk("path", { d: p + "Z", fill: cor + "33", stroke: cor, "stroke-width": .55 }, g);
     }
     function rot(g, x, y, txt, fs, cor) {
-      const t = mk("text", { x, y, "text-anchor": "middle", "font-size": fs || 3.6, fill: cor || PAL.giz, "font-family": "Caveat, 'Patrick Hand', cursive", stroke: "#262626", "stroke-width": .9, "paint-order": "stroke", "stroke-linejoin": "round" }, g);
+      const t = mk("text", { x, y, "text-anchor": "middle", "font-size": fs || 3.6, fill: cor || PAL.giz, "font-family": "Caveat, 'Patrick Hand', cursive", stroke: PAL.fundo, "stroke-width": .9, "paint-order": "stroke", "stroke-linejoin": "round" }, g);
       t.textContent = txt; return t;
     }
     function posEl(e) { e.g.setAttribute("transform", `translate(${e.x.toFixed(2)},${e.y.toFixed(2)}) scale(${e.esc})`); }
-    function raioEl(e) { const t = e.tipo, tam = e.def.tamanho || 1; return (RAIO[t] || 3) * tam * e.esc; }
+    function raioEl(e) { const t = e.tipo, tam = e.def.tamanho || 1; if (t === "cadeia") return ((e.def.unidades || 4) * 2.3 * tam) / 2 + .6; return (RAIO[t] || 3) * tam * e.esc; }
 
     /* ---------- moléculas (partículas) ---------- */
     function desenharAgua(g, ang, gelo, tam) {
       tam = tam || 1;
       const o = mk("circle", { r: RAIO.agua * tam, fill: gelo ? PAL.gelo : PAL.agua }, g);
       const hs = [];
-      [-52, 52].forEach(da => { const a = (ang + da) * Math.PI / 180; hs.push(mk("circle", { cx: Math.cos(a) * 1.55 * tam, cy: Math.sin(a) * 1.55 * tam, r: .62 * tam, fill: PAL.H }, g)); });
+      [-52, 52].forEach(da => { const a = (ang + da) * Math.PI / 180; hs.push(mk("circle", { cx: Math.cos(a) * 1.55 * tam, cy: Math.sin(a) * 1.55 * tam, r: .62 * tam, fill: PAL.H, stroke: PAL.Hb, "stroke-width": .22 }, g)); });
       return { o, hs };
     }
     function novaParte(tipo, x, y, op) {
@@ -898,12 +946,13 @@ var Cena = (function () {
       else if (tipo === "ion") mk("circle", { r: 1.9, fill: PAL.ion }, g);
       else if (tipo === "acucar") hexagono(g, 2.2, PAL.acucar);
       else if (tipo === "gordura") mk("circle", { r: 2.4, fill: PAL.gordura }, g);
+      else if (tipo === "o2") { mk("circle", { cx: -.8, r: 1, fill: PAL.o2 }, g); mk("circle", { cx: .8, r: 1, fill: PAL.o2 }, g); }
       else mk("circle", { r: RAIO.particula, fill: PAL.particula }, g);
       parts.push(p); return p;
     }
     function setGelo(p, v) {
       if (p.tipo !== "agua" || p.gelo === v) return; p.gelo = v;
-      p.vis.o.setAttribute("fill", v ? PAL.gelo : PAL.agua);
+      p.vis.o.setAttribute("fill", v ? PAL.gelo : PAL.agua); p.vis.o.setAttribute("stroke", v ? PAL.geloBorda : "none"); p.vis.o.setAttribute("stroke-width", v ? .3 : 0);
     }
     function orient(p, ang) {
       if (p.tipo !== "agua") return; p.ang = ang;
@@ -950,7 +999,7 @@ var Cena = (function () {
           const vel = p.modo === "indo" ? 2.2 : 7;
           const k = 1 - Math.exp(-vel * dt);
           p.x += (p.casa.x - p.x) * k; p.y += (p.casa.y - p.y) * k;
-          if (p.modo === "indo" && dist(p.x, p.y, p.casa.x, p.casa.y) < .35) { p.modo = p.modoFinal || "preso"; if (p.modo === "gelo") { setGelo(p, true); orient(p, -90); } }
+          if (p.modo === "indo" && dist(p.x, p.y, p.casa.x, p.casa.y) < .35) { p.modo = p.modoFinal || "preso"; if (p.modo === "gelo") { setGelo(p, true); orient(p, -90); } if (p.modo === "livre") { p.casa = null; continue; } }
           const j = p.modo === "gelo" ? .05 : .22;
           p.jx = (Math.random() - .5) * j; p.jy = (Math.random() - .5) * j;
         }
@@ -969,7 +1018,7 @@ var Cena = (function () {
         const a = gs[i], b = gs[j]; if (Math.abs(a.x - b.x) > S * 1.2 || Math.abs(a.y - b.y) > S * 1.2) continue;
         if (dist(a.x, a.y, b.x, b.y) < S * 1.12) d += `M${a.x.toFixed(1)},${a.y.toFixed(1)}L${b.x.toFixed(1)},${b.y.toFixed(1)}`;
       }
-      L.bonds.innerHTML = d ? `<path d="${d}" stroke="${PAL.gelo}" stroke-opacity=".35" stroke-width=".35" fill="none" stroke-dasharray=".8 .6"/>` : "";
+      L.bonds.innerHTML = d ? `<path d="${d}" stroke="${PAL.ligacao}" stroke-opacity=".35" stroke-width=".35" fill="none" stroke-dasharray=".8 .6"/>` : "";
     }
     function desenharPontes() {
       if (!pontes.length) { if (L.pontes.childNodes.length) L.pontes.innerHTML = ""; return; }
@@ -1032,17 +1081,23 @@ var Cena = (function () {
       for (let i = 0; i < n1; i++) { const t = 2 * Math.PI * i / n1; pos.push([r1, t]); }
       for (let i = 0; i < n2; i++) { const t = 2 * Math.PI * (i + .5) / n2; pos.push([r2, t]); }
       const ion = e.tipo === "ion";
+      e.hid = (e.hid || []).filter(q => !q.morrer);
+      const antigos = e.hid.slice(); e.hid = [];
       pos.forEach(([r, t], i) => {
         const x = e.x + Math.cos(t) * r, y = e.y + Math.sin(t) * r;
-        let p = maisProxima(livres(a.grupo || "*"), x, y);
+        let p = antigos.length ? antigos.shift() : maisProxima(livres(a.grupo || "*"), x, y);
         if (!p) p = novaParte("agua", rnd(2, 98), rnd(2, 58));
+        e.hid.push(p);
+        p.ligada = cam === 2 && i < n1;
         p.reserva = false; p.modo = an ? "indo" : "preso"; p.modoFinal = "preso"; p.casa = { x, y };
         if (ion) orient(p, t * 180 / Math.PI); // oxigênio voltado ao cátion
         if (!an) { p.x = x; p.y = y; p.alfa = 1; p.g.setAttribute("opacity", 1); }
       });
+      antigos.forEach(q => { q.modo = "livre"; q.casa = null; });
       const rh = (cam === 2 ? r2 : r1) + 1.9;
-      const halo = mk("g", {}, L.halo);
-      mk("circle", { cx: e.x, cy: e.y, r: rh, fill: PAL.azul + "14", stroke: PAL.azul, "stroke-width": .35, "stroke-dasharray": "1.2 1" }, halo);
+      if (e.halo) e.halo.remove();
+      const halo = mk("g", {}, L.halo); e.halo = halo;
+      if (a.halo !== false) mk("circle", { cx: e.x, cy: e.y, r: rh, fill: PAL.azul + "14", stroke: PAL.azul, "stroke-width": .35, "stroke-dasharray": "1.2 1" }, halo);
       if (a.rotulo) rot(halo, e.x, e.y + rh + 3.8, a.rotulo, 3.4, PAL.azul);
       if (an) { halo.setAttribute("opacity", 0); timers.push(setTimeout(() => fade(halo, true), 1800)); }
     };
@@ -1117,8 +1172,8 @@ var Cena = (function () {
       const n = a.n || 8, ps = [];
       for (let i = 0; i < n; i++) { const p = novaParte("agua", e.x + rnd(-3, 3), e.y + rnd(-1.2, 1.2), { agit: .8 }); p.modo = "preso"; p.casa = { x: p.x, y: p.y }; ps.push(p); if (!an) { p.alfa = 1; } }
       const sair = () => ps.forEach(p => { p.modo = "livre"; p.lim = { t: "r", x1: 2, y1: 2, x2: 98, y2: 58 }; const t = Math.atan2(p.y - e.y, p.x - e.x); p.vx = Math.cos(t) * 14; p.vy = Math.sin(t) * 14; });
-      if (!an) { ps.forEach(p => { const t = rnd(0, 6.28); p.x = e.x + Math.cos(t) * rnd(9, 20); p.y = e.y + Math.sin(t) * rnd(8, 16); p.modo = "livre"; p.lim = { t: "r", x1: 2, y1: 2, x2: 98, y2: 58 }; p.g.setAttribute("opacity", 1); }); e.esc = .78; posEl(e); if (e.corpo) e.corpo.setAttribute("fill", "#5fae7a"); return; }
-      timers.push(setTimeout(() => { sair(); tween(1800, k => { e.esc = 1 - .22 * k; posEl(e); }, true); if (e.corpo) e.corpo.setAttribute("fill", "#5fae7a"); }, 900));
+      if (!an) { ps.forEach(p => { const t = rnd(0, 6.28); p.x = e.x + Math.cos(t) * rnd(9, 20); p.y = e.y + Math.sin(t) * rnd(8, 16); p.modo = "livre"; p.lim = { t: "r", x1: 2, y1: 2, x2: 98, y2: 58 }; p.g.setAttribute("opacity", 1); }); e.esc = .78; posEl(e); if (e.corpo) e.corpo.setAttribute("fill", PAL.bactSeca); return; }
+      timers.push(setTimeout(() => { sair(); tween(1800, k => { e.esc = 1 - .22 * k; posEl(e); }, true); if (e.corpo) e.corpo.setAttribute("fill", PAL.bactSeca); }, 900));
     };
 
     A.coletar = (a, an) => {
@@ -1129,7 +1184,7 @@ var Cena = (function () {
 
     A.rotulo = (a, an) => { const g = mk("g", {}, L.ann); rot(g, a.x, a.y, a.texto, a.tamanho || 3.9, PAL[a.cor] || PAL.giz); fade(g, an); };
     A.circulo = (a, an) => { const g = mk("g", {}, L.ann); const c = PAL[a.cor] || PAL.ambar; mk("circle", { cx: a.x, cy: a.y, r: a.r || 6, fill: "none", stroke: c, "stroke-width": .5, "stroke-dasharray": "1.4 1" }, g); if (a.rotulo) rot(g, a.x, a.y - (a.r || 6) - 1.6, a.rotulo, 3.6, c); fade(g, an); };
-    A.linha = (a, an) => { const g = mk("g", {}, L.ann); mk("line", { x1: a.de[0], y1: a.de[1], x2: a.para[0], y2: a.para[1], stroke: PAL[a.cor] || "#ffffff55", "stroke-width": .4, "stroke-dasharray": "1.5 1.2" }, g); fade(g, an); };
+    A.linha = (a, an) => { const g = mk("g", {}, L.ann); mk("line", { x1: a.de[0], y1: a.de[1], x2: a.para[0], y2: a.para[1], stroke: PAL[a.cor] || PAL.giz + "66", "stroke-width": .4, "stroke-dasharray": "1.5 1.2" }, g); fade(g, an); };
     A.seta = (a, an) => {
       const g = mk("g", {}, L.ann); const c = PAL[a.cor] || PAL.giz;
       const [x1, y1] = a.de, [x2, y2] = a.para, t = Math.atan2(y2 - y1, x2 - x1);
@@ -1137,6 +1192,36 @@ var Cena = (function () {
       mk("path", { d: `M${x2},${y2}L${x2 - 2 * Math.cos(t - .45)},${y2 - 2 * Math.sin(t - .45)}L${x2 - 2 * Math.cos(t + .45)},${y2 - 2 * Math.sin(t + .45)}Z`, fill: c }, g);
       if (a.rotulo) rot(g, x1, y1 + (y2 > y1 ? -1.6 : 4), a.rotulo, 3.6, c);
       fade(g, an);
+    };
+    A.evaporar = (a, an) => {
+      const ar = a.area || [0, 0, 100, 60];
+      const alvo = parts.filter(p => p.tipo === "agua" && !p.morrer && !p.ligada && dentro(ar, p.x, p.y));
+      alvo.forEach((p, i) => {
+        const sair = () => { p.modo = "indo"; p.modoFinal = "preso"; p.casa = { x: p.x + rnd(-6, 6), y: -8 }; p.alvoAlfa = 0; p.morrer = true; if (p.sitio) sites.delete(p.sitio); };
+        if (!an) { p.g.remove(); p.morrer = true; p.alfa = 0; return; }
+        timers.push(setTimeout(sair, rnd(0, a.duracao || 3000)));
+      });
+      if (!an) parts = parts.filter(p => !(p.morrer && p.alfa <= 0));
+      Object.values(els).forEach(e => { if (e.hid) e.hid = e.hid.filter(q => q.ligada); if (e.halo && an) tween(1500, k => e.halo.setAttribute("opacity", 1 - k), true); else if (e.halo) e.halo.setAttribute("opacity", 0); });
+    };
+    A.prender = (a, an) => {
+      const ar = areaDe(a);
+      parts.filter(p => p.tipo === "agua" && p.modo === "livre" && !p.morrer && (!a.grupo || p.grupo === a.grupo)).slice(0, a.n || 999).forEach(p => {
+        const x = rnd(ar[0], ar[2]), y = rnd(ar[1], ar[3]);
+        p.lim = { t: "r", x1: ar[0], y1: ar[1], x2: ar[2], y2: ar[3] };
+        if (a.agitacao != null) p.agit = a.agitacao;
+        if (!an) { p.x = x; p.y = y; return; }
+        p.modo = "indo"; p.modoFinal = "livre"; p.casa = { x, y };
+      });
+    };
+    A.vagar = (a, an) => {
+      const e = els[a.elemento]; if (!e) return;
+      const ar = a.area || [6, 6, 94, 54]; let vx = 0, vy = 0, t0 = 0;
+      const ag = a.agitacao == null ? .5 : a.agitacao;
+      e.vagando = true;
+      procs.push(t => { if (!e.vagando) return false; const dt = t0 ? Math.min(.05, (t - t0) / 1000) : 0; t0 = t;
+        vx += (Math.random() - .5) * ag * 40 * dt * 6; vy += (Math.random() - .5) * ag * 40 * dt * 6; const dmp = Math.pow(.2, dt); vx *= dmp; vy *= dmp;
+        e.x += vx * dt; e.y += vy * dt; if (e.x < ar[0] || e.x > ar[2]) { vx *= -1; e.x = Math.min(Math.max(e.x, ar[0]), ar[2]); } if (e.y < ar[1] || e.y > ar[3]) { vy *= -1; e.y = Math.min(Math.max(e.y, ar[1]), ar[3]); } posEl(e); });
     };
     A.limpar_cena = () => limpar();
 
@@ -1178,7 +1263,9 @@ function desenharCena(b, passo, anim){
   if($('quadro')) $('quadro').classList.toggle('t-comCena', !!b.cena);
   if(!b.cena){ box.classList.add('oculto'); return; }
   box.classList.remove('oculto'); carregarFonteGiz();
-  CENA = Cena.criar(sv, b.cena, {x: 0, y: 0, largura: 100});
+  var claro = !!(T && T.trilha && T.trilha.visual && T.trilha.visual.fundo === 'branco');
+  box.classList.toggle('t-claro', claro);
+  CENA = Cena.criar(sv, b.cena, {x: 0, y: 0, largura: 100, tema: claro ? 'claro' : 'escuro'});
   var ultimo = function(ac){ var k = -1; (ac || []).forEach(function(a, i){ if(a.tipo === 'limpar_cena') k = i; }); return k; };
   var j0 = 0; for(var j = passo; j >= 0; j--){ if(ultimo(b.passos[j].cena_acoes) >= 0){ j0 = j; break; } }
   for(var i = j0; i <= passo; i++){
@@ -1384,7 +1471,13 @@ var G = (function(){
     desenharCena(bloco, passo, P.tocando);
     b = bloco; svg = $('svg'); svg.innerHTML = ''; geometria(!!bloco.cena); caixas = []; visiveis = {}; destaque = ''; marcadores = {}; animarAte = Date.now();
     if(!b.grafico){
-      var t = el('text', {x: W / 2, y: H / 2 - 20, 'text-anchor': 'middle', class: 't-rotEixo', style: 'font-size:26px', fill: '#17389C'}, svg); t.textContent = b.passos[passo].titulo || b.titulo;
+      // sem gráfico: título e pontos do passo em letras grandes, quebrando as linhas
+      var ps = b.passos[passo], cel = W < 600, max = cel ? 24 : 46, y = 46;
+      var quebra = function(txt, n){ var out = [], cur = ''; String(txt).split(/\s+/).forEach(function(w){ if((cur + ' ' + w).trim().length > n){ if(cur) out.push(cur); cur = w; } else cur = (cur + ' ' + w).trim(); }); if(cur) out.push(cur); return out; };
+      quebra(ps.titulo || b.titulo, max).forEach(function(l){ var t = el('text', {x: 24, y: y, class: 't-rotEixo', style: 'font-size:' + (cel ? 28 : 32) + 'px', fill: '#17389C'}, svg); t.textContent = l; y += cel ? 34 : 40; });
+      y += 10;
+      (ps.pontos || []).forEach(function(pt){ quebra('• ' + pt, max + 4).forEach(function(l, k){ var t = el('text', {x: k ? 44 : 24, y: y, style: 'font-size:' + (cel ? 22 : 24) + 'px', fill: '#26344f'}, svg); t.textContent = l; y += cel ? 28 : 32; }); y += 6; });
+      svg.setAttribute('viewBox', '0 0 ' + W + ' ' + Math.max(H * .6, y + 10));
       G.fimAcoes = Date.now(); return;
     }
     eixos();
@@ -1462,8 +1555,10 @@ function abrirDuvida(){
     encerrarDuvida(true, true);
   });
 }
+var vigiaD = null, novasTentativasD = 0;
 function conectarD(primeira){
   var t = tokenVoz, c = t.config;
+  clearTimeout(vigiaD);
   var nova = new WebSocket('wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=' + encodeURIComponent(t.token));
   nova.onopen = function(){
     nova.send(JSON.stringify({setup: {model: t.modelo, generationConfig: {responseModalities: c.responseModalities, speechConfig: c.speechConfig}, systemInstruction: c.systemInstruction,
@@ -1473,6 +1568,7 @@ function conectarD(primeira){
     (typeof ev.data === 'string' ? Promise.resolve(ev.data) : ev.data.text()).then(function(txt){
       var m; try{ m = JSON.parse(txt); }catch(e){ return; }
       if(m.setupComplete){
+        clearTimeout(vigiaD); novasTentativasD = 0;
         var velha = wsD; wsD = nova; wsPendente = null; trocando = false; tentativasRetomar = 0;
         if(primeira){
           ligarMicrofone(); estadoD('ouvindo você… pode falar', 'on'); tD0 = Date.now();
@@ -1499,6 +1595,19 @@ function conectarD(primeira){
     encerrarDuvida(true, true);
   };
   if(primeira) wsD = nova; else wsPendente = nova;
+  if(primeira) vigiaD = setTimeout(function(){
+    if(wsD !== nova || tD0) return;   // já conectou ou já foi encerrada
+    nova.onclose = null; try{ nova.close(1000); }catch(e){}
+    if(novasTentativasD < 2){
+      novasTentativasD++; estadoD('o Google não respondeu; tentando de novo…');
+      api('trilhaToken', {id: T.id, blocoId: blocoAtual().id, passo: P.passo, modo: 'duvida'}).then(function(t2){ if(wsD !== nova) return; tokenVoz = t2; alcaRetomada = ''; conectarD(true); })
+        .catch(function(e){ if($('msgD')) $('msgD').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; encerrarDuvida(true, true); });
+    } else {
+      novasTentativasD = 0;
+      if($('msgD')) $('msgD').innerHTML = '<div class="erro">A conversa por voz não conectou agora (o Google não respondeu). Tente de novo em alguns minutos.</div>';
+      encerrarDuvida(true, true);
+    }
+  }, 12000);
 }
 function ligarMicrofone(){
   var url = URL.createObjectURL(new Blob([CODIGO_WORKLET], {type: 'application/javascript'}));
@@ -1518,6 +1627,7 @@ function ligarMicrofone(){
   });
 }
 function encerrarDuvida(semFechar, manterCaixa){
+  clearTimeout(vigiaD);
   var seg = tD0 ? Math.round((Date.now() - tD0) / 1000) : 0;
   var w = wsD; wsD = null;
   try{ if(w && !semFechar){ w.onclose = null; w.close(1000); } }catch(e){}
@@ -1548,11 +1658,12 @@ function desenharNarracao(){
     '<div class="t-estNarr">' + itens.map(function(x){ var s = T.narracao[x.k]; return '<span title="' + esc(x.b.titulo + ' · passo ' + (x.i + 1)) + '" style="background:' + (s === 'ok' ? '#1E8A4C' : s === 'velha' ? '#B8890A' : '#b9c2d3') + '">' + (x.i + 1) + '</span>'; }).join('') + '</div>' +
     '<p class="aviso">' + ok + ' de ' + itens.length + ' falas gravadas' + (velhas ? ' · ' + velhas + ' com o texto mudado desde a gravação (amarelo)' : '') + '.</p>' +
     '<div class="botoes"><label>Voz: <select id="tr_narrVoz">' + L.vozes.map(function(v){ return '<option' + (v === T.voz ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>' +
-    '<button class="mini" id="tr_btNarrFundo"' + (ok === itens.length ? ' disabled' : '') + '>🌙 Gravar as que faltam em segundo plano (pode fechar o site)</button>' +
-    '<button class="mini secundario" id="tr_btNarrFundoTodas">🌙 Regravar todas em segundo plano</button></div>' +
-    '<details style="margin-top:8px"><summary class="link">Gravar agora, com o site aberto (mais rápido, sem limite de cota)</summary><div class="botoes">' +
-    '<button class="mini" id="tr_btNarrFaltam"' + (ok === itens.length ? ' disabled' : '') + '>⚡ Gravar agora as que faltam</button>' +
-    '<button class="mini secundario" id="tr_btNarrEste">Regravar o passo atual</button><button class="mini secundario" id="tr_btNarrTodas">Regravar todas agora</button></div></details>' +
+    '<button class="mini" id="tr_btNarrFaltam"' + (ok === itens.length ? ' disabled' : '') + '>🎙 Gravar com a voz da conversa (as que faltam)</button>' +
+    '<button class="mini secundario" id="tr_btNarrEste">Regravar o passo atual</button><button class="mini secundario" id="tr_btNarrTodas">Regravar todas</button></div>' +
+    '<p class="aviso" style="margin:4px 0 0">É a mesma voz natural da dúvida por voz. Deixe esta aba aberta enquanto grava (uns 3 a 5 minutos por aula).</p>' +
+    '<details style="margin-top:8px"><summary class="link">Voz de leitura em segundo plano (pode fechar o site, mas a voz é mais neutra)</summary><div class="botoes">' +
+    '<button class="mini secundario" id="tr_btNarrFundo"' + (ok === itens.length ? ' disabled' : '') + '>🌙 Gravar as que faltam em segundo plano</button>' +
+    '<button class="mini secundario" id="tr_btNarrFundoTodas">🌙 Regravar todas em segundo plano</button></div></details>' +
     '<div id="tr_narrProg"></div><div id="tr_narrLog" style="font-size:13px"></div>';
   var fundo = function(refazer){
     $('narrProg').innerHTML = '<p class="aviso">Colocando na fila…</p>';
@@ -1711,7 +1822,7 @@ window.Trilha = {
   abrir: function(el, helpers, opc){
     H = helpers;
     var modo = opc && opc.modo === 'aluno' ? 'aluno' : 'prof', mudou = modo !== MODO; MODO = modo;
-    if(!document.getElementById('tr_estilo')){ var st = document.createElement('style'); st.id = 'tr_estilo'; st.textContent = ".t-app .t-tag{display:inline-block;font-size:11px;border-radius:999px;padding:2px 9px;background:#e7ecf6;color:var(--navy);text-transform:none;letter-spacing:0;vertical-align:middle;font-weight:bold}\n.t-app .t-passoNum{display:inline-block;background:var(--menu);color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:13px;margin-right:6px}\n.t-app .t-listaAulas{max-height:260px;overflow:auto;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;margin-top:8px}\n.t-app .t-listaAulas label{display:flex;gap:8px;align-items:flex-start;margin:4px 0;cursor:pointer;font-size:14px}\n.t-app ul.t-erros{margin:6px 0;padding-left:20px;font-size:13.5px}\n.t-app textarea{width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12.5px}\n.t-app .t-blocos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}\n.t-app button.t-chip{border:1.5px solid var(--linha);background:#fff;color:var(--navy);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:normal}\n.t-app button.t-chip.t-atual{background:var(--menu);color:#fff;border-color:var(--menu)}\n.t-app .t-palco{background:#fff;border:1px solid var(--linha);border-radius:10px 10px 0 0;padding:10px 12px 4px}\n.t-app .t-titSlide{font-size:18px;font-weight:bold;color:var(--menu);min-height:24px}\n.t-app .t-ref{font-size:12px;color:var(--cinza)}\n.t-app .t-palco svg{width:100%;height:auto;display:block}\n.t-app .t-controles{position:sticky;top:0;z-index:5;background:#f5f8fe;border:1px solid var(--linha);border-top:0;border-radius:0 0 10px 10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}\n.t-app .t-controles .t-barra{flex:1 1 120px;height:6px;background:#dfe6f3;border-radius:3px;overflow:hidden;min-width:80px}\n.t-app .t-controles .t-barra>div{height:100%;background:var(--azul,#2E62C6);width:0;transition:width .3s}\n.t-app .t-controles .t-info{font-size:12.5px;color:var(--cinza);white-space:nowrap}\n.t-app .t-controles select{padding:4px 6px;font-size:13px;width:auto}\n.t-app .t-texto{margin-top:14px;display:grid;grid-template-columns:1fr;gap:12px}\n@media(min-width:760px){ .t-app .t-texto{grid-template-columns:1.1fr 1fr} }\n.t-app .t-pontos li{margin:4px 0}\n.t-app .t-pontos li.t-ativo{font-weight:bold}\n.t-app .t-pontos li.t-novo{animation:tSurge .6s}\n@keyframes tSurge{from{background:#fff3b0}to{background:transparent}}\n.t-app .t-legenda{font-size:14.5px;color:#26344f}\n.t-app .t-duvidaBox{border:2px solid #C0392B;border-radius:10px;padding:12px 14px;margin-top:12px;background:#fff}\n.t-app .t-estado{font-size:14px;margin:4px 0}\n.t-app .t-bola{display:inline-block;width:10px;height:10px;border-radius:50%;background:#aab;margin-right:6px;vertical-align:middle}\n.t-app .t-bola.t-on{background:#1E8A4C}\n.t-app .t-bola.t-fala{background:#2E62C6}\n.t-app .t-nivel{height:5px;background:#eee;border-radius:3px;overflow:hidden;max-width:220px;margin:4px 0}\n.t-app .t-nivel>div{height:100%;background:#1E8A4C;width:0}\n.t-app .t-conversa{max-height:260px;overflow:auto;margin-top:8px}\n.t-app .t-msg{border-radius:10px;padding:7px 10px;margin:6px 0;font-size:14px}\n.t-app .t-msg.t-ia{background:#eef3fc}\n.t-app .t-msg.t-eu{background:#f2f2f2;margin-left:30px}\n.t-app .t-msg .t-quem{font-size:11.5px;color:var(--cinza);font-weight:bold}\n.t-app .t-checagem{border:1px solid var(--linha);border-radius:10px;padding:12px 14px;margin-top:14px;background:#fff}\n.t-app button.t-op{display:block;width:100%;text-align:left;background:#fff;color:var(--navy);border:1.5px solid var(--linha);margin:6px 0;padding:9px 11px;font-weight:normal}\n.t-app button.t-op.t-certa{background:#e8f5ec;border-color:#1E8A4C}\n.t-app button.t-op.t-errada{background:#fdecea;border-color:#C0392B}\n.t-app .t-admNarr{margin-top:14px}\n.t-app .t-estNarr span{display:inline-block;width:18px;height:18px;border-radius:4px;margin:2px;font-size:10px;text-align:center;line-height:18px;color:#fff}\n.t-app .t-eixo{stroke:#4a5873;stroke-width:1.4}\n.t-app .t-grade{stroke:#e8edf5;stroke-width:1}\n.t-app .t-tick{font-size:13.5px;fill:#4a5873}\n.t-app .t-rotEixo{font-size:15px;fill:#26344f;font-weight:bold}\n.t-app .t-rot{font-size:15px;font-weight:bold;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}\n/* celular */\n@media (max-width:620px){\n  .t-app .t-palco{padding:8px 4px 2px;margin:0 -12px}\n  .t-app .t-controles{margin:0 -12px}\n  .t-app .t-titSlide{font-size:16px}\n  .t-app .t-controles{gap:6px;padding:8px}\n  .t-app .t-controles button.mini{padding:10px 13px;font-size:15px}\n  .t-app .t-controles .t-barra{order:10;flex-basis:100%}\n  .t-app .t-controles select{font-size:14px;padding:7px 6px}\n  .t-app .t-controles button.vermelho{flex:1 1 100%;order:11}\n  .t-app .t-rot{font-size:17px}\n  .t-app .t-tick{font-size:15px}\n  .t-app .t-rotEixo{font-size:16px}\n  .t-app button.t-op{padding:12px}\n  .t-app .t-msg.t-eu{margin-left:14px}\n}\n/* aula em vídeo (YouTube) */\n.t-app .t-videoBox{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden;margin-top:6px}\n.t-app .t-videoBox.t-vertical{aspect-ratio:9/16;width:min(100%, calc(72vh * 9 / 16));margin:6px auto 0}\n.t-app .t-videoBox iframe{position:absolute;inset:0;width:100%;height:100%;border:0}\n.t-app .t-notaProf{background:#fff6dc;border-left:4px solid #B8890A;border-radius:0 8px 8px 0;padding:8px 10px;margin:8px 0 2px;font-size:14px}\n/* cena animada (moléculas), lousa escura abaixo do gráfico */\n.t-app .t-cenaBox{background:#2a2a2a;border-radius:8px;margin-top:8px;overflow:hidden}\n.t-app .t-cenaBox svg{width:100%;height:auto;display:block}\n/* enquadramento: o gráfico nunca passa da tela; com cena, no computador, gráfico e lousa lado a lado */\n.t-app .t-quadro > svg{max-height:62vh}\n@media (min-width:900px){\n  .t-app .t-quadro.t-comCena{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center}\n  .t-app .t-quadro.t-comCena .t-cenaBox{margin-top:0}\n  .t-app .t-quadro.t-comCena > svg{max-height:52vh}\n}\n@media (max-width:899px){\n  .t-app .t-quadro.t-comCena > svg{max-height:40vh}\n}\n"; document.head.appendChild(st); }
+    if(!document.getElementById('tr_estilo')){ var st = document.createElement('style'); st.id = 'tr_estilo'; st.textContent = ".t-app .t-tag{display:inline-block;font-size:11px;border-radius:999px;padding:2px 9px;background:#e7ecf6;color:var(--navy);text-transform:none;letter-spacing:0;vertical-align:middle;font-weight:bold}\n.t-app .t-passoNum{display:inline-block;background:var(--menu);color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:13px;margin-right:6px}\n.t-app .t-listaAulas{max-height:260px;overflow:auto;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;margin-top:8px}\n.t-app .t-listaAulas label{display:flex;gap:8px;align-items:flex-start;margin:4px 0;cursor:pointer;font-size:14px}\n.t-app ul.t-erros{margin:6px 0;padding-left:20px;font-size:13.5px}\n.t-app textarea{width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12.5px}\n.t-app .t-blocos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}\n.t-app button.t-chip{border:1.5px solid var(--linha);background:#fff;color:var(--navy);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:normal}\n.t-app button.t-chip.t-atual{background:var(--menu);color:#fff;border-color:var(--menu)}\n.t-app .t-palco{background:#fff;border:1px solid var(--linha);border-radius:10px 10px 0 0;padding:10px 12px 4px}\n.t-app .t-titSlide{font-size:18px;font-weight:bold;color:var(--menu);min-height:24px}\n.t-app .t-ref{font-size:12px;color:var(--cinza)}\n.t-app .t-palco svg{width:100%;height:auto;display:block}\n.t-app .t-controles{position:sticky;top:0;z-index:5;background:#f5f8fe;border:1px solid var(--linha);border-top:0;border-radius:0 0 10px 10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}\n.t-app .t-controles .t-barra{flex:1 1 120px;height:6px;background:#dfe6f3;border-radius:3px;overflow:hidden;min-width:80px}\n.t-app .t-controles .t-barra>div{height:100%;background:var(--azul,#2E62C6);width:0;transition:width .3s}\n.t-app .t-controles .t-info{font-size:12.5px;color:var(--cinza);white-space:nowrap}\n.t-app .t-controles select{padding:4px 6px;font-size:13px;width:auto}\n.t-app .t-texto{margin-top:14px;display:grid;grid-template-columns:1fr;gap:12px}\n@media(min-width:760px){ .t-app .t-texto{grid-template-columns:1.1fr 1fr} }\n.t-app .t-pontos li{margin:4px 0}\n.t-app .t-pontos li.t-ativo{font-weight:bold}\n.t-app .t-pontos li.t-novo{animation:tSurge .6s}\n@keyframes tSurge{from{background:#fff3b0}to{background:transparent}}\n.t-app .t-legenda{font-size:14.5px;color:#26344f}\n.t-app .t-duvidaBox{border:2px solid #C0392B;border-radius:10px;padding:12px 14px;margin-top:12px;background:#fff}\n.t-app .t-estado{font-size:14px;margin:4px 0}\n.t-app .t-bola{display:inline-block;width:10px;height:10px;border-radius:50%;background:#aab;margin-right:6px;vertical-align:middle}\n.t-app .t-bola.t-on{background:#1E8A4C}\n.t-app .t-bola.t-fala{background:#2E62C6}\n.t-app .t-nivel{height:5px;background:#eee;border-radius:3px;overflow:hidden;max-width:220px;margin:4px 0}\n.t-app .t-nivel>div{height:100%;background:#1E8A4C;width:0}\n.t-app .t-conversa{max-height:260px;overflow:auto;margin-top:8px}\n.t-app .t-msg{border-radius:10px;padding:7px 10px;margin:6px 0;font-size:14px}\n.t-app .t-msg.t-ia{background:#eef3fc}\n.t-app .t-msg.t-eu{background:#f2f2f2;margin-left:30px}\n.t-app .t-msg .t-quem{font-size:11.5px;color:var(--cinza);font-weight:bold}\n.t-app .t-checagem{border:1px solid var(--linha);border-radius:10px;padding:12px 14px;margin-top:14px;background:#fff}\n.t-app button.t-op{display:block;width:100%;text-align:left;background:#fff;color:var(--navy);border:1.5px solid var(--linha);margin:6px 0;padding:9px 11px;font-weight:normal}\n.t-app button.t-op.t-certa{background:#e8f5ec;border-color:#1E8A4C}\n.t-app button.t-op.t-errada{background:#fdecea;border-color:#C0392B}\n.t-app .t-admNarr{margin-top:14px}\n.t-app .t-estNarr span{display:inline-block;width:18px;height:18px;border-radius:4px;margin:2px;font-size:10px;text-align:center;line-height:18px;color:#fff}\n.t-app .t-eixo{stroke:#4a5873;stroke-width:1.4}\n.t-app .t-grade{stroke:#e8edf5;stroke-width:1}\n.t-app .t-tick{font-size:13.5px;fill:#4a5873}\n.t-app .t-rotEixo{font-size:15px;fill:#26344f;font-weight:bold}\n.t-app .t-rot{font-size:15px;font-weight:bold;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}\n/* celular */\n@media (max-width:620px){\n  .t-app .t-palco{padding:8px 4px 2px;margin:0 -12px}\n  .t-app .t-controles{margin:0 -12px}\n  .t-app .t-titSlide{font-size:16px}\n  .t-app .t-controles{gap:6px;padding:8px}\n  .t-app .t-controles button.mini{padding:10px 13px;font-size:15px}\n  .t-app .t-controles .t-barra{order:10;flex-basis:100%}\n  .t-app .t-controles select{font-size:14px;padding:7px 6px}\n  .t-app .t-controles button.vermelho{flex:1 1 100%;order:11}\n  .t-app .t-rot{font-size:17px}\n  .t-app .t-tick{font-size:15px}\n  .t-app .t-rotEixo{font-size:16px}\n  .t-app button.t-op{padding:12px}\n  .t-app .t-msg.t-eu{margin-left:14px}\n}\n/* aula em vídeo (YouTube) */\n.t-app .t-videoBox{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden;margin-top:6px}\n.t-app .t-videoBox.t-vertical{aspect-ratio:9/16;width:min(100%, calc(72vh * 9 / 16));margin:6px auto 0}\n.t-app .t-videoBox iframe{position:absolute;inset:0;width:100%;height:100%;border:0}\n.t-app .t-notaProf{background:#fff6dc;border-left:4px solid #B8890A;border-radius:0 8px 8px 0;padding:8px 10px;margin:8px 0 2px;font-size:14px}\n/* cena animada (moléculas), lousa escura abaixo do gráfico */\n.t-app .t-cenaBox{background:#2a2a2a;border-radius:8px;margin-top:8px;overflow:hidden}\n.t-app .t-cenaBox svg{width:100%;height:auto;display:block}\n.t-app .t-cenaBox.t-claro{background:#fff;border:1px solid #d8dee8}\n/* enquadramento: o gráfico nunca passa da tela; com cena, no computador, gráfico e lousa lado a lado */\n.t-app .t-quadro > svg{max-height:62vh}\n@media (min-width:900px){\n  .t-app .t-quadro.t-comCena{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:center}\n  .t-app .t-quadro.t-comCena .t-cenaBox{margin-top:0}\n  .t-app .t-quadro.t-comCena > svg{max-height:52vh}\n}\n@media (max-width:899px){\n  .t-app .t-quadro.t-comCena > svg{max-height:40vh}\n}\n"; document.head.appendChild(st); }
     if(RAIZ === el && !mudou && document.getElementById('tr_corpo') && el.contains(document.getElementById('tr_corpo'))) return;
     if(RAIZ && RAIZ !== el){ pararTudo(); RAIZ.innerHTML = ''; }   // já aberta: mantém onde estava
     RAIZ = el; el.classList.add('t-app');
