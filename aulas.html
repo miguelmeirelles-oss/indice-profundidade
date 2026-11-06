@@ -72,6 +72,7 @@
   .chip:hover{background:var(--bloco);transform:none;box-shadow:none}
   .chip[aria-pressed="true"]{background:var(--azul);color:#fff}
   .abas{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .foraAba{display:none!important}
   .aba{border:2px solid var(--navy);border-radius:999px;padding:8px 14px;font-size:13px;font-weight:bold;color:var(--navy);background:#fff;box-shadow:none}
   .aba:hover{background:var(--bloco);transform:none;box-shadow:none}
   .aba[aria-pressed="true"]{background:var(--navy);color:#fff}
@@ -399,16 +400,22 @@
       <div id="cartaoAvisos"></div>
       <div id="correio" style="margin-bottom:12px"></div>
       <div id="avisoVista"></div>
-      <div class="caixa">
+      <div class="abas" role="group" aria-label="Seções do aluno">
+        <button type="button" class="aba" data-abaal="mat" aria-pressed="true">Minhas matérias</button>
+        <button type="button" class="aba" data-abaal="provas" aria-pressed="false">Minhas provas</button>
+        <button type="button" class="aba oculto" data-abaal="trilha" id="abaAlTrilha" aria-pressed="false">🎓 Aulas em trilha</button>
+        <button type="button" class="aba" data-abaal="insc" aria-pressed="false">Inscrever-se numa matéria</button>
+      </div>
+      <div class="caixa" data-painelal="mat">
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
       </div>
-      <div class="caixa oculto" id="caixaTrilhaAluno"></div>
-      <div class="caixa" id="caixaProvas">
+      <div class="caixa oculto" id="caixaTrilhaAluno" data-painelal="trilha"></div>
+      <div class="caixa" id="caixaProvas" data-painelal="provas">
         <h2>📝 Minhas provas</h2>
         <div id="listaProvasAluno"><p class="carregando">Carregando…</p></div>
       </div>
-      <div class="caixa">
+      <div class="caixa" data-painelal="insc">
         <h2>Inscrever-se em uma matéria</h2>
         <label class="rot" for="selProf">Professor</label>
         <select id="selProf"><option value="">Carregando professores…</option></select>
@@ -735,7 +742,9 @@ window.addEventListener('focus', voltouATela);
 function abrirAluno(){
   voltarListaAluno();
   carregarMinhas(); carregarAbertas(); desenharCartaoAvisos(); carregarProvasAluno();
-  if(sessao && sessao.admin) abrirTrilhaAluno();   // prévia: por enquanto só o administrador vê
+  $('abaAlTrilha').classList.toggle('oculto', !(sessao && sessao.admin));   // prévia: por enquanto só o administrador vê a aula em trilha
+  var lembrada = ''; try{ lembrada = localStorage.getItem('aulas_abaal') || ''; }catch(e){}
+  abaAluno(lembrada === 'trilha' && !(sessao && sessao.admin) ? 'mat' : (lembrada || 'mat'));
   try{
     var qp = new URLSearchParams(location.search);
     if(qp.get('recado') && qp.get('p')){
@@ -1079,7 +1088,7 @@ function desenharMsgsAluno(){
       }).join('');
     }).join('') : '<p class="aviso">Nenhuma mensagem no momento.</p>') + '</div>';
   ligarFecharMsgs();
-  el.querySelectorAll('[data-vercorrecao]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); $('caixaProvas').scrollIntoView({behavior: 'smooth', block: 'start'}); }); });
+  el.querySelectorAll('[data-vercorrecao]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno('provas'); $('caixaProvas').scrollIntoView({behavior: 'smooth', block: 'start'}); }); });
   var porProf = {};
   MINHAS_LISTA.forEach(function(m){ (m.recados || []).forEach(function(r){ if(!r.lido) (porProf[m.professorId] = porProf[m.professorId] || []).push(r.id); }); });
   if(Object.keys(porProf).length) api('marcarRecadosLidos', {itens: Object.keys(porProf).map(function(k){ return {professorId: k, ids: porProf[k]}; })}).then(function(){
@@ -1211,7 +1220,7 @@ function carregarMinhas(){
   apiLembrar('minhas', 'minhasMaterias', {}).then(function(lista){
     desenharCorreio(lista);
     var el = $('listaMinhas');
-    if(!lista.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria. Peça inscrição abaixo.</p>'; return; }
+    if(!lista.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria. Peça inscrição na aba <a href="#" class="link" onclick="abaAluno(\'insc\');return false">Inscrever-se numa matéria</a>.</p>'; return; }
     var cartaoMateria = function(m, i){
       var tag = m.situacao === 'aprovada' ? '<span class="tag t-ok">inscrito</span>' : '<span class="tag t-warn">aguardando aprovação</span>';
       return '<div class="cartao"><div class="l1"><span>' + esc(m.nome) + ' · ' + esc(m.semestre) + '</span>' + tag + '</div>' +
@@ -1266,6 +1275,16 @@ function carregarMaterias(){
   }).catch(function(e){ el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
 
+// abas da visão de aluno: Minhas matérias, Minhas provas, Aulas em trilha, Inscrever-se
+function abaAluno(a){
+  if(['mat', 'provas', 'trilha', 'insc'].indexOf(a) === -1) a = 'mat';
+  if(a !== 'trilha' && window.Trilha) Trilha.parar();
+  try{ localStorage.setItem('aulas_abaal', a); }catch(e){}
+  document.querySelectorAll('[data-abaal]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.abaal === a)); });
+  document.querySelectorAll('[data-painelal]').forEach(function(x){ x.classList.toggle('foraAba', x.dataset.painelal !== a); });
+  if(a === 'trilha') abrirTrilhaAluno();
+}
+document.querySelectorAll('[data-abaal]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno(b.dataset.abaal); }); });
 function voltarListaAluno(){ if(typeof fimLeitura === 'function') fimLeitura(); $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
 
 /* ================= MINHAS PROVAS (aluno) =================
@@ -1309,7 +1328,7 @@ function carregarProvasAluno(){
       if(new URLSearchParams(location.search).get('provas')){
         history.replaceState(null, '', location.pathname);
         if(abertas.length === 1) abrirProvaAluno(PROVAS_ALUNO.indexOf(abertas[0]));
-        else $('caixaProvas').scrollIntoView({behavior: 'smooth', block: 'start'});
+        else { abaAluno('provas'); $('caixaProvas').scrollIntoView({behavior: 'smooth', block: 'start'}); }
       }
     }catch(x){}
   }).catch(function(e){ $('listaProvasAluno').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
@@ -1843,7 +1862,7 @@ function carregarTrilha(el, modo){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=1';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=4';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);

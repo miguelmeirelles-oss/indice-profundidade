@@ -27,7 +27,8 @@ var PROMPT_TRILHA = [
 '- Coordenadas SEMPRE nas unidades dos eixos (ex.: x de 0 a 1 para atividade de água), nunca em pixels.',
 '- Curvas são calculadas a partir de um modelo e parâmetros. Modelos: "gab" {m0, c, k (k<1)}; "bet" {m0, c} (só até x≈0,5); "linear" {a, b}: y=a+b·x; "exponencial" {a, b}: y=a·e^(b·x); "sino" {altura, centro, largura} (curva em sino, ex.: velocidade de reação com máximo); "pontos" {pontos: [[x,y],…]} para qualquer curva lida de um slide (liga os pontos; com "marcadores": true mostra só as bolinhas, como dados experimentais).',
 '- Confira as contas: a curva inteira (de "de" até "ate") precisa caber entre y.min e y.max.',
-'- Rótulos curtos (até ~30 caracteres). Ponha a ORIGEM das setas ("de") num espaço vazio do gráfico, longe das curvas: o rótulo da seta fica na origem. A ponta ("para") encosta no que ela aponta (para apontar uma curva, calcule o y da curva naquele x).',
+'- A MAIORIA DOS ESTUDANTES VAI ASSISTIR NO CELULAR (tela estreita). A plataforma ajusta o tamanho sozinha, mas: rótulos bem curtos (até ~22 caracteres), no máximo 3 ou 4 anotações visíveis ao mesmo tempo (use "limpar" e recomece quando o gráfico ficar cheio), "pontos" curtos (até ~90 caracteres) e títulos de passo curtos (até ~40 caracteres).',
+'- Rótulos curtos. Ponha a ORIGEM das setas ("de") num espaço vazio do gráfico, longe das curvas: o rótulo da seta fica na origem. A ponta ("para") encosta no que ela aponta (para apontar uma curva, calcule o y da curva naquele x).',
 '- As séries começam escondidas; aparecem com a ação "serie" (desenhada aos poucos). Use "limpar" no início de um passo para apagar as anotações anteriores e começar de novo (as curvas também somem; mostre de novo as que precisar).',
 '- Cada passo herda o que os passos anteriores do bloco desenharam (até um "limpar").',
 '- Cores: azul, laranja, verde, vermelho, roxo, cinza, ambar.',
@@ -96,13 +97,18 @@ function desenharLista(){
   if(MODO === 'aluno'){ desenharListaAluno(); return; }
   pararTudo();
   T = null;
-  var h = '<div class="caixa"><h2>Suas aulas em trilha</h2>';
-  h += L.trilhas.length ? '<div class="tabelaBox"><table><tr><th>Aula</th><th>Disciplina</th><th>Versão</th><th>Narração</th><th>Uso</th><th></th></tr>' +
-    L.trilhas.map(function(t){
+  var filtro = ''; try{ filtro = localStorage.getItem('trilha_filtro_prof') || ''; }catch(e){}
+  var discsCom = {}; L.trilhas.forEach(function(t){ discsCom[t.disciplina_id || ''] = (discsCom[t.disciplina_id || ''] || 0) + 1; });
+  if(filtro && !discsCom[filtro]) filtro = '';
+  var mostradas = L.trilhas.filter(function(t){ return !filtro || (t.disciplina_id || '') === filtro; }).sort(function(a, b){ return nomeDisc(a.disciplina_id).localeCompare(nomeDisc(b.disciplina_id)); });
+  var h = '<div class="caixa"><h2>Suas aulas em trilha</h2>' + (Object.keys(discsCom).length > 1 ? '<div class="t-blocos"><button class="t-chip' + (filtro ? '' : ' t-atual') + '" data-trfiltro="">Todas (' + L.trilhas.length + ')</button>' +
+    Object.keys(discsCom).sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); }).map(function(d){ return '<button class="t-chip' + (d === filtro ? ' t-atual' : '') + '" data-trfiltro="' + esc(d) + '">' + esc(nomeDisc(d)) + ' (' + discsCom[d] + ')</button>'; }).join('') + '</div>' : '');
+  h += mostradas.length ? '<div class="tabelaBox"><table><tr><th>Aula</th><th>Disciplina</th><th>Versão</th><th>Narração</th><th>Uso</th><th></th></tr>' +
+    mostradas.map(function(t){
       return '<tr><td><b>' + esc(t.titulo) + '</b><div class="aviso">' + esc(t.tema || '') + '</div></td><td>' + esc(nomeDisc(t.disciplina_id)) + '</td><td>v' + t.versao + '<div class="aviso">' + esc(t.atualizado) + '</div></td>' +
         '<td>' + (t.audios ? t.audios + ' fala(s) gravada(s)' : '<span class="aviso">voz do navegador</span>') + '</td>' +
         '<td>' + (t.sessoes ? t.alunos + ' pessoa(s) · ' + t.sessoes + ' sessão(ões)' : '<span class="aviso">—</span>') + '</td>' +
-        '<td style="white-space:nowrap"><button class="mini" data-abrir="' + esc(t.id) + '">▶ Abrir</button> <button class="mini secundario" data-apagar="' + esc(t.id) + '">Apagar</button></td></tr>';
+        '<td style="white-space:nowrap"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button> <button class="mini secundario" data-trapagar="' + esc(t.id) + '">Apagar</button></td></tr>';
     }).join('') + '</table></div>' : '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
   h += '</div>';
 
@@ -122,9 +128,10 @@ function desenharLista(){
   h += '<div class="caixa"><h2>📊 Quem estudou</h2><div id="tr_boxUso"><p class="aviso">Carregando…</p></div></div>';
   $('corpo').innerHTML = h;
 
-  document.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-abrir')); }); });
-  document.querySelectorAll('[data-apagar]').forEach(function(b){ b.addEventListener('click', function(){
-    var t = L.trilhas.filter(function(x){ return x.id === b.getAttribute('data-apagar'); })[0];
+  document.querySelectorAll('[data-trfiltro]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_filtro_prof', b.getAttribute('data-trfiltro')); }catch(e){} desenharLista(); }); });
+  document.querySelectorAll('[data-trabrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trabrir')); }); });
+  document.querySelectorAll('[data-trapagar]').forEach(function(b){ b.addEventListener('click', function(){
+    var t = L.trilhas.filter(function(x){ return x.id === b.getAttribute('data-trapagar'); })[0];
     if(!confirm('Apagar "' + t.titulo + '"? A pasta dela vai para a lixeira do seu Drive (dá para recuperar por 30 dias).')) return;
     b.disabled = true;
     api('trilhaApagar', {id: t.id}).then(inicio).catch(function(e){ b.disabled = false; erroGeral(e.message); });
@@ -145,15 +152,23 @@ function desenharLista(){
 // visão do aluno: só a lista para estudar (sem criar, sem apagar, sem estatística)
 function desenharListaAluno(){
   pararTudo(); T = null;
-  var porDisc = {};
-  L.trilhas.forEach(function(t){ (porDisc[t.disciplina_id] = porDisc[t.disciplina_id] || []).push(t); });
-  $('corpo').innerHTML = L.trilhas.length ? Object.keys(porDisc).map(function(d){
-    return '<p style="margin:10px 0 4px"><b>' + esc(nomeDisc(d)) + '</b></p>' + porDisc[d].map(function(t){
-      return '<div class="convite" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px"><div><b>' + (t.estudei ? '✓ ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') + '<div class="aviso">' + esc(t.tema || '') + '</div></div>' +
-        '<button class="mini' + (t.estudei ? ' sec' : '') + '" data-estudar="' + esc(t.id) + '">' + (t.estudei ? '↻ Rever' : '▶ Estudar') + '</button></div>';
-    }).join('');
-  }).join('') : '<p class="aviso">Ainda não há aulas em trilha.</p>';
-  document.querySelectorAll('[data-estudar]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-estudar')); }); });
+  var porDisc = {}, ordem = [];
+  L.trilhas.forEach(function(t){ var d = t.disciplina_id || ''; if(!porDisc[d]){ porDisc[d] = []; ordem.push(d); } porDisc[d].push(t); });
+  ordem.sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); });
+  if(!L.trilhas.length){ $('corpo').innerHTML = '<p class="aviso">Ainda não há aulas em trilha.</p>'; return; }
+  var atual = ''; try{ atual = localStorage.getItem('trilha_materia') || ''; }catch(e){}
+  if(!porDisc[atual]) atual = ordem[0];
+  var h = '<div class="t-blocos">' + ordem.map(function(d){
+    var n = porDisc[d].length, feitas = porDisc[d].filter(function(t){ return t.estudei; }).length;
+    return '<button class="t-chip' + (d === atual ? ' t-atual' : '') + '" data-trmateria="' + esc(d) + '">' + esc(nomeDisc(d)) + ' <span style="opacity:.75">(' + (feitas ? feitas + '/' : '') + n + ')</span></button>';
+  }).join('') + '</div>';
+  h += '<div id="tr_listaDaMateria">' + porDisc[atual].map(function(t){
+    return '<div class="convite" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px"><div><b>' + (t.estudei ? '✓ ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') + '<div class="aviso">' + esc(t.tema || '') + '</div></div>' +
+      '<button class="mini' + (t.estudei ? ' secundario' : '') + '" data-trestudar="' + esc(t.id) + '">' + (t.estudei ? '↻ Rever' : '▶ Estudar') + '</button></div>';
+  }).join('') + '</div>';
+  $('corpo').innerHTML = h;
+  document.querySelectorAll('[data-trmateria]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_materia', b.getAttribute('data-trmateria')); }catch(e){} desenharListaAluno(); }); });
+  document.querySelectorAll('[data-trestudar]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trestudar')); }); });
 }
 function carregarAulasMaterial(){
   var id = $('selDisc').value; $('btCopiar').disabled = $('btBaixarPrompt').disabled = true;
@@ -161,13 +176,13 @@ function carregarAulasMaterial(){
   $('boxAulas').innerHTML = '<p class="aviso">Carregando as aulas…</p>';
   api('trilhaMaterial', {disciplinaId: id}).then(function(r){
     $('boxAulas').innerHTML = r.aulas.length ? '<div class="t-listaAulas">' + r.aulas.map(function(a){
-      return '<label><input type="checkbox" data-aulamat="' + esc(a.id) + '"> <span>Aula ' + esc(a.numero) + ' · ' + esc(a.data) + ' · <b>' + esc(a.tema || 'sem tema') + '</b>' + (a.gravada ? (a.temAta ? '' : ' <span class="aviso">(sem ata)</span>') : ' <span class="aviso">(não gravada: sem transcrição)</span>') + '</span></label>';
+      return '<label><input type="checkbox" data-traulamat="' + esc(a.id) + '"> <span>Aula ' + esc(a.numero) + ' · ' + esc(a.data) + ' · <b>' + esc(a.tema || 'sem tema') + '</b>' + (a.gravada ? (a.temAta ? '' : ' <span class="aviso">(sem ata)</span>') : ' <span class="aviso">(não gravada: sem transcrição)</span>') + '</span></label>';
     }).join('') + '</div><p class="aviso">Marque só as aulas do assunto da trilha (material demais deixa a IA menos precisa).</p>' : '<p class="aviso">Essa disciplina ainda não tem aulas.</p>';
-    document.querySelectorAll('[data-aulamat]').forEach(function(c){ c.addEventListener('change', function(){ $('btCopiar').disabled = $('btBaixarPrompt').disabled = !document.querySelector('[data-aulamat]:checked'); }); });
+    document.querySelectorAll('[data-traulamat]').forEach(function(c){ c.addEventListener('change', function(){ $('btCopiar').disabled = $('btBaixarPrompt').disabled = !document.querySelector('[data-traulamat]:checked'); }); });
   }).catch(function(e){ $('boxAulas').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 function montarPrompt(feito){
-  var ids = Array.prototype.map.call(document.querySelectorAll('[data-aulamat]:checked'), function(c){ return c.getAttribute('data-aulamat'); });
+  var ids = Array.prototype.map.call(document.querySelectorAll('[data-traulamat]:checked'), function(c){ return c.getAttribute('data-traulamat'); });
   $('msgPrompt').textContent = 'Juntando o material…';
   api('trilhaMaterial', {disciplinaId: $('selDisc').value, aulaIds: ids}).then(function(r){
     feito(PROMPT_TRILHA.replace('para a plataforma "Aula por IA".', 'para a plataforma "Aula por IA", disciplina "' + r.disciplina + '" (graduação em Engenharia de Alimentos).') + '\n\n' + r.texto + (r.cortado ? '\n\n(Aviso: o material foi cortado por tamanho.)' : ''));
@@ -232,7 +247,7 @@ function abrirPlayer(t){
   var h = '<div class="botoes" style="margin:0 0 6px;justify-content:space-between"><a class="link" id="tr_lnVoltar">← ' + (MODO === 'aluno' ? 'outras aulas em trilha' : 'todas as aulas em trilha') + '</a>' +
     (MODO === 'aluno' ? '' : t.previa ? '<span class="t-tag">pré-visualização (ainda não salva)</span>' : '<span class="aviso">v' + t.versao + ' · <a href="' + esc(t.pasta) + '" target="_blank" rel="noopener">pasta no Drive</a></span>') + '</div>' +
     '<h2 style="margin:0">' + esc(tr.titulo) + '</h2>' +
-    '<div class="t-blocos" id="tr_chips">' + tr.blocos.map(function(b, i){ return '<button class="t-chip" data-bloco="' + i + '">' + (i + 1) + '. ' + esc(b.titulo) + '</button>'; }).join('') + '</div>' +
+    '<div class="t-blocos" id="tr_chips">' + tr.blocos.map(function(b, i){ return '<button class="t-chip" data-trbloco="' + i + '">' + (i + 1) + '. ' + esc(b.titulo) + '</button>'; }).join('') + '</div>' +
     '<div class="t-palco"><div class="t-titSlide" id="tr_titSlide"></div><div class="t-ref" id="tr_refSlide"></div><svg id="tr_svg" viewBox="0 0 800 440" role="img" aria-label="gráfico da aula"></svg></div>' +
     '<div class="t-controles">' +
       '<button class="mini secundario" id="tr_btVolta" title="passo anterior">⏮</button>' +
@@ -243,6 +258,7 @@ function abrirPlayer(t){
       '<select id="tr_selVel" title="velocidade"><option value="0.9">0,9×</option><option value="1">1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select>' +
       '<button class="mini vermelho" id="tr_btDuvida">✋ Tenho uma dúvida</button>' +
     '</div>' +
+    (MODO === 'prof' && !t.previa && !temNarracaoIA() ? '<div class="convite" id="tr_avisoNarr" style="margin-top:10px">🔈 Esta aula ainda está com a <b>voz do navegador</b> (robótica). Grave uma vez com a <b>voz da IA</b>, a mesma voz natural do Gemini Live; depois ela toca para todos. <button class="mini" id="tr_btIrNarr">🎙 Gravar com a voz da IA</button></div>' : '') +
     '<div id="tr_duvidaBox" class="t-duvidaBox oculto"></div>' +
     '<div class="t-texto"><div><b>Pontos-chave</b><ul class="t-pontos" id="tr_pontos"></ul></div>' +
       '<div><b>O que a voz está dizendo</b><div class="t-legenda" id="tr_legenda"></div><div id="tr_avisoVoz" class="convite oculto"></div></div></div>' +
@@ -252,7 +268,7 @@ function abrirPlayer(t){
   $('corpo').innerHTML = h;
   if(!t.previa) desenharMarca();
   $('lnVoltar').addEventListener('click', function(){ U.enviar(true); inicio(); });
-  document.querySelectorAll('[data-bloco]').forEach(function(b){ b.addEventListener('click', function(){ irPara(Number(b.getAttribute('data-bloco')), 0, P.tocando); }); });
+  document.querySelectorAll('[data-trbloco]').forEach(function(b){ b.addEventListener('click', function(){ irPara(Number(b.getAttribute('data-trbloco')), 0, P.tocando); }); });
   $('btPlay').addEventListener('click', function(){ if(P.tocando) pausar(); else { if(P.fimDoBloco) irPara(P.bloco, 0, false); tocar(); } });
   $('btAvanca').addEventListener('click', function(){ avancar(1); });
   $('btVolta').addEventListener('click', function(){ avancar(-1); });
@@ -260,6 +276,7 @@ function abrirPlayer(t){
   $('selVel').addEventListener('change', function(){ P.vel = Number(this.value); try{ localStorage.setItem('trilha_vel', String(P.vel)); }catch(e){} if(P.aud) P.aud.playbackRate = P.vel; });
   montarSelVoz();
   $('btDuvida').addEventListener('click', abrirDuvida);
+  if($('btIrNarr')) $('btIrNarr').addEventListener('click', function(){ var d = $('admNarr'); d.open = true; desenharNarracao(); d.scrollIntoView({behavior: 'smooth', block: 'start'}); });
   if($('admNarr')) $('admNarr').addEventListener('toggle', function(){ if(this.open) desenharNarracao(); });
   irPara(0, 0, false);
 }
@@ -292,6 +309,8 @@ function montarSelVoz(){
   P.modoVoz = s.value;
   s.onchange = function(){ P.modoVoz = s.value; try{ localStorage.setItem('trilha_voz', s.value); }catch(e){} if(P.tocando){ pararSom(); narrar(); } };
 }
+var redim = null;
+window.addEventListener('resize', function(){ clearTimeout(redim); redim = setTimeout(function(){ if(T && $('svg') && !P.tocando) G.desenhar(blocoAtual(), P.passo); }, 250); });
 function blocoAtual(){ return T.trilha.blocos[P.bloco]; }
 function totalPassos(){ return T.trilha.blocos.reduce(function(s, b){ return s + b.passos.length; }, 0); }
 function irPara(bi, pi, continuar){
@@ -300,7 +319,7 @@ function irPara(bi, pi, continuar){
   var b = blocoAtual();
   P.passo = Math.max(0, Math.min(b.passos.length - 1, pi));
   P.fimDoBloco = false;
-  document.querySelectorAll('[data-bloco]').forEach(function(c){ c.classList.toggle('t-atual', Number(c.getAttribute('data-bloco')) === P.bloco); });
+  document.querySelectorAll('[data-trbloco]').forEach(function(c){ c.classList.toggle('t-atual', Number(c.getAttribute('data-trbloco')) === P.bloco); });
   var p = b.passos[P.passo];
   $('titSlide').textContent = p.titulo || b.titulo;
   $('refSlide').textContent = b.titulo + ' · passo ' + (P.passo + 1) + ' de ' + b.passos.length;
@@ -323,12 +342,17 @@ function avancar(d){
   if(np < 0){ if(nb > 0){ nb--; np = T.trilha.blocos[nb].passos.length - 1; } else np = 0; }
   irPara(nb, np, cont);
 }
-function tocar(){ P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; G.desenhar(blocoAtual(), P.passo); narrar(); }
+var AUD = null;
+function liberarSom(){
+  try{ if(!AUD){ AUD = new Audio(); AUD.setAttribute('playsinline', ''); AUD.src = 'data:audio/wav;base64,UklGRmQGAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YUAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'; AUD.play().catch(function(){}); } }catch(e){}
+  try{ if('speechSynthesis' in window && !P.vozLiberada){ P.vozLiberada = true; var u = new SpeechSynthesisUtterance(' '); u.volume = 0; speechSynthesis.speak(u); } }catch(e){}
+}
+function tocar(){ liberarSom(); P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; G.desenhar(blocoAtual(), P.passo); narrar(); }
 function pausar(){ P.tocando = false; $('btPlay').textContent = '▶ Continuar'; limparTimers(); pararSom(); }
 function limparTimers(){ P.timers.forEach(clearTimeout); P.timers = []; }
 function pararSom(){
   try{ speechSynthesis.cancel(); }catch(e){}
-  if(P.aud){ try{ P.aud.onended = null; P.aud.pause(); }catch(e){} P.aud = null; }
+  if(P.aud){ try{ P.aud.onended = null; P.aud.onerror = null; P.aud.pause(); }catch(e){} P.aud = null; }
 }
 function pararTudo(){ limparTimers(); pararSom(); P.tocando = false; if(typeof encerrarDuvida === 'function' && wsD) encerrarDuvida(); }
 // narra o passo atual e, no fim (e depois das animações), segue para o próximo
@@ -350,7 +374,7 @@ function narrar(){
   if(P.modoVoz === 'ia' && T.narracao[chave] === 'ok'){
     pegarAudio(chave).then(function(url){
       if(!P.tocando || blocoAtual() !== b || b.passos[P.passo] !== p) return;
-      var a = new Audio(url); a.playbackRate = P.vel; P.aud = a;
+      var a = AUD || new Audio(); a.src = url; a.playbackRate = P.vel; P.aud = a;
       a.onended = seguir; a.onerror = function(){ falarNavegador(p.fala, seguir, tempoLeitura); };
       a.play().catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura); });
     }).catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura); });
@@ -401,16 +425,16 @@ function fimDoBloco(){
   var b = blocoAtual(), c = b.checagem, ultimo = P.bloco >= T.trilha.blocos.length - 1;
   var h = '<div class="t-checagem">';
   if(c && c.tipo === 'multipla'){
-    h += '<b>✔ Confira se entendeu</b><p>' + esc(c.pergunta) + '</p>' + c.alternativas.map(function(a, i){ return '<button class="t-op" data-op="' + i + '">' + esc(a) + '</button>'; }).join('') + '<div id="tr_retCheck"></div>';
+    h += '<b>✔ Confira se entendeu</b><p>' + esc(c.pergunta) + '</p>' + c.alternativas.map(function(a, i){ return '<button class="t-op" data-trop="' + i + '">' + esc(a) + '</button>'; }).join('') + '<div id="tr_retCheck"></div>';
   } else if(c && c.tipo === 'aberta'){
     h += '<b>✔ Pense nisto</b><p>' + esc(c.pergunta) + '</p><details><summary class="link">ver o que uma boa resposta contém</summary><p>' + esc(c.esperado) + '</p></details>';
   } else h += '<b>Fim do bloco.</b>';
   if(b.pergunta_falada) h += '<p class="aviso" style="margin-bottom:0">Quer treinar explicando em voz alta? Aperte <b>✋ Tenho uma dúvida</b> e diga "quero responder a pergunta": a IA faz a pergunta e comenta a sua resposta.</p>';
   h += '<div class="botoes">' + (ultimo ? '<span class="ok" style="margin:0">🎉 Você chegou ao fim desta aula em trilha. Marque ✓ Já estudei aqui embaixo.</span>' : '<button id="tr_btProxBloco">Próximo bloco →</button>') + '</div></div>';
   $('checagem').innerHTML = h;
-  document.querySelectorAll('[data-op]').forEach(function(bt){ bt.addEventListener('click', function(){
-    var i = Number(bt.getAttribute('data-op')), certo = i === c.correta;
-    document.querySelectorAll('[data-op]').forEach(function(x){ x.classList.remove('t-certa', 't-errada'); });
+  document.querySelectorAll('[data-trop]').forEach(function(bt){ bt.addEventListener('click', function(){
+    var i = Number(bt.getAttribute('data-trop')), certo = i === c.correta;
+    document.querySelectorAll('[data-trop]').forEach(function(x){ x.classList.remove('t-certa', 't-errada'); });
     bt.classList.add(certo ? 't-certa' : 't-errada');
     $('retCheck').innerHTML = '<div class="' + (certo ? 'ok' : 'erro') + '">' + (certo ? '✓ ' : '✗ ') + esc(certo ? (c.explicacao || 'Isso!') : 'Ainda não. Tente de novo ou reveja o bloco.') + '</div>';
     U.checagem(b.id, certo);
@@ -423,6 +447,13 @@ function fimDoBloco(){
 var G = (function(){
   var NS = 'http://www.w3.org/2000/svg', W = 800, H = 440, ML = 74, MR = 26, MT = 22, MB = 58;
   var X0 = ML, X1 = W - MR, Y0 = H - MB, Y1 = MT;
+  // tela estreita (celular): folha de 480 de largura, assim o texto do gráfico sai ~70% maior
+  function geometria(){
+    var larg = (svg.parentNode && svg.parentNode.clientWidth) || 800, cel = larg < 620;
+    W = cel ? 420 : 800; H = cel ? 420 : 440; ML = cel ? 54 : 74; MR = cel ? 10 : 26; MT = cel ? 16 : 22; MB = cel ? 52 : 58;
+    X0 = ML; X1 = W - MR; Y0 = H - MB; Y1 = MT;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+  }
   var svg, gReg, gSer, gAnot, gRot, b, caixas = [], visiveis = {}, destaque = '', animarAte = 0;
   var CORES = {azul: '#2E62C6', laranja: '#D9731A', verde: '#1E8A4C', vermelho: '#C0392B', roxo: '#7D3C98', cinza: '#6B7A90', ambar: '#B8890A'};
   function cor(c){ return CORES[c] || '#26344f'; }
@@ -451,7 +482,7 @@ var G = (function(){
   function rotulo(x, y, texto, c, ancora, opc){
     if(!texto) return;
     opc = opc || {};
-    var larg = texto.length * 8.2 + 6, alt = 18;
+    var larg = texto.length * (W < 600 ? 9.6 : 8.2) + 6, alt = 18;
     var tenta = [0, -18, 18, -36, 36, -54, 54], melhor = null;
     for(var i = 0; i < tenta.length; i++){
       var yy = y + tenta[i], a = ancora, xi = a === 'end' ? x - larg : a === 'middle' ? x - larg / 2 : x;
@@ -490,7 +521,7 @@ var G = (function(){
     return d;
   }
   function desenharSerie(s, atraso){
-    var gs = el('g', {'data-serie': s.id}, gSer);
+    var gs = el('g', {'data-trserie': s.id}, gSer);
     if(s.marcadores){
       s.params.pontos.forEach(function(q, i){
         var c = el('circle', {cx: px(q[0]), cy: py(q[1]), r: 5.5, fill: '#fff', stroke: cor(s.cor), 'stroke-width': 2.2}, gs);
@@ -528,7 +559,7 @@ var G = (function(){
     switch(a.tipo){
       case 'limpar': gReg.innerHTML = ''; gSer.innerHTML = ''; gAnot.innerHTML = ''; gRot.innerHTML = ''; caixas = []; visiveis = {}; destaque = ''; break;
       case 'serie': if(!visiveis[a.serie]){ visiveis[a.serie] = 1; desenharSerie(serie(a.serie), at); } break;
-      case 'destacar': destaque = a.serie; gSer.querySelectorAll('[data-serie]').forEach(function(x){ x.setAttribute('opacity', x.getAttribute('data-serie') === a.serie ? '1' : '0.28'); var p = x.querySelector('path'); if(p) p.setAttribute('stroke-width', x.getAttribute('data-serie') === a.serie ? 4.5 : 3); }); break;
+      case 'destacar': destaque = a.serie; gSer.querySelectorAll('[data-trserie]').forEach(function(x){ x.setAttribute('opacity', x.getAttribute('data-trserie') === a.serie ? '1' : '0.28'); var p = x.querySelector('path'); if(p) p.setAttribute('stroke-width', x.getAttribute('data-trserie') === a.serie ? 4.5 : 3); }); break;
       case 'regiao':
         g = el('g', {}, gReg);
         el('rect', {x: px(a.de), y: Y1, width: Math.max(0, px(a.ate) - px(a.de)), height: Y0 - Y1, fill: cor(a.cor), opacity: 0.1}, g);
@@ -558,15 +589,15 @@ var G = (function(){
         var s = serie(a.serie), gg = el('g', {}, gAnot);
         var guiaV = el('line', {stroke: cor(a.cor), 'stroke-dasharray': '3 4', 'stroke-opacity': .6}, gg), guiaH = el('line', {stroke: cor(a.cor), 'stroke-dasharray': '3 4', 'stroke-opacity': .6}, gg);
         var bola = el('circle', {r: 8, fill: cor(a.cor), stroke: '#fff', 'stroke-width': 2}, gg);
-        var txt = el('text', {class: 't-rot', fill: cor(a.cor)}, gg);
+        // a leitura do ponto fica num lugar fixo do gráfico (desvia dos outros rótulos) e só o número muda
+        var leitura = function(xv){ return (a.rotulo ? a.rotulo + ': ' : '') + num(xv) + ' → ' + num(valor(s, xv)); };
+        var txt = rotulo(X0 + 10, Y1 + 46, leitura(a.ate), a.cor, 'start');
         var pos = function(xv){
           var yv = valor(s, xv), X = px(xv), Y = py(yv);
           bola.setAttribute('cx', X); bola.setAttribute('cy', Y);
           guiaV.setAttribute('x1', X); guiaV.setAttribute('x2', X); guiaV.setAttribute('y1', Y); guiaV.setAttribute('y2', Y0);
           guiaH.setAttribute('x1', X0); guiaH.setAttribute('x2', X); guiaH.setAttribute('y1', Y); guiaH.setAttribute('y2', Y);
-          var esq = X > (X0 + X1) / 2;
-          txt.setAttribute('x', X + (esq ? -12 : 12)); txt.setAttribute('y', Math.max(Y1 + 14, Y - 12)); txt.setAttribute('text-anchor', esq ? 'end' : 'start');
-          txt.textContent = (a.rotulo ? a.rotulo + ': ' : '') + num(xv) + ' → ' + num(yv);
+          if(txt) txt.textContent = leitura(xv);
         };
         if(!anim){ pos(a.ate); break; }
         pos(a.de); gg.style.opacity = 0;
@@ -605,9 +636,9 @@ var G = (function(){
     }
   }
   function desenhar(bloco, passo){
-    b = bloco; svg = $('svg'); svg.innerHTML = ''; caixas = []; visiveis = {}; destaque = ''; marcadores = {}; animarAte = Date.now();
+    b = bloco; svg = $('svg'); svg.innerHTML = ''; geometria(); caixas = []; visiveis = {}; destaque = ''; marcadores = {}; animarAte = Date.now();
     if(!b.grafico){
-      var t = el('text', {x: 400, y: 200, 'text-anchor': 'middle', class: 't-rotEixo', style: 'font-size:26px', fill: '#17389C'}, svg); t.textContent = b.passos[passo].titulo || b.titulo;
+      var t = el('text', {x: W / 2, y: H / 2 - 20, 'text-anchor': 'middle', class: 't-rotEixo', style: 'font-size:26px', fill: '#17389C'}, svg); t.textContent = b.passos[passo].titulo || b.titulo;
       G.fimAcoes = Date.now(); return;
     }
     eixos();
@@ -671,12 +702,14 @@ function abrirDuvida(){
   $('btFimD').addEventListener('click', function(){ encerrarDuvida(); });
   ultimaFala = {ia: null, eu: null}; estadoD('preparando o microfone…');
   box.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  try{ ctxSom = new AudioContext({sampleRate: 24000}); }catch(e){ ctxSom = new AudioContext(); }
+  ctxMic = new AudioContext();
   navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1}}).then(function(s){
     streamMic = s; estadoD('abrindo a conversa…');
     return api('trilhaToken', {id: T.id, blocoId: b.id, passo: P.passo, modo: 'duvida'});
   }).then(function(t){
     tokenVoz = t; alcaRetomada = ''; trocando = false; tentativasRetomar = 0;
-    ctxSom = new AudioContext({sampleRate: 24000}); ctxMic = new AudioContext();
+    try{ ctxSom.resume(); ctxMic.resume(); }catch(e){}
     conectarD(true);
   }).catch(function(e){
     if($('msgD')) $('msgD').innerHTML = '<div class="erro">' + esc(/Permission|NotAllowed/i.test(e.name || e.message) ? 'O navegador não liberou o microfone. Permita o microfone para este site e tente de novo.' : e.message) + '</div>';
@@ -847,6 +880,7 @@ function terminouFala(){
 function fimNarracao(erro){
   N.rodando = false; clearTimeout(N.timer); T.voz = N.voz;
   var log = $('narrLog') ? $('narrLog').innerHTML : '';
+  if(temNarracaoIA()){ try{ localStorage.setItem('trilha_voz', 'ia'); }catch(e){} if($('avisoNarr')) $('avisoNarr').remove(); }
   montarSelVoz(); desenharNarracao();
   if($('narrLog')) $('narrLog').innerHTML = log;
   $('narrProg').innerHTML = erro ? '<div class="erro">' + esc(erro) + '</div>' : '<div class="ok">Pronto. Escolha "🔊 voz da IA (gravada)" na barra e dê ▶.</div>';
@@ -917,7 +951,7 @@ window.Trilha = {
   abrir: function(el, helpers, opc){
     H = helpers;
     var modo = opc && opc.modo === 'aluno' ? 'aluno' : 'prof', mudou = modo !== MODO; MODO = modo;
-    if(!document.getElementById('tr_estilo')){ var st = document.createElement('style'); st.id = 'tr_estilo'; st.textContent = ".t-app .t-tag{display:inline-block;font-size:11px;border-radius:999px;padding:2px 9px;background:#e7ecf6;color:var(--navy);text-transform:none;letter-spacing:0;vertical-align:middle;font-weight:bold}\n.t-app .t-passoNum{display:inline-block;background:var(--menu);color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:13px;margin-right:6px}\n.t-app .t-listaAulas{max-height:260px;overflow:auto;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;margin-top:8px}\n.t-app .t-listaAulas label{display:flex;gap:8px;align-items:flex-start;margin:4px 0;cursor:pointer;font-size:14px}\n.t-app ul.t-erros{margin:6px 0;padding-left:20px;font-size:13.5px}\n.t-app textarea{width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12.5px}\n.t-app .t-blocos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}\n.t-app button.t-chip{border:1.5px solid var(--linha);background:#fff;color:var(--navy);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:normal}\n.t-app button.t-chip.t-atual{background:var(--menu);color:#fff;border-color:var(--menu)}\n.t-app .t-palco{background:#fff;border:1px solid var(--linha);border-radius:10px 10px 0 0;padding:10px 12px 4px}\n.t-app .t-titSlide{font-size:18px;font-weight:bold;color:var(--menu);min-height:24px}\n.t-app .t-ref{font-size:12px;color:var(--cinza)}\n.t-app .t-palco svg{width:100%;height:auto;display:block}\n.t-app .t-controles{position:sticky;top:0;z-index:5;background:#f5f8fe;border:1px solid var(--linha);border-top:0;border-radius:0 0 10px 10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}\n.t-app .t-controles .t-barra{flex:1 1 120px;height:6px;background:#dfe6f3;border-radius:3px;overflow:hidden;min-width:80px}\n.t-app .t-controles .t-barra>div{height:100%;background:var(--azul,#2E62C6);width:0;transition:width .3s}\n.t-app .t-controles .t-info{font-size:12.5px;color:var(--cinza);white-space:nowrap}\n.t-app .t-controles select{padding:4px 6px;font-size:13px;width:auto}\n.t-app .t-texto{margin-top:14px;display:grid;grid-template-columns:1fr;gap:12px}\n@media(min-width:760px){ .t-app .t-texto{grid-template-columns:1.1fr 1fr} }\n.t-app .t-pontos li{margin:4px 0}\n.t-app .t-pontos li.t-ativo{font-weight:bold}\n.t-app .t-pontos li.t-novo{animation:tSurge .6s}\n@keyframes tSurge{from{background:#fff3b0}to{background:transparent}}\n.t-app .t-legenda{font-size:14.5px;color:#26344f}\n.t-app .t-duvidaBox{border:2px solid #C0392B;border-radius:10px;padding:12px 14px;margin-top:12px;background:#fff}\n.t-app .t-estado{font-size:14px;margin:4px 0}\n.t-app .t-bola{display:inline-block;width:10px;height:10px;border-radius:50%;background:#aab;margin-right:6px;vertical-align:middle}\n.t-app .t-bola.t-on{background:#1E8A4C}\n.t-app .t-bola.t-fala{background:#2E62C6}\n.t-app .t-nivel{height:5px;background:#eee;border-radius:3px;overflow:hidden;max-width:220px;margin:4px 0}\n.t-app .t-nivel>div{height:100%;background:#1E8A4C;width:0}\n.t-app .t-conversa{max-height:260px;overflow:auto;margin-top:8px}\n.t-app .t-msg{border-radius:10px;padding:7px 10px;margin:6px 0;font-size:14px}\n.t-app .t-msg.t-ia{background:#eef3fc}\n.t-app .t-msg.t-eu{background:#f2f2f2;margin-left:30px}\n.t-app .t-msg .t-quem{font-size:11.5px;color:var(--cinza);font-weight:bold}\n.t-app .t-checagem{border:1px solid var(--linha);border-radius:10px;padding:12px 14px;margin-top:14px;background:#fff}\n.t-app button.t-op{display:block;width:100%;text-align:left;background:#fff;color:var(--navy);border:1.5px solid var(--linha);margin:6px 0;padding:9px 11px;font-weight:normal}\n.t-app button.t-op.t-certa{background:#e8f5ec;border-color:#1E8A4C}\n.t-app button.t-op.t-errada{background:#fdecea;border-color:#C0392B}\n.t-app .t-admNarr{margin-top:14px}\n.t-app .t-estNarr span{display:inline-block;width:18px;height:18px;border-radius:4px;margin:2px;font-size:10px;text-align:center;line-height:18px;color:#fff}\n.t-app .t-eixo{stroke:#4a5873;stroke-width:1.4}\n.t-app .t-grade{stroke:#e8edf5;stroke-width:1}\n.t-app .t-tick{font-size:13.5px;fill:#4a5873}\n.t-app .t-rotEixo{font-size:15px;fill:#26344f;font-weight:bold}\n.t-app .t-rot{font-size:15px;font-weight:bold;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}\n"; document.head.appendChild(st); }
+    if(!document.getElementById('tr_estilo')){ var st = document.createElement('style'); st.id = 'tr_estilo'; st.textContent = ".t-app .t-tag{display:inline-block;font-size:11px;border-radius:999px;padding:2px 9px;background:#e7ecf6;color:var(--navy);text-transform:none;letter-spacing:0;vertical-align:middle;font-weight:bold}\n.t-app .t-passoNum{display:inline-block;background:var(--menu);color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:13px;margin-right:6px}\n.t-app .t-listaAulas{max-height:260px;overflow:auto;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;margin-top:8px}\n.t-app .t-listaAulas label{display:flex;gap:8px;align-items:flex-start;margin:4px 0;cursor:pointer;font-size:14px}\n.t-app ul.t-erros{margin:6px 0;padding-left:20px;font-size:13.5px}\n.t-app textarea{width:100%;min-height:140px;font-family:Consolas,monospace;font-size:12.5px}\n.t-app .t-blocos{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 10px}\n.t-app button.t-chip{border:1.5px solid var(--linha);background:#fff;color:var(--navy);border-radius:999px;padding:4px 12px;font-size:13px;font-weight:normal}\n.t-app button.t-chip.t-atual{background:var(--menu);color:#fff;border-color:var(--menu)}\n.t-app .t-palco{background:#fff;border:1px solid var(--linha);border-radius:10px 10px 0 0;padding:10px 12px 4px}\n.t-app .t-titSlide{font-size:18px;font-weight:bold;color:var(--menu);min-height:24px}\n.t-app .t-ref{font-size:12px;color:var(--cinza)}\n.t-app .t-palco svg{width:100%;height:auto;display:block}\n.t-app .t-controles{position:sticky;top:0;z-index:5;background:#f5f8fe;border:1px solid var(--linha);border-top:0;border-radius:0 0 10px 10px;padding:8px 10px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}\n.t-app .t-controles .t-barra{flex:1 1 120px;height:6px;background:#dfe6f3;border-radius:3px;overflow:hidden;min-width:80px}\n.t-app .t-controles .t-barra>div{height:100%;background:var(--azul,#2E62C6);width:0;transition:width .3s}\n.t-app .t-controles .t-info{font-size:12.5px;color:var(--cinza);white-space:nowrap}\n.t-app .t-controles select{padding:4px 6px;font-size:13px;width:auto}\n.t-app .t-texto{margin-top:14px;display:grid;grid-template-columns:1fr;gap:12px}\n@media(min-width:760px){ .t-app .t-texto{grid-template-columns:1.1fr 1fr} }\n.t-app .t-pontos li{margin:4px 0}\n.t-app .t-pontos li.t-ativo{font-weight:bold}\n.t-app .t-pontos li.t-novo{animation:tSurge .6s}\n@keyframes tSurge{from{background:#fff3b0}to{background:transparent}}\n.t-app .t-legenda{font-size:14.5px;color:#26344f}\n.t-app .t-duvidaBox{border:2px solid #C0392B;border-radius:10px;padding:12px 14px;margin-top:12px;background:#fff}\n.t-app .t-estado{font-size:14px;margin:4px 0}\n.t-app .t-bola{display:inline-block;width:10px;height:10px;border-radius:50%;background:#aab;margin-right:6px;vertical-align:middle}\n.t-app .t-bola.t-on{background:#1E8A4C}\n.t-app .t-bola.t-fala{background:#2E62C6}\n.t-app .t-nivel{height:5px;background:#eee;border-radius:3px;overflow:hidden;max-width:220px;margin:4px 0}\n.t-app .t-nivel>div{height:100%;background:#1E8A4C;width:0}\n.t-app .t-conversa{max-height:260px;overflow:auto;margin-top:8px}\n.t-app .t-msg{border-radius:10px;padding:7px 10px;margin:6px 0;font-size:14px}\n.t-app .t-msg.t-ia{background:#eef3fc}\n.t-app .t-msg.t-eu{background:#f2f2f2;margin-left:30px}\n.t-app .t-msg .t-quem{font-size:11.5px;color:var(--cinza);font-weight:bold}\n.t-app .t-checagem{border:1px solid var(--linha);border-radius:10px;padding:12px 14px;margin-top:14px;background:#fff}\n.t-app button.t-op{display:block;width:100%;text-align:left;background:#fff;color:var(--navy);border:1.5px solid var(--linha);margin:6px 0;padding:9px 11px;font-weight:normal}\n.t-app button.t-op.t-certa{background:#e8f5ec;border-color:#1E8A4C}\n.t-app button.t-op.t-errada{background:#fdecea;border-color:#C0392B}\n.t-app .t-admNarr{margin-top:14px}\n.t-app .t-estNarr span{display:inline-block;width:18px;height:18px;border-radius:4px;margin:2px;font-size:10px;text-align:center;line-height:18px;color:#fff}\n.t-app .t-eixo{stroke:#4a5873;stroke-width:1.4}\n.t-app .t-grade{stroke:#e8edf5;stroke-width:1}\n.t-app .t-tick{font-size:13.5px;fill:#4a5873}\n.t-app .t-rotEixo{font-size:15px;fill:#26344f;font-weight:bold}\n.t-app .t-rot{font-size:15px;font-weight:bold;paint-order:stroke;stroke:#fff;stroke-width:4px;stroke-linejoin:round}\n/* celular */\n@media (max-width:620px){\n  .t-app .t-palco{padding:8px 4px 2px;margin:0 -12px}\n  .t-app .t-controles{margin:0 -12px}\n  .t-app .t-titSlide{font-size:16px}\n  .t-app .t-controles{gap:6px;padding:8px}\n  .t-app .t-controles button.mini{padding:10px 13px;font-size:15px}\n  .t-app .t-controles .t-barra{order:10;flex-basis:100%}\n  .t-app .t-controles select{font-size:14px;padding:7px 6px}\n  .t-app .t-controles button.vermelho{flex:1 1 100%;order:11}\n  .t-app .t-rot{font-size:17px}\n  .t-app .t-tick{font-size:15px}\n  .t-app .t-rotEixo{font-size:16px}\n  .t-app button.t-op{padding:12px}\n  .t-app .t-msg.t-eu{margin-left:14px}\n}\n"; document.head.appendChild(st); }
     if(RAIZ === el && !mudou && document.getElementById('tr_corpo') && el.contains(document.getElementById('tr_corpo'))) return;
     if(RAIZ && RAIZ !== el){ pararTudo(); RAIZ.innerHTML = ''; }   // já aberta: mantém onde estava
     RAIZ = el; el.classList.add('t-app');
