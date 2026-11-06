@@ -1862,7 +1862,7 @@ function carregarTrilha(el, modo){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=5';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=9';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);
@@ -3695,29 +3695,33 @@ function desenharTemas(){
   var linhaSub = function(t, g){
     var opcoes = (g ? [['herdar', 'segue o grande tema (' + NOMES_IMP[g.importancia] + ')']] : []).concat([['alta', NOMES_IMP.alta], ['normal', NOMES_IMP.normal], ['nao', NOMES_IMP.nao]]);
     var det = detalheDesemp(t.desempenho);
-    return '<div class="temaLinha subtema" data-sub="' + esc(t.id) + '"><span class="nome">' + esc(t.nome) + (t.critico ? ' <span class="tag t-err">crítico</span>' : '') +
-      '<br><span class="aviso" style="font-weight:normal">' + (t.aulas.length ? 'aula' + (t.aulas.length > 1 ? 's ' : ' ') + t.aulas.join(', ') : 'ainda sem aula neste semestre') + (det ? ' · ' + det : '') + '</span></span>' +
+    return '<div class="temaLinha subtema" data-sub="' + esc(t.id) + '">' + setasTema(t.id) + '<span class="nome">' + esc(t.nome) + (t.critico ? ' <span class="tag t-err">crítico</span>' : '') +
+      '<br><span class="aviso" style="font-weight:normal">' + (t.aulas.length ? 'aula' + (t.aulas.length > 1 ? 's ' : ' ') + t.aulas.join(', ') : 'ainda sem aula neste semestre') + (det ? ' · ' + det : '') + '</span>' +
+      (t.descricao ? '<br><span class="aviso" style="font-weight:normal;font-style:italic">o que cai: ' + esc(t.descricao) + '</span>' : '') + '</span>' +
       chipDesemp(t.desempenho) +
       '<select data-imp="' + esc(t.id) + '" aria-label="Prioridade">' + opcoes.map(function(o){ return '<option value="' + o[0] + '"' + (t.importancia === o[0] || (!g && t.importancia === 'herdar' && o[0] === 'normal') ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
       '<button type="button" class="secundario mini" data-renomear="' + esc(t.id) + '">Renomear</button>' +
       '<select data-mover="' + esc(t.id) + '" aria-label="Mover para"><option value="">mover para…</option>' + grupos.filter(function(x){ return !g || x.id !== g.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select>' +
-      '<select data-juntar="' + esc(t.id) + '" aria-label="Juntar com"><option value="">juntar com…</option>' + todosSub.filter(function(x){ return x.id !== t.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select></div>';
+      '<select data-juntar="' + esc(t.id) + '" aria-label="Juntar com"><option value="">juntar com…</option>' + todosSub.filter(function(x){ return x.id !== t.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select>' +
+      maisSubtema(t) + '</div>';
   };
   var blocoGrupo = function(g){
     var aberto = !!TEMAS.abertos[g.id];
-    return '<div class="grupoTema" data-grupo="' + esc(g.id) + '"><div class="temaLinha" style="border-bottom:0">' +
+    return '<div class="grupoTema" data-grupo="' + esc(g.id) + '"><div class="temaLinha" style="border-bottom:0">' + setasTema(g.id) +
       '<button type="button" class="link" data-abrir="' + esc(g.id) + '" style="font-size:15px;text-decoration:none" aria-expanded="' + aberto + '">' + (aberto ? '▾' : '▸') + '</button>' +
       '<span class="nome" style="cursor:pointer" data-abrir="' + esc(g.id) + '">' + (g.importancia === 'alta' ? '⭐ ' : '') + esc(g.nome) + (g.critico ? ' <span class="tag t-err">crítico</span>' : '') +
         '<br><span class="aviso" style="font-weight:normal">' + g.subtemas.length + ' subtema(s)' + (g.aulas.length ? ' · aulas ' + g.aulas.join(', ') : '') + '</span></span>' +
       chipDesemp(g.desempenho) +
       '<select data-impg="' + esc(g.id) + '" aria-label="Prioridade do grande tema">' + ['alta', 'normal', 'nao'].map(function(v){ return '<option value="' + v + '"' + (g.importancia === v ? ' selected' : '') + '>' + NOMES_IMP[v] + '</option>'; }).join('') + '</select>' +
       '<button type="button" class="secundario mini" data-renomear="' + esc(g.id) + '">Renomear</button>' +
-      '<select data-juntar="' + esc(g.id) + '" aria-label="Juntar com"><option value="">juntar com…</option>' + grupos.filter(function(x){ return x.id !== g.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select></div>' +
+      '<select data-juntar="' + esc(g.id) + '" aria-label="Juntar com"><option value="">juntar com…</option>' + grupos.filter(function(x){ return x.id !== g.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select>' +
+      maisGrupo(g, grupos) + '</div>' +
       '<div class="subtemas"' + (aberto ? '' : ' hidden') + '>' + (g.subtemas.length ? g.subtemas.map(function(t){ return linhaSub(t, g); }).join('') : '<p class="aviso" style="margin:6px 0 6px 28px">Nenhum subtema.</p>') + '</div></div>';
   };
   var h = '<div class="caixa"><div class="linha" style="border:0;padding:0"><h2 style="margin:0">Configurar prioridade dos temas · ' + esc(r.disciplina) + ' ' + ajuda('Os assuntos ficam em dois níveis: <b>grandes temas</b> (ex.: "Processos térmicos") e, dentro deles, <b>subtemas</b> (ex.: "Valor D e valor Z"). Clique no ▸ para ver os subtemas.<br><br>' +
     '<b>Prioridade:</b> marque o grande tema como <b>⭐ importante</b>, <b>normal</b> ou <b>não cobrar</b>. Cada subtema vem como <b>"segue o grande tema"</b>, mas você pode mudar só ele (por exemplo, um exemplo específico como "não cobrar"). As questões de revisão são sempre sobre um subtema, e variam os grandes temas quando há assunto suficiente.<br><br>' +
     '<b>Desempenho da turma</b> = acerto nas fechadas e nota média nas abertas (só respostas corrigidas); no grande tema é a soma dos subtemas. Verde: 70% ou mais · amarelo: 50 a 69% · vermelho: abaixo de 50%.<br><br>' +
+    '<b>Ordem:</b> as setas ↑↓ põem os grandes temas e os subtemas na sequência do curso (é a ordem que o aluno vê no estudo e nas aulas em trilha).<br><br><b>⋯ mais:</b> "o que cai" (uma linha sua que vai para os prompts das questões do estudo e das aulas em trilha), as aulas que tratam do subtema, mudar de nível e apagar.<br><br>' +
     'As mudanças são salvas na hora; a lista se reorganiza quando o painel for aberto de novo. Ao copiar a disciplina para o próximo semestre, os temas e as prioridades vão junto (sem as notas).') + '</h2>' +
     '<button type="button" class="link" id="fecharTemas">fechar</button></div>';
   if(grupos.length || r.soltos.length) h += '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="btRecatalogar">🔄 Recatalogar nomes dos temas</button> ' +
@@ -3735,8 +3739,68 @@ function desenharTemas(){
     '<button type="button" class="secundario mini" id="btNovoTema">+ Criar</button></div><div id="msgTemas"></div></div>';
   el.innerHTML = h;
   ligarPainelTemas();
+  ligarExtrasTemas();
 }
 // Recatalogar: mostra a proposta da IA ("antes → depois") e grava só o que o professor marcar
+// ---- organização extra: ordem, o que cai, aulas, nível, apagar ----
+function setasTema(id){ return '<span style="display:inline-flex;flex-direction:column;gap:2px;margin-right:6px"><button type="button" class="secundario mini" data-ordem="' + esc(id) + '" data-dir="cima" title="subir" aria-label="subir" style="padding:0 7px;line-height:1.3">↑</button><button type="button" class="secundario mini" data-ordem="' + esc(id) + '" data-dir="baixo" title="descer" aria-label="descer" style="padding:0 7px;line-height:1.3">↓</button></span>'; }
+function maisSubtema(t){
+  var aulas = (TEMAS.r.aulasDisc || []);
+  return '<details class="maisTema" style="flex-basis:100%;width:100%;margin:6px 0 2px"><summary class="link" style="font-size:13px">⋯ mais</summary><div style="padding:8px 0 4px">' +
+    '<label class="rot" for="desc_' + esc(t.id) + '">O que cai neste subtema <span class="aviso" style="font-weight:normal">(vai para os prompts das questões; diga também o que NÃO cobrar)</span></label>' +
+    '<textarea id="desc_' + esc(t.id) + '" maxlength="500" style="min-height:52px" placeholder="ex.: leitura do gráfico, regiões I/II/III, histerese; não cobrar a equação do BET">' + esc(t.descricao || '') + '</textarea>' +
+    '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-desc="' + esc(t.id) + '">Salvar o que cai</button></div>' +
+    '<p class="rot" style="margin:10px 0 4px">Aulas que tratam deste subtema</p>' +
+    (aulas.length ? '<div style="max-height:180px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:4px 8px">' + aulas.map(function(a){ return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:13.5px;margin:3px 0;cursor:pointer"><input type="checkbox" data-aulatema="' + esc(t.id) + '" value="' + esc(a.id) + '"' + ((t.aulaIds || []).indexOf(a.id) !== -1 ? ' checked' : '') + ' style="width:15px;height:15px;margin-top:2px"> Aula ' + a.numero + ' · ' + esc(a.tema || 'sem tema') + '</label>'; }).join('') + '</div>' +
+      '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-salvaraulas="' + esc(t.id) + '">Salvar as aulas</button><span class="aviso">o estudo dirigido só libera o subtema que tem aula dada ligada</span></div>' : '<p class="aviso">Ainda não há aulas nesta disciplina.</p>') +
+    '<div class="botoes" style="margin-top:10px"><button type="button" class="secundario mini" data-promover="' + esc(t.id) + '">⬆ Virar grande tema</button><button type="button" class="secundario mini" data-apagartema="' + esc(t.id) + '">Apagar</button></div></div></details>';
+}
+function maisGrupo(g, grupos){
+  if(g.subtemas.length) return '';
+  return '<details class="maisTema" style="flex-basis:100%;width:100%;margin:6px 0 2px"><summary class="link" style="font-size:13px">⋯ mais</summary><div class="botoes" style="padding:6px 0">' +
+    '<select data-rebaixar="' + esc(g.id) + '" style="width:auto"><option value="">⬇ virar subtema de…</option>' + grupos.filter(function(x){ return x.id !== g.id; }).map(function(x){ return '<option value="' + esc(x.id) + '">' + esc(x.nome) + '</option>'; }).join('') + '</select>' +
+    '<button type="button" class="secundario mini" data-apagartema="' + esc(g.id) + '">Apagar</button></div></details>';
+}
+// relê os temas sem pular para o topo (mantém os grandes temas abertos)
+function recarregarTemas(msg){
+  var discId = TEMAS.disc, y = window.scrollY;
+  return api('temasDisciplina', {disciplinaId: discId}).then(function(r){ TEMAS.r = r; desenharTemas(); window.scrollTo(0, y); if(msg) $('msgTemas').innerHTML = '<div class="ok">' + msg + '</div>'; });
+}
+function ligarExtrasTemas(){
+  var el = $('painelTemas'), discId = TEMAS.disc;
+  var erro = function(e){ $('msgTemas').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; $('msgTemas').scrollIntoView({behavior: 'smooth', block: 'nearest'}); };
+  el.querySelectorAll('[data-ordem]').forEach(function(b){ b.addEventListener('click', function(){
+    el.querySelectorAll('[data-ordem]').forEach(function(x){ x.disabled = true; });
+    api('moverOrdemTema', {disciplinaId: discId, id: b.dataset.ordem, direcao: b.dataset.dir}).then(function(){ return recarregarTemas(); }).catch(function(e){ el.querySelectorAll('[data-ordem]').forEach(function(x){ x.disabled = false; }); erro(e); });
+  }); });
+  el.querySelectorAll('[data-desc]').forEach(function(b){ b.addEventListener('click', function(){
+    var id = b.dataset.desc; b.disabled = true;
+    api('salvarTema', {disciplinaId: discId, tema: {id: id, descricao: $('desc_' + id).value}}).then(function(){ return recarregarTemas('✓ "O que cai" salvo.'); }).catch(function(e){ b.disabled = false; erro(e); });
+  }); });
+  el.querySelectorAll('[data-salvaraulas]').forEach(function(b){ b.addEventListener('click', function(){
+    var id = b.dataset.salvaraulas, ids = Array.prototype.map.call(el.querySelectorAll('[data-aulatema="' + id + '"]:checked'), function(c){ return c.value; });
+    b.disabled = true;
+    api('salvarTema', {disciplinaId: discId, tema: {id: id, aulas: ids}}).then(function(){ return recarregarTemas('✓ Aulas do subtema salvas.'); }).catch(function(e){ b.disabled = false; erro(e); });
+  }); });
+  el.querySelectorAll('[data-promover]').forEach(function(b){ b.addEventListener('click', function(){
+    var x = acharTema(b.dataset.promover);
+    if(!confirm('"' + x.t.nome + '" vira um grande tema novo, com ele mesmo como primeiro subtema (as questões, aulas e o estudo continuam ligados). Seguir?')) return;
+    b.disabled = true;
+    api('nivelTema', {disciplinaId: discId, id: x.t.id, acao: 'promover'}).then(function(){ return recarregarTemas('✓ "' + x.t.nome + '" agora é um grande tema.'); }).catch(function(e){ b.disabled = false; erro(e); });
+  }); });
+  el.querySelectorAll('[data-rebaixar]').forEach(function(s){ s.addEventListener('change', function(){
+    if(!s.value) return; var x = acharTema(s.dataset.rebaixar), d = acharTema(s.value);
+    if(!confirm('"' + x.t.nome + '" vira subtema de "' + d.t.nome + '"?')){ s.value = ''; return; }
+    s.disabled = true;
+    api('nivelTema', {disciplinaId: discId, id: x.t.id, acao: 'rebaixar', alvo: s.value}).then(function(){ TEMAS.abertos[s.value] = true; return recarregarTemas('✓ "' + x.t.nome + '" agora é subtema de "' + d.t.nome + '".'); }).catch(function(e){ s.disabled = false; s.value = ''; erro(e); });
+  }); });
+  el.querySelectorAll('[data-apagartema]').forEach(function(b){ b.addEventListener('click', function(){
+    var x = acharTema(b.dataset.apagartema);
+    if(!confirm('Apagar "' + x.t.nome + '"?')) return;
+    b.disabled = true;
+    api('apagarTema', {disciplinaId: discId, id: x.t.id}).then(function(){ return recarregarTemas('✓ "' + x.t.nome + '" apagado.'); }).catch(function(e){ b.disabled = false; erro(e); });
+  }); });
+}
 function recatalogarTemas(bt){
   var caixa = $('recatalogo'), discId = TEMAS.disc;
   bt.disabled = true;

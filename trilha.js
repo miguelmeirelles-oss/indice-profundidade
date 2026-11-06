@@ -213,6 +213,9 @@ function desenharListaAluno(){
   // grandes temas da matéria (ex.: Água), cada um com as suas aulas e o % concluído
   var grupos = {}, ordG = [];
   porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(!grupos[g]){ grupos[g] = []; ordG.push(g); } grupos[g].push(t); });
+  // na sequência do curso (a ordem que o professor deu aos grandes temas); sem ordem vão para o fim
+  var ordemG = {}; porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(t.grandeOrdem) ordemG[g] = t.grandeOrdem; });
+  ordG.sort(function(a, b){ return ((ordemG[a] || 1e6) - (ordemG[b] || 1e6)) || a.localeCompare(b); });
   var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; }catch(e){}
   h += ordG.map(function(g){
     var l = grupos[g], pct = Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length);
