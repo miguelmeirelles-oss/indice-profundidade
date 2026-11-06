@@ -22,6 +22,8 @@ var PROMPT_TRILHA = [
 '5. Cada bloco é um trecho da aula com UM gráfico (ou nenhum). Use de 6 a 12 passos por bloco; cada passo mostra uma coisa nova no gráfico (uma curva, uma região, uma seta, um ponto andando…).',
 '6. "contexto_ia" (800 a 3000 caracteres): resumo fiel do que a aula ensina naquele bloco, com os exemplos e números usados. É a base da IA que tira as dúvidas, então escreva tudo o que ela precisa saber para não contradizer a aula.',
 '7. Feche cada bloco com uma "checagem" (múltipla escolha que exige entender, não decorar) e uma "pergunta_falada" (o estudante responde falando).',
+'8. No fim de cada bloco o estudante faz a avaliação de profundidade do "Estudar com IA" sobre o assunto do bloco. Em "subtopico_id", ponha o id do assunto do CATÁLOGO DO ESTUDAR COM IA (no fim deste prompt) que melhor corresponde ao bloco; se nenhum servir, deixe vazio.',
+'9. Em "tema_id", ponha o id do SUBTEMA DA DISCIPLINA (lista no fim deste prompt) do assunto do bloco: as questões abertas do estudo dirigido no fim do bloco saem desse subtema. Se nenhum servir, deixe vazio.',
 '',
 'REGRAS DO GRÁFICO (a plataforma desenha; você só descreve):',
 '- Coordenadas SEMPRE nas unidades dos eixos (ex.: x de 0 a 1 para atividade de água), nunca em pixels.',
@@ -45,6 +47,8 @@ var PROMPT_TRILHA = [
 '  {"tipo":"texto","x":x,"y":y,"texto":"texto"}  texto solto',
 '  {"tipo":"limpar"}',
 '',
+'REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre ao professor o ROTEIRO de cada aula em trilha: uma tabela por bloco com o nº do passo, o título, o que a voz diz (resumido) e o que aparece ou se anima no gráfico. Se a sua interface permitir conteúdo visual (por exemplo um artifact em HTML/SVG), mostre também uma prévia simples do gráfico de cada passo. Pergunte se ele quer mudar algo, ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).',
+'',
 'DIVIDIR EM AULAS CURTAS (LOTE): se o material tiver várias aulas ou vários assuntos, divida em AULAS EM TRILHA CURTAS, uma por assunto, na ordem do curso: cada uma com 1 a 3 blocos (uns 10 a 15 minutos de estudo). Nesse caso devolva {"formato": "aula-trilha/1", "trilhas": [ trilha1, trilha2, … ]}, cada trilha no formato abaixo. Se a resposta for ficar longa demais, devolva só algumas trilhas por vez (um JSON completo por resposta) e diga quais assuntos ainda faltam; o professor pede "continue".',
 '',
 'FORMATO DA RESPOSTA: devolva SÓ o JSON (sem comentários, sem texto antes ou depois), num bloco de código ou num arquivo .json. Formato de UMA trilha:',
@@ -58,6 +62,8 @@ var PROMPT_TRILHA = [
 '      "id": "b1",',
 '      "titulo": "título do bloco",',
 '      "contexto_ia": "resumo fiel do que a aula ensina neste bloco…",',
+'      "subtopico_id": "id do assunto no catálogo do Estudar com IA (ou vazio)",',
+'      "tema_id": "id do subtema da disciplina (ou vazio)",',
 '      "grafico": {',
 '        "x": {"rotulo": "Atividade de água (Aw)", "min": 0, "max": 1, "passo": 0.1},',
 '        "y": {"rotulo": "Umidade (g/100 g ss)", "min": 0, "max": 40, "passo": 10},',
@@ -79,6 +85,35 @@ var PROMPT_TRILHA = [
 '============================== MATERIAL DAS AULAS =============================='
 ].join('\n');
 
+// pedido de AJUSTE de uma aula já pronta (o professor anota o que mudar em cada passo)
+function promptAjuste(trilha, notas){
+  var ini = PROMPT_TRILHA.indexOf('REGRAS DE CONTEÚDO'), fim = PROMPT_TRILHA.indexOf('============================== MATERIAL DAS AULAS');
+  return [
+    'Você vai AJUSTAR uma AULA EM TRILHA já pronta da plataforma "Aula por IA" (aula interativa: slides com gráficos que se animam, narrada por voz de IA, com dúvidas por voz).',
+    'Abaixo vêm as regras do formato (as mesmas de quando a aula foi criada), o JSON ATUAL da aula e os AJUSTES que o professor pediu, passo a passo.',
+    'Faça SÓ o que foi pedido e mantenha o resto igual: os mesmos ids de blocos e a mesma ordem dos passos (assim a narração já gravada continua valendo onde a fala não mudou).',
+    'Primeiro mostre ao professor, em poucas linhas, o que você vai mudar em cada passo (se a sua interface permitir, mostre também uma prévia visual do gráfico dos passos alterados). Depois devolva o JSON COMPLETO da aula ajustada, num bloco de código ou arquivo .json.',
+    '', PROMPT_TRILHA.slice(ini, fim).replace(/\n?REVISÃO COM O PROFESSOR[^\n]*\n/, '\n').replace(/\n?DIVIDIR EM AULAS CURTAS[^\n]*\n/, '\n'),
+    '============================== AJUSTES PEDIDOS PELO PROFESSOR ==============================', notas,
+    '', '============================== JSON ATUAL DA AULA ==============================', JSON.stringify(trilha, null, 1)
+  ].join('\n');
+}
+function chaveAjustes(){ return 'trilha_aj_' + (T && T.id ? T.id : 'previa'); }
+function lerAjustes(){ try{ return JSON.parse(localStorage.getItem(chaveAjustes()) || '{}') || {}; }catch(e){ return {}; } }
+function gravarAjustes(a){ try{ localStorage.setItem(chaveAjustes(), JSON.stringify(a)); }catch(e){} }
+function textoAjustes(){
+  var a = lerAjustes(), linhas = [];
+  if(a.geral) linhas.push('• Na aula toda: ' + a.geral);
+  T.trilha.blocos.forEach(function(b, bi){ b.passos.forEach(function(p, i){ var n = a[b.id + ':' + i]; if(n) linhas.push('• Bloco ' + (bi + 1) + ' "' + b.titulo + '" › passo ' + (i + 1) + ' "' + (p.titulo || '') + '": ' + n); }); });
+  return linhas;
+}
+function mostrarAjuste(){
+  if(!$('txtAjuste')) return;
+  var b = blocoAtual(), a = lerAjustes();
+  $('txtAjuste').value = a[b.id + ':' + P.passo] || '';
+  $('rotAjuste').textContent = 'O que mudar no passo ' + (P.passo + 1) + ' (' + (b.passos[P.passo].titulo || b.titulo) + ')?';
+  var n = textoAjustes().length; $('nAjustes').textContent = n ? n + ' ajuste(s) anotado(s)' : '';
+}
 /* ===================== estado geral ===================== */
 var L = {disciplinas: [], trilhas: [], vozes: []};   // lista
 var T = null;          // trilha aberta: {id, versao, trilha, narracao, voz, previa}
@@ -106,10 +141,14 @@ function desenharLista(){
   h += mostradas.length ? '<div class="tabelaBox"><table><tr><th>Aula</th><th>Disciplina</th><th>Versão</th><th>Narração</th><th>Uso</th><th></th></tr>' +
     mostradas.map(function(t){
       return '<tr><td><b>' + esc(t.titulo) + '</b><div class="aviso">' + esc(t.tema || '') + '</div></td><td>' + esc(nomeDisc(t.disciplina_id)) + '</td><td>v' + t.versao + '<div class="aviso">' + esc(t.atualizado) + '</div></td>' +
-        '<td>' + (t.audios ? '🔊 ' + t.audios + ' fala(s) com a voz da IA' : '<span class="aviso">voz do navegador (robótica)</span><br><button class="mini" data-trgravar="' + esc(t.id) + '" style="margin-top:4px">🎙 Gravar com a voz da IA</button>') + '</td>' +
+        '<td>' + (t.fila ? '⏳ <b>gravando em segundo plano</b>: faltam ' + t.fila.faltam + ' fala(s)' + (t.fila.proxima ? '<div class="aviso">próxima rodada: ' + esc(t.fila.proxima) + '</div>' : '') + (t.fila.erro ? '<div class="aviso">último problema: ' + esc(t.fila.erro) + '</div>' : '') :
+          (t.audios ? '🔊 ' + t.audios + ' fala(s) com a voz da IA' : '<span class="aviso">voz do navegador (robótica)</span>') + '<br><button class="mini' + (t.audios ? ' secundario' : '') + '" data-trgravar="' + esc(t.id) + '" style="margin-top:4px">🎙 ' + (t.audios ? 'Gravar as que faltam' : 'Gravar com a voz da IA') + '</button>') + '</td>' +
         '<td>' + (t.sessoes ? t.alunos + ' pessoa(s) · ' + t.sessoes + ' sessão(ões)' : '<span class="aviso">—</span>') + '</td>' +
         '<td style="white-space:nowrap"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button> <button class="mini secundario" data-trapagar="' + esc(t.id) + '">Apagar</button></td></tr>';
-    }).join('') + '</table></div>' : '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
+    }).join('') + '</table></div>' +
+    '<div class="convite" style="margin-top:12px"><b>🎙 Voz da IA em segundo plano</b><div class="aviso">O servidor grava sozinho: pode fechar o site. A cota grátis de voz é pequena (umas 10 falas por modelo por dia); se acabar, ele continua no dia seguinte e te avisa no celular quando terminar.</div>' +
+    '<div class="botoes" style="margin-top:8px"><label>Voz: <select id="tr_vozLote">' + L.vozes.map(function(v){ return '<option>' + v + '</option>'; }).join('') + '</select></label><button class="mini" id="tr_btGravarTodas">Gravar a voz de todas as aulas que faltam</button><span id="tr_msgLote" class="aviso"></span></div></div>' :
+    '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
   h += '</div>';
 
   h += '<div class="caixa"><h2>Criar uma aula em trilha</h2>' +
@@ -130,7 +169,14 @@ function desenharLista(){
 
   document.querySelectorAll('[data-trfiltro]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_filtro_prof', b.getAttribute('data-trfiltro')); }catch(e){} desenharLista(); }); });
   document.querySelectorAll('[data-trabrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trabrir')); }); });
-  document.querySelectorAll('[data-trgravar]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trgravar'), true); }); });
+  var gravarFundo = function(dados, msg){
+    $('msgLote').textContent = 'Colocando na fila…';
+    api('trilhaNarrarFundo', dados).then(function(r){
+      return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; });
+    }).catch(function(e){ $('msgLote').textContent = ''; erroGeral(e.message); });
+  };
+  document.querySelectorAll('[data-trgravar]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; gravarFundo({ids: [b.getAttribute('data-trgravar')], voz: $('vozLote').value}); }); });
+  if($('btGravarTodas')) $('btGravarTodas').addEventListener('click', function(){ this.disabled = true; gravarFundo({todas: true, voz: $('vozLote').value}); });
   document.querySelectorAll('[data-trapagar]').forEach(function(b){ b.addEventListener('click', function(){
     var t = L.trilhas.filter(function(x){ return x.id === b.getAttribute('data-trapagar'); })[0];
     if(!confirm('Apagar "' + t.titulo + '"? A pasta dela vai para a lixeira do seu Drive (dá para recuperar por 30 dias).')) return;
@@ -151,6 +197,7 @@ function desenharLista(){
   carregarUso();
 }
 // visão do aluno: só a lista para estudar (sem criar, sem apagar, sem estatística)
+function barraPct(p){ var c = p >= 100 ? '#1a7a3c' : p >= 50 ? '#2E62C6' : '#B8890A'; return '<div style="height:7px;background:#e3e8f2;border-radius:4px;overflow:hidden;margin:5px 0 2px"><div style="height:100%;width:' + Math.max(0, Math.min(100, p || 0)) + '%;background:' + c + '"></div></div>'; }
 function desenharListaAluno(){
   pararTudo(); T = null;
   var porDisc = {}, ordem = [];
@@ -160,14 +207,25 @@ function desenharListaAluno(){
   var atual = ''; try{ atual = localStorage.getItem('trilha_materia') || ''; }catch(e){}
   if(!porDisc[atual]) atual = ordem[0];
   var h = '<div class="t-blocos">' + ordem.map(function(d){
-    var n = porDisc[d].length, feitas = porDisc[d].filter(function(t){ return t.estudei; }).length;
-    return '<button class="t-chip' + (d === atual ? ' t-atual' : '') + '" data-trmateria="' + esc(d) + '">' + esc(nomeDisc(d)) + ' <span style="opacity:.75">(' + (feitas ? feitas + '/' : '') + n + ')</span></button>';
+    var l = porDisc[d], pct = Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length);
+    return '<button class="t-chip' + (d === atual ? ' t-atual' : '') + '" data-trmateria="' + esc(d) + '">' + esc(nomeDisc(d)) + ' <span style="opacity:.75">· ' + pct + '%</span></button>';
   }).join('') + '</div>';
-  h += '<div id="tr_listaDaMateria">' + porDisc[atual].map(function(t){
-    return '<div class="convite" style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:8px"><div><b>' + (t.estudei ? '✓ ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') + '<div class="aviso">' + esc(t.tema || '') + '</div></div>' +
-      '<button class="mini' + (t.estudei ? ' secundario' : '') + '" data-trestudar="' + esc(t.id) + '">' + (t.estudei ? '↻ Rever' : '▶ Estudar') + '</button></div>';
-  }).join('') + '</div>';
+  // grandes temas da matéria (ex.: Água), cada um com as suas aulas e o % concluído
+  var grupos = {}, ordG = [];
+  porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(!grupos[g]){ grupos[g] = []; ordG.push(g); } grupos[g].push(t); });
+  var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; }catch(e){}
+  h += ordG.map(function(g){
+    var l = grupos[g], pct = Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length);
+    return '<details class="convite" data-trgrupo="' + esc(g) + '" style="margin-bottom:10px"' + (abertos[g] || ordG.length === 1 ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:16px">' + esc(g) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
+      l.map(function(t){
+        var subs = (t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; });
+        return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:9px 11px;margin-top:8px"><div style="flex:1 1 200px"><b>' + ((t.progresso || 0) >= 100 || t.estudei ? '✓ ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') +
+          (subs.length ? '<div class="aviso">' + esc(subs.join(' · ')) + '</div>' : '') + barraPct(t.progresso || 0) + '<span class="aviso">' + (t.progresso || 0) + '% · vídeo, questões e Estudar com IA</span></div>' +
+          '<button class="mini' + (t.progresso ? ' secundario' : '') + '" data-trestudar="' + esc(t.id) + '">' + (t.progresso >= 100 ? '↻ Rever' : t.progresso ? '▶ Continuar' : '▶ Estudar') + '</button></div>';
+      }).join('') + '</details>';
+  }).join('');
   $('corpo').innerHTML = h;
+  document.querySelectorAll('[data-trgrupo]').forEach(function(d){ d.addEventListener('toggle', function(){ try{ var a = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; a[d.getAttribute('data-trgrupo')] = d.open; localStorage.setItem('trilha_grupos', JSON.stringify(a)); }catch(e){} }); });
   document.querySelectorAll('[data-trmateria]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_materia', b.getAttribute('data-trmateria')); }catch(e){} desenharListaAluno(); }); });
   document.querySelectorAll('[data-trestudar]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trestudar')); }); });
 }
@@ -186,7 +244,7 @@ function montarPrompt(feito){
   var ids = Array.prototype.map.call(document.querySelectorAll('[data-traulamat]:checked'), function(c){ return c.getAttribute('data-traulamat'); });
   $('msgPrompt').textContent = 'Juntando o material…';
   api('trilhaMaterial', {disciplinaId: $('selDisc').value, aulaIds: ids}).then(function(r){
-    feito(PROMPT_TRILHA.replace('para a plataforma "Aula por IA".', 'para a plataforma "Aula por IA", disciplina "' + r.disciplina + '" (graduação em Engenharia de Alimentos).') + '\n\n' + r.texto + (r.cortado ? '\n\n(Aviso: o material foi cortado por tamanho.)' : ''));
+    feito(PROMPT_TRILHA.replace('para a plataforma "Aula por IA".', 'para a plataforma "Aula por IA", disciplina "' + r.disciplina + '" (graduação em Engenharia de Alimentos).') + '\n\n' + r.texto + (r.cortado ? '\n\n(Aviso: o material foi cortado por tamanho.)' : '') + (r.temas ? '\n\n============================== SUBTEMAS DA DISCIPLINA (id — tema › subtema) ==============================\n' + r.temas : '') + (r.catalogo ? '\n\n============================== CATÁLOGO DO ESTUDAR COM IA (id — área › assunto) ==============================\n' + r.catalogo : ''));
   }).catch(function(e){ $('msgPrompt').textContent = ''; erroGeral(e.message); });
 }
 function conferir(){
@@ -223,11 +281,11 @@ function fmtTempo(s){ s = Math.round(s || 0); var h = Math.floor(s / 3600), m = 
 function carregarUso(){
   api('trilhaUso', {}).then(function(l){
     var nomeT = function(id){ var t = L.trilhas.filter(function(x){ return x.id === id; })[0]; return t ? t.titulo : '(apagada)'; };
-    $('boxUso').innerHTML = l.length ? '<div class="tabelaBox"><table><tr><th>Quem</th><th>Aula</th><th>Tempo de estudo</th><th>Avanço</th><th>Dúvidas por voz</th><th>Checagens</th><th>Marcou como estudada</th><th>Comentário</th><th>Último uso</th></tr>' +
+    $('boxUso').innerHTML = l.length ? '<div class="tabelaBox"><table><tr><th>Quem</th><th>Aula</th><th>Tempo de estudo</th><th>Avanço</th><th>Dúvidas por voz</th><th>Checagens</th><th>Profundidade (Estudar com IA)</th><th>Marcou como estudada</th><th>Comentário</th><th>Último uso</th></tr>' +
       l.map(function(a){
         return '<tr><td>' + esc(a.aluno) + '</td><td>' + esc(nomeT(a.trilha_id)) + '</td><td>' + fmtTempo(a.segundos) + ' <span class="aviso">(' + a.sessoes + ' sessão' + (a.sessoes > 1 ? 'ões' : '') + ')</span></td>' +
           '<td>' + a.passos + ' de ' + a.total_passos + ' passos</td><td>' + (a.duvidas ? a.duvidas + ' · ' + fmtTempo(a.duvida_seg) : '—') + '</td>' +
-          '<td>' + (a.checagens ? a.acertos + ' de ' + a.checagens + ' certas' : '—') + '</td><td>' + (a.estudei ? '✓ ' + esc(a.estudei) : '—') + '</td><td style="max-width:260px">' + (a.comentario ? esc(a.comentario) : '—') + '</td><td>' + esc(a.ultimo || '—') + '</td></tr>';
+          '<td>' + (a.checagens ? a.acertos + ' de ' + a.checagens + ' certas' : '—') + '</td><td>' + (a.profundidade !== undefined ? '<b>' + a.profundidade + '</b> <span class="aviso">(melhor de ' + a.avaliacoes + ')</span>' : '—') + '</td><td>' + (a.estudei ? '✓ ' + esc(a.estudei) : '—') + '</td><td style="max-width:260px">' + (a.comentario ? esc(a.comentario) : '—') + '</td><td>' + esc(a.ultimo || '—') + '</td></tr>';
       }).join('') + '</table></div><p class="aviso">Tempo de estudo conta só com a aula aberta na tela e em uso. Por enquanto só você usa; quando liberarmos para os alunos, eles aparecem aqui.</p>' :
       '<p class="aviso">Ninguém usou ainda. Aqui vai aparecer quem estudou, por quanto tempo, até onde chegou, as dúvidas por voz, os acertos nas checagens, quem marcou como estudada e os comentários.</p>';
   }).catch(function(e){ $('boxUso').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
@@ -245,7 +303,7 @@ function abrirTrilha(id, gravar){
 }
 function abrirPlayer(t){
   pararTudo();
-  T = t; P.bloco = 0; P.passo = 0; P.cacheAud = {}; P.tocando = false;
+  T = t; P.bloco = 0; P.passo = 0; P.cacheAud = {}; P.tocando = false; P.blocoAssunto = -1;
   try{ P.vel = Number(localStorage.getItem('trilha_vel') || 1) || 1; }catch(e){}
   U.iniciar();
   var tr = t.trilha;
@@ -253,6 +311,7 @@ function abrirPlayer(t){
     (MODO === 'aluno' ? '' : t.previa ? '<span class="t-tag">pré-visualização (ainda não salva)</span>' : '<span class="aviso">v' + t.versao + ' · <a href="' + esc(t.pasta) + '" target="_blank" rel="noopener">pasta no Drive</a></span>') + '</div>' +
     '<h2 style="margin:0">' + esc(tr.titulo) + '</h2>' +
     '<div class="t-blocos" id="tr_chips">' + tr.blocos.map(function(b, i){ return '<button class="t-chip" data-trbloco="' + i + '">' + (i + 1) + '. ' + esc(b.titulo) + '</button>'; }).join('') + '</div>' +
+    (MODO === 'prof' && !t.previa ? '<div id="tr_temaBox" class="aviso" style="margin:-4px 0 4px"></div><div id="tr_assuntoBox" class="aviso" style="margin:0 0 10px"></div>' : '') +
     '<div class="t-palco"><div class="t-titSlide" id="tr_titSlide"></div><div class="t-ref" id="tr_refSlide"></div><svg id="tr_svg" viewBox="0 0 800 440" role="img" aria-label="gráfico da aula"></svg></div>' +
     '<div class="t-controles">' +
       '<button class="mini secundario" id="tr_btVolta" title="passo anterior">⏮</button>' +
@@ -263,15 +322,33 @@ function abrirPlayer(t){
       '<select id="tr_selVel" title="velocidade"><option value="0.9">0,9×</option><option value="1">1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select>' +
       '<button class="mini vermelho" id="tr_btDuvida">✋ Tenho uma dúvida</button>' +
     '</div>' +
-    (MODO === 'prof' && !t.previa && !temNarracaoIA() ? '<div class="convite" id="tr_avisoNarr" style="margin-top:10px">🔈 Esta aula ainda está com a <b>voz do navegador</b> (robótica). Grave uma vez com a <b>voz da IA</b>, a mesma voz natural do Gemini Live; depois ela toca para todos. <button class="mini" id="tr_btIrNarr">🎙 Gravar com a voz da IA</button></div>' : '') +
+    (MODO === 'prof' && !t.previa && !temNarracaoIA() ? '<div class="convite" id="tr_avisoNarr" style="margin-top:10px">🔈 Esta aula ainda está com a <b>voz do navegador</b> (robótica). Grave uma vez com a <b>voz da IA</b> (as mesmas vozes do Gemini); depois ela toca para todos. Dá para gravar em segundo plano e fechar o site. <button class="mini" id="tr_btIrNarr">🎙 Gravar com a voz da IA</button></div>' : '') +
     '<div id="tr_duvidaBox" class="t-duvidaBox oculto"></div>' +
     '<div class="t-texto"><div><b>Pontos-chave</b><ul class="t-pontos" id="tr_pontos"></ul></div>' +
       '<div><b>O que a voz está dizendo</b><div class="t-legenda" id="tr_legenda"></div><div id="tr_avisoVoz" class="convite oculto"></div></div></div>' +
     '<div id="tr_checagem"></div>' +
     (t.previa ? '' : '<div id="tr_marcaBox" class="convite" style="margin-top:14px"></div>') +
+    (MODO === 'prof' ? '<details class="convite" id="tr_ajusteBox" style="margin-top:14px"><summary class="link"><b>📝 Pedir ajustes à IA</b> (anote o que mudar em cada passo)</summary>' +
+      '<label class="aviso" id="tr_rotAjuste" for="txtAjuste" style="display:block;margin-top:8px"></label><textarea id="tr_txtAjuste" style="min-height:60px;font-family:inherit;font-size:14px" placeholder="ex.: a seta tem que apontar para a curva de cima; fala longa demais; trocar o exemplo do leite por café"></textarea>' +
+      '<label class="aviso" for="txtAjusteGeral" style="display:block;margin-top:6px">Ajuste na aula toda (opcional)</label><input type="text" id="tr_txtAjusteGeral" style="width:100%" placeholder="ex.: falas mais curtas; mais um bloco sobre histerese">' +
+      '<div class="botoes"><button class="mini" id="tr_btCopiarAjuste">📋 Copiar pedido de ajustes para a IA</button><button class="mini secundario" id="tr_btLimparAjuste">Limpar anotações</button><span id="tr_nAjustes" class="aviso"></span></div>' +
+      '<p class="aviso" style="margin-bottom:0">Cole na sua IA (de preferência na mesma conversa em que a aula foi criada). Depois traga o JSON corrigido em <b>Criar uma aula em trilha → passo 3</b> e salve como <b>nova versão</b> desta aula.</p><div id="tr_msgAjuste"></div></details>' : '') +
     (t.previa || MODO === 'aluno' ? '' : '<details class="t-admNarr convite" id="tr_admNarr"><summary class="link"><b>🎙 Narração com voz da IA</b> (gravada uma vez, depois toca para todos sem gastar cota)</summary><div id="tr_admNarrCorpo"></div></details>');
   $('corpo').innerHTML = h;
   if(!t.previa) desenharMarca();
+  if($('txtAjuste')){
+    $('txtAjusteGeral').value = lerAjustes().geral || '';
+    $('txtAjuste').addEventListener('input', function(){ var a = lerAjustes(), k = blocoAtual().id + ':' + P.passo; if(this.value.trim()) a[k] = this.value.trim(); else delete a[k]; gravarAjustes(a); mostrarAjuste(); });
+    $('txtAjusteGeral').addEventListener('input', function(){ var a = lerAjustes(); if(this.value.trim()) a.geral = this.value.trim(); else delete a.geral; gravarAjustes(a); mostrarAjuste(); });
+    $('btLimparAjuste').addEventListener('click', function(){ if(confirm('Apagar as anotações de ajuste desta aula?')){ gravarAjustes({}); $('txtAjusteGeral').value = ''; mostrarAjuste(); } });
+    $('btCopiarAjuste').addEventListener('click', function(){
+      var l = textoAjustes();
+      if(!l.length){ $('msgAjuste').innerHTML = '<div class="erro">Anote pelo menos um ajuste (em algum passo ou na aula toda).</div>'; return; }
+      var txt = promptAjuste(T.trilha, l.join('\n'));
+      navigator.clipboard.writeText(txt).then(function(){ $('msgAjuste').innerHTML = '<div class="ok">✓ Copiado (' + l.length + ' ajuste(s)). Cole na sua IA.</div>'; })
+        .catch(function(){ var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type: 'text/plain;charset=utf-8'})); a.download = 'ajustes-aula-em-trilha.txt'; a.click(); $('msgAjuste').innerHTML = '<div class="ok">O navegador não deixou copiar: baixei como arquivo .txt.</div>'; });
+    });
+  }
   $('lnVoltar').addEventListener('click', function(){ U.enviar(true); inicio(); });
   document.querySelectorAll('[data-trbloco]').forEach(function(b){ b.addEventListener('click', function(){ irPara(Number(b.getAttribute('data-trbloco')), 0, P.tocando); }); });
   $('btPlay').addEventListener('click', function(){ if(P.tocando) pausar(); else { if(P.fimDoBloco) irPara(P.bloco, 0, false); tocar(); } });
@@ -305,6 +382,58 @@ function desenharMarca(){
   $('chkEstudei').addEventListener('change', function(){ salvar(function(r){ return r.estudei ? '✓ Marcada como estudada.' : 'Desmarcada.'; }); });
   $('btComent').addEventListener('click', function(){ salvar(function(){ return '✓ Comentário salvo.'; }); });
 }
+// assunto do Estudar com IA ligado ao bloco (vem do servidor; na pré-visualização ainda não tem)
+function assuntoDoBloco(b){ var a = (T.assuntos || []).filter(function(x){ return x.bloco === b.id; })[0]; return a && a.id ? a : null; }
+function desenharTemaBloco(){
+  var box = $('temaBox'); if(!box) return;
+  var b = blocoAtual(), a = temaDoBloco(b), lista = T.temasDisc || [];
+  if(!T.disciplina_id){ box.innerHTML = '📝 Questões: escolha a disciplina da trilha ao salvar (nova versão) para ligar os subtemas.'; return; }
+  var gr = {}; lista.forEach(function(x){ (gr[x.grupo || 'Outros'] = gr[x.grupo || 'Outros'] || []).push(x); });
+  box.innerHTML = '📝 Questões deste bloco (estudo dirigido): <select id="tr_selTemaBloco" style="max-width:100%;font-size:13px;padding:4px 6px"><option value="">— sem questão aberta —</option>' +
+    Object.keys(gr).sort().map(function(g){ return '<optgroup label="' + esc(g) + '">' + gr[g].map(function(x){ return '<option value="' + esc(x.id) + '"' + (a && a.id === x.id ? ' selected' : '') + '>' + esc(x.nome) + '</option>'; }).join('') + '</optgroup>'; }).join('') + '</select>' +
+    (a && a.origem === 'sugerido' ? ' <span class="t-tag">sugerido: confira</span>' : '') +
+    ' <label style="white-space:nowrap;cursor:pointer"><input type="checkbox" id="tr_chkQProva"' + (T.questoesProva ? ' checked' : '') + '> incluir assuntos da próxima prova</label> <span id="tr_msgTema"></span>';
+  $('selTemaBloco').addEventListener('change', function(){
+    $('msgTema').textContent = 'salvando…';
+    api('trilhaTema', {id: T.id, blocoId: b.id, temaId: this.value}).then(function(l){ T.temasBlocos = l; desenharTemaBloco(); $('msgTema').textContent = '✓ salvo'; }).catch(function(e){ $('msgTema').textContent = e.message; });
+  });
+  $('chkQProva').addEventListener('change', function(){
+    var v = this.checked; $('msgTema').textContent = 'salvando…';
+    api('trilhaQuestoesProva', {id: T.id, ligado: v}).then(function(r){ T.questoesProva = r; $('msgTema').textContent = '✓ salvo'; }).catch(function(e){ $('msgTema').textContent = e.message; });
+  });
+}
+function desenharAssunto(){
+  desenharTemaBloco();
+  var box = $('assuntoBox'); if(!box) return;
+  var b = blocoAtual(), a = assuntoDoBloco(b), cat = T.catalogo || [];
+  if(!cat.length){ box.innerHTML = 'Não deu para ler o catálogo do Estudar com IA agora.'; return; }
+  var areas = {}; cat.forEach(function(c){ (areas[c.area] = areas[c.area] || []).push(c); });
+  box.innerHTML = '🎤 Avaliação no fim deste bloco (Estudar com IA): <select id="tr_selAssunto" style="max-width:100%;font-size:13px;padding:4px 6px"><option value="">— sem avaliação —</option>' +
+    Object.keys(areas).sort().map(function(ar){ return '<optgroup label="' + esc(ar) + '">' + areas[ar].map(function(c){ return '<option value="' + esc(c.id) + '"' + (a && a.id === c.id ? ' selected' : '') + '>' + esc(c.nome) + '</option>'; }).join('') + '</optgroup>'; }).join('') +
+    '</select>' + (a && a.origem === 'sugerido' ? ' <span class="t-tag">sugerido: confira</span>' : '') + ' <span id="tr_msgAssunto"></span>';
+  $('selAssunto').addEventListener('change', function(){
+    var v = this.value; $('msgAssunto').textContent = 'salvando…';
+    api('trilhaAssunto', {id: T.id, blocoId: b.id, subtopicoId: v}).then(function(l){ T.assuntos = l; P.blocoAssunto = -1; desenharAssunto(); $('msgAssunto').textContent = '✓ salvo'; })
+      .catch(function(e){ $('msgAssunto').textContent = e.message; });
+  });
+}
+// a própria página do Estudar com IA, embutida, já no assunto do bloco (fica no histórico do aluno)
+function abrirAvaliacao(ass){
+  pausar();
+  var ctl = document.querySelector('.t-app .t-controles'); if(ctl) ctl.style.position = 'static';   // a barra fixa não cobre a avaliação
+  var box = $('avalBox'); if(!box) return;
+  box.innerHTML = '<b>🎤 ' + esc(ass.nome) + '</b> <span class="aviso">· Estudar com IA</span>' +
+    '<iframe id="tr_frAval" src="index.html?embed=trilha&sub=' + encodeURIComponent(ass.id) + '" allow="microphone" title="Avaliação de profundidade" style="width:100%;border:0;min-height:460px;margin-top:6px;background:transparent"></iframe>';
+}
+var telaAval = '';
+window.addEventListener('message', function(ev){
+  var d = ev.data, fr = $('frAval');
+  if(!fr || !d || d.tipo !== 'avaliador' || ev.source !== fr.contentWindow) return;
+  if(d.altura) fr.style.height = Math.max(460, d.altura) + 'px';
+  // mudou de tela lá dentro (rodada, resultado…): traz o topo da avaliação para a vista
+  if(d.tela && telaAval && d.tela !== telaAval) fr.scrollIntoView({behavior: 'smooth', block: 'start'});
+  telaAval = d.tela || telaAval;
+});
 function temNarracaoIA(){ return T && Object.keys(T.narracao || {}).some(function(k){ return T.narracao[k] === 'ok'; }); }
 function montarSelVoz(){
   var s = $('selVoz'), ia = temNarracaoIA();
@@ -336,8 +465,11 @@ function irPara(bi, pi, continuar){
   var html = '';
   b.passos.slice(0, P.passo + 1).forEach(function(q, k){ (q.pontos || []).forEach(function(t){ html += '<li class="' + (k === P.passo ? 't-ativo t-novo' : '') + '">' + esc(t) + '</li>'; }); });
   $('pontos').innerHTML = html || '<li class="aviso">—</li>';
+  var ctl0 = document.querySelector('.t-app .t-controles'); if(ctl0) ctl0.style.position = '';
   G.desenhar(b, P.passo);
+  if(P.blocoAssunto !== P.bloco){ P.blocoAssunto = P.bloco; desenharAssunto(); }
   U.visto(b.id + ':' + P.passo);
+  mostrarAjuste();
   if(continuar) narrar();
   if(!T.previa) preCarregarAudio(1);
 }
@@ -425,16 +557,22 @@ function preCarregarAudio(n){
   var b = blocoAtual();
   for(var i = 1; i <= n; i++){ var k = b.id + ':' + (P.passo + i); if(T.narracao[k] === 'ok') pegarAudio(k); }
 }
+// fim do bloco: 1) vídeo-aula (feito) 2) questões 3) Estudar com IA
+function temaDoBloco(b){ var a = (T.temasBlocos || []).filter(function(x){ return x.bloco === b.id; })[0]; return a && a.id ? a : null; }
 function fimDoBloco(){
   P.tocando = false; P.fimDoBloco = true; $('btPlay').textContent = '↻ Rever o bloco';
-  var b = blocoAtual(), c = b.checagem, ultimo = P.bloco >= T.trilha.blocos.length - 1;
-  var h = '<div class="t-checagem">';
+  var ctlF = document.querySelector('.t-app .t-controles'); if(ctlF) ctlF.style.position = 'static';   // nas questões a barra não fica presa no topo
+  var b = blocoAtual(), c = b.checagem, ultimo = P.bloco >= T.trilha.blocos.length - 1, ass = assuntoDoBloco(b), tem = temaDoBloco(b);
+  var passo = function(n, txt, feito){ return '<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:bold;color:' + (feito ? '#1a7a3c' : 'var(--navy)') + '"><span class="t-passoNum" style="background:' + (feito ? '#1a7a3c' : '') + '">' + (feito ? '✓' : n) + '</span>' + txt + '</span>'; };
+  var h = '<div class="t-checagem"><div style="margin-bottom:10px">' + passo(1, 'Vídeo-aula', true) + passo(2, 'Questões') + (ass ? passo(3, 'Estudar com IA') : '') + '</div>';
+  h += '<p style="margin:0 0 6px"><b>2 · Questões</b></p>';
   if(c && c.tipo === 'multipla'){
-    h += '<b>✔ Confira se entendeu</b><p>' + esc(c.pergunta) + '</p>' + c.alternativas.map(function(a, i){ return '<button class="t-op" data-trop="' + i + '">' + esc(a) + '</button>'; }).join('') + '<div id="tr_retCheck"></div>';
+    h += '<p style="margin:4px 0"><b>✔ Confira se entendeu</b></p><p>' + esc(c.pergunta) + '</p>' + c.alternativas.map(function(a, i){ return '<button class="t-op" data-trop="' + i + '">' + esc(a) + '</button>'; }).join('') + '<div id="tr_retCheck"></div>';
   } else if(c && c.tipo === 'aberta'){
-    h += '<b>✔ Pense nisto</b><p>' + esc(c.pergunta) + '</p><details><summary class="link">ver o que uma boa resposta contém</summary><p>' + esc(c.esperado) + '</p></details>';
-  } else h += '<b>Fim do bloco.</b>';
-  if(b.pergunta_falada) h += '<p class="aviso" style="margin-bottom:0">Quer treinar explicando em voz alta? Aperte <b>✋ Tenho uma dúvida</b> e diga "quero responder a pergunta": a IA faz a pergunta e comenta a sua resposta.</p>';
+    h += '<p style="margin:4px 0"><b>✔ Pense nisto</b></p><p>' + esc(c.pergunta) + '</p><details><summary class="link">ver o que uma boa resposta contém</summary><p>' + esc(c.esperado) + '</p></details>';
+  }
+  if(tem && T.professorId && T.disciplina_id) h += '<div id="tr_questBox" class="convite" style="margin-top:12px"><b>📝 Questão aberta · ' + esc(tem.nome) + '</b><p class="aviso" style="margin:4px 0 0">Uma questão do estudo dirigido sobre o assunto do vídeo, com correção comentada. Não vale nota: é treino para a prova.</p><div class="botoes"><button class="mini" id="tr_btQuest">✍ Responder uma questão</button></div></div>';
+  if(ass) h += '<p style="margin:16px 0 6px"><b>3 · Estudar com IA</b></p><div class="convite" id="tr_avalBox"><b>🎤 Agora explique com as suas palavras</b><p class="aviso" style="margin:4px 0 0">É a avaliação de profundidade do <b>Estudar com IA</b> sobre "' + esc(ass.nome) + '": você fala, ela conversa com você e dá a nota e o parecer. Fica guardada no seu histórico do Estudar com IA.</p><div class="botoes"><button class="mini" id="tr_btAvaliar">🎤 Fazer a avaliação</button></div></div>';
   h += '<div class="botoes">' + (ultimo ? '<span class="ok" style="margin:0">🎉 Você chegou ao fim desta aula em trilha. Marque ✓ Já estudei aqui embaixo.</span>' : '<button id="tr_btProxBloco">Próximo bloco →</button>') + '</div></div>';
   $('checagem').innerHTML = h;
   document.querySelectorAll('[data-trop]').forEach(function(bt){ bt.addEventListener('click', function(){
@@ -445,7 +583,68 @@ function fimDoBloco(){
     U.checagem(b.id, certo);
   }); });
   if($('btProxBloco')) $('btProxBloco').addEventListener('click', function(){ irPara(P.bloco + 1, 0, false); tocar(); });
+  if($('btAvaliar')) $('btAvaliar').addEventListener('click', function(){ abrirAvaliacao(ass); });
+  if($('btQuest')) $('btQuest').addEventListener('click', function(){ pedirQuestaoTrilha(tem.id); });
   $('checagem').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+// questões do estudo dirigido dentro da trilha (mesmo banco, mesma correção e mesmo limite do dia)
+var QT = {q: null, r: null, tema: ''};
+function notaDez(n){ return typeof window.dezEst === 'function' ? window.dezEst(n) : (n === null || n === undefined ? '—' : (Math.round(n) / 10).toFixed(1).replace('.', ',')); }
+function pedirQuestaoTrilha(temaId){
+  var box = $('questBox'); if(!box) return;
+  pausar(); QT.tema = temaId;
+  box.innerHTML = '<p class="aviso">Preparando a questão… (a primeira do assunto pode levar uns 20 segundos)</p>';
+  api('estudoProxima', {professorId: T.professorId, disciplinaId: T.disciplina_id, temaId: temaId, daTrilha: !!temaId}).then(function(q){ QT.q = q; QT.r = null; desenharQuestaoTrilha(''); })
+    .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+}
+function desenharQuestaoTrilha(rascunho){
+  var box = $('questBox'), q = QT.q, u = QT.r;
+  box.innerHTML = '<p style="margin:0 0 6px"><span class="t-tag">' + esc(q.tema) + '</span>' + (q.naProva && q.prova ? ' <span class="aviso">· cai na ' + esc(q.prova) + '</span>' : '') + '</p>' +
+    '<p style="font-weight:bold;font-size:16px;margin:4px 0">' + esc(q.enunciado) + '</p>' +
+    (u ? '<p class="aviso" style="margin:0 0 6px">Tentativa ' + (u.tentativa + 1) + ' · sua melhor nota até agora: <b>' + notaDez(Math.max(u.nota, u.melhorAntes || 0)) + '</b>.</p>' : '') +
+    '<label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px;margin:6px 0"><input type="checkbox" id="tr_qtAjuda" style="width:18px;height:18px"> 💡 Quero ajuda para montar a resposta</label>' +
+    '<div class="oculto" id="tr_qtAjudaBox" style="background:#fff;border-left:4px solid #B8890A;padding:8px 10px;margin:6px 0;font-size:14px"><b>Sua resposta deve passar por:</b>' + (q.ajuda || []).map(function(t){ return '<br>• ' + esc(t); }).join('') + '</div>' +
+    '<textarea id="tr_qtResp" placeholder="Escreva sua resposta com suas palavras…" style="min-height:130px;font-family:inherit;font-size:15px">' + esc(rascunho || '') + '</textarea>' +
+    '<div class="botoes"><button class="mini" id="tr_qtEnviar">Enviar resposta</button><button class="mini secundario" id="tr_qtPular">Outra questão</button></div><div id="tr_qtMsg"></div>';
+  var ta = $('qtResp');
+  var barrar = function(e){ e.preventDefault(); $('qtMsg').innerHTML = '<div class="erro">Escreva a resposta com suas palavras.</div>'; };
+  ta.addEventListener('paste', barrar); ta.addEventListener('drop', barrar);
+  ta.addEventListener('beforeinput', function(e){ if(/^insertFrom(Paste|Drop)/.test(e.inputType || '')) barrar(e); });
+  $('qtAjuda').addEventListener('change', function(){ $('qtAjudaBox').classList.toggle('oculto', !this.checked); });
+  $('qtPular').addEventListener('click', function(){ pedirQuestaoTrilha(QT.tema); });
+  $('qtEnviar').addEventListener('click', function(){
+    var txt = ta.value.trim();
+    if(txt.length < 10){ $('qtMsg').innerHTML = '<div class="erro">Escreva sua resposta antes de enviar.</div>'; return; }
+    var bt = this; bt.disabled = true; $('qtMsg').innerHTML = '<p class="aviso">Corrigindo… (uns 10 a 20 segundos)</p>';
+    var tentar = function(n){
+      api('estudoResponder', {professorId: T.professorId, disciplinaId: T.disciplina_id, questaoId: q.id, resposta: txt, usouAjuda: $('qtAjuda').checked})
+        .then(function(r){ QT.r = r; desenharCorrecaoTrilha(txt); })
+        .catch(function(e){
+          if(/ocupada/i.test(e.message) && n < 2){ $('qtMsg').innerHTML = '<p class="aviso">A IA está ocupada agora. Tento de novo sozinho em 40 segundos; sua resposta está guardada aqui.</p>'; setTimeout(function(){ if($('qtMsg')) tentar(n + 1); }, 40000); return; }
+          bt.disabled = false; $('qtMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>';
+        });
+    };
+    tentar(0);
+  });
+}
+function desenharCorrecaoTrilha(txt){
+  var box = $('questBox'), q = QT.q, r = QT.r;
+  var cor = r.nota >= 70 ? '#1a7a3c' : r.nota >= 50 ? '#b07d00' : '#c62828', subiu = r.melhorAntes !== null && r.melhorAntes !== undefined && r.nota > r.melhorAntes;
+  var eixo = function(c, t, x){ return '<div style="background:#fff;border-left:4px solid ' + c + ';padding:7px 10px;margin:8px 0;font-size:14px"><b>' + t + '</b><br>' + esc(x || '') + '</div>'; };
+  var f = r.feedback || {};
+  box.innerHTML = '<p style="margin:0 0 6px"><span class="t-tag">' + esc(q.tema) + '</span></p><p style="font-weight:bold;margin:4px 0">' + esc(q.enunciado) + '</p>' +
+    '<details style="margin:0 0 8px"><summary class="link" style="font-size:13px">ver a sua resposta</summary><p class="aviso" style="white-space:pre-line;margin:6px 0 0">' + esc(txt) + '</p></details>' +
+    '<div style="display:flex;gap:16px;align-items:baseline;flex-wrap:wrap"><div><span class="aviso">sua nota</span><div style="font-size:26px;font-weight:bold;color:' + cor + '">' + notaDez(r.nota) + '</div></div>' +
+    '<span class="aviso">tentativa ' + r.tentativa + (subiu ? ' · <b style="color:#1a7a3c">subiu de ' + notaDez(r.melhorAntes) + ' para ' + notaDez(r.nota) + '! 🎉</b>' : '') + ' · não vale nota</span></div>' +
+    eixo('#1a7a3c', '✅ O que você acertou', f.acertos) + eixo('#c62828', '🔬 Conteúdo técnico', f.conteudo) + eixo('#2E62C6', '🧩 Estrutura da resposta', f.estrutura) + eixo('#8a6100', '🧠 Forma de pensar', f.pensamento) +
+    (typeof window.htmlModelo === 'function' ? window.htmlModelo(r.modelo) : '') +
+    '<div class="botoes"><button class="mini" id="tr_qtDeNovo">✍ Explicar de novo</button><button class="mini secundario" id="tr_qtProx"' + (r.restantesHoje ? '' : ' disabled') + '>Outra questão deste assunto</button>' +
+    (T.questoesProva ? '<button class="mini secundario" id="tr_qtProva"' + (r.restantesHoje ? '' : ' disabled') + '>🎯 Questão de um assunto da prova</button>' : '') + '</div>' +
+    '<p class="aviso">' + (r.restantesHoje ? 'Hoje você ainda pode fazer ' + r.restantesHoje + ' correção(ões).' : 'Você usou as correções de hoje. Volte amanhã!') + '</p>';
+  $('qtDeNovo').addEventListener('click', function(){ desenharQuestaoTrilha(''); });
+  $('qtProx').addEventListener('click', function(){ pedirQuestaoTrilha(QT.tema); });
+  if($('qtProva')) $('qtProva').addEventListener('click', function(){ pedirQuestaoTrilha(''); });
+  box.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
 
 /* ===================== GRÁFICO (desenhado a partir dos dados; nada de código vindo do arquivo) ===================== */
@@ -802,13 +1001,27 @@ function desenharNarracao(){
   var itens = [];
   T.trilha.blocos.forEach(function(b){ b.passos.forEach(function(p, i){ itens.push({k: b.id + ':' + i, b: b, i: i}); }); });
   var ok = itens.filter(function(x){ return T.narracao[x.k] === 'ok'; }).length, velhas = itens.filter(function(x){ return T.narracao[x.k] === 'velha'; }).length;
-  box.innerHTML = '<p class="aviso">A voz da IA ao vivo lê cada fala uma vez; o áudio fica guardado no seu Drive e toca para todos sem gastar cota. Usa a mesma voz natural da dúvida por voz.</p>' +
+  box.innerHTML = '<p class="aviso">A IA lê cada fala uma vez; o áudio fica guardado no seu Drive e depois toca para todos sem gastar cota.</p>' +
+    (T.fila ? '<div class="ok" style="margin:6px 0">⏳ Gravando em segundo plano: faltam ' + T.fila.faltam + ' fala(s)' + (T.fila.proxima ? ' · próxima rodada ' + esc(T.fila.proxima) : '') + '. Pode fechar o site. <button class="mini secundario" id="tr_btNarrParar">Parar</button></div>' : '') +
     '<div class="t-estNarr">' + itens.map(function(x){ var s = T.narracao[x.k]; return '<span title="' + esc(x.b.titulo + ' · passo ' + (x.i + 1)) + '" style="background:' + (s === 'ok' ? '#1E8A4C' : s === 'velha' ? '#B8890A' : '#b9c2d3') + '">' + (x.i + 1) + '</span>'; }).join('') + '</div>' +
     '<p class="aviso">' + ok + ' de ' + itens.length + ' falas gravadas' + (velhas ? ' · ' + velhas + ' com o texto mudado desde a gravação (amarelo)' : '') + '.</p>' +
     '<div class="botoes"><label>Voz: <select id="tr_narrVoz">' + L.vozes.map(function(v){ return '<option' + (v === T.voz ? ' selected' : '') + '>' + v + '</option>'; }).join('') + '</select></label>' +
-    '<button class="mini" id="tr_btNarrFaltam"' + (ok === itens.length ? ' disabled' : '') + '>🎙 Gravar as que faltam</button>' +
-    '<button class="mini secundario" id="tr_btNarrEste">Regravar o passo atual</button><button class="mini secundario" id="tr_btNarrTodas">Regravar todas (outra voz)</button></div>' +
+    '<button class="mini" id="tr_btNarrFundo"' + (ok === itens.length ? ' disabled' : '') + '>🌙 Gravar as que faltam em segundo plano (pode fechar o site)</button>' +
+    '<button class="mini secundario" id="tr_btNarrFundoTodas">🌙 Regravar todas em segundo plano</button></div>' +
+    '<details style="margin-top:8px"><summary class="link">Gravar agora, com o site aberto (mais rápido, sem limite de cota)</summary><div class="botoes">' +
+    '<button class="mini" id="tr_btNarrFaltam"' + (ok === itens.length ? ' disabled' : '') + '>⚡ Gravar agora as que faltam</button>' +
+    '<button class="mini secundario" id="tr_btNarrEste">Regravar o passo atual</button><button class="mini secundario" id="tr_btNarrTodas">Regravar todas agora</button></div></details>' +
     '<div id="tr_narrProg"></div><div id="tr_narrLog" style="font-size:13px"></div>';
+  var fundo = function(refazer){
+    $('narrProg').innerHTML = '<p class="aviso">Colocando na fila…</p>';
+    api('trilhaNarrarFundo', {ids: [T.id], voz: $('narrVoz').value, refazer: refazer}).then(function(r){
+      T.fila = r.falas ? {faltam: r.falas, proxima: ''} : null; desenharNarracao();
+      $('narrProg').innerHTML = r.falas ? '<div class="ok">✓ ' + r.falas + ' fala(s) na fila. Pode fechar o site: o servidor grava sozinho e te avisa quando terminar.</div>' : '<div class="ok">Já está tudo gravado.</div>';
+    }).catch(function(e){ $('narrProg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  };
+  $('btNarrFundo').addEventListener('click', function(){ fundo(false); });
+  $('btNarrFundoTodas').addEventListener('click', function(){ if(confirm('Regravar todas as ' + itens.length + ' falas com a voz ' + $('narrVoz').value + ', em segundo plano?')) fundo(true); });
+  if($('btNarrParar')) $('btNarrParar').addEventListener('click', function(){ api('trilhaNarrarParar', {id: T.id}).then(function(){ T.fila = null; desenharNarracao(); }); });
   $('btNarrFaltam').addEventListener('click', function(){ gravarNarracao(itens.filter(function(x){ return T.narracao[x.k] !== 'ok'; })); });
   $('btNarrEste').addEventListener('click', function(){ var b = blocoAtual(); gravarNarracao([{k: b.id + ':' + P.passo, b: b, i: P.passo}]); });
   $('btNarrTodas').addEventListener('click', function(){ if(confirm('Regravar todas as ' + itens.length + ' falas com a voz ' + $('narrVoz').value + '?')) gravarNarracao(itens); });
