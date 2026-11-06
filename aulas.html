@@ -1943,14 +1943,68 @@ function abrirEstudoProf(){
     .catch(function(e){ $('estTurma').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
   carregarBancoEstudo(disc);
 }
+// Painel único do estudo da turma: 📝 questões (estudo dirigido) + 📺 aulas em trilha + 🎤 Estudar com IA
+function corNivel(v){ return v === null || v === undefined ? ['#eef1f6', '#6b7a90'] : v >= 70 ? ['#dcf2e4', '#1a6b3a'] : v >= 50 ? ['#fff1c9', '#7a5800'] : ['#fde3e0', '#9a2318']; }
+function celNivel(v, txt, sub){ var c = corNivel(v); return '<td style="background:' + c[0] + ';color:' + c[1] + ';text-align:center;font-weight:bold;white-space:nowrap">' + (v === null || v === undefined ? '—' : txt) + (sub ? '<div style="font-weight:normal;font-size:11.5px;opacity:.85">' + sub + '</div>' : '') + '</td>'; }
+function tempoCurto(sg){ sg = Math.round(sg || 0); var h = Math.floor(sg / 3600), m = Math.round(sg % 3600 / 60); return h ? h + 'h' + (m ? ('0' + m).slice(-2) : '') : m + ' min'; }
 function desenharEstudoTurma(disc, r){
-  var t = r.turma;
-  var h = '<h2>Estudo dos alunos · ' + esc(disc.nome) + ' ' + ajuda('O <b>estudo dirigido</b> é o treino dos alunos para a prova (em "Minhas matérias" → 📚 Estudar). Não conta na nota. As questões são criadas pela IA a partir das aulas, da sua apostila e das suas regras, e ficam num banco reaproveitado por todos. Aqui você acompanha quem está estudando, os temas mais fracos da turma e o relatório de cada aluno.') + '</h2>' +
-    '<p class="aviso" style="margin-top:0">' + t.estudaramSemana + ' de ' + t.alunos + ' aluno(s) estudaram nos últimos 7 dias · ' + t.respostas + ' resposta(s)' + (t.media !== null ? ' · média ' + dez(t.media) : '') + '</p>' +
-    (t.temasFracos.length ? '<p style="margin:4px 0 10px"><b>Temas mais fracos da turma:</b> ' + t.temasFracos.map(function(x){ return esc(x.tema) + ' (' + dez(x.media) + ')'; }).join(' · ') + '</p>' : '');
-  h += r.alunos.length ? '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Questões</th><th>Média</th><th>Evolução</th><th>Tema mais fraco</th><th></th></tr></thead><tbody>' + r.alunos.map(function(a){
-    return '<tr><td>' + esc(a.nome) + '</td><td>' + a.questoes + '</td><td>' + (a.media === null ? '—' : dez(a.media)) + '</td><td>' + (a.inicio === null ? '—' : dez(a.inicio) + ' → ' + dez(a.fim) + (a.fim > a.inicio ? ' ▲' : '')) + '</td>' +
-      '<td>' + esc(a.temaFraco || '—') + '</td><td>' + (a.questoes ? '<button type="button" class="link" data-relaluno="' + esc(a.id) + '">relatório</button>' : '<span class="tag t-warn">não estudou</span>') + '</td></tr>';
+  var t = r.turma, c = r.compilado || {temTrilhas: false, temAvaliacoes: false, turma: {}, porAluno: {}, temas: []};
+  var pa = c.porAluno || {}, temV = c.temTrilhas, temA = c.temAvaliacoes;
+  var h = '<h2>Estudo dos alunos · ' + esc(disc.nome) + ' ' + ajuda('O <b>estudo dirigido</b> é o treino dos alunos para a prova (em "Minhas matérias" → 📚 Estudar). Não conta na nota. As questões são criadas pela IA a partir das aulas, da sua apostila e das suas regras, e ficam num banco reaproveitado por todos. Aqui você acompanha quem está estudando, os temas mais fracos da turma e o relatório de cada aluno.') + '</h2>';
+  // 1) a semana em números
+  var card = function(ic, tit, val, sub){ return '<div style="background:#f5f8fe;border:1px solid var(--linha);border-radius:10px;padding:10px 12px;flex:1 1 150px;min-width:140px"><div class="aviso">' + ic + ' ' + tit + '</div><div style="font-size:22px;font-weight:bold;color:var(--navy);line-height:1.2">' + val + '</div><div class="aviso">' + (sub || '') + '</div></div>'; };
+  var ativos = c.turma && c.turma.ativos7 !== undefined ? c.turma.ativos7 : t.estudaramSemana;
+  h += '<div style="display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 14px">' +
+    card('👥', 'Estudaram na semana', ativos + ' de ' + t.alunos, temV || temA ? 'em qualquer frente' : 'no estudo dirigido') +
+    card('📝', 'Questões do estudo', t.respostas, t.media !== null ? 'média ' + dez(t.media) : 'nenhuma ainda') +
+    (temV ? card('📺', 'Aulas em trilha', (c.turma.horasTrilha || 0).toString().replace('.', ',') + ' h', 'vídeo assistido: ' + (c.turma.videoMedio === null ? '—' : c.turma.videoMedio + '%') + ' em média') : '') +
+    (temA ? card('🎤', 'Estudar com IA', c.turma.avaliacoes, c.turma.mediaAv !== null ? 'índice médio ' + c.turma.mediaAv : 'nenhuma avaliação ainda') : '') + '</div>';
+  // 2) alertas: quem parou e onde a turma está fraca
+  var parados = r.alunos.filter(function(a){ var x = pa[a.id]; return !x || x.diasSem === null || x.diasSem >= 7; });
+  var fracos = (c.temas || []).filter(function(tm){ var v = [tm.questoes, tm.video, tm.aval].filter(function(x){ return x !== null && x !== undefined; }); return v.length && v.filter(function(x){ return x < 50; }).length >= Math.min(2, v.length); });
+  if(parados.length || fracos.length || t.temasFracos.length){
+    h += '<div class="convite" style="margin-bottom:14px">' +
+      (parados.length ? '<div>😴 <b>Sem estudar há 7 dias ou mais:</b> ' + parados.map(function(a){ return esc(a.nome); }).join(', ') + '</div>' : '') +
+      (fracos.length ? '<div style="margin-top:4px">⚠ <b>Temas fracos em mais de uma frente:</b> ' + fracos.map(function(x){ return esc(x.nome); }).join(', ') + ' <span class="aviso">(vale retomar em sala)</span></div>' : '') +
+      (!fracos.length && t.temasFracos.length ? '<div style="margin-top:4px"><b>Temas mais fracos nas questões:</b> ' + t.temasFracos.map(function(x){ return esc(x.tema) + ' (' + dez(x.media) + ')'; }).join(' · ') + '</div>' : '') + '</div>';
+  }
+  // 3) mapa da turma por tema, na ordem do curso
+  var comDado = (c.temas || []).filter(function(tm){ return tm.respostas || tm.temTrilha || tm.avaliacoes; });
+  if(comDado.length){
+    var grupos = [], porG = {};
+    comDado.forEach(function(tm){ if(!porG[tm.grupo]){ porG[tm.grupo] = []; grupos.push(tm.grupo); } porG[tm.grupo].push(tm); });
+    var med = function(l){ l = l.filter(function(x){ return x !== null && x !== undefined; }); return l.length ? Math.round(l.reduce(function(a, b){ return a + b; }, 0) / l.length) : null; };
+    h += '<p style="margin:4px 0 6px"><b>🗺 Mapa da turma por tema</b> <span class="aviso">na ordem do curso · verde 70+ · amarelo 50–69 · vermelho abaixo de 50</span></p>' +
+      '<div class="tabelaBox" style="margin-bottom:16px"><table><thead><tr><th>Tema</th>' + (temV ? '<th style="text-align:center">📺 vídeo</th>' : '') + '<th style="text-align:center">📝 questões</th>' + (temA ? '<th style="text-align:center">🎤 Estudar com IA</th>' : '') + '</tr></thead><tbody>' +
+      grupos.map(function(g){
+        var l = porG[g];
+        return '<tr style="background:#f5f8fe"><td><b>' + esc(g) + '</b></td>' + (temV ? celNivel(med(l.map(function(x){ return x.video; })), med(l.map(function(x){ return x.video; })) + '%') : '') +
+          celNivel(med(l.map(function(x){ return x.questoes; })), dez(med(l.map(function(x){ return x.questoes; })))) + (temA ? celNivel(med(l.map(function(x){ return x.aval; })), med(l.map(function(x){ return x.aval; }))) : '') + '</tr>' +
+          l.map(function(tm){
+            return '<tr><td style="padding-left:20px">' + (fracos.indexOf(tm) !== -1 ? '⚠ ' : '') + esc(tm.nome) + '</td>' + (temV ? (tm.temTrilha ? celNivel(tm.video, tm.video + '%') : '<td style="text-align:center" class="aviso">sem aula em trilha</td>') : '') +
+              celNivel(tm.questoes, dez(tm.questoes), tm.respostas ? tm.alunosQ + ' aluno(s) · ' + tm.respostas + ' resp.' : '') + (temA ? celNivel(tm.aval, tm.aval, tm.avaliacoes ? tm.avaliacoes + ' aval.' : '') : '') + '</tr>';
+          }).join('');
+      }).join('') + '</tbody></table></div>';
+  }
+  // 4) cada aluno: a semana dia a dia + as três frentes
+  var semana = function(d){
+    var nomes = ['hoje', 'ontem', 'há 2 dias', 'há 3 dias', 'há 4 dias', 'há 5 dias', 'há 6 dias'];
+    return '<span style="display:inline-flex;gap:2px">' + [6, 5, 4, 3, 2, 1, 0].map(function(i){
+      var b = d ? d[i] : 0, n = (b & 1 ? 1 : 0) + (b & 2 ? 1 : 0) + (b & 4 ? 1 : 0);
+      var o = []; if(b & 1) o.push('vídeo'); if(b & 2) o.push('questões'); if(b & 4) o.push('Estudar com IA');
+      return '<span title="' + nomes[i] + (o.length ? ': ' + o.join(', ') : ': nada') + '" style="width:11px;height:14px;border-radius:3px;background:' + ['#e3e8f2', '#9fc0ef', '#4f86d9', '#17389C'][n] + '"></span>';
+    }).join('') + '</span>';
+  };
+  h += '<p style="margin:4px 0 6px"><b>👩‍🎓 Cada aluno</b> <span class="aviso">a barrinha é a última semana, dia a dia (quanto mais escuro, mais frentes estudadas no dia)</span></p>';
+  h += r.alunos.length ? '<div class="tabelaBox"><table><thead><tr><th>Aluno</th><th>Semana</th>' + (temV ? '<th>📺 Aulas em trilha</th>' : '') + '<th>📝 Questões</th><th>Evolução</th>' + (temA ? '<th>🎤 Estudar com IA</th>' : '') + '<th>Ponto fraco</th><th>Última atividade</th><th></th></tr></thead><tbody>' + r.alunos.map(function(a){
+    var x = pa[a.id] || {};
+    return '<tr><td><b>' + esc(a.nome) + '</b></td><td>' + semana(x.dias) + '</td>' +
+      (temV ? '<td>' + (x.video ? x.video + '% <span class="aviso">· ' + tempoCurto(x.tempo) + '</span>' : '<span class="aviso">não assistiu</span>') + '</td>' : '') +
+      '<td>' + (a.questoes ? a.questoes + ' <span class="aviso">· média ' + dez(a.media) + '</span>' : '<span class="aviso">nenhuma</span>') + '</td>' +
+      '<td>' + (a.inicio === null ? '—' : dez(a.inicio) + ' → ' + dez(a.fim) + (a.fim > a.inicio ? ' ▲' : a.fim < a.inicio ? ' ▼' : '')) + '</td>' +
+      (temA ? '<td>' + (x.avaliacoes ? 'melhor ' + x.melhorAv + ' <span class="aviso">· ' + x.avaliacoes + ' aval.</span>' : '<span class="aviso">nenhuma</span>') + '</td>' : '') +
+      '<td>' + esc(a.temaFraco || '—') + '</td><td>' + (x.ultima ? esc(x.ultima) + (x.diasSem >= 7 ? ' <span class="tag t-warn">parado</span>' : '') : '<span class="tag t-warn">não estudou</span>') + '</td>' +
+      '<td>' + (a.questoes ? '<button type="button" class="link" data-relaluno="' + esc(a.id) + '">relatório</button>' : '') + '</td></tr>';
   }).join('') + '</tbody></table></div>' : '<p class="aviso">Nenhum aluno inscrito.</p>';
   $('estTurma').innerHTML = h;
   $('estTurma').querySelectorAll('[data-relaluno]').forEach(function(b){ b.addEventListener('click', function(){
