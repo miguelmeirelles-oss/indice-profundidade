@@ -659,7 +659,7 @@ function iniciar(){
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + (r.admin ? '<a href="trilha.html">🎓 Aula em trilha (beta)</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
@@ -2273,15 +2273,34 @@ function desenharInicioAula(pend){
   $('btTeste').addEventListener('click', testarGravacao);
   $('btNG').addEventListener('click', function(){
     if(!G.disc){ $('msgIni').innerHTML = '<div class="erro">Selecione a disciplina antes de marcar a aula como não gravada.</div>'; return; }
-    $('caixaNG').innerHTML = '<div class="convite" style="margin-top:14px"><label class="rot" for="temaNG">Tema da aula não gravada</label><input type="text" id="temaNG" placeholder="ex.: Branqueamento">' +
-      '<p class="aviso" style="margin:8px 0 0">A apostila vai usar as gravações de semestres anteriores com esse tema. Esta aula não tem questões e não conta para a presença.</p>' +
-      '<div class="botoes"><button type="button" class="mini" id="btSalvarNG">Salvar</button></div><div id="msgNG"></div></div>';
-    $('temaNG').focus();
-    $('btSalvarNG').addEventListener('click', function(){
-      var b = this; b.disabled = true;
-      api('marcarNaoGravada', {disciplinaId: G.disc, tema: $('temaNG').value}).then(function(){ $('caixaNG').innerHTML = '<div class="ok">Aula registrada como não gravada.</div>'; listarAulas(); })
-        .catch(function(e){ b.disabled = false; $('msgNG').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
-    });
+    var hoje = new Date(), hojeTxt = hoje.getFullYear() + '-' + ('0' + (hoje.getMonth() + 1)).slice(-2) + '-' + ('0' + hoje.getDate()).slice(-2);
+    $('caixaNG').innerHTML = '<div class="convite" style="margin-top:14px"><p class="carregando" style="margin:0">Carregando a turma…</p></div>';
+    api('turmaParaChamada', {disciplinaId: G.disc}).then(function(t){
+      $('caixaNG').innerHTML = '<div class="convite" style="margin-top:14px"><b>Aula não gravada</b> <span class="aviso">(vai para o Diário do portal e a extensão preenche o portal com ela)</span>' +
+        '<div class="campos" style="margin-top:8px"><div><label class="rot" for="dataNG">Data da aula</label><input type="date" id="dataNG" value="' + hojeTxt + '" max="' + hojeTxt + '"></div>' +
+        '<div><label class="rot" for="temposNG">Períodos</label><select id="temposNG">' + [1, 2, 3, 4].map(function(n){ return '<option value="' + n + '"' + (n === t.tempos ? ' selected' : '') + '>' + n + ' (P1' + (n > 1 ? '–P' + n : '') + ')</option>'; }).join('') + '</select></div></div>' +
+        '<label class="rot" for="temaNG" style="margin-top:8px">Assunto da aula (conteúdo ministrado)</label><input type="text" id="temaNG" placeholder="ex.: Branqueamento: objetivos, tempo e temperatura">' +
+        '<label class="rot" style="margin-top:10px">Chamada <span class="aviso" style="font-weight:normal">(desmarque quem faltou)</span></label>' +
+        (t.alunos.length ? '<div style="columns:2 220px;margin:4px 0">' + t.alunos.map(function(a){ return '<label style="display:flex;gap:6px;align-items:center;font-size:14px;cursor:pointer;margin:2px 0;break-inside:avoid"><input type="checkbox" data-presNG="' + esc(a.id) + '" checked style="width:16px;height:16px"> ' + esc(a.nome) + '</label>'; }).join('') + '</div>' +
+          '<label style="display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer"><input type="checkbox" id="semChamadaNG" style="width:15px;height:15px"> Não fiz chamada nesta aula (fica sem frequência)</label>' : '<p class="aviso">Nenhum aluno inscrito ainda.</p>') +
+        '<p class="aviso" style="margin:8px 0 0">Sem questões nesta aula. A apostila usa as gravações de semestres anteriores com esse assunto. A chamada vale para a frequência, como numa aula gravada.</p>' +
+        '<div class="botoes"><button type="button" class="mini" id="btSalvarNG">Salvar</button><button type="button" class="secundario mini" id="btCancNG">Cancelar</button></div><div id="msgNG"></div></div>';
+      $('temaNG').focus();
+      $('btCancNG').addEventListener('click', function(){ $('caixaNG').innerHTML = ''; });
+      var sc = $('semChamadaNG');
+      if(sc) sc.addEventListener('change', function(){ document.querySelectorAll('[data-presNG]').forEach(function(c){ c.disabled = sc.checked; }); });
+      $('btSalvarNG').addEventListener('click', function(){
+        var b = this, dt = $('dataNG').value;
+        if(!dt){ $('msgNG').innerHTML = '<div class="erro">Escolha a data da aula.</div>'; return; }
+        var pres = {};
+        if(!(sc && sc.checked)) document.querySelectorAll('[data-presNG]').forEach(function(c){ pres[c.getAttribute('data-presNG')] = c.checked; });
+        b.disabled = true;
+        api('marcarNaoGravada', {disciplinaId: G.disc, tema: $('temaNG').value, data: new Date(dt + 'T00:00:00').getTime(), tempos: Number($('temposNG').value), presencas: pres}).then(function(){
+          var f = Object.keys(pres).filter(function(k){ return !pres[k]; }).length;
+          $('caixaNG').innerHTML = '<div class="ok">Aula não gravada registrada em ' + dt.split('-').reverse().join('/') + (Object.keys(pres).length ? ' com chamada (' + f + ' falta' + (f === 1 ? '' : 's') + ')' : ' sem chamada') + '. Ela já aparece no Diário do portal.</div>'; listarAulas();
+        }).catch(function(e){ b.disabled = false; $('msgNG').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+      });
+    }).catch(function(e){ $('caixaNG').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
   listarAulas();
 }
