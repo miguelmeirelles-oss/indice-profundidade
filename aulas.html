@@ -403,6 +403,7 @@
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
       </div>
+      <div class="caixa oculto" id="caixaTrilhaAluno"></div>
       <div class="caixa" id="caixaProvas">
         <h2>📝 Minhas provas</h2>
         <div id="listaProvasAluno"><p class="carregando">Carregando…</p></div>
@@ -428,6 +429,7 @@
       <button type="button" class="aba" data-aba="disc" aria-pressed="false">Disciplinas</button>
       <button type="button" class="aba" data-aba="insc" aria-pressed="false">Inscrições<span class="badge oculto" id="badgeInsc"></span></button>
       <button type="button" class="aba" data-aba="cfg" aria-pressed="false">Configurações</button>
+      <button type="button" class="aba oculto" data-aba="trilha" id="abaTrilha" aria-pressed="false">🎓 Aula em trilha</button>
       <button type="button" class="aba abaChat" data-aba="chat" aria-pressed="false">🤖 Chat com IA</button>
     </div>
     <div id="discBarra" class="caixa oculto"></div>
@@ -471,6 +473,7 @@
     </div>
 
     <div id="pChat" class="oculto"></div>
+    <div id="pTrilha" class="oculto"></div>
     <div id="pMsgs" class="oculto"><div id="painelMsgsDentro"></div></div>
 
     <div id="pCfg" class="oculto">
@@ -658,8 +661,9 @@ function iniciar(){
     $('tCarregando').classList.add('oculto');
     if(!r.logado){ mostrarLogin(); return; }
     sessao = r;
+    if(r.admin){ $('abaTrilha').classList.remove('oculto'); if(/[?&]aba=trilha/.test(location.search)) abaAtual = 'trilha'; }
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + (r.admin ? '<a href="trilha.html">🎓 Aula em trilha (beta)</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
@@ -678,6 +682,7 @@ function iniciar(){
 function lerPref(){ try{ return localStorage.getItem('aulas_visao'); }catch(e){ return null; } }
 function trocarVisao(v){
   if(v === 'aluno' && G.aula && G.fase === 'gravando'){ erroGeral('Há uma aula sendo gravada. Encerre antes de trocar para a visão de aluno.'); return; }
+  if(window.Trilha) Trilha.parar();   // trocou de visão: para a narração e a conversa da aula em trilha
   document.querySelectorAll('[data-visao]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.visao === v)); });
   $('tAluno').classList.toggle('oculto', v !== 'aluno');
   $('tProf').classList.toggle('oculto', v !== 'prof');
@@ -730,6 +735,7 @@ window.addEventListener('focus', voltouATela);
 function abrirAluno(){
   voltarListaAluno();
   carregarMinhas(); carregarAbertas(); desenharCartaoAvisos(); carregarProvasAluno();
+  if(sessao && sessao.admin) abrirTrilhaAluno();   // prévia: por enquanto só o administrador vê
   try{
     var qp = new URLSearchParams(location.search);
     if(qp.get('recado') && qp.get('p')){
@@ -1809,9 +1815,10 @@ function textoCapitulo(t){
 var abaAtual = 'aula';
 document.querySelectorAll('[data-aba]').forEach(function(b){ b.addEventListener('click', function(){ abrirAba(b.dataset.aba); }); });
 function abrirAba(a){
+  if(a !== 'trilha' && window.Trilha) Trilha.parar();   // saiu da aula em trilha: para a narração e a conversa
   abaAtual = a;
   document.querySelectorAll('[data-aba]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.aba === a)); });
-  ['aula', 'quest', 'notas', 'hist', 'estudo', 'disc', 'insc', 'cfg', 'chat', 'msgs'].forEach(function(x){
+  ['aula', 'quest', 'notas', 'hist', 'estudo', 'disc', 'insc', 'cfg', 'chat', 'msgs', 'trilha'].forEach(function(x){
     $('p' + x.charAt(0).toUpperCase() + x.slice(1)).classList.toggle('oculto', x !== a);
   });
   if(!resumo) return;
@@ -1824,9 +1831,23 @@ function abrirAba(a){
   if(a === 'insc') carregarInscricoes();
   if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); carregarAvisosAdmin(); }
   if(a === 'chat') abrirChat($('pChat'));
+  if(a === 'trilha') abrirTrilhaAba();
   if(a === 'msgs') carregarMsgsProf();
 }
 
+// Aula em trilha (beta, só o administrador): o código só é carregado quando a aba abre
+// professor: monta as trilhas (aba); aluno: só assiste e interage (caixa na visão de aluno)
+function abrirTrilhaAba(){ carregarTrilha($('pTrilha'), 'prof'); }
+function abrirTrilhaAluno(){ var el = $('caixaTrilhaAluno'); el.classList.remove('oculto'); carregarTrilha(el, 'aluno'); }
+function carregarTrilha(el, modo){
+  var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); };
+  if(window.Trilha){ abrir(); return; }
+  el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=1';
+  sc.onload = abrir;
+  sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
+  document.head.appendChild(sc);
+}
 function abrirProf(){ carregarResumo().then(function(){ abrirAba(abaAtual); }); }
 
 function carregarResumo(){
