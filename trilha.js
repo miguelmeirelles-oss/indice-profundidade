@@ -12,7 +12,7 @@ function erroGeral(m){ var e = $('erroGeral'); if(!e) return; e.textContent = m 
 var PROMPT_TRILHA = [
 'Você vai montar uma AULA EM TRILHA para a plataforma "Aula por IA". É uma aula interativa que o estudante assiste sozinho: a plataforma desenha slides com gráficos que se animam, uma voz de IA lê a sua "fala" de cada passo, e o estudante pode pausar e tirar dúvidas por voz com outra IA (que usa o seu "contexto_ia" como base).',
 '',
-'MATERIAL: logo abaixo vem o material das aulas do professor (atas e transcrições da fala dele). Se o professor anexar também os slides ou a apostila, use-os junto.',
+'MATERIAL: logo abaixo vem primeiro um resumo da disciplina (orientações e regras do professor, próxima prova, onde a turma está indo mal, glossário e a apostila de referência dele) e depois, aula por aula, a ata, a apostila gerada, as questões que ele fez em sala e a transcrição da fala dele. No fim, a PASTA DO GOOGLE DRIVE da disciplina com a lista dos arquivos (slides, apostilas). Se você tiver acesso ao Google Drive do professor, abra os arquivos que correspondem às aulas marcadas e use-os (os slides são a melhor base para os gráficos e os números). Se não tiver acesso, diga ao professor quais arquivos da lista ele deve anexar na conversa antes de você continuar.',
 '',
 'REGRAS DE CONTEÚDO (as mais importantes):',
 '1. FIDELIDADE: siga a aula do professor: a mesma sequência, os mesmos conceitos, exemplos e números que ele usou. Você pode explicar de outro jeito, mais claro, mas NÃO acrescente conteúdo que a aula não deu e NÃO mude conceitos.',
@@ -157,7 +157,7 @@ function desenharLista(){
     '<select id="tr_selDisc"><option value="">— disciplina —</option>' + L.disciplinas.map(function(d){ return '<option value="' + esc(d.id) + '">' + esc(d.nome) + ' (' + esc(d.semestre) + ')</option>'; }).join('') + '</select>' +
     '<div id="tr_boxAulas"></div>' +
     '<p style="margin-top:16px"><span class="t-passoNum">2</span><b>Copie o prompt e cole na sua IA</b></p>' +
-    '<p class="aviso" style="margin-top:0">O prompt já leva as atas e transcrições das aulas marcadas. Se quiser, anexe também os slides (PDF) ou a apostila na conversa da IA.</p>' +
+    '<p class="aviso" style="margin-top:0">O prompt já leva as atas e transcrições das aulas marcadas e o link da <b>pasta de material da disciplina no Drive</b> com a lista dos arquivos (o campo "material no Drive" da disciplina). Se a sua IA não tiver acesso ao seu Drive, ela vai pedir os arquivos: aí é só anexar os slides (PDF) na conversa.</p>' +
     '<div class="botoes" style="margin-top:4px"><button id="tr_btCopiar" disabled>📋 Copiar o prompt com o material</button><button class="secundario" id="tr_btBaixarPrompt" disabled>⬇ Baixar como arquivo .txt</button><span id="tr_msgPrompt" class="aviso"></span></div>' +
     '<p style="margin-top:16px"><span class="t-passoNum">3</span><b>Traga de volta o que a IA devolveu</b></p>' +
     '<textarea id="tr_txtJson" placeholder="Cole aqui o JSON que a IA devolveu (ou escolha o arquivo .json abaixo)"></textarea>' +
@@ -247,7 +247,7 @@ function montarPrompt(feito){
   var ids = Array.prototype.map.call(document.querySelectorAll('[data-traulamat]:checked'), function(c){ return c.getAttribute('data-traulamat'); });
   $('msgPrompt').textContent = 'Juntando o material…';
   api('trilhaMaterial', {disciplinaId: $('selDisc').value, aulaIds: ids}).then(function(r){
-    feito(PROMPT_TRILHA.replace('para a plataforma "Aula por IA".', 'para a plataforma "Aula por IA", disciplina "' + r.disciplina + '" (graduação em Engenharia de Alimentos).') + '\n\n' + r.texto + (r.cortado ? '\n\n(Aviso: o material foi cortado por tamanho.)' : '') + (r.temas ? '\n\n============================== SUBTEMAS DA DISCIPLINA (id — tema › subtema) ==============================\n' + r.temas : '') + (r.catalogo ? '\n\n============================== CATÁLOGO DO ESTUDAR COM IA (id — área › assunto) ==============================\n' + r.catalogo : ''));
+    feito(PROMPT_TRILHA.replace('para a plataforma "Aula por IA".', 'para a plataforma "Aula por IA", disciplina "' + r.disciplina + '" (graduação em Engenharia de Alimentos).') + '\n\n' + r.texto + (r.cortado ? '\n\n(Aviso: o material foi cortado por tamanho.)' : '') + (r.drive ? '\n\n============================== MATERIAL NO GOOGLE DRIVE ==============================\nPasta da disciplina: ' + r.drive.url + (r.drive.arquivos && r.drive.arquivos.length ? '\n' + r.drive.arquivos.map(function(f){ return '- ' + f.nome + ' — ' + f.url; }).join('\n') : (r.drive.erro ? '\n(' + r.drive.erro + ')' : '')) : '') + (r.temas ? '\n\n============================== SUBTEMAS DA DISCIPLINA (id — tema › subtema) ==============================\n' + r.temas : '') + (r.catalogo ? '\n\n============================== CATÁLOGO DO ESTUDAR COM IA (id — área › assunto) ==============================\n' + r.catalogo : ''));
   }).catch(function(e){ $('msgPrompt').textContent = ''; erroGeral(e.message); });
 }
 function conferir(){
