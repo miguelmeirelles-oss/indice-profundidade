@@ -106,7 +106,7 @@ function desenharLista(){
   h += mostradas.length ? '<div class="tabelaBox"><table><tr><th>Aula</th><th>Disciplina</th><th>Versão</th><th>Narração</th><th>Uso</th><th></th></tr>' +
     mostradas.map(function(t){
       return '<tr><td><b>' + esc(t.titulo) + '</b><div class="aviso">' + esc(t.tema || '') + '</div></td><td>' + esc(nomeDisc(t.disciplina_id)) + '</td><td>v' + t.versao + '<div class="aviso">' + esc(t.atualizado) + '</div></td>' +
-        '<td>' + (t.audios ? t.audios + ' fala(s) gravada(s)' : '<span class="aviso">voz do navegador</span>') + '</td>' +
+        '<td>' + (t.audios ? '🔊 ' + t.audios + ' fala(s) com a voz da IA' : '<span class="aviso">voz do navegador (robótica)</span><br><button class="mini" data-trgravar="' + esc(t.id) + '" style="margin-top:4px">🎙 Gravar com a voz da IA</button>') + '</td>' +
         '<td>' + (t.sessoes ? t.alunos + ' pessoa(s) · ' + t.sessoes + ' sessão(ões)' : '<span class="aviso">—</span>') + '</td>' +
         '<td style="white-space:nowrap"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button> <button class="mini secundario" data-trapagar="' + esc(t.id) + '">Apagar</button></td></tr>';
     }).join('') + '</table></div>' : '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
@@ -130,6 +130,7 @@ function desenharLista(){
 
   document.querySelectorAll('[data-trfiltro]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_filtro_prof', b.getAttribute('data-trfiltro')); }catch(e){} desenharLista(); }); });
   document.querySelectorAll('[data-trabrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trabrir')); }); });
+  document.querySelectorAll('[data-trgravar]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trgravar'), true); }); });
   document.querySelectorAll('[data-trapagar]').forEach(function(b){ b.addEventListener('click', function(){
     var t = L.trilhas.filter(function(x){ return x.id === b.getAttribute('data-trapagar'); })[0];
     if(!confirm('Apagar "' + t.titulo + '"? A pasta dela vai para a lixeira do seu Drive (dá para recuperar por 30 dias).')) return;
@@ -234,9 +235,13 @@ function carregarUso(){
 
 /* ===================== PLAYER ===================== */
 var P = {bloco: 0, passo: 0, tocando: false, modoVoz: 'auto', vel: 1, timers: [], raf: null, fimAcoes: 0, aud: null, cacheAud: {}, fimDoBloco: false};
-function abrirTrilha(id){
+function abrirTrilha(id, gravar){
   $('corpo').innerHTML = '<p class="aviso">Abrindo a aula…</p>';
-  api('trilhaVer', {id: id}).then(abrirPlayer).catch(function(e){ $('corpo').innerHTML = '<div class="erro">' + esc(e.message) + '</div><a class="link" onclick="Trilha.voltar()">voltar</a>'; });
+  api('trilhaVer', {id: id}).then(function(t){
+    abrirPlayer(t);
+    // veio do botão "Gravar com a voz da IA": já abre o painel da narração
+    if(gravar && $('admNarr')){ var d = $('admNarr'); d.open = true; desenharNarracao(); setTimeout(function(){ d.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); }
+  }).catch(function(e){ $('corpo').innerHTML = '<div class="erro">' + esc(e.message) + '</div><a class="link" onclick="Trilha.voltar()">voltar</a>'; });
 }
 function abrirPlayer(t){
   pararTudo();
@@ -288,7 +293,7 @@ function desenharMarca(){
   box.innerHTML = '<label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:bold"><input type="checkbox" id="tr_chkEstudei" style="width:18px;height:18px"' + (m.estudei ? ' checked' : '') + '> ✓ Já estudei esta aula</label>' +
     '<details style="margin-top:6px"' + (m.comentario ? ' open' : '') + '><summary class="link">' + (m.comentario ? 'Seu comentário' : 'Deixar um comentário (opcional)') + '</summary>' +
     '<textarea id="tr_txtComent" maxlength="2000" style="min-height:70px;font-family:inherit;font-size:14px" placeholder="O que ficou claro, o que ainda ficou confuso, uma sugestão…">' + esc(m.comentario) + '</textarea>' +
-    '<div class="botoes" style="margin-top:6px"><button class="mini" id="tr_btComent">Salvar comentário</button><span class="aviso">o professor vê o seu comentário</span></div></details><div id="tr_msgMarca"></div>';
+    '<div class="botoes" style="margin-top:6px"><button class="mini" id="tr_btComent">Salvar comentário</button></div></details><div id="tr_msgMarca"></div>';
   var salvar = function(msg){
     var est = $('chkEstudei').checked, com = $('txtComent').value;
     $('msgMarca').innerHTML = '<p class="aviso">Salvando…</p>';
