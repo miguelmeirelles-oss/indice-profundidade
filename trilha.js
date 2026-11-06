@@ -71,12 +71,13 @@ var PROMPT_TRILHA = [
 "",
 "REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre a LISTA de trilhas na ordem do curso (ordem dos PDFs das aulas e da apostila no Google Drive, não a ordem das gravações), com o assunto de cada uma e de quais aulas gravadas vem. Depois de aprovada, mostre o ROTEIRO de cada trilha (tabela com nº do passo, título, o que a voz diz, o que aparece no gráfico e o que acontece na cena) e, se a sua interface permitir conteúdo visual, uma PRÉVIA animada no formato vertical. Liste as correções feitas (REGRA PRINCIPAL). Ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).",
 "",
-"LOTE: se o material tiver vários assuntos, faça várias trilhas curtas (uma por assunto, um bloco cada), na ordem do curso, e devolva um arquivo .json por trilha. Se a resposta for ficar longa demais, entregue algumas trilhas por vez e diga quais ainda faltam; o professor pede \"continue\".",
+"LOTE: se o material tiver vários assuntos, faça várias trilhas curtas (uma por assunto, um bloco cada), na ordem do curso, e devolva um arquivo .json por trilha, com o número da aula no nome do arquivo e no campo \"ordem\" (01a, 01b, 02a…: o número é o da aula do curso, a letra é a sequência dentro dela); a plataforma usa esse número para pôr as aulas em ordem. Se a resposta for ficar longa demais, entregue algumas trilhas por vez e diga quais ainda faltam; o professor pede \"continue\".",
 "",
 "FORMATO DE CADA ARQUIVO (devolva SÓ o JSON, sem comentários):",
 "{",
 "  \"formato\": \"aula-trilha/1\",",
 "  \"titulo\": \"título curto da aula em trilha\",",
+"  \"ordem\": \"número da aula na sequência do curso, o mesmo do nome do arquivo (ex.: 03b)\",",
 "  \"tema\": \"assuntos cobertos\",",
 "  \"visual\": {\"fundo\": \"branco\"},",
 "  \"fonte\": \"de quais aulas/slides veio. AJUSTES FEITOS EM RELAÇÃO À FALA: … As cenas de moléculas são esquemáticas (fora de escala).\",",
@@ -165,7 +166,7 @@ function desenharLista(){
   var h = '<div class="caixa"><h2>Suas aulas em trilha</h2>';
   if(L.trilhas.length){
     h += (discsOrd.length > 1 ? '<div class="t-blocos">' + discsOrd.map(function(d){ return '<button class="t-chip' + (d === filtro ? ' t-atual' : '') + '" data-trfiltro="' + esc(d) + '">' + esc(nomeDisc(d)) + ' (' + discsCom[d] + ')</button>'; }).join('') + '</div>' : '') +
-      '<div class="botoes" style="margin:4px 0 10px"><input type="text" id="tr_buscaTrilha" placeholder="🔎 buscar aula…" style="flex:1 1 200px;max-width:340px"><button class="mini secundario" id="tr_btAbrirTodos">abrir todos</button><button class="mini secundario" id="tr_btFecharTodos">fechar todos</button></div>' +
+      '<div class="botoes" style="margin:4px 0 10px"><input type="text" id="tr_buscaTrilha" placeholder="🔎 buscar aula…" style="flex:1 1 200px;max-width:340px"><button class="mini secundario" id="tr_btAbrirTodos">abrir todos</button><button class="mini secundario" id="tr_btFecharTodos">fechar todos</button><button class="mini" id="tr_btOrganizar">✏️ Organizar</button></div>' +
       '<div id="tr_listaTrilhasProf"></div>' +
       '<details class="convite" style="margin-top:12px"><summary class="link"><b>🌙 Voz de leitura em segundo plano</b> (todas as aulas de uma vez; a voz é mais neutra que a da conversa)</summary><div class="aviso">Para a voz natural, abra a aula e use <b>🎙 Gravar com a voz da conversa</b>. Aqui o servidor grava sozinho (pode fechar o site), com a cota pequena de voz (umas 10 falas por modelo por dia); se acabar, continua no dia seguinte e te avisa no celular.</div>' +
       '<div class="botoes" style="margin-top:8px"><label>Voz: <select id="tr_vozLote">' + L.vozes.map(function(v){ return '<option>' + v + '</option>'; }).join('') + '</select></label><button class="mini secundario" id="tr_btGravarTodas">Gravar a voz de todas as aulas que faltam</button><span id="tr_msgLote" class="aviso"></span></div></details>';
@@ -181,7 +182,7 @@ function desenharLista(){
     '<div class="botoes" style="margin-top:4px"><button id="tr_btCopiar" disabled>📋 Copiar o prompt com o material</button><button class="secundario" id="tr_btBaixarPrompt" disabled>⬇ Baixar como arquivo .txt</button><span id="tr_msgPrompt" class="aviso"></span></div>' +
     '<p style="margin-top:16px"><span class="t-passoNum">3</span><b>Traga de volta o que a IA devolveu</b></p>' +
     '<textarea id="tr_txtJson" placeholder="Cole aqui o JSON que a IA devolveu (ou escolha o arquivo .json abaixo)"></textarea>' +
-    '<div class="botoes"><input type="file" id="tr_arqJson" accept=".json,application/json,text/plain"><button id="tr_btConferir">Conferir</button></div>' +
+    '<div class="botoes"><input type="file" id="tr_arqJson" multiple accept=".json,application/json,text/plain"><button id="tr_btConferir">Conferir</button></div>' +
     '<div id="tr_resConf"></div></div>';
 
   h += '<div class="caixa"><h2>🎬 Criar a partir de um vídeo (NotebookLM)</h2>' +
@@ -196,6 +197,7 @@ function desenharLista(){
   if($('buscaTrilha')){ var tb = null; $('buscaTrilha').addEventListener('input', function(){ clearTimeout(tb); tb = setTimeout(desenharListaProf, 200); }); }
   if($('btAbrirTodos')) $('btAbrirTodos').addEventListener('click', function(){ document.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.open = true; }); });
   if($('btFecharTodos')) $('btFecharTodos').addEventListener('click', function(){ document.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.open = false; }); });
+  if($('btOrganizar')) $('btOrganizar').addEventListener('click', function(){ if(ORG) return; comecarOrganizar(); });
   desenharListaProf();
   if($('btGravarTodas')) $('btGravarTodas').addEventListener('click', function(){ this.disabled = true; $('msgLote').textContent = 'Colocando na fila…'; api('trilhaNarrarFundo', {todas: true, voz: $('vozLote').value}).then(function(r){ return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; }); }).catch(function(e){ erroGeral(e.message); }); });
   $('selDisc').addEventListener('change', carregarAulasMaterial);
@@ -207,7 +209,7 @@ function desenharLista(){
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type: 'text/plain;charset=utf-8'})); a.download = 'prompt-aula-em-trilha.txt'; a.click();
     $('msgPrompt').textContent = '✓ Arquivo baixado: anexe na conversa da sua IA.';
   }); });
-  $('arqJson').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; f.text().then(function(t){ $('txtJson').value = t; conferir(); }); });
+  $('arqJson').addEventListener('change', function(){ var fs = Array.prototype.slice.call(this.files || []); if(!fs.length) return; lerArquivosTrilha(fs).then(function(t){ $('txtJson').value = t; conferir(); }); });
   $('btConferir').addEventListener('click', conferir);
   $('btVid').addEventListener('click', function(){
     var bt = this, f = $('arqVid').files[0], link = $('linkVid').value.trim(), disc = $('selDiscVid').value, msg = $('msgVid');
@@ -238,17 +240,31 @@ function desenharLista(){
   carregarUso();
 }
 // lista do professor: grande tema (na ordem do curso) → aulas (na ordem dos subtemas)
-function desenharListaProf(){
-  var box = $('listaTrilhasProf'); if(!box) return;
+var ORG = null; // organizando a lista: {disc, grupos: [{nome, ids}]}
+function gruposDaLista(filtro){
+  var lista = L.trilhas.filter(function(t){ return (t.disciplina_id || '') === filtro; }), grupos = {}, ordem = {}, nomes = [];
+  lista.forEach(function(t){ var g = t.grandeTema || SEM_TOPICO; if(!grupos[g]){ grupos[g] = []; nomes.push(g); } grupos[g].push(t); if(t.grandeOrdem) ordem[g] = Math.min(ordem[g] || 1e9, t.grandeOrdem); });
+  nomes.sort(function(a, b){ return ((ordem[a] || 1e6) - (ordem[b] || 1e6)) || a.localeCompare(b); });
+  return nomes.map(function(g){ return {nome: g, aulas: grupos[g].sort(function(a, b){ return ((a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem)) || a.titulo.localeCompare(b.titulo); })}; });
+}
+var SEM_TOPICO = 'Sem grande tema (ligue os subtemas na aula)';
+function filtroProf(){
   var filtro = ''; try{ filtro = localStorage.getItem('trilha_filtro_prof') || ''; }catch(e){}
   var ds = {}; L.trilhas.forEach(function(t){ ds[t.disciplina_id || ''] = 1; });
   if(!filtro || !ds[filtro]) filtro = Object.keys(ds).sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); })[0] || '';
+  return filtro;
+}
+function desenharListaProf(){
+  var box = $('listaTrilhasProf'); if(!box) return;
+  if(ORG && ORG.disc === filtroProf()){ desenharOrganizar(); return; }
+  ORG = null;
+  var filtro = filtroProf();
   var q = ($('buscaTrilha') ? $('buscaTrilha').value : '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   var bate = function(t){ if(!q) return true; return (t.titulo + ' ' + (t.tema || '') + ' ' + (t.subtemas || []).join(' ') + ' ' + (t.grandeTema || '')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').indexOf(q) !== -1; };
   var lista = L.trilhas.filter(function(t){ return (t.disciplina_id || '') === filtro && bate(t); });
   if(!lista.length){ box.innerHTML = '<p class="aviso">' + (q ? 'Nenhuma aula com "' + esc(q) + '".' : 'Nenhuma aula nesta matéria.') + '</p>'; return; }
   var grupos = {}, ordem = {}, nomes = [];
-  lista.forEach(function(t){ var g = t.grandeTema || 'Sem grande tema (ligue os subtemas na aula)'; if(!grupos[g]){ grupos[g] = []; nomes.push(g); } grupos[g].push(t); if(t.grandeOrdem) ordem[g] = t.grandeOrdem; });
+  lista.forEach(function(t){ var g = t.grandeTema || SEM_TOPICO; if(!grupos[g]){ grupos[g] = []; nomes.push(g); } grupos[g].push(t); if(t.grandeOrdem) ordem[g] = Math.min(ordem[g] || 1e9, t.grandeOrdem); });
   nomes.sort(function(a, b){ return ((ordem[a] || 1e6) - (ordem[b] || 1e6)) || a.localeCompare(b); });
   var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos_prof') || '{}') || {}; }catch(e){}
   var tipoTxt = {video: '🎬 vídeo', cena: '🔬 cena', grafico: '📈 gráfico'};
@@ -307,7 +323,8 @@ function desenharListaAluno(){
   var grupos = {}, ordG = [];
   porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(!grupos[g]){ grupos[g] = []; ordG.push(g); } grupos[g].push(t); });
   // na sequência do curso (a ordem que o professor deu aos grandes temas); sem ordem vão para o fim
-  var ordemG = {}; porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(t.grandeOrdem) ordemG[g] = t.grandeOrdem; });
+  var ordemG = {}; porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(t.grandeOrdem) ordemG[g] = Math.min(ordemG[g] || 1e9, t.grandeOrdem); });
+  ordG.forEach(function(g){ grupos[g].sort(function(a, b){ return (a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem); }); });
   ordG.sort(function(a, b){ return ((ordemG[a] || 1e6) - (ordemG[b] || 1e6)) || a.localeCompare(b); });
   var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; }catch(e){}
   h += ordG.map(function(g){
@@ -357,7 +374,8 @@ function conferir(){
       h += '<div class="ok">✓ Formato certo' + (lote ? ': <b>' + conferida.length + ' aulas em trilha</b> neste arquivo' : '') + '.<ul class="t-erros" style="margin-bottom:0">' + (r.resumo || []).map(function(x){ return '<li><b>' + esc(x.titulo) + '</b> · ' + x.blocos + ' bloco(s) · ' + x.passos + ' passos</li>'; }).join('') + '</ul></div>' +
         '<div class="botoes">' + (lote ? '<select id="tr_selPrevia">' + conferida.map(function(t, i){ return '<option value="' + i + '">' + esc(t.titulo) + '</option>'; }).join('') + '</select>' : '') + '<button class="secundario" id="tr_btPrevia">▶ Ver antes de salvar</button>' +
         '<select id="tr_selDiscSalvar"><option value="">disciplina…</option>' + L.disciplinas.map(function(d){ return '<option value="' + esc(d.id) + '"' + (d.id === $('selDisc').value ? ' selected' : '') + '>' + esc(d.nome) + '</option>'; }).join('') + '</select>' +
-        (lote ? '' : '<select id="tr_selDestino"><option value="">salvar como trilha nova</option>' + L.trilhas.map(function(t){ return '<option value="' + esc(t.id) + '">nova versão de: ' + esc(t.titulo) + ' (v' + t.versao + ')</option>'; }).join('') + '</select>') +
+        (lote ? '' : '<select id="tr_selDestino"><option value="">salvar como trilha nova</option>' + L.trilhas.map(function(t){ return '<option value="' + esc(t.id) + '">nova versão de: ' + esc(t.titulo) + ' (v' + t.versao + ')</option>'; }).join('') + '</select>' +
+          '<input type="text" id="tr_txtComVersao" maxlength="500" style="flex:1;min-width:200px" placeholder="comentário da nova versão (opcional): ex.: corrigi a seta do passo 3">') +
         '<button id="tr_btSalvar">' + (lote ? 'Salvar as ' + conferida.length + ' aulas' : 'Salvar') + '</button></div><div id="tr_msgSalvar"></div>';
     }
     $('resConf').innerHTML = h;
@@ -365,7 +383,7 @@ function conferir(){
       $('btPrevia').addEventListener('click', function(){ abrirPlayer({id: '', versao: 0, trilha: conferida[$('selPrevia') ? Number($('selPrevia').value) : 0], narracao: {}, voz: 'Kore', previa: true}); });
       $('btSalvar').addEventListener('click', function(){
         var b = this; b.disabled = true; $('msgSalvar').innerHTML = '<p class="aviso">Salvando no Drive…</p>';
-        api('trilhaEnviar', {texto: $('txtJson').value, salvar: true, disciplinaId: $('selDiscSalvar').value, id: $('selDestino') ? $('selDestino').value : ''}).then(function(s){
+        api('trilhaEnviar', {texto: $('txtJson').value, salvar: true, disciplinaId: $('selDiscSalvar').value, id: $('selDestino') ? $('selDestino').value : '', comentario: $('txtComVersao') ? $('txtComVersao').value : ''}).then(function(s){
           if(s.erros && s.erros.length) throw new Error(s.erros.join(' '));
           return api('trilhasListar').then(function(r2){ L = r2; if((s.ids || []).length > 1){ desenharLista(); erroGeral(''); $('corpo').insertAdjacentHTML('afterbegin', '<div class="ok">✓ ' + s.ids.length + ' aulas em trilha salvas no seu Drive.</div>'); } else abrirTrilha(s.id); });
         }).catch(function(e){ b.disabled = false; $('msgSalvar').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
@@ -429,7 +447,8 @@ function abrirPlayer(t){
       '<label class="aviso" id="tr_rotAjuste" for="txtAjuste" style="display:block;margin-top:8px"></label><textarea id="tr_txtAjuste" style="min-height:60px;font-family:inherit;font-size:14px" placeholder="ex.: a seta tem que apontar para a curva de cima; fala longa demais; trocar o exemplo do leite por café"></textarea>' +
       '<label class="aviso" for="txtAjusteGeral" style="display:block;margin-top:6px">Ajuste na aula toda (opcional)</label><input type="text" id="tr_txtAjusteGeral" style="width:100%" placeholder="ex.: falas mais curtas; mais um bloco sobre histerese">' +
       '<div class="botoes"><button class="mini" id="tr_btCopiarAjuste">📋 Copiar pedido de ajustes para a IA</button><button class="mini secundario" id="tr_btLimparAjuste">Limpar anotações</button><span id="tr_nAjustes" class="aviso"></span></div>' +
-      '<p class="aviso" style="margin-bottom:0">Cole na sua IA (de preferência na mesma conversa em que a aula foi criada). Depois traga o JSON corrigido em <b>Criar uma aula em trilha → passo 3</b> e salve como <b>nova versão</b> desta aula.</p><div id="tr_msgAjuste"></div></details>' : '') +
+      '<p class="aviso" style="margin-bottom:0">Cole na sua IA (de preferência na mesma conversa em que a aula foi criada). Depois traga o JSON corrigido em <b>Criar uma aula em trilha → passo 3</b> e salve como <b>nova versão</b> desta aula. Se a IA errar, volte para a versão anterior em <b>🕘 Versões desta aula</b>.</p><div id="tr_msgAjuste"></div></details>' : '') +
+    (MODO === 'prof' && !t.previa ? '<details class="convite" id="tr_versoesBox" style="margin-top:14px"><summary class="link"><b>🕘 Versões desta aula</b> (voltar para uma anterior, comentar, apagar)</summary><div id="tr_versoesCorpo"></div></details>' : '') +
     (MODO === 'prof' && !t.previa && tr.video ? '<details class="convite" id="tr_notaBox" style="margin-top:14px"><summary class="link"><b>📌 Nota do professor neste trecho</b> (aparece para o aluno nesse momento do vídeo; serve para corrigir ou completar sem refazer o vídeo)</summary>' +
       '<label class="aviso" id="tr_rotNota" for="txtNota" style="display:block;margin-top:8px"></label><textarea id="tr_txtNota" maxlength="400" style="min-height:56px;font-family:inherit;font-size:14px" placeholder="ex.: atenção: aqui o vídeo diz 0,7, mas o certo é 0,6"></textarea><div class="botoes"><button class="mini" id="tr_btNota">Salvar a nota</button><span id="tr_msgNota" class="aviso"></span></div></details>' : '') +
     (MODO === 'prof' && tr.video ? '<div class="botoes"><button class="mini secundario" id="tr_btCapitulos">📋 Copiar os capítulos para a descrição do YouTube</button><span id="tr_msgCap" class="aviso"></span></div>' : '') +
@@ -449,6 +468,7 @@ function abrirPlayer(t){
         .catch(function(){ var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type: 'text/plain;charset=utf-8'})); a.download = 'ajustes-aula-em-trilha.txt'; a.click(); $('msgAjuste').innerHTML = '<div class="ok">O navegador não deixou copiar: baixei como arquivo .txt.</div>'; });
     });
   }
+  if($('versoesBox')) $('versoesBox').addEventListener('toggle', function(){ if(this.open) carregarVersoes(); });
   $('lnVoltar').addEventListener('click', function(){ U.enviar(true); inicio(); });
   document.querySelectorAll('[data-trbloco]').forEach(function(b){ b.addEventListener('click', function(){ irPara(Number(b.getAttribute('data-trbloco')), 0, P.tocando); }); });
   $('btPlay').addEventListener('click', function(){ if(P.tocando) pausar(); else { if(P.fimDoBloco) irPara(P.bloco, 0, false); tocar(); } });
@@ -824,6 +844,160 @@ function desenharCorrecaoTrilha(txt){
   $('qtProx').addEventListener('click', function(){ pedirQuestaoTrilha(QT.tema); });
   if($('qtProva')) $('qtProva').addEventListener('click', function(){ pedirQuestaoTrilha(''); });
   box.scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+
+// ----- Organizar a lista: arrastar aulas e tópicos, renomear, novo tópico -----
+function comecarOrganizar(){
+  var d = filtroProf();
+  ORG = {disc: d, grupos: gruposDaLista(d).map(function(g){ return {nome: g.nome === SEM_TOPICO ? '' : g.nome, ids: g.aulas.map(function(t){ return t.id; })}; })};
+  if($('buscaTrilha')) $('buscaTrilha').value = '';
+  desenharOrganizar();
+}
+function tituloDe(id){ var t = L.trilhas.filter(function(x){ return x.id === id; })[0]; return t ? t.titulo : id; }
+function codigoDe(id){ var t = L.trilhas.filter(function(x){ return x.id === id; })[0]; return t && t.codigo || ''; }
+function chaveCodigo(c){ var m = String(c || '').trim().toLowerCase().match(/^(\d+)\s*([a-z]*)/); return m ? ('0000' + m[1]).slice(-4) + m[2] : 'zzzz'; }
+// arquivos escolhidos: o número da aula sai do nome (aula-trilha-03b-….json) quando o JSON não tem "ordem"; vários viram um lote
+function numeroDoArquivo(nome){ var m = String(nome).match(/(?:^|[^0-9a-z])(\d{1,3}[a-z]?)(?=[-_ .])/i); return m ? m[1].toLowerCase() : ''; }
+function lerArquivosTrilha(fs){
+  return Promise.all(fs.map(function(f){ return f.text().then(function(t){ return {nome: f.name, texto: t}; }); })).then(function(l){
+    var objs = [], ruins = [];
+    l.forEach(function(a){
+      var o; try{ o = JSON.parse(a.texto.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')); }catch(e){ ruins.push(a); return; }
+      var lista = Array.isArray(o) ? o : (o && Array.isArray(o.trilhas) ? o.trilhas : [o]), n = numeroDoArquivo(a.nome);
+      lista.forEach(function(t){ if(t && typeof t === 'object' && !t.ordem && n && lista.length === 1) t.ordem = n; objs.push(t); });
+    });
+    if(ruins.length) return ruins[0].texto;
+    return objs.length === 1 ? JSON.stringify(objs[0], null, 2) : JSON.stringify({formato: 'aula-trilha/1', trilhas: objs}, null, 1);
+  });
+}
+function desenharOrganizar(){
+  var box = $('listaTrilhasProf'); if(!box || !ORG) return;
+  var nG = ORG.grupos.length, mover = function(gi){ return '<select data-tromover="1" title="mover para outro tópico" style="max-width:150px">' + ORG.grupos.map(function(g, k){ return '<option value="' + k + '"' + (k === gi ? ' selected' : '') + '>' + esc(g.nome || 'sem nome') + '</option>'; }).join('') + '</select>'; };
+  box.innerHTML = '<div class="convite" style="margin:0 0 10px"><b>✏️ Organizando a lista</b><div class="aviso" style="margin:4px 0 8px">Arraste pelo <b>⠿</b> as aulas e os tópicos para mudar a ordem (pode soltar uma aula em outro tópico). No celular, use ↑ ↓ e “mover para”. Clique no nome do tópico para mudar. A ordem vale também para a lista dos alunos.</div>' +
+    '<div class="botoes" style="margin:0"><button class="mini" id="tr_btOrgSalvar">💾 Salvar organização</button><button class="mini secundario" id="tr_btOrgNovo">➕ Novo tópico</button><button class="mini secundario" id="tr_btOrgNumero" title="ordena as aulas e os tópicos pelo número das aulas (01a, 01b, 02a…)">🔢 Pôr na ordem dos números</button><button class="mini secundario" id="tr_btOrgSair">Cancelar</button><span id="tr_msgOrg" class="aviso"></span></div></div>' +
+    ORG.grupos.map(function(g, gi){
+      return '<div data-trogrupo="' + gi + '" style="background:#f3f5f9;border:1px solid var(--linha);border-left:4px solid #E8B923;border-radius:8px;padding:8px 10px;margin:0 0 10px">' +
+        '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span draggable="true" data-troarrastag="' + gi + '" title="arraste para mudar a ordem do tópico" style="cursor:grab;font-size:18px;padding:0 4px;user-select:none">⠿</span>' +
+          '<input type="text" data-tronome="' + gi + '" value="' + esc(g.nome) + '" placeholder="nome do tópico (ex.: Água)" maxlength="80" style="flex:1 1 200px;font-weight:bold">' +
+          '<button class="mini secundario" data-trogsobe="' + gi + '"' + (gi ? '' : ' disabled') + '>↑</button><button class="mini secundario" data-trogdesce="' + gi + '"' + (gi < nG - 1 ? '' : ' disabled') + '>↓</button>' +
+          (g.ids.length ? '<span class="aviso">' + g.ids.length + ' aula' + (g.ids.length > 1 ? 's' : '') + '</span>' : '<button class="mini secundario" data-trotira="' + gi + '">✕ tirar tópico vazio</button>') + '</div>' +
+        (g.ids.length ? '' : '<div class="aviso" data-trovazio="' + gi + '" style="border:2px dashed var(--linha);border-radius:8px;padding:12px;margin-top:6px;text-align:center">solte uma aula aqui</div>') +
+        g.ids.map(function(id, ai){
+          return '<div data-troaula="' + esc(id) + '" data-trogi="' + gi + '" data-troai="' + ai + '" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:6px 8px;margin-top:6px">' +
+            '<span draggable="true" data-troarrasta="' + esc(id) + '" title="arraste" style="cursor:grab;font-size:18px;padding:0 4px;user-select:none">⠿</span>' +
+            '<b style="flex:1 1 200px;min-width:0">' + (codigoDe(id) ? '<span class="aviso" style="font-weight:normal">' + esc(codigoDe(id)) + ' · </span>' : '') + esc(tituloDe(id)) + '</b>' +
+            '<button class="mini secundario" data-trorenomear="' + esc(id) + '" title="mudar o título da aula">✏️ título</button>' +
+            '<button class="mini secundario" data-trosobe="1"' + (gi || ai ? '' : ' disabled') + '>↑</button><button class="mini secundario" data-trodesce="1"' + (gi < nG - 1 || ai < g.ids.length - 1 ? '' : ' disabled') + '>↓</button>' + mover(gi) + '</div>';
+        }).join('') + '</div>';
+    }).join('');
+  ligarOrganizar();
+}
+function ligarOrganizar(){
+  var box = $('listaTrilhasProf'), G = ORG.grupos, redesenha = function(){ desenharOrganizar(); };
+  var tirar = function(id){ for(var g = 0; g < G.length; g++){ var i = G[g].ids.indexOf(id); if(i !== -1){ G[g].ids.splice(i, 1); return [g, i]; } } return null; };
+  $('btOrgSair').addEventListener('click', function(){ ORG = null; desenharListaProf(); });
+  $('btOrgNumero').addEventListener('click', function(){
+    var sem = 0; G.forEach(function(g){ g.ids.sort(function(a, b){ var ka = chaveCodigo(codigoDe(a)), kb = chaveCodigo(codigoDe(b)); return ka < kb ? -1 : ka > kb ? 1 : 0; }); g.ids.forEach(function(id){ if(!codigoDe(id)) sem++; }); });
+    G.sort(function(a, b){ var ka = a.ids.length ? chaveCodigo(codigoDe(a.ids[0])) : 'zzzzz', kb = b.ids.length ? chaveCodigo(codigoDe(b.ids[0])) : 'zzzzz'; return ka < kb ? -1 : ka > kb ? 1 : 0; });
+    redesenha(); $('msgOrg').textContent = sem ? sem + ' aula(s) sem número ficaram no fim do tópico (arraste para o lugar certo).' : '✓ Em ordem. Confira e salve.';
+  });
+  $('btOrgNovo').addEventListener('click', function(){ var n = prompt('Nome do novo tópico (ex.: Água, Carboidratos):'); if(n && n.trim()){ G.push({nome: n.trim().slice(0, 80), ids: []}); redesenha(); } });
+  $('btOrgSalvar').addEventListener('click', function(){
+    var b = this, semNome = G.filter(function(g){ return g.ids.length && !g.nome.trim(); }).length;
+    if(semNome && !confirm(semNome + ' tópico(s) sem nome: as aulas dele(s) aparecem como "' + SEM_TOPICO + '" (para o aluno, "Outros assuntos"). Salvar assim?')) return;
+    b.disabled = true; $('msgOrg').textContent = 'Salvando…';
+    api('trilhaOrganizar', {disciplinaId: ORG.disc, grupos: G.filter(function(g){ return g.ids.length; }).map(function(g){ return {nome: g.nome.trim(), ids: g.ids}; })}).then(function(){
+      return api('trilhasListar').then(function(r2){ L = r2; ORG = null; desenharListaProf(); var bx = $('listaTrilhasProf'); if(bx) bx.insertAdjacentHTML('afterbegin', '<div class="ok">✓ Organização salva. Os alunos já veem nesta ordem.</div>'); });
+    }).catch(function(e){ b.disabled = false; $('msgOrg').textContent = ''; erroGeral(e.message); });
+  });
+  box.querySelectorAll('[data-tronome]').forEach(function(inp){ inp.addEventListener('input', function(){ G[Number(inp.getAttribute('data-tronome'))].nome = inp.value; }); inp.addEventListener('change', redesenha); });
+  box.querySelectorAll('[data-trogsobe]').forEach(function(b){ b.addEventListener('click', function(){ var i = Number(b.getAttribute('data-trogsobe')); G.splice(i - 1, 0, G.splice(i, 1)[0]); redesenha(); }); });
+  box.querySelectorAll('[data-trogdesce]').forEach(function(b){ b.addEventListener('click', function(){ var i = Number(b.getAttribute('data-trogdesce')); G.splice(i + 1, 0, G.splice(i, 1)[0]); redesenha(); }); });
+  box.querySelectorAll('[data-trotira]').forEach(function(b){ b.addEventListener('click', function(){ G.splice(Number(b.getAttribute('data-trotira')), 1); redesenha(); }); });
+  box.querySelectorAll('[data-troaula]').forEach(function(row){
+    var id = row.getAttribute('data-troaula'), gi = Number(row.getAttribute('data-trogi')), ai = Number(row.getAttribute('data-troai'));
+    row.querySelector('[data-trosobe]').addEventListener('click', function(){ tirar(id); if(ai > 0) G[gi].ids.splice(ai - 1, 0, id); else G[gi - 1].ids.push(id); redesenha(); });
+    row.querySelector('[data-trodesce]').addEventListener('click', function(){ tirar(id); if(ai < G[gi].ids.length) G[gi].ids.splice(ai + 1, 0, id); else G[gi + 1].ids.unshift(id); redesenha(); });
+    row.querySelector('[data-tromover]').addEventListener('change', function(){ tirar(id); G[Number(this.value)].ids.push(id); redesenha(); });
+    row.querySelector('[data-trorenomear]').addEventListener('click', function(){
+      var b = this, novo = prompt('Novo título da aula (vira uma nova versão; dá para voltar em 🕘 Versões):', tituloDe(id));
+      if(!novo || !novo.trim() || novo.trim() === tituloDe(id)) return;
+      b.disabled = true; $('msgOrg').textContent = 'Mudando o título…';
+      api('trilhaRenomear', {id: id, titulo: novo.trim()}).then(function(r){ L.trilhas.forEach(function(t){ if(t.id === id){ t.titulo = r.titulo; t.versao = r.versao; } }); $('msgOrg').textContent = '✓ Título mudado (v' + r.versao + ').'; redesenha(); })
+        .catch(function(e){ b.disabled = false; $('msgOrg').textContent = ''; erroGeral(e.message); });
+    });
+  });
+  // arrastar e soltar (computador)
+  var arr = null; // {tipo: 'aula'|'grupo', id|gi}
+  box.querySelectorAll('[data-troarrasta]').forEach(function(h){ h.addEventListener('dragstart', function(ev){ arr = {tipo: 'aula', id: h.getAttribute('data-troarrasta')}; try{ ev.dataTransfer.setData('text/plain', arr.id); ev.dataTransfer.setDragImage(h.parentNode, 10, 10); }catch(e){} h.parentNode.style.opacity = '.5'; }); h.addEventListener('dragend', function(){ arr = null; h.parentNode.style.opacity = ''; }); });
+  box.querySelectorAll('[data-troarrastag]').forEach(function(h){ h.addEventListener('dragstart', function(ev){ arr = {tipo: 'grupo', gi: Number(h.getAttribute('data-troarrastag'))}; try{ ev.dataTransfer.setData('text/plain', 'g'); ev.dataTransfer.setDragImage(h.parentNode.parentNode, 10, 10); }catch(e){} }); h.addEventListener('dragend', function(){ arr = null; }); });
+  var marca = function(el, cima){ box.querySelectorAll('[data-troaula],[data-trogrupo]').forEach(function(x){ x.style.boxShadow = ''; }); if(el) el.style.boxShadow = cima ? '0 -3px 0 #2E62C6' : '0 3px 0 #2E62C6'; };
+  box.querySelectorAll('[data-troaula]').forEach(function(row){
+    row.addEventListener('dragover', function(ev){ if(!arr || arr.tipo !== 'aula') return; ev.preventDefault(); ev.stopPropagation(); var r = row.getBoundingClientRect(); marca(row, ev.clientY < r.top + r.height / 2); });
+    row.addEventListener('drop', function(ev){
+      if(!arr || arr.tipo !== 'aula') return; ev.preventDefault(); ev.stopPropagation();
+      var alvo = row.getAttribute('data-troaula'); if(alvo === arr.id){ marca(null); return; }
+      var r = row.getBoundingClientRect(), cima = ev.clientY < r.top + r.height / 2;
+      tirar(arr.id); var g = Number(row.getAttribute('data-trogi')), i = G[g].ids.indexOf(alvo); G[g].ids.splice(cima ? i : i + 1, 0, arr.id); arr = null; redesenha();
+    });
+  });
+  box.querySelectorAll('[data-trogrupo]').forEach(function(gr){
+    var gi = Number(gr.getAttribute('data-trogrupo'));
+    gr.addEventListener('dragover', function(ev){ if(!arr) return; ev.preventDefault(); var r = gr.getBoundingClientRect(); marca(gr, arr.tipo === 'grupo' && ev.clientY < r.top + r.height / 2); });
+    gr.addEventListener('dragleave', function(ev){ if(ev.target === gr) marca(null); });
+    gr.addEventListener('drop', function(ev){
+      if(!arr) return; ev.preventDefault();
+      if(arr.tipo === 'aula'){ tirar(arr.id); G[gi].ids.push(arr.id); }
+      else if(arr.gi !== gi){ var r = gr.getBoundingClientRect(), cima = ev.clientY < r.top + r.height / 2, g = G.splice(arr.gi, 1)[0], alvo = gi > arr.gi ? gi - 1 : gi; G.splice(cima ? alvo : alvo + 1, 0, g); }
+      arr = null; redesenha();
+    });
+  });
+}
+
+// ----- Versões desta aula: cada "salvar" guarda a anterior no Drive -----
+function carregarVersoes(){
+  var box = $('versoesCorpo'); if(!box) return;
+  box.innerHTML = '<p class="aviso">Carregando as versões…</p>';
+  api('trilhaVersoes', {id: T.id}).then(function(l){
+    if(!l.length){ box.innerHTML = '<p class="aviso">Nenhuma versão encontrada na pasta da aula no Drive.</p>'; return; }
+    box.innerHTML = '<p class="aviso" style="margin:8px 0">Cada vez que você salva, a versão anterior fica guardada. <b>Voltar para esta</b> cria uma versão nova igual à escolhida (nada se perde). <b>Apagar</b> manda para a lixeira do Drive (dá para recuperar por 30 dias).</p>' +
+      l.map(function(v){
+        var dif = v.atual ? '<b style="color:#1a7f37">✓ em uso</b>' : v.ilegivel ? '<span class="vermelho">não deu para ler</span>' :
+          (!v.passosDiferentes && !v.outrasMudancas ? 'igual à atual' :
+            [v.passosDiferentes ? v.passosDiferentes + ' passo(s) diferente(s) da atual' : '', v.outrasMudancas ? 'gráfico, cena ou resumo diferentes' : ''].filter(Boolean).join(' + '));
+        return '<div data-trvarq="' + esc(v.arquivoId) + '" style="border:1px solid ' + (v.atual ? '#1a7f37' : '#d8dee8') + ';border-radius:8px;padding:8px 10px;margin:6px 0;background:#fff">' +
+          '<div><b>v' + v.versao + '</b> · ' + esc(v.data) + (v.passos ? ' · ' + v.passos + ' passos' : '') + ' · ' + dif + ' · <a class="link" target="_blank" rel="noopener" href="' + esc(v.url) + '">abrir no Drive</a></div>' +
+          '<div class="botoes" style="margin:6px 0 0"><input type="text" data-trvtxt="1" maxlength="500" value="' + esc(v.comentario) + '" placeholder="comentário (ex.: versão aprovada; a IA errou a seta)" style="flex:1;min-width:180px">' +
+          '<button class="mini secundario" data-trvcom="1">Salvar comentário</button>' +
+          (v.atual ? '' : '<button class="mini" data-trvvoltar="' + v.versao + '">↩ Voltar para esta</button><button class="mini secundario" data-trvapagar="' + v.versao + '">🗑 Apagar</button>') +
+          '</div><div class="aviso" data-trvmsg="1"></div></div>';
+      }).join('');
+    box.querySelectorAll('[data-trvarq]').forEach(function(card){
+      var arq = card.getAttribute('data-trvarq'), msg = card.querySelector('[data-trvmsg]'), txt = card.querySelector('[data-trvtxt]');
+      var ok = function(h){ msg.innerHTML = h; }, falhou = function(e){ msg.innerHTML = '<span class="vermelho">' + esc(e.message) + '</span>'; card.querySelectorAll('button').forEach(function(b){ b.disabled = false; }); };
+      card.querySelector('[data-trvcom]').addEventListener('click', function(){
+        var b = this; b.disabled = true; ok('Salvando…');
+        api('trilhaVersaoComentar', {id: T.id, arquivoId: arq, comentario: txt.value}).then(function(){ b.disabled = false; ok('✓ Comentário salvo.'); }).catch(falhou);
+      });
+      txt.addEventListener('keydown', function(ev){ if(ev.key === 'Enter') card.querySelector('[data-trvcom]').click(); });
+      var bv = card.querySelector('[data-trvvoltar]');
+      if(bv) bv.addEventListener('click', function(){
+        var n = bv.getAttribute('data-trvvoltar');
+        if(!confirm('Voltar a aula para a versão ' + n + '?\n\nEla vira uma versão nova (a atual continua guardada, dá para voltar depois). As narrações dos passos que não mudaram continuam valendo.')) return;
+        card.querySelectorAll('button').forEach(function(b){ b.disabled = true; }); ok('Voltando…');
+        pausar();
+        api('trilhaRestaurar', {id: T.id, arquivoId: arq}).then(function(r){
+          return api('trilhasListar').then(function(r2){ L = r2; abrirTrilha(T.id); setTimeout(function(){ erroGeral(''); var c = $('corpo'); if(c) c.insertAdjacentHTML('afterbegin', '<div class="ok">✓ A aula voltou para a v' + r.de + ' (salva como v' + r.versao + ').</div>'); }, 600); });
+        }).catch(falhou);
+      });
+      var ba = card.querySelector('[data-trvapagar]');
+      if(ba) ba.addEventListener('click', function(){
+        if(!confirm('Apagar a versão ' + ba.getAttribute('data-trvapagar') + '?\n\nEla vai para a lixeira do seu Drive (dá para recuperar lá por 30 dias).')) return;
+        card.querySelectorAll('button').forEach(function(b){ b.disabled = true; }); ok('Apagando…');
+        api('trilhaVersaoApagar', {id: T.id, arquivoId: arq}).then(function(){ card.remove(); }).catch(falhou);
+      });
+    });
+  }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 
 /* ===================== CENA (moléculas animadas) =====================
