@@ -139,23 +139,17 @@ function desenharLista(){
   T = null;
   var filtro = ''; try{ filtro = localStorage.getItem('trilha_filtro_prof') || ''; }catch(e){}
   var discsCom = {}; L.trilhas.forEach(function(t){ discsCom[t.disciplina_id || ''] = (discsCom[t.disciplina_id || ''] || 0) + 1; });
-  if(filtro && !discsCom[filtro]) filtro = '';
-  var mostradas = L.trilhas.filter(function(t){ return !filtro || (t.disciplina_id || '') === filtro; }).sort(function(a, b){ return nomeDisc(a.disciplina_id).localeCompare(nomeDisc(b.disciplina_id)); });
-  var h = '<div class="caixa"><h2>Suas aulas em trilha</h2>' + (Object.keys(discsCom).length > 1 ? '<div class="t-blocos"><button class="t-chip' + (filtro ? '' : ' t-atual') + '" data-trfiltro="">Todas (' + L.trilhas.length + ')</button>' +
-    Object.keys(discsCom).sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); }).map(function(d){ return '<button class="t-chip' + (d === filtro ? ' t-atual' : '') + '" data-trfiltro="' + esc(d) + '">' + esc(nomeDisc(d)) + ' (' + discsCom[d] + ')</button>'; }).join('') + '</div>' : '');
-  h += mostradas.length ? '<div class="tabelaBox"><table><tr><th>Aula</th><th>Disciplina</th><th>Versão</th><th>Narração</th><th>Uso</th><th></th></tr>' +
-    mostradas.map(function(t){
-      return '<tr><td><b>' + esc(t.titulo) + '</b><div class="aviso">' + esc(t.tema || '') + '</div></td><td>' + esc(nomeDisc(t.disciplina_id)) + '</td><td>v' + t.versao + '<div class="aviso">' + esc(t.atualizado) + '</div></td>' +
-        '<td>' + (t.fila ? '⏳ <b>gravando em segundo plano</b>: faltam ' + t.fila.faltam + ' fala(s)' + (t.fila.proxima ? '<div class="aviso">próxima rodada: ' + esc(t.fila.proxima) + '</div>' : '') + (t.fila.erro ? '<div class="aviso">último problema: ' + esc(t.fila.erro) + '</div>' : '') :
-          (t.audios ? '🔊 ' + t.audios + ' fala(s) com a voz da IA' : '<span class="aviso">voz do navegador (robótica)</span>') + '<br><button class="mini' + (t.audios ? ' secundario' : '') + '" data-trgravar="' + esc(t.id) + '" style="margin-top:4px">🎙 ' + (t.audios ? 'Gravar as que faltam' : 'Gravar com a voz da IA') + '</button>') + '</td>' +
-        '<td>' + (t.sessoes ? t.alunos + ' pessoa(s) · ' + t.sessoes + ' sessão(ões)' : '<span class="aviso">—</span>') + '</td>' +
-        '<td style="white-space:nowrap"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button> <button class="mini secundario" data-trapagar="' + esc(t.id) + '">Apagar</button></td></tr>';
-    }).join('') + '</table></div>' +
-    '<div class="convite" style="margin-top:12px"><b>🎙 Voz da IA em segundo plano</b><div class="aviso">O servidor grava sozinho: pode fechar o site. A cota grátis de voz é pequena (umas 10 falas por modelo por dia); se acabar, ele continua no dia seguinte e te avisa no celular quando terminar.</div>' +
-    '<div class="botoes" style="margin-top:8px"><label>Voz: <select id="tr_vozLote">' + L.vozes.map(function(v){ return '<option>' + v + '</option>'; }).join('') + '</select></label><button class="mini" id="tr_btGravarTodas">Gravar a voz de todas as aulas que faltam</button><span id="tr_msgLote" class="aviso"></span></div></div>' :
-    '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
+  var discsOrd = Object.keys(discsCom).sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); });
+  if(!filtro || !discsCom[filtro]) filtro = discsOrd[0] || '';   // uma matéria por vez (com 30 aulas cada, "todas" vira bagunça)
+  var h = '<div class="caixa"><h2>Suas aulas em trilha</h2>';
+  if(L.trilhas.length){
+    h += (discsOrd.length > 1 ? '<div class="t-blocos">' + discsOrd.map(function(d){ return '<button class="t-chip' + (d === filtro ? ' t-atual' : '') + '" data-trfiltro="' + esc(d) + '">' + esc(nomeDisc(d)) + ' (' + discsCom[d] + ')</button>'; }).join('') + '</div>' : '') +
+      '<div class="botoes" style="margin:4px 0 10px"><input type="text" id="tr_buscaTrilha" placeholder="🔎 buscar aula…" style="flex:1 1 200px;max-width:340px"><button class="mini secundario" id="tr_btAbrirTodos">abrir todos</button><button class="mini secundario" id="tr_btFecharTodos">fechar todos</button></div>' +
+      '<div id="tr_listaTrilhasProf"></div>' +
+      '<div class="convite" style="margin-top:12px"><b>🎙 Voz da IA em segundo plano</b><div class="aviso">O servidor grava sozinho: pode fechar o site. A cota grátis de voz é pequena (umas 10 falas por modelo por dia); se acabar, ele continua no dia seguinte e te avisa no celular quando terminar.</div>' +
+      '<div class="botoes" style="margin-top:8px"><label>Voz: <select id="tr_vozLote">' + L.vozes.map(function(v){ return '<option>' + v + '</option>'; }).join('') + '</select></label><button class="mini" id="tr_btGravarTodas">Gravar a voz de todas as aulas que faltam</button><span id="tr_msgLote" class="aviso"></span></div></div>';
+  } else h += '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
   h += '</div>';
-
   h += '<div class="caixa"><h2>Criar uma aula em trilha</h2>' +
     '<p class="aviso" style="margin-top:0">O conteúdo é feito por uma IA robusta de fora (Claude, por exemplo), com o prompt da plataforma e o material das suas aulas. A plataforma confere, guarda no seu Drive (pasta "Aula em trilha", com as versões) e monta a aula.</p>' +
     '<p><span class="t-passoNum">1</span><b>Escolha as aulas que viram material</b></p>' +
@@ -178,21 +172,11 @@ function desenharLista(){
   $('corpo').innerHTML = h;
 
   document.querySelectorAll('[data-trfiltro]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_filtro_prof', b.getAttribute('data-trfiltro')); }catch(e){} desenharLista(); }); });
-  document.querySelectorAll('[data-trabrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trabrir')); }); });
-  var gravarFundo = function(dados, msg){
-    $('msgLote').textContent = 'Colocando na fila…';
-    api('trilhaNarrarFundo', dados).then(function(r){
-      return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; });
-    }).catch(function(e){ $('msgLote').textContent = ''; erroGeral(e.message); });
-  };
-  document.querySelectorAll('[data-trgravar]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; gravarFundo({ids: [b.getAttribute('data-trgravar')], voz: $('vozLote').value}); }); });
-  if($('btGravarTodas')) $('btGravarTodas').addEventListener('click', function(){ this.disabled = true; gravarFundo({todas: true, voz: $('vozLote').value}); });
-  document.querySelectorAll('[data-trapagar]').forEach(function(b){ b.addEventListener('click', function(){
-    var t = L.trilhas.filter(function(x){ return x.id === b.getAttribute('data-trapagar'); })[0];
-    if(!confirm('Apagar "' + t.titulo + '"? A pasta dela vai para a lixeira do seu Drive (dá para recuperar por 30 dias).')) return;
-    b.disabled = true;
-    api('trilhaApagar', {id: t.id}).then(inicio).catch(function(e){ b.disabled = false; erroGeral(e.message); });
-  }); });
+  if($('buscaTrilha')){ var tb = null; $('buscaTrilha').addEventListener('input', function(){ clearTimeout(tb); tb = setTimeout(desenharListaProf, 200); }); }
+  if($('btAbrirTodos')) $('btAbrirTodos').addEventListener('click', function(){ document.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.open = true; }); });
+  if($('btFecharTodos')) $('btFecharTodos').addEventListener('click', function(){ document.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.open = false; }); });
+  desenharListaProf();
+  if($('btGravarTodas')) $('btGravarTodas').addEventListener('click', function(){ this.disabled = true; $('msgLote').textContent = 'Colocando na fila…'; api('trilhaNarrarFundo', {todas: true, voz: $('vozLote').value}).then(function(r){ return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; }); }).catch(function(e){ erroGeral(e.message); }); });
   $('selDisc').addEventListener('change', carregarAulasMaterial);
   $('btCopiar').addEventListener('click', function(){ montarPrompt(function(txt){
     navigator.clipboard.writeText(txt).then(function(){ $('msgPrompt').textContent = '✓ Copiado (' + Math.round(txt.length / 1000) + ' mil caracteres). Cole na sua IA.'; })
@@ -231,6 +215,58 @@ function desenharLista(){
     }).catch(function(e){ bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
   carregarUso();
+}
+// lista do professor: grande tema (na ordem do curso) → aulas (na ordem dos subtemas)
+function desenharListaProf(){
+  var box = $('listaTrilhasProf'); if(!box) return;
+  var filtro = ''; try{ filtro = localStorage.getItem('trilha_filtro_prof') || ''; }catch(e){}
+  var ds = {}; L.trilhas.forEach(function(t){ ds[t.disciplina_id || ''] = 1; });
+  if(!filtro || !ds[filtro]) filtro = Object.keys(ds).sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); })[0] || '';
+  var q = ($('buscaTrilha') ? $('buscaTrilha').value : '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  var bate = function(t){ if(!q) return true; return (t.titulo + ' ' + (t.tema || '') + ' ' + (t.subtemas || []).join(' ') + ' ' + (t.grandeTema || '')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').indexOf(q) !== -1; };
+  var lista = L.trilhas.filter(function(t){ return (t.disciplina_id || '') === filtro && bate(t); });
+  if(!lista.length){ box.innerHTML = '<p class="aviso">' + (q ? 'Nenhuma aula com "' + esc(q) + '".' : 'Nenhuma aula nesta matéria.') + '</p>'; return; }
+  var grupos = {}, ordem = {}, nomes = [];
+  lista.forEach(function(t){ var g = t.grandeTema || 'Sem grande tema (ligue os subtemas na aula)'; if(!grupos[g]){ grupos[g] = []; nomes.push(g); } grupos[g].push(t); if(t.grandeOrdem) ordem[g] = t.grandeOrdem; });
+  nomes.sort(function(a, b){ return ((ordem[a] || 1e6) - (ordem[b] || 1e6)) || a.localeCompare(b); });
+  var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos_prof') || '{}') || {}; }catch(e){}
+  var tipoTxt = {video: '🎬 vídeo', cena: '🔬 cena', grafico: '📈 gráfico'};
+  box.innerHTML = nomes.map(function(g){
+    var l = grupos[g].sort(function(a, b){ return ((a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem)) || a.titulo.localeCompare(b.titulo); });
+    var comVoz = l.filter(function(t){ return t.audios || t.tipo === 'video'; }).length;
+    return '<details class="convite" data-trgrupoprof="' + esc(g) + '" style="margin:0 0 8px;padding:8px 12px"' + (q || abertos[g] || nomes.length === 1 ? ' open' : '') + '>' +
+      '<summary style="cursor:pointer"><b>' + esc(g) + '</b> <span class="aviso">· ' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · ' + comVoz + ' com voz</span></summary>' +
+      l.map(function(t){
+        var voz = t.tipo === 'video' ? '' : t.fila ? '⏳ gravando (faltam ' + t.fila.faltam + ')' : t.audios ? '🔊 voz da IA' : '🔈 voz do navegador';
+        return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin-top:6px">' +
+          '<div style="flex:1 1 240px;min-width:0"><b>' + esc(t.titulo) + '</b>' +
+            '<div class="aviso" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc((t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; }).join(' · ') || t.tema || '') + '</div>' +
+            '<div class="aviso" style="margin-top:2px">' + [tipoTxt[t.tipo] || '', voz, 'v' + t.versao, t.sessoes ? '👥 ' + t.alunos : ''].filter(Boolean).join(' · ') + '</div></div>' +
+          '<div style="display:flex;gap:6px;align-items:center"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button>' +
+            '<details style="position:relative"><summary class="link" style="list-style:none;cursor:pointer;font-size:18px;padding:0 6px" title="mais opções">⋯</summary>' +
+              '<div style="position:absolute;right:0;z-index:5;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:190px;box-shadow:0 4px 14px #0002">' +
+              (t.tipo === 'video' ? '' : '<button class="mini secundario" data-trgravar="' + esc(t.id) + '">🎙 ' + (t.audios ? 'Gravar as falas que faltam' : 'Gravar com a voz da IA') + '</button>') +
+              '<button class="mini secundario" data-trapagar="' + esc(t.id) + '">🗑 Apagar</button></div></details></div></div>';
+      }).join('') + '</details>';
+  }).join('');
+  box.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.addEventListener('toggle', function(){ if(q) return; try{ var a = JSON.parse(localStorage.getItem('trilha_grupos_prof') || '{}') || {}; a[d.getAttribute('data-trgrupoprof')] = d.open; localStorage.setItem('trilha_grupos_prof', JSON.stringify(a)); }catch(e){} }); });
+  ligarBotoesListaProf();
+}
+function ligarBotoesListaProf(){
+  document.querySelectorAll('[data-trabrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trabrir')); }); });
+  var gravarFundo = function(dados, msg){
+    $('msgLote').textContent = 'Colocando na fila…';
+    api('trilhaNarrarFundo', dados).then(function(r){
+      return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; });
+    }).catch(function(e){ $('msgLote').textContent = ''; erroGeral(e.message); });
+  };
+  document.querySelectorAll('[data-trgravar]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; gravarFundo({ids: [b.getAttribute('data-trgravar')], voz: $('vozLote').value}); }); });
+  document.querySelectorAll('[data-trapagar]').forEach(function(b){ b.addEventListener('click', function(){
+    var t = L.trilhas.filter(function(x){ return x.id === b.getAttribute('data-trapagar'); })[0];
+    if(!confirm('Apagar "' + t.titulo + '"? A pasta dela vai para a lixeira do seu Drive (dá para recuperar por 30 dias).')) return;
+    b.disabled = true;
+    api('trilhaApagar', {id: t.id}).then(inicio).catch(function(e){ b.disabled = false; erroGeral(e.message); });
+  }); });
 }
 // visão do aluno: só a lista para estudar (sem criar, sem apagar, sem estatística)
 function barraPct(p){ var c = p >= 100 ? '#1a7a3c' : p >= 50 ? '#2E62C6' : '#B8890A'; return '<div style="height:7px;background:#e3e8f2;border-radius:4px;overflow:hidden;margin:5px 0 2px"><div style="height:100%;width:' + Math.max(0, Math.min(100, p || 0)) + '%;background:' + c + '"></div></div>'; }
