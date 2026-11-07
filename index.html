@@ -698,6 +698,16 @@ if(!visitante){
   localStorage.setItem('ip_visitante', visitante);
 }
 
+// cota da IA acabou: aviso no topo com o passo a passo para o aluno cadastrar a própria chave (grátis)
+function mostrarConviteChave(tipo){
+  var v = document.getElementById('conviteChave'); if(v) v.remove();
+  var propria = tipo === 'COTA_PROPRIA';
+  document.body.insertAdjacentHTML('afterbegin', '<div id="conviteChave" class="convite" style="position:sticky;top:0;z-index:50;margin:0 auto 10px;max-width:760px;box-shadow:0 4px 14px #0002">' +
+    '<div class="eyebrow">' + (propria ? 'A sua chave também chegou ao limite' : 'Os créditos de IA da plataforma acabaram por hoje') + '</div>' +
+    (propria ? '<p style="font-size:14px;margin:4px 0 8px">A sua chave do Gemini atingiu o limite gratuito agora (ou está com problema). Espere um pouco e tente de novo, ou confira se a chave em Minha conta está certa.</p>'
+      : '<p style="font-size:14px;margin:4px 0 4px">Para continuar agora, cadastre a <b>sua própria chave do Gemini</b> (leva 2 minutos):</p>' + "<ol style=\"margin:6px 0 8px 18px;padding:0;font-size:14px;line-height:1.5\"><li>Abra <a href=\"https://aistudio.google.com/apikey\" target=\"_blank\" rel=\"noopener\">aistudio.google.com/apikey</a> e entre com a sua conta Google.</li><li>Clique em <b>Criar chave de API</b> (<i>Create API key</i>) e aceite os termos, se pedir.</li><li>Copie a chave (começa com <b>AIza</b>).</li><li>Em <b>Minha conta</b> → <b>Sua chave do Gemini</b>, cole e clique em <b>Salvar chave</b>.</li></ol><p style=\"font-size:12.5px;margin:0 0 8px;opacity:.85\">É grátis e não pede cartão. No plano grátis o Google pode usar as conversas para melhorar os produtos dele.</p>") +
+    '<div class="botoes" style="margin:0"><button onclick="document.getElementById(\'conviteChave\').remove(); abrirConta()">' + (propria ? 'Abrir Minha conta' : 'Cadastrar minha chave') + '</button><button class="secundario" onclick="document.getElementById(\'conviteChave\').remove()">Fechar</button></div></div>');
+}
 function api(acao, dados){
   dados = dados || {};
   if(dados.turnos || dados.resultado) dados.visitante = visitante;
@@ -713,6 +723,11 @@ function api(acao, dados){
   .then(function(j){
     if(!j.ok){
       // O servidor manda um código; o texto que o aluno lê é montado aqui.
+      if(j.erro === 'COTA_SEM_CHAVE' || j.erro === 'COTA_PROPRIA'){
+        try{ mostrarConviteChave(j.erro); }catch(x){}
+        throw new Error(j.erro === 'COTA_PROPRIA' ? 'A sua chave do Gemini e os créditos da plataforma atingiram o limite agora. Sua resposta continua na tela: tente de novo mais tarde ou confira a sua chave em Minha conta.'
+          : 'Os créditos de IA da plataforma acabaram por hoje. Cadastre a sua própria chave gratuita do Gemini (passo a passo no aviso no topo da página) e reenvie: sua resposta continua na tela.');
+      }
       if(j.erro === 'COTA'){
         throw new Error('Os créditos de uso da inteligência artificial ' +
           'acabaram por hoje. Eles voltam na virada do dia — sua resposta ' +
