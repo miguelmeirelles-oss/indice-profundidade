@@ -66,7 +66,7 @@ var PROMPT_TRILHA = [
 "  {\"tipo\":\"derreter\",\"centro\":[x,y],\"raio\":12,\"duracao\":3000} · {\"tipo\":\"evaporar\",\"duracao\":3000} (sai toda a água menos a ligada)",
 "  {\"tipo\":\"desidratar\",\"alvo\":\"id\",\"n\":8}  água sai de dentro de uma célula · {\"tipo\":\"prender\",\"grupo\":\"w\",\"dentro\":\"id\"}  água capturada por uma rede",
 "  {\"tipo\":\"coletar\",\"especie\":\"particula\",\"para\":[x,y]}",
-"  {\"tipo\":\"rotulo\",\"x\":x,\"y\":y,\"texto\":\"texto\",\"cor\":\"azul\"} · {\"tipo\":\"circulo\",\"x\":x,\"y\":y,\"r\":6,\"rotulo\":\"texto\"} · {\"tipo\":\"seta\",\"de\":[x,y],\"para\":[x,y],\"rotulo\":\"texto\"} · {\"tipo\":\"linha\",\"de\":[x,y],\"para\":[x,y]} · {\"tipo\":\"limpar_rotulos\"} (apaga só os textos, setas e círculos; os desenhos ficam) · {\"tipo\":\"limpar_cena\"} (apaga tudo). Use SÓ essas ações.",
+"  {\"tipo\":\"rotulo\",\"x\":x,\"y\":y,\"texto\":\"texto\",\"cor\":\"azul\"} · {\"tipo\":\"circulo\",\"x\":x,\"y\":y,\"r\":6,\"rotulo\":\"texto\"} · {\"tipo\":\"seta\",\"de\":[x,y],\"para\":[x,y],\"rotulo\":\"texto\"} · {\"tipo\":\"linha\",\"de\":[x,y],\"para\":[x,y]} · {\"tipo\":\"organizar\",\"especie\":\"acucar\",\"de_area\":[x1,y1,x2,y2],\"area\":[x1,y1,x2,y2],\"espaco\":6} (as partículas se arrumam numa grade: cristal) · {\"tipo\":\"congelar_solutos\",\"de_area\":[…]} (as partículas param de se mexer: vítreo) · {\"tipo\":\"limpar_rotulos\"} (apaga só os textos, setas e círculos; os desenhos ficam) · {\"tipo\":\"limpar_cena\"} (apaga tudo). Use SÓ essas ações.",
 "- Para comparar dois casos, divida a cena ao meio com uma \"linha\" em x=50 e rótulos no topo de cada lado. Rótulos da cena também curtos (até ~30 caracteres). As cenas são esquemáticas (fora de escala); diga isso no campo \"fonte\".",
 "",
 "REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre a LISTA de trilhas na ordem do curso (ordem dos PDFs das aulas e da apostila no Google Drive, não a ordem das gravações), com o assunto de cada uma e de quais aulas gravadas vem. Depois de aprovada, mostre o ROTEIRO de cada trilha (tabela com nº do passo, título, o que a voz diz, o que aparece no gráfico e o que acontece na cena) e, se a sua interface permitir conteúdo visual, uma PRÉVIA animada no formato vertical. Liste as correções feitas (REGRA PRINCIPAL). Ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).",
@@ -1502,6 +1502,20 @@ var Cena = (function () {
         e.x += vx * dt; e.y += vy * dt; if (e.x < ar[0] || e.x > ar[2]) { vx *= -1; e.x = Math.min(Math.max(e.x, ar[0]), ar[2]); } if (e.y < ar[1] || e.y > ar[3]) { vy *= -1; e.y = Math.min(Math.max(e.y, ar[1]), ar[3]); } posEl(e); });
     };
     A.limpar_cena = () => limpar();
+    A.organizar = (a, an) => {
+      const esp = a.especie || "acucar", de = a.de_area, ar = a.area || [20, 15, 80, 45], sp = a.espaco || 6;
+      const l = parts.filter(p => !p.morrer && p.tipo === esp && (!de || dentro(de, p.x, p.y)));
+      const cols = Math.max(1, Math.floor((ar[2] - ar[0]) / sp) + 1), rows = Math.max(1, Math.floor((ar[3] - ar[1]) / sp) + 1);
+      const ox = ar[0] + ((ar[2] - ar[0]) - (cols - 1) * sp) / 2, oy = ar[1] + ((ar[3] - ar[1]) - (rows - 1) * sp) / 2, pos = [];
+      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) pos.push({ x: ox + c * sp, y: oy + r * sp });
+      l.sort((p, q) => (p.y - q.y) || (p.x - q.x)).slice(0, pos.length).forEach((p, i) => {
+        p.casa = pos[i]; p.modoFinal = "preso"; p.vx = 0; p.vy = 0;
+        if (!an) { p.x = pos[i].x; p.y = pos[i].y; p.modo = "preso"; } else p.modo = "indo";
+      });
+    };
+    A.congelar_solutos = (a) => {
+      parts.forEach(p => { if (p.tipo === "agua" || p.morrer || p.modo !== "livre") return; if (a.especie && p.tipo !== a.especie) return; if (a.de_area && !dentro(a.de_area, p.x, p.y)) return; p.agit = a.agitacao == null ? .02 : a.agitacao; p.vx = 0; p.vy = 0; });
+    };
     A.limpar_rotulos = (a, an) => { L.ann.querySelectorAll("[data-trrot]").forEach(g => { if (an) { g.style.transition = "opacity .4s"; g.setAttribute("opacity", 0); setTimeout(() => g.remove(), 450); } else g.remove(); }); };
 
     function limpar() {
