@@ -388,7 +388,7 @@ function conferir(){
   var txt = $('txtJson').value.trim();
   if(!txt){ $('resConf').innerHTML = '<div class="erro">Cole o JSON ou escolha o arquivo.</div>'; return; }
   $('resConf').innerHTML = '<p class="aviso">Conferindo…</p>'; conferida = null;
-  api('trilhaEnviar', {texto: txt, salvar: false}).then(function(r){
+  api('trilhaEnviar', {texto: txt, salvar: false, motorAcoes: acoesDoMotor()}).then(function(r){
     var h = '';
     if(r.erros.length) h += '<div class="erro"><b>Precisa corrigir antes de salvar (' + r.erros.length + '):</b><ul class="t-erros">' + r.erros.map(function(e){ return '<li>' + esc(e) + '</li>'; }).join('') + '</ul>Dica: copie esta lista e peça à IA para corrigir.</div>';
     if(r.avisos.length) h += '<div class="convite"><b>Avisos:</b><ul class="t-erros">' + r.avisos.map(function(e){ return '<li>' + esc(e) + '</li>'; }).join('') + '</ul></div>';
@@ -407,7 +407,7 @@ function conferir(){
       $('btPrevia').addEventListener('click', function(){ abrirPlayer({id: '', versao: 0, trilha: conferida[$('selPrevia') ? Number($('selPrevia').value) : 0], narracao: {}, voz: 'Kore', previa: true}); });
       $('btSalvar').addEventListener('click', function(){
         var b = this; b.disabled = true; $('msgSalvar').innerHTML = '<p class="aviso">Salvando no Drive…</p>';
-        api('trilhaEnviar', {texto: $('txtJson').value, salvar: true, disciplinaId: $('selDiscSalvar').value, id: $('selDestino') ? $('selDestino').value : '', comentario: $('txtComVersao') ? $('txtComVersao').value : ''}).then(function(s){
+        api('trilhaEnviar', {texto: $('txtJson').value, salvar: true, motorAcoes: acoesDoMotor(), disciplinaId: $('selDiscSalvar').value, id: $('selDestino') ? $('selDestino').value : '', comentario: $('txtComVersao') ? $('txtComVersao').value : ''}).then(function(s){
           if(s.erros && s.erros.length) throw new Error(s.erros.join(' '));
           return api('trilhasListar').then(function(r2){ L = r2; if((s.ids || []).length > 1){ desenharLista(); erroGeral(''); $('corpo').insertAdjacentHTML('afterbegin', '<div class="ok">✓ ' + s.ids.length + ' aulas em trilha salvas no seu Drive.</div>'); } else abrirTrilha(s.id); });
         }).catch(function(e){ b.disabled = false; $('msgSalvar').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
@@ -1091,25 +1091,22 @@ var Cena = (function () {
     fundo: "#262626", agua: "#7cc4ff", gelo: "#dff4ff", geloBorda: "#dff4ff", H: "#ffffff", Hb: "none", ligacao: "#dff4ff",
     ion: "#f2b84b", ionMenos: "#b9a5ff", acucar: "#ff9fc7", particula: "#e9826f",
     gordura: "#f5d76e", bacteria: "#7ddc9a", bactBorda: "#3f8f5c", bactSeca: "#5fae7a", bactDano: "#6a3b3b",
-    caixa: "#e8e2d0", caixaFundo: "#ffffff12", estrutura: "#f2c79b", cadeia: "#e6c27a", o2: "#ff8a8a",
-    levedura: "#f3d27a", levBorda: "#b8962f", fungo: "#b9cf8f", fungoEsporo: "#7f9a52",
+    caixa: "#e8e2d0", caixaFundo: "#ffffff12", estrutura: "#f2c79b", cadeia: "#e6c27a", o2: "#ff8a8a", fungo: "#b9d36b", levedura: "#e8c98a",
     giz: "#f4f1e8", dano: "#ff6b6b",
     azul: "#7cc4ff", laranja: "#ffb070", verde: "#8fe3b0", vermelho: "#ff8a8a",
-    roxo: "#c7a6ff", cinza: "#bdbdbd", ambar: "#ffd479", rosa: "#ff9fc7"
+    roxo: "#c7a6ff", cinza: "#bdbdbd", ambar: "#ffd479", rosa: "#ff9fc7", hmais: "#ff6b6b", acido: "#c7a6ff", anion: "#9fd0ff"
   };
   const PAL_CLARO = {
     fundo: "#ffffff", agua: "#2b7fd4", gelo: "#cfe8fa", geloBorda: "#2b7fd4", H: "#ffffff", Hb: "#5d6b78", ligacao: "#2b7fd4",
     ion: "#f0a91e", ionMenos: "#8b6be0", acucar: "#d6337a", particula: "#c9472f",
     gordura: "#d9a90f", bacteria: "#3fb46a", bactBorda: "#1f7a42", bactSeca: "#2d8a50", bactDano: "#8a3a3a",
-    caixa: "#6b6a64", caixaFundo: "#0000000a", estrutura: "#b8742d", cadeia: "#a8741a", o2: "#d62828",
-    levedura: "#e8b931", levBorda: "#8a6a0c", fungo: "#5f8a3a", fungoEsporo: "#3d5c22",
+    caixa: "#6b6a64", caixaFundo: "#0000000a", estrutura: "#b8742d", cadeia: "#a8741a", o2: "#d62828", fungo: "#5f7d1e", levedura: "#b07a1e",
     giz: "#1d1d1b", dano: "#d62828",
     azul: "#1f6fd1", laranja: "#d9650b", verde: "#1a8a47", vermelho: "#d62828",
-    roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a"
+    roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6"
   };
-  const RAIO = { agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, levedura: 4.2, fungo: 5.5 };
-  const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1, levedura: 1, fungo: 1 };
-  const CELULA = { bacteria: 1, levedura: 1, fungo: 1 };
+  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9 };
+  const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
   function mk(tag, at, par) { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); if (par) par.appendChild(e); return e; }
@@ -1147,6 +1144,17 @@ var Cena = (function () {
       }
       else if (t === "acucar") { hexagono(g, RAIO.acucar * tam, PAL.acucar); if (d.rotulo) rot(g, 0, RAIO.acucar * tam + 4, d.rotulo, 3.4); }
       else if (t === "particula") { mk("circle", { r: RAIO.particula * tam, fill: PAL.particula }, g); }
+      else if (t === "fungo") {
+        const cor = PAL.fungo, s = tam;
+        mk("path", { d: `M0,${4*s} L0,${-1*s} L${-2.6*s},${-3.6*s} M0,${-1*s} L${2.4*s},${-3.2*s} L${3.4*s},${-5*s} M${2.4*s},${-3.2*s} L${4.4*s},${-2.4*s} M0,${1.5*s} L${-3*s},${0.5*s}`, stroke: cor, "stroke-width": .55 * s, fill: "none", "stroke-linecap": "round" }, g);
+        [[-2.6, -3.6], [3.4, -5], [4.4, -2.4], [-3, .5]].forEach(([x, y]) => mk("circle", { cx: x * s, cy: y * s, r: .75 * s, fill: cor }, g));
+        if (d.rotulo) rot(g, 0, 7.6 * s, d.rotulo, 3.2);
+      }
+      else if (t === "levedura") {
+        mk("ellipse", { rx: 2.6 * tam, ry: 2 * tam, fill: PAL.levedura, stroke: PAL.cadeia, "stroke-width": .35 }, g);
+        mk("ellipse", { cx: 2.7 * tam, cy: -1.3 * tam, rx: 1.2 * tam, ry: 1 * tam, fill: PAL.levedura, stroke: PAL.cadeia, "stroke-width": .35 }, g);
+        if (d.rotulo) rot(g, 0, 5.4 * tam, d.rotulo, 3.2);
+      }
       else if (t === "cadeia") {
         const n = d.unidades || 4, cor = PAL[d.cor] || PAL.cadeia, r = 1.25 * tam, dx = 2.3 * tam;
         let pth = ""; for (let i = 0; i < n; i++) { const x = (i - (n - 1) / 2) * dx, y = (i % 2 ? .9 : -.9) * tam; pth += (i ? "L" : "M") + x.toFixed(2) + "," + y.toFixed(2); }
@@ -1169,25 +1177,6 @@ var Cena = (function () {
         e.corpo = mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: h / 2, fill: e.dano ? PAL.bactDano : PAL.bacteria, stroke: e.dano ? PAL.dano : PAL.bactBorda, "stroke-width": .5 }, g);
         if (e.dano) mk("path", { d: `M${-w / 4},${-h / 2} l1.4,2 l-1.6,1.4 l1.8,2`, stroke: PAL.dano, "stroke-width": .6, fill: "none" }, g);
         if (d.rotulo) rot(g, 0, h / 2 + 3.6, d.rotulo, 3.2);
-      }
-      else if (t === "levedura") {
-        // célula oval com um broto (gemulação) e o núcleo
-        const rx = 3.8 * tam, ry = 3.0 * tam, f = e.dano ? PAL.bactDano : PAL.levedura, b = e.dano ? PAL.dano : PAL.levBorda;
-        e.corpo = mk("ellipse", { rx, ry, fill: f, stroke: b, "stroke-width": .5 }, g);
-        mk("ellipse", { cx: rx * .95, cy: -ry * .55, rx: 1.5 * tam, ry: 1.2 * tam, fill: f, stroke: b, "stroke-width": .45 }, g);
-        mk("circle", { cx: -rx * .25, cy: ry * .1, r: .9 * tam, fill: b, opacity: .55 }, g);
-        if (e.dano) mk("path", { d: `M${-rx / 2},${-ry} l1.2,1.8 l-1.4,1.2 l1.6,1.8`, stroke: PAL.dano, "stroke-width": .6, fill: "none" }, g);
-        if (d.rotulo) rot(g, 0, ry + 3.8, d.rotulo, 3.2);
-      }
-      else if (t === "fungo") {
-        // bolor: filamentos (hifas) ramificados com esporos nas pontas
-        const c = e.dano ? PAL.dano : PAL.fungo, sp = e.dano ? PAL.bactDano : PAL.fungoEsporo, k = tam;
-        const ramos = [[0, 3, -3.5, -1.5], [-3.5, -1.5, -5.5, -4.5], [-3.5, -1.5, -1.5, -5], [0, 3, 3.2, -0.8], [3.2, -0.8, 5.5, -3.8], [3.2, -0.8, 1.8, -4.6], [0, 3, 0.4, -2.6]];
-        let pth = ""; ramos.forEach(r => { pth += `M${(r[0] * k).toFixed(2)},${(r[1] * k).toFixed(2)}Q${((r[0] + r[2]) / 2 * k + .6).toFixed(2)},${((r[1] + r[3]) / 2 * k).toFixed(2)} ${(r[2] * k).toFixed(2)},${(r[3] * k).toFixed(2)}`; });
-        mk("path", { d: pth, stroke: c, "stroke-width": .55 * Math.max(.7, k), fill: "none", "stroke-linecap": "round" }, g);
-        e.corpo = mk("ellipse", { cx: 0, cy: 3.3 * k, rx: 2.6 * k, ry: .8 * k, fill: c, opacity: .5 }, g);
-        [[-5.5, -4.5], [-1.5, -5], [5.5, -3.8], [1.8, -4.6], [0.4, -2.6]].forEach(q => mk("circle", { cx: q[0] * k, cy: q[1] * k, r: .85 * k, fill: sp }, g));
-        if (d.rotulo) rot(g, 0, 4.2 * k + 3.4, d.rotulo, 3.2);
       }
       else if (t === "caixa" || t === "estrutura") {
         const w = d.w || 20, h = d.h || 14;
@@ -1225,6 +1214,9 @@ var Cena = (function () {
       else if (tipo === "acucar") hexagono(g, 2.2, PAL.acucar);
       else if (tipo === "gordura") mk("circle", { r: 2.4, fill: PAL.gordura }, g);
       else if (tipo === "o2") { mk("circle", { cx: -.8, r: 1, fill: PAL.o2 }, g); mk("circle", { cx: .8, r: 1, fill: PAL.o2 }, g); }
+      else if (tipo === "h") { mk("circle", { r: 1.35, fill: PAL.hmais }, g); const t = mk("text", { "text-anchor": "middle", y: .75, "font-size": 2, "font-weight": 700, fill: "#fff", "font-family": "system-ui,sans-serif" }, g); t.textContent = "+"; }
+      else if (tipo === "ha") { mk("circle", { r: 1.9, fill: PAL.acido + "33", stroke: PAL.acido, "stroke-width": .5 }, g); mk("circle", { cx: 1.75, cy: -1.2, r: .95, fill: PAL.hmais }, g); }
+      else if (tipo === "a") { mk("circle", { r: 1.9, fill: PAL.anion + "26", stroke: PAL.anion, "stroke-width": .5, "stroke-dasharray": ".9 .6" }, g); const t = mk("text", { "text-anchor": "middle", y: .9, "font-size": 2.8, "font-weight": 700, fill: PAL.anion, "font-family": "system-ui,sans-serif" }, g); t.textContent = "−"; }
       else mk("circle", { r: RAIO.particula, fill: PAL.particula }, g);
       parts.push(p); return p;
     }
@@ -1270,7 +1262,7 @@ var Cena = (function () {
           else { const d = dist(p.x, p.y, l.cx, l.cy); if (d > l.r) { p.x = l.cx + (p.x - l.cx) * l.r / d; p.y = l.cy + (p.y - l.cy) * l.r / d; p.vx *= -.5; p.vy *= -.5; } }
           if (l.t === "r") {
             for (const dk of discos) { const d = dist(p.x, p.y, dk.cx, dk.cy); if (d < dk.r && d > .01) { p.x = dk.cx + (p.x - dk.cx) * dk.r / d; p.y = dk.cy + (p.y - dk.cy) * dk.r / d; } }
-            for (const e of obst) { const w = (e.def.w || 20) / 2 + 1.4, h = (e.def.h || 14) / 2 + 1.4; if (Math.abs(p.x - e.x) < w && Math.abs(p.y - e.y) < h) { const dx = w - Math.abs(p.x - e.x), dy = h - Math.abs(p.y - e.y); if (dx < dy) p.x = e.x + Math.sign(p.x - e.x || 1) * w; else p.y = e.y + Math.sign(p.y - e.y || 1) * h; } }
+            for (const e of obst) { const w = (e.def.w || 20) / 2 + 1.4, h = (e.def.h || 14) / 2 + 1.4; if (l.x1 >= e.x - w && l.x2 <= e.x + w && l.y1 >= e.y - h && l.y2 <= e.y + h) continue; if (Math.abs(p.x - e.x) < w && Math.abs(p.y - e.y) < h) { const dx = w - Math.abs(p.x - e.x), dy = h - Math.abs(p.y - e.y); if (dx < dy) p.x = e.x + Math.sign(p.x - e.x || 1) * w; else p.y = e.y + Math.sign(p.y - e.y || 1) * h; } }
           }
           if (p.tipo === "agua" && frame % 3 === 0) orient(p, p.ang + (Math.random() - .5) * 30 * p.agit);
         } else if (p.casa) {
@@ -1353,7 +1345,7 @@ var Cena = (function () {
     A.hidratar = (a, an) => {
       const e = els[a.alvo]; if (!e) return;
       const re = raioEl(e), cam = a.camadas || 1, n = a.n || 8;
-      const r1 = re + 2.3, r2 = r1 + 2.9;
+      const r1 = a.raio || re + 2.3, r2 = r1 + 2.9;
       const n1 = cam === 2 ? Math.max(4, Math.round(n * .42)) : n, n2 = n - n1;
       const pos = [];
       for (let i = 0; i < n1; i++) { const t = 2 * Math.PI * i / n1; pos.push([r1, t]); }
@@ -1396,7 +1388,7 @@ var Cena = (function () {
         });
       } else if (a.expulsar !== false) {
         sol.forEach(s => {
-          if (s.el && CELULA[s.el.tipo]) return;
+          if (s.el && s.el.tipo === "bacteria") return;
           let x = s.x, y = s.y;
           for (let it = 0; it < 3; it++) for (const [nx, ny] of nuc) { const d = dist(x, y, nx, ny); if (d < R + 1.5) { const k = (R + 2.4) / (d || .01); x = nx + (x - nx) * k; y = ny + (y - ny) * k; } }
           x = Math.min(Math.max(x, ar[0] + 1), ar[2] - 1); y = Math.min(Math.max(y, ar[1] + 1), ar[3] - 1);
@@ -1411,7 +1403,7 @@ var Cena = (function () {
         const key = x.toFixed(1) + "," + y.toFixed(1); if (sites.has(key)) continue;
         let dn = 1e9; for (const [nx, ny] of nuc) dn = Math.min(dn, dist(x, y, nx, ny)); if (dn > R) continue;
         if (ev != null && sol.some(s => dist(x, y, s.x, s.y) < s.r + ev)) continue;
-        if (ev == null && sol.some(s => s.el && CELULA[s.el.tipo] && dist(x, y, s.x, s.y) < 3.2)) { /* cristal atravessa a célula */ }
+        if (ev == null && sol.some(s => s.el && s.el.tipo === "bacteria" && dist(x, y, s.x, s.y) < 3.2)) { /* cristal atravessa a célula */ }
         st.push({ x, y, key, dn });
       }
       st.sort((p, q) => p.dn - q.dn);
@@ -1460,11 +1452,11 @@ var Cena = (function () {
       ps.forEach((p, i) => { const r = 2.2 * Math.sqrt(i), t = i * 2.4; const x = cx + Math.cos(t) * r, y = cy + Math.sin(t) * r; p.casa = { x, y }; p.modo = an ? "indo" : "preso"; p.modoFinal = "preso"; if (!an) { p.x = x; p.y = y; } });
     };
 
-    A.rotulo = (a, an) => { const g = mk("g", { "data-trrot": 1 }, L.ann); rot(g, a.x, a.y, a.texto, a.tamanho || 3.9, PAL[a.cor] || PAL.giz); fade(g, an); };
-    A.circulo = (a, an) => { const g = mk("g", { "data-trrot": 1 }, L.ann); const c = PAL[a.cor] || PAL.ambar; mk("circle", { cx: a.x, cy: a.y, r: a.r || 6, fill: "none", stroke: c, "stroke-width": .5, "stroke-dasharray": "1.4 1" }, g); if (a.rotulo) rot(g, a.x, a.y - (a.r || 6) - 1.6, a.rotulo, 3.6, c); fade(g, an); };
+    A.rotulo = (a, an) => { const g = mk("g", {}, L.ann); rot(g, a.x, a.y, a.texto, a.tamanho || 3.9, PAL[a.cor] || PAL.giz); fade(g, an); };
+    A.circulo = (a, an) => { const g = mk("g", {}, L.ann); const c = PAL[a.cor] || PAL.ambar; mk("circle", { cx: a.x, cy: a.y, r: a.r || 6, fill: "none", stroke: c, "stroke-width": .5, "stroke-dasharray": "1.4 1" }, g); if (a.rotulo) rot(g, a.x, a.y - (a.r || 6) - 1.6, a.rotulo, 3.6, c); fade(g, an); };
     A.linha = (a, an) => { const g = mk("g", {}, L.ann); mk("line", { x1: a.de[0], y1: a.de[1], x2: a.para[0], y2: a.para[1], stroke: PAL[a.cor] || PAL.giz + "66", "stroke-width": .4, "stroke-dasharray": "1.5 1.2" }, g); fade(g, an); };
     A.seta = (a, an) => {
-      const g = mk("g", { "data-trrot": 1 }, L.ann); const c = PAL[a.cor] || PAL.giz;
+      const g = mk("g", {}, L.ann); const c = PAL[a.cor] || PAL.giz;
       const [x1, y1] = a.de, [x2, y2] = a.para, t = Math.atan2(y2 - y1, x2 - x1);
       mk("line", { x1, y1, x2, y2, stroke: c, "stroke-width": .55 }, g);
       mk("path", { d: `M${x2},${y2}L${x2 - 2 * Math.cos(t - .45)},${y2 - 2 * Math.sin(t - .45)}L${x2 - 2 * Math.cos(t + .45)},${y2 - 2 * Math.sin(t + .45)}Z`, fill: c }, g);
@@ -1473,14 +1465,14 @@ var Cena = (function () {
     };
     A.evaporar = (a, an) => {
       const ar = a.area || [0, 0, 100, 60];
-      const alvo = parts.filter(p => p.tipo === "agua" && !p.morrer && !p.ligada && dentro(ar, p.x, p.y));
+      const alvo = parts.filter(p => p.tipo === "agua" && !p.morrer && !p.ligada && dentro(ar, p.x, p.y) && (!a.apenas || (a.apenas === "livre" ? p.modo === "livre" : p.modo !== "livre"))).slice(0, a.n || 9999);
       alvo.forEach((p, i) => {
         const sair = () => { p.modo = "indo"; p.modoFinal = "preso"; p.casa = { x: p.x + rnd(-6, 6), y: -8 }; p.alvoAlfa = 0; p.morrer = true; if (p.sitio) sites.delete(p.sitio); };
         if (!an) { p.g.remove(); p.morrer = true; p.alfa = 0; return; }
         timers.push(setTimeout(sair, rnd(0, a.duracao || 3000)));
       });
       if (!an) parts = parts.filter(p => !(p.morrer && p.alfa <= 0));
-      Object.values(els).forEach(e => { if (e.hid) e.hid = e.hid.filter(q => q.ligada); if (e.halo && an) tween(1500, k => e.halo.setAttribute("opacity", 1 - k), true); else if (e.halo) e.halo.setAttribute("opacity", 0); });
+      if (a.apenas !== "livre") Object.values(els).forEach(e => { if (e.hid) e.hid = e.hid.filter(q => q.ligada); if (e.halo && an) tween(1500, k => e.halo.setAttribute("opacity", 1 - k), true); else if (e.halo) e.halo.setAttribute("opacity", 0); });
     };
     A.prender = (a, an) => {
       const ar = areaDe(a);
@@ -1501,22 +1493,69 @@ var Cena = (function () {
         vx += (Math.random() - .5) * ag * 40 * dt * 6; vy += (Math.random() - .5) * ag * 40 * dt * 6; const dmp = Math.pow(.2, dt); vx *= dmp; vy *= dmp;
         e.x += vx * dt; e.y += vy * dt; if (e.x < ar[0] || e.x > ar[2]) { vx *= -1; e.x = Math.min(Math.max(e.x, ar[0]), ar[2]); } if (e.y < ar[1] || e.y > ar[3]) { vy *= -1; e.y = Math.min(Math.max(e.y, ar[1]), ar[3]); } posEl(e); });
     };
-    A.limpar_cena = () => limpar();
     A.organizar = (a, an) => {
-      const esp = a.especie || "acucar", de = a.de_area, ar = a.area || [20, 15, 80, 45], sp = a.espaco || 6;
-      const l = parts.filter(p => !p.morrer && p.tipo === esp && (!de || dentro(de, p.x, p.y)));
-      const cols = Math.max(1, Math.floor((ar[2] - ar[0]) / sp) + 1), rows = Math.max(1, Math.floor((ar[3] - ar[1]) / sp) + 1);
-      const ox = ar[0] + ((ar[2] - ar[0]) - (cols - 1) * sp) / 2, oy = ar[1] + ((ar[3] - ar[1]) - (rows - 1) * sp) / 2, pos = [];
-      for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) pos.push({ x: ox + c * sp, y: oy + r * sp });
-      l.sort((p, q) => (p.y - q.y) || (p.x - q.x)).slice(0, pos.length).forEach((p, i) => {
-        p.casa = pos[i]; p.modoFinal = "preso"; p.vx = 0; p.vy = 0;
-        if (!an) { p.x = pos[i].x; p.y = pos[i].y; p.modo = "preso"; } else p.modo = "indo";
+      const ar = a.area || [10, 10, 90, 50], sp = a.espaco || 5.5;
+      const ps = parts.filter(p => p.tipo === (a.especie || "acucar") && !p.morrer && (!a.de_area || dentro(a.de_area, p.x, p.y)));
+      const cols = Math.max(1, Math.floor((ar[2] - ar[0]) / sp));
+      ps.forEach((p, i) => { const x = ar[0] + (i % cols) * sp + sp / 2, y = ar[1] + Math.floor(i / cols) * sp * .9 + sp / 2; p.casa = { x, y }; p.modo = an ? "indo" : "preso"; p.modoFinal = "preso"; if (!an) { p.x = x; p.y = y; } });
+    };
+    A.congelar_solutos = (a, an) => { parts.filter(p => p.tipo !== "agua" && !p.morrer && (!a.de_area || dentro(a.de_area, p.x, p.y))).forEach(p => { p.modo = "preso"; p.casa = { x: p.x, y: p.y }; }); };
+    A.limpar_rotulos = () => { L.ann.innerHTML = ""; };
+    /* ---------- ácidos: HA ⇌ H⁺ + A⁻ ---------- */
+    function limR(ar) { return { t: "r", x1: ar[0], y1: ar[1], x2: ar[2], y2: ar[3] }; }
+    function parteVis(p, an, atraso) { if (!an) { p.alfa = 1; p.g.setAttribute("opacity", 1); } else if (atraso) { p.alvoAlfa = 0; timers.push(setTimeout(() => { if (!p.morrer) p.alvoAlfa = 1; }, atraso)); } }
+    function daEspecie(esp, ar, grupo) { return parts.filter(p => p.tipo === esp && !p.morrer && (!grupo || p.grupo === grupo) && (!ar || dentro(ar, p.x, p.y))); }
+    // acidos: {n, area|dentro, frac (0..1 dissociados), grupo, agitacao}
+    A.acidos = (a, an) => {
+      const ar = areaDe(a), n = a.n || 10, fr = a.frac || 0, nd = Math.round(n * fr), lim = limR(ar), ag = a.agitacao == null ? .45 : a.agitacao, gr = a.grupo || "acid";
+      for (let i = 0; i < n; i++) {
+        const x = rnd(ar[0], ar[2]), y = rnd(ar[1], ar[3]);
+        if (i < nd) { parteVis(novaParte("a", x, y, { grupo: gr, agit: ag, lim }), an); parteVis(novaParte("h", Math.min(ar[2], x + 3), y, { grupo: gr, agit: ag * 1.4, lim }), an); }
+        else parteVis(novaParte("ha", x, y, { grupo: gr, agit: ag, lim }), an);
+      }
+    };
+    // protons: {n, area|dentro, grupo}
+    A.protons = (a, an) => { const ar = areaDe(a); for (let i = 0; i < (a.n || 8); i++) parteVis(novaParte("h", rnd(ar[0], ar[2]), rnd(ar[1], ar[3]), { grupo: a.grupo || "hm", agit: a.agitacao == null ? .7 : a.agitacao, lim: limR(ar) }), an); };
+    // dissociar: {area|dentro, frac (fração dos HA da área) | n, grupo, duracao}
+    A.dissociar = (a, an) => {
+      const ar = areaDe(a), lista = daEspecie("ha", ar, a.grupo);
+      const k = a.n != null ? Math.min(a.n, lista.length) : Math.round(lista.length * (a.frac == null ? 1 : a.frac));
+      const dur = a.duracao || 2500;
+      lista.slice(0, k).forEach((p, i) => {
+        const fazer = () => { if (p.morrer) return; remover(p); p.alfa = 0; p.g.setAttribute("opacity", 0);
+          const na = novaParte("a", p.x, p.y, { grupo: p.grupo, agit: p.agit, lim: p.lim }); na.alfa = 1; na.g.setAttribute("opacity", 1);
+          const nh = novaParte("h", p.x + 1.8, p.y - 1.2, { grupo: p.grupo, agit: Math.max(.6, p.agit * 1.4), lim: p.lim }); nh.alfa = 1; nh.g.setAttribute("opacity", 1); nh.vx = rnd(4, 9); nh.vy = rnd(-6, 6); };
+        if (!an) fazer(); else timers.push(setTimeout(fazer, dur * i / Math.max(1, k)));
       });
     };
-    A.congelar_solutos = (a) => {
-      parts.forEach(p => { if (p.tipo === "agua" || p.morrer || p.modo !== "livre") return; if (a.especie && p.tipo !== a.especie) return; if (a.de_area && !dentro(a.de_area, p.x, p.y)) return; p.agit = a.agitacao == null ? .02 : a.agitacao; p.vx = 0; p.vy = 0; });
+    // associar: {area|dentro, frac|n, grupo, duracao} — A⁻ captura um H⁺ próximo e volta a HA
+    A.associar = (a, an) => {
+      const ar = areaDe(a), lista = daEspecie("a", ar, a.grupo);
+      const k = a.n != null ? Math.min(a.n, lista.length) : Math.round(lista.length * (a.frac == null ? 1 : a.frac));
+      const dur = a.duracao || 2500;
+      lista.slice(0, k).forEach((p, i) => {
+        const fazer = () => { if (p.morrer) return; const hs = daEspecie("h", ar); const h = maisProxima(hs, p.x, p.y); if (h) { remover(h); h.alfa = 0; h.g.setAttribute("opacity", 0); }
+          remover(p); p.alfa = 0; p.g.setAttribute("opacity", 0); const n = novaParte("ha", p.x, p.y, { grupo: p.grupo, agit: p.agit, lim: p.lim }); n.alfa = 1; n.g.setAttribute("opacity", 1); };
+        if (!an) fazer(); else timers.push(setTimeout(fazer, dur * i / Math.max(1, k)));
+      });
     };
-    A.limpar_rotulos = (a, an) => { L.ann.querySelectorAll("[data-trrot]").forEach(g => { if (an) { g.style.transition = "opacity .4s"; g.setAttribute("opacity", 0); setTimeout(() => g.remove(), 450); } else g.remove(); }); };
+    // atravessar: {especie, de:area|id, para:area|id, n, duracao, grupo_novo} — partículas passam de uma região a outra (ex.: HA cruza a membrana)
+    A.atravessar = (a, an) => {
+      const reg = r => typeof r === "string" ? areaDe({ dentro: r }) : (r || [2, 2, 98, 58]);
+      const de = a.de ? reg(a.de) : null, para = reg(a.para);
+      let lista = daEspecie(a.especie || "ha", null, a.grupo).filter(p => !de || dentro(de, p.x, p.y));
+      if (a.fora) { const f = reg(a.fora); lista = lista.filter(p => !dentro(f, p.x, p.y)); }
+      lista = lista.slice(0, a.n == null ? lista.length : a.n);
+      const dur = a.duracao || 3000;
+      lista.forEach((p, i) => {
+        const fazer = () => { const x = rnd(para[0], para[2]), y = rnd(para[1], para[3]); p.lim = limR(para); if (a.grupo_novo) p.grupo = a.grupo_novo;
+          if (!an) { p.x = x; p.y = y; p.modo = "livre"; p.casa = null; return; } p.modo = "indo"; p.modoFinal = "livre"; p.casa = { x, y }; };
+        if (!an) fazer(); else timers.push(setTimeout(fazer, dur * i / Math.max(1, lista.length)));
+      });
+    };
+    // remover_especie: {especie, area|dentro, n}
+    A.remover_especie = (a, an) => { const ar = (a.area || a.dentro) ? areaDe(a) : null; daEspecie(a.especie, ar, a.grupo).slice(0, a.n == null ? 999 : a.n).forEach(p => { remover(p); if (!an) { p.alfa = 0; } }); };
+    A.limpar_cena = () => limpar();
 
     function limpar() {
       timers.forEach(clearTimeout); timers = []; procs = [];
@@ -1550,6 +1589,22 @@ function carregarFonteGiz(){
 }
 function pararCena(){ if(CENA){ try{ CENA.parar(); }catch(e){} CENA = null; } }
 // estado da cena no passo: refaz do último "limpar_cena" até aqui (os anteriores já prontos; o atual animado se estiver tocando)
+// motor de cenas: o cena.js publicado ao lado do trilha.js (o mesmo das prévias do Claude); se não carregar, a cópia embutida
+var MOTOR = {ext: null, acoes: null};
+function motorCena(){ return MOTOR.ext || Cena; }
+function acoesDoMotor(){
+  if(MOTOR.acoes) return MOTOR.acoes;
+  try{ var sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), c = motorCena().criar(sv, {elementos: []}, {x: 0, y: 0, largura: 100}); MOTOR.acoes = (c.acoes || []).slice(); c.parar(); }catch(e){ MOTOR.acoes = []; }
+  return MOTOR.acoes;
+}
+(function carregarMotor(){
+  var antigo = window.Cena;
+  var sc = document.createElement('script');
+  sc.src = 'cena.js?t=' + Math.floor(Date.now() / 600000); // novo a cada 10 min no máximo: trocar o arquivo no GitHub já vale
+  sc.onload = function(){ var c = window.Cena; if(c && typeof c.criar === 'function' && c !== antigo){ MOTOR.ext = c; MOTOR.acoes = null; } window.Cena = antigo; };
+  sc.onerror = function(){ window.Cena = antigo; };
+  document.head.appendChild(sc);
+})();
 function desenharCena(b, passo, anim){
   var box = $('cenaBox'), sv = $('cenaSvg'); if(!box || !sv) return;
   pararCena(); sv.innerHTML = '';
@@ -1558,7 +1613,7 @@ function desenharCena(b, passo, anim){
   box.classList.remove('oculto'); carregarFonteGiz();
   var claro = !!(T && T.trilha && T.trilha.visual && T.trilha.visual.fundo === 'branco');
   box.classList.toggle('t-claro', claro);
-  CENA = Cena.criar(sv, b.cena, {x: 0, y: 0, largura: 100, tema: claro ? 'claro' : 'escuro'});
+  CENA = motorCena().criar(sv, b.cena, {x: 0, y: 0, largura: 100, tema: claro ? 'claro' : 'escuro'});
   var ultimo = function(ac){ var k = -1; (ac || []).forEach(function(a, i){ if(a.tipo === 'limpar_cena') k = i; }); return k; };
   var j0 = 0; for(var j = passo; j >= 0; j--){ if(ultimo(b.passos[j].cena_acoes) >= 0){ j0 = j; break; } }
   for(var i = j0; i <= passo; i++){
