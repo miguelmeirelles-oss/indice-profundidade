@@ -937,7 +937,7 @@ function desenharOrganizar(){
   var CAPS = capsDoOrg();
   var nG = ORG.grupos.length, mover = function(gi){ return '<select data-tromover="1" title="mover para outro tópico" style="max-width:150px">' + ORG.grupos.map(function(g, k){ return '<option value="' + k + '"' + (k === gi ? ' selected' : '') + '>' + esc((g.cap ? g.cap + SEP_CAP : '') + (g.nome || 'sem nome')) + '</option>'; }).join('') + '</select>'; };
   box.innerHTML = '<div class="convite" style="margin:0 0 10px"><b>✏️ Organizando a lista</b><div class="aviso" style="margin:4px 0 8px">Arraste pelo <b>⠿</b> as aulas e os tópicos para mudar a ordem (pode soltar uma aula em outro tópico). No celular, use ↑ ↓ e “mover para”. Clique no nome do tópico para mudar. Para juntar tópicos num <b>capítulo</b> (ex.: 1. Água → 1.1, 1.2…), escolha o capítulo no tópico (ou “➕ novo capítulo…”). A ordem vale também para a lista dos alunos.</div>' +
-    '<div class="botoes" style="margin:0"><button class="mini" id="tr_btOrgSalvar">💾 Salvar organização</button><button class="mini secundario" id="tr_btOrgNovo">➕ Novo tópico</button><button class="mini secundario" id="tr_btOrgNumero" title="ordena as aulas e os tópicos pelo número das aulas (01a, 01b, 02a…)">🔢 Pôr na ordem dos números</button><button class="mini secundario" id="tr_btOrgSair">Cancelar</button><span id="tr_msgOrg" class="aviso"></span></div></div>' +
+    '<div class="botoes" style="margin:0"><button class="mini" id="tr_btOrgSalvar">💾 Salvar organização</button><button class="mini secundario" id="tr_btOrgNovo">➕ Novo tópico</button><button class="mini secundario" id="tr_btOrgSair">Cancelar</button><span id="tr_msgOrg" class="aviso"></span></div></div>' +
     ORG.grupos.map(function(g, gi){
       var cab = g.cap && (gi === 0 || ORG.grupos[gi - 1].cap !== g.cap) ? '<div data-trocap="' + esc(g.cap) + '" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#e8eefb;border:1px solid #b9c8ea;border-left:4px solid #17389C;border-radius:8px;padding:8px 10px;margin:0 0 8px"><b>📚 Capítulo</b>' +
         '<input type="text" data-trocapnome="' + esc(g.cap) + '" value="' + esc(g.cap) + '" maxlength="70" style="flex:1 1 200px;font-weight:bold" title="mudar o nome do capítulo (vale para todos os tópicos dele)">' +
@@ -963,11 +963,6 @@ function ligarOrganizar(){
   var box = $('listaTrilhasProf'), G = ORG.grupos, redesenha = function(){ desenharOrganizar(); };
   var tirar = function(id){ for(var g = 0; g < G.length; g++){ var i = G[g].ids.indexOf(id); if(i !== -1){ G[g].ids.splice(i, 1); return [g, i]; } } return null; };
   $('btOrgSair').addEventListener('click', function(){ ORG = null; desenharListaProf(); });
-  $('btOrgNumero').addEventListener('click', function(){
-    var sem = 0; G.forEach(function(g){ g.ids.sort(function(a, b){ var ka = chaveCodigo(codigoDe(a)), kb = chaveCodigo(codigoDe(b)); return ka < kb ? -1 : ka > kb ? 1 : 0; }); g.ids.forEach(function(id){ if(!codigoDe(id)) sem++; }); });
-    G.sort(function(a, b){ var ka = a.ids.length ? chaveCodigo(codigoDe(a.ids[0])) : 'zzzzz', kb = b.ids.length ? chaveCodigo(codigoDe(b.ids[0])) : 'zzzzz'; return ka < kb ? -1 : ka > kb ? 1 : 0; });
-    redesenha(); $('msgOrg').textContent = sem ? sem + ' aula(s) sem número ficaram no fim do tópico (arraste para o lugar certo).' : '✓ Em ordem. Confira e salve.';
-  });
   $('btOrgNovo').addEventListener('click', function(){ var n = prompt('Nome do novo tópico (ex.: Água, Carboidratos):'); if(n && n.trim()){ G.push({nome: n.trim().slice(0, 80), ids: []}); redesenha(); } });
   $('btOrgSalvar').addEventListener('click', function(){
     var b = this, semNome = G.filter(function(g){ return g.ids.length && !g.nome.trim(); }).length;
