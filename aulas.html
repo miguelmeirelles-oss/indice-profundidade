@@ -1862,7 +1862,7 @@ function carregarTrilha(el, modo){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=26';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=28';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);
@@ -4086,13 +4086,16 @@ function lerSemestre(s){
   var d = new Date(); return {n: d.getMonth() < 6 ? '1' : '2', ano: String(d.getFullYear())};
 }
 
-var etapasEdit = [];
+var etapasEdit = [], GRUPOS_FORM = null;
 function abrirForm(d){
   var p = resumo.padrao, v = d || {nome:'', semestre:'', tempos:p.tempos, prazo_padrao:p.prazo_padrao,
     presenca_min:p.presenca_min, tempo_resposta:p.tempo_resposta, tempo_aberta:p.tempo_aberta, descartar_piores:false, apostila_auto:false,
     rigor:3, rev_fechadas:0, rev_abertas:0, rev_janela:0, explicar_alts:true, qtd_fechadas:p.qtd_fechadas, qtd_abertas:p.qtd_abertas, peso_fechadas:p.peso_fechadas, orientacoes:'', glossario:[],
     composicao:{etapas:[{id:'', nome:'P1', peso:1, fim:'', itens:itensNovos(1)}, {id:'', nome:'P2', peso:1, fim:'', itens:itensNovos(2)}]}};
   etapasEdit = JSON.parse(JSON.stringify((v.composicao && v.composicao.etapas) || []));
+  // assuntos (grandes temas) da disciplina, para marcar o que cai em cada prova
+  GRUPOS_FORM = null;
+  if(d && d.id) api('temasDisciplina', {disciplinaId: d.id}).then(function(r){ if(!$('etapasBox')) return; lerEtapas(); GRUPOS_FORM = (r.grupos || []).map(function(g){ return {id: g.id, nome: g.nome, aulas: g.aulas || []}; }); desenharEtapas(); }).catch(function(){});
   var sem = lerSemestre(v.semestre);
   var f = $('formDisc');
   f.innerHTML = '<h2>' + (d ? 'Editar disciplina' : 'Nova disciplina') + '</h2>' +
@@ -4287,8 +4290,9 @@ function desenharEtapas(){
     return '<div class="etapaEd" data-et="' + i + '">' +
       '<div class="etapaCab"><input type="text" data-c="nome" value="' + esc(e.nome) + '" aria-label="Nome da etapa" style="width:90px;font-weight:bold">' +
       '<label>Peso na média <input type="number" min="0" step="0.5" data-c="peso" value="' + esc(e.peso) + '" style="width:70px"></label>' +
-      '<label>Exercícios até <input type="date" data-c="fim" value="' + esc(e.fim) + '" style="width:150px"></label>' +
+      '<label title="vale só para as aulas sem assunto marcado">Exercícios até <input type="date" data-c="fim" value="' + esc(e.fim) + '" style="width:150px"></label>' +
       (etapasEdit.length > 1 ? '<button type="button" class="secundario mini" data-tiraret="' + i + '">Remover etapa</button>' : '') + '</div>' +
+      (GRUPOS_FORM === null ? '' : '<div data-tmbox="1" style="margin:6px 0 4px;font-size:14px"><b>Assuntos que caem nesta prova:</b> ' + (GRUPOS_FORM.length ? GRUPOS_FORM.map(function(g){ return '<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 12px 2px 0;font-weight:normal"><input type="checkbox" data-tm="' + esc(g.id) + '"' + ((e.temas || []).indexOf(g.id) !== -1 ? ' checked' : '') + '> ' + esc(g.nome) + '</label>'; }).join('') : '<span class="aviso">cadastre os grandes temas em Temas da disciplina para escolher aqui.</span>') + '</div>') +
       '<table class="itensEd"><tbody>' + e.itens.map(function(it, j){
         return '<tr data-it="' + j + '"><td><select data-t="tipo" aria-label="Tipo">' + ['prova', 'trabalho', 'aulas'].map(function(t){ return '<option value="' + t + '"' + (it.tipo === t ? ' selected' : '') + '>' + NOMES_TIPO[t] + '</option>'; }).join('') + '</select></td>' +
           '<td><input type="text" data-t="nome" value="' + esc(it.nome) + '" aria-label="Nome do item"></td>' +
@@ -4297,11 +4301,12 @@ function desenharEtapas(){
       }).join('') + '</tbody></table>' +
       '<div class="linha" style="border:0;padding:6px 0 0"><button type="button" class="secundario mini" data-maisit="' + i + '">+ Item</button>' +
       '<span>Total: <b' + (Math.abs(soma - 10) > 0.01 ? ' style="color:#c62828"' : '') + '>' + nota10(soma) + '</b> de 10' + (Math.abs(soma - 10) > 0.01 ? ' <span class="tag t-warn">precisa somar 10</span>' : '') + '</span></div></div>';
-  }).join('') +
+  }).join('') + avisoTemasSemProva() +
   '<p class="aviso" style="margin-top:6px">Média final = ' + (pesosIguais(etapasEdit) ? '(' + etapasEdit.map(function(e){ return esc(e.nome); }).join(' + ') + ') ÷ ' + etapasEdit.length
     : '(' + etapasEdit.map(function(e){ return esc(e.nome) + ' × ' + nota10(e.peso); }).join(' + ') + ') ÷ soma dos pesos') +
-  '. Os exercícios em aula entram na etapa pela data: até a data informada ou, se ficar em branco, até a data da prova da etapa cadastrada no Prova por IA.</p>';
+  '. <b>Os exercícios em aula entram na etapa pelo assunto</b> marcado acima (ex.: P1 = água e carboidratos), mesmo que a prova seja adiada; esses assuntos também definem o que cai na prova no estudo dirigido e nas aulas em trilha. Aulas sem assunto marcado entram pela data: até a data informada ou, se ficar em branco, até a data da prova da etapa cadastrada no Prova por IA.</p>';
   var box = $('etapasBox');
+  box.querySelectorAll('[data-tm]').forEach(function(c){ c.addEventListener('change', function(){ lerEtapas(); desenharEtapas(); }); });
   box.querySelectorAll('[data-tiraret]').forEach(function(b){ b.addEventListener('click', function(){ lerEtapas(); etapasEdit.splice(Number(b.dataset.tiraret), 1); desenharEtapas(); }); });
   box.querySelectorAll('[data-maisit]').forEach(function(b){ b.addEventListener('click', function(){ lerEtapas(); etapasEdit[Number(b.dataset.maisit)].itens.push({id:'', tipo:'trabalho', nome:'Trabalho', valor:0}); desenharEtapas(); }); });
   box.querySelectorAll('[data-tirarit]').forEach(function(b){ b.addEventListener('click', function(){
@@ -4310,10 +4315,22 @@ function desenharEtapas(){
   }); });
   box.querySelectorAll('input, select').forEach(function(inp){ inp.addEventListener('change', function(){ lerEtapas(); desenharEtapas(); }); });
 }
+// grandes temas que não caem em nenhuma prova: as aulas deles seguem a data (aviso só quando os assuntos já estão em uso)
+function avisoTemasSemProva(){
+  if(!GRUPOS_FORM || !GRUPOS_FORM.length) return '';
+  var marcados = {}, usa = false;
+  etapasEdit.forEach(function(e){ (e.temas || []).forEach(function(id){ marcados[id] = true; usa = true; }); });
+  if(!usa) return '<p class="aviso" style="margin:6px 0 0">💡 Marque os assuntos de cada prova para as aulas irem para a prova certa mesmo quando a prova é adiada.</p>';
+  var faltam = GRUPOS_FORM.filter(function(g){ return !marcados[g.id]; });
+  if(!faltam.length) return '<p class="ok" style="margin:6px 0 0">✓ Todos os grandes temas estão em alguma prova.</p>';
+  return '<div class="alerta" style="margin:6px 0 0">' + faltam.map(function(g){ return '⚠ <b>' + esc(g.nome) + '</b>' + (g.aulas && g.aulas.length ? ' (aula' + (g.aulas.length > 1 ? 's ' : ' ') + g.aulas.join(', ') + ')' : '') + ' não está em nenhuma prova'; }).join('<br>') +
+    '<br><span class="aviso">As aulas desses assuntos seguem a data ("Exercícios até"). Marque cada um na prova em que cai.</span></div>';
+}
 function lerEtapas(){
   $('etapasBox').querySelectorAll('[data-et]').forEach(function(box){
     var e = etapasEdit[Number(box.dataset.et)];
     box.querySelectorAll('.etapaCab [data-c]').forEach(function(inp){ e[inp.dataset.c] = inp.dataset.c === 'peso' ? String(inp.value).replace(',', '.') : inp.value; });
+    var tb = box.querySelector('[data-tmbox]'); if(tb) e.temas = Array.prototype.slice.call(tb.querySelectorAll('[data-tm]')).filter(function(c){ return c.checked; }).map(function(c){ return c.dataset.tm; });
     box.querySelectorAll('[data-it]').forEach(function(tr){
       var it = e.itens[Number(tr.dataset.it)];
       var tipoAntes = it.tipo;

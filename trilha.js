@@ -168,8 +168,8 @@ function desenharLista(){
     h += (discsOrd.length > 1 ? '<div class="t-blocos">' + discsOrd.map(function(d){ return '<button class="t-chip' + (d === filtro ? ' t-atual' : '') + '" data-trfiltro="' + esc(d) + '">' + esc(nomeDisc(d)) + ' (' + discsCom[d] + ')</button>'; }).join('') + '</div>' : '') +
       '<div class="botoes" style="margin:4px 0 10px"><input type="text" id="tr_buscaTrilha" placeholder="🔎 buscar aula…" style="flex:1 1 200px;max-width:340px"><button class="mini secundario" id="tr_btAbrirTodos">abrir todos</button><button class="mini secundario" id="tr_btFecharTodos">fechar todos</button><button class="mini" id="tr_btOrganizar">✏️ Organizar</button></div>' +
       '<div id="tr_listaTrilhasProf"></div>' +
-      '<details class="convite" style="margin-top:12px"><summary class="link"><b>🌙 Voz de leitura em segundo plano</b> (todas as aulas de uma vez; a voz é mais neutra que a da conversa)</summary><div class="aviso">Para a voz natural, abra a aula e use <b>🎙 Gravar com a voz da conversa</b>. Aqui o servidor grava sozinho (pode fechar o site), com a cota pequena de voz (umas 10 falas por modelo por dia); se acabar, continua no dia seguinte e te avisa no celular.</div>' +
-      '<div class="botoes" style="margin-top:8px"><label>Voz: <select id="tr_vozLote">' + L.vozes.map(function(v){ return '<option>' + v + '</option>'; }).join('') + '</select></label><button class="mini secundario" id="tr_btGravarTodas">Gravar a voz de todas as aulas que faltam</button><span id="tr_msgLote" class="aviso"></span></div></details>';
+      '<div class="convite" style="margin-top:12px"><b>🎙 Voz da conversa (natural) em todas as aulas</b><div class="aviso" style="margin:4px 0 6px">Grava uma aula depois da outra com a mesma voz da gravação aula por aula. <b>Deixe esta aba aberta</b> até terminar (uns 3 a 5 minutos por aula); pode usar outras abas.</div><div class="botoes" style="margin:0"><button class="mini" id="tr_btGravarTodasLive">🎙 Gravar com a voz da conversa todas as aulas que faltam</button></div></div>' +
+    '';
   } else h += '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
   h += '</div>';
   h += '<div class="caixa"><h2>Criar uma aula em trilha</h2>' +
@@ -199,6 +199,12 @@ function desenharLista(){
   if($('btFecharTodos')) $('btFecharTodos').addEventListener('click', function(){ document.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.open = false; }); });
   if($('btOrganizar')) $('btOrganizar').addEventListener('click', function(){ if(ORG) return; comecarOrganizar(); });
   desenharListaProf();
+  if($('btGravarTodasLive')) $('btGravarTodasLive').addEventListener('click', function(){
+    var ids = []; gruposDaLista(filtroProf()).forEach(function(g){ g.aulas.forEach(function(t){ if(t.tipo !== 'video') ids.push(t.id); }); });
+    if(!ids.length){ erroGeral('Nenhuma aula para gravar nesta matéria.'); return; }
+    if(!confirm('Gravar com a voz da conversa as falas que faltam em ' + ids.length + ' aula(s) desta matéria?\n\nDeixe esta aba aberta até terminar. As aulas que já têm todas as falas gravadas são puladas.')) return;
+    LV = {fila: ids, total: ids.length, n: 0, parar: false}; proximaDoLote();
+  });
   if($('btGravarTodas')) $('btGravarTodas').addEventListener('click', function(){ this.disabled = true; $('msgLote').textContent = 'Colocando na fila…'; api('trilhaNarrarFundo', {todas: true, voz: $('vozLote').value}).then(function(r){ return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; }); }).catch(function(e){ erroGeral(e.message); }); });
   $('selDisc').addEventListener('change', carregarAulasMaterial);
   $('btCopiar').addEventListener('click', function(){ montarPrompt(function(txt){
@@ -413,7 +419,8 @@ function abrirTrilha(id, gravar){
     abrirPlayer(t);
     // veio do botão "Gravar com a voz da IA": já abre o painel da narração
     if(gravar && $('admNarr')){ var d = $('admNarr'); d.open = true; desenharNarracao(); setTimeout(function(){ d.scrollIntoView({behavior: 'smooth', block: 'start'}); }, 100); }
-  }).catch(function(e){ $('corpo').innerHTML = '<div class="erro">' + esc(e.message) + '</div><a class="link" onclick="Trilha.voltar()">voltar</a>'; });
+    if(LV && LV.atual === id) seguirLote();
+  }).catch(function(e){ $('corpo').innerHTML = '<div class="erro">' + esc(e.message) + '</div><a class="link" onclick="Trilha.voltar()">voltar</a>'; if(LV && LV.atual === id){ (LV.erros = LV.erros || []).push(id + ': ' + e.message); setTimeout(proximaDoLote, 1500); } });
 }
 function abrirPlayer(t){
   pararTudo();
@@ -1891,9 +1898,6 @@ function desenharNarracao(){
     '<button class="mini" id="tr_btNarrFaltam"' + (ok === itens.length ? ' disabled' : '') + '>🎙 Gravar com a voz da conversa (as que faltam)</button>' +
     '<button class="mini secundario" id="tr_btNarrEste">Regravar o passo atual</button><button class="mini secundario" id="tr_btNarrTodas">Regravar todas</button></div>' +
     '<p class="aviso" style="margin:4px 0 0">É a mesma voz natural da dúvida por voz. Deixe esta aba aberta enquanto grava (uns 3 a 5 minutos por aula).</p>' +
-    '<details style="margin-top:8px"><summary class="link">Voz de leitura em segundo plano (pode fechar o site, mas a voz é mais neutra)</summary><div class="botoes">' +
-    '<button class="mini secundario" id="tr_btNarrFundo"' + (ok === itens.length ? ' disabled' : '') + '>🌙 Gravar as que faltam em segundo plano</button>' +
-    '<button class="mini secundario" id="tr_btNarrFundoTodas">🌙 Regravar todas em segundo plano</button></div></details>' +
     '<div id="tr_narrProg"></div><div id="tr_narrLog" style="font-size:13px"></div>';
   var fundo = function(refazer){
     $('narrProg').innerHTML = '<p class="aviso">Colocando na fila…</p>';
@@ -1902,8 +1906,6 @@ function desenharNarracao(){
       $('narrProg').innerHTML = r.falas ? '<div class="ok">✓ ' + r.falas + ' fala(s) na fila. Pode fechar o site: o servidor grava sozinho e te avisa quando terminar.</div>' : '<div class="ok">Já está tudo gravado.</div>';
     }).catch(function(e){ $('narrProg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   };
-  $('btNarrFundo').addEventListener('click', function(){ fundo(false); });
-  $('btNarrFundoTodas').addEventListener('click', function(){ if(confirm('Regravar todas as ' + itens.length + ' falas com a voz ' + $('narrVoz').value + ', em segundo plano?')) fundo(true); });
   if($('btNarrParar')) $('btNarrParar').addEventListener('click', function(){ api('trilhaNarrarParar', {id: T.id}).then(function(){ T.fila = null; desenharNarracao(); }); });
   $('btNarrFaltam').addEventListener('click', function(){ gravarNarracao(itens.filter(function(x){ return T.narracao[x.k] !== 'ok'; })); });
   $('btNarrEste').addEventListener('click', function(){ var b = blocoAtual(); gravarNarracao([{k: b.id + ':' + P.passo, b: b, i: P.passo}]); });
@@ -1985,6 +1987,29 @@ function fimNarracao(erro){
   montarSelVoz(); desenharNarracao();
   if($('narrLog')) $('narrLog').innerHTML = log;
   $('narrProg').innerHTML = erro ? '<div class="erro">' + esc(erro) + '</div>' : '<div class="ok">Pronto. Escolha "🔊 voz da IA (gravada)" na barra e dê ▶.</div>';
+  if(LV && LV.gravando){ LV.gravando = false; if(erro) LV.erros.push(T.trilha.titulo + ': ' + erro); setTimeout(proximaDoLote, 1500); }
+}
+// ----- lote: voz da conversa em todas as aulas que faltam (aba aberta) -----
+var LV = null;
+function faixaLote(){
+  var c = $('corpo'); if(!c || !LV) return; var f = $('faixaLote'); if(f) f.remove();
+  c.insertAdjacentHTML('afterbegin', '<div id="tr_faixaLote" class="convite" style="margin:0 0 10px;border-left-color:#c62828"><b>🎙 Gravando todas as aulas com a voz da conversa: aula ' + LV.n + ' de ' + LV.total + '</b><div class="aviso">⚠ Não feche esta aba. ' + (LV.parar ? 'Vai parar ao fim desta aula.' : '') + '</div><div class="botoes" style="margin:4px 0 0">' + (LV.parar ? '' : '<button class="mini secundario" id="tr_btPararLote">Parar depois desta aula</button>') + '</div></div>');
+  if($('btPararLote')) $('btPararLote').addEventListener('click', function(){ LV.parar = true; faixaLote(); });
+}
+function proximaDoLote(){
+  if(!LV) return;
+  if(LV.parar || !LV.fila.length){
+    var r = LV; LV = null;
+    return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); erroGeral(''); var c = $('corpo'); if(c) c.insertAdjacentHTML('afterbegin', '<div class="' + (r.erros && r.erros.length ? 'alerta' : 'ok') + '">' + (r.parar ? '⏸ Gravação parada' : '✓ Gravação terminada') + ': ' + r.n + ' de ' + r.total + ' aula(s) passaram pela gravação.' + (r.erros && r.erros.length ? '<br>Com problema: ' + r.erros.map(esc).join('<br>') : '') + '</div>'); });
+  }
+  LV.erros = LV.erros || []; LV.atual = LV.fila.shift(); LV.n++;
+  abrirTrilha(LV.atual, true);
+}
+function seguirLote(){
+  faixaLote();
+  var b = $('btNarrFaltam');
+  if(!b || b.disabled){ setTimeout(proximaDoLote, 300); return; } // já tem todas as falas gravadas
+  LV.gravando = true; b.click();
 }
 
 /* ===================== REGISTRO DE USO (estatística para o professor) ===================== */
