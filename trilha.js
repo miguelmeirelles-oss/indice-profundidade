@@ -346,36 +346,41 @@ function desenharListaAluno(){
   L.trilhas.forEach(function(t){ var d = t.disciplina_id || ''; if(!porDisc[d]){ porDisc[d] = []; ordem.push(d); } porDisc[d].push(t); });
   ordem.sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); });
   if(!L.trilhas.length){ $('corpo').innerHTML = '<p class="aviso">Ainda não há aulas em trilha.</p>'; return; }
-  var atual = ''; try{ atual = localStorage.getItem('trilha_materia') || ''; }catch(e){}
-  if(!porDisc[atual]) atual = ordem[0];
-  var h = '<div class="t-blocos">' + ordem.map(function(d){
-    var l = porDisc[d], pct = Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length);
-    return '<button class="t-chip' + (d === atual ? ' t-atual' : '') + '" data-trmateria="' + esc(d) + '">' + esc(nomeDisc(d)) + ' <span style="opacity:.75">· ' + pct + '%</span></button>';
-  }).join('') + '</div>';
-  // capítulos → tópicos → aulas, na ordem que o professor deu, cada um com o % concluído
-  var caps = emCapitulos(gruposDaLista(atual)), num = numeracao(caps);
-  var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; }catch(e){}
+  // tudo começa fechado: matéria → assunto (capítulo) → subassunto (tópico) → aulas, cada nível com o % concluído
+  // o que o aluno abre fica aberto só enquanto ele está no site (ao entrar de novo, tudo minimizado)
+  var abertos = {}; try{ abertos = JSON.parse(sessionStorage.getItem('trilha_grupos') || '{}') || {}; }catch(e){}
   var pctDe = function(l){ return l.length ? Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length) : 0; };
+  var NUM = {aulas: {}, secoes: {}}, D = '';
   var linhaA = function(t){
     var subs = (t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; });
-    return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:9px 11px;margin-top:8px"><div style="flex:1 1 200px"><b>' + ((t.progresso || 0) >= 100 || t.estudei ? '✓ ' : '') + (num.aulas[t.id] ? '<span style="color:#6b7a99;font-weight:normal">' + num.aulas[t.id] + '</span> ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') +
+    return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:9px 11px;margin-top:8px"><div style="flex:1 1 200px"><b>' + ((t.progresso || 0) >= 100 || t.estudei ? '✓ ' : '') + (NUM.aulas[t.id] ? '<span style="color:#6b7a99;font-weight:normal">' + NUM.aulas[t.id] + '</span> ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') +
       (subs.length ? '<div class="aviso">' + esc(subs.join(' · ')) + '</div>' : '') + barraPct(t.progresso || 0) + '<span class="aviso">' + (t.progresso || 0) + '% · vídeo, questões e Estudar com IA</span></div>' +
       '<button class="mini' + (t.progresso ? ' secundario' : '') + '" data-trestudar="' + esc(t.id) + '">' + (t.progresso >= 100 ? '↻ Rever' : t.progresso ? '▶ Continuar' : '▶ Estudar') + '</button></div>';
   };
   var topicoA = function(g, dentro, unico){
-    var l = g.aulas, pct = pctDe(l), n = num.secoes[g.nome], nome = g.nome === SEM_TOPICO ? 'Outros assuntos' : g.sec;
-    return '<details class="convite" data-trgrupo="' + esc(g.nome) + '" style="margin:' + (dentro ? '8px 0 0' : '0 0 10px') + (dentro ? ';background:#fbfcfe' : '') + '"' + (abertos[g.nome] || unico ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:' + (dentro ? 15 : 16) + 'px">' + (n ? n + (dentro ? ' ' : '. ') : '') + esc(nome) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
+    var l = g.aulas, pct = pctDe(l), n = NUM.secoes[g.nome], nome = g.nome === SEM_TOPICO ? 'Outros assuntos' : g.sec;
+    return '<details class="convite" data-trgrupo="' + esc(D + '|' + g.nome) + '" style="margin:' + (dentro ? '8px 0 0' : '0 0 10px') + (dentro ? ';background:#fbfcfe' : '') + '"' + (abertos[D + '|' + g.nome] || unico ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:' + (dentro ? 15 : 16) + 'px">' + '▸ ' + (n ? n + (n.indexOf('.') === -1 ? '. ' : ' ') : '') + esc(nome) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pct + '%</b></span></div>' + barraPct(pct) + '</summary>' +
       l.map(linhaA).join('') + '</details>';
   };
-  h += caps.map(function(c, ci){
-    if(!c.cap) return topicoA(c.grupos[0], false, caps.length === 1);
-    var todas = [].concat.apply([], c.grupos.map(function(g){ return g.aulas; })), pct = pctDe(todas), k = 'cap:' + c.cap;
-    return '<details class="convite" data-trgrupo="' + esc(k) + '" style="margin-bottom:12px;border-left-color:#17389C"' + (abertos[k] || caps.length === 1 ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:17px">' + (ci + 1) + '. ' + esc(c.cap) + '</b><span class="aviso">' + todas.length + ' aula' + (todas.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
-      c.grupos.map(function(g){ return topicoA(g, true, c.grupos.length === 1); }).join('') + '</details>';
-  }).join('');
+  var matHTML = function(d){
+    D = d; var caps = emCapitulos(gruposDaLista(d)); NUM = numeracao(caps);
+    var l = porDisc[d], pctM = pctDe(l), km = 'mat|' + d;
+    var dentro = caps.map(function(c, ci){
+      if(!c.cap) return topicoA(c.grupos[0], true, false);
+      var todas = [].concat.apply([], c.grupos.map(function(g){ return g.aulas; })), pct = pctDe(todas), k = d + '|cap:' + c.cap;
+      return '<details class="convite" data-trgrupo="' + esc(k) + '" style="margin:8px 0 0;border-left-color:#2E62C6;background:#fbfcfe"' + (abertos[k] ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:16px">▸ ' + (ci + 1) + '. ' + esc(c.cap) + '</b><span class="aviso">' + todas.length + ' aula' + (todas.length > 1 ? 's' : '') + ' · <b>' + pct + '%</b></span></div>' + barraPct(pct) + '</summary>' +
+        c.grupos.map(function(g){ return topicoA(g, true, c.grupos.length === 1); }).join('') + '</details>';
+    }).join('');
+    var minha = (L.minhas || []).indexOf(d) !== -1;
+    return '<details class="convite" data-trgrupo="' + esc(km) + '" style="margin-bottom:12px;border-left-color:' + (minha ? '#E8B923;border-left-width:6px;background:#fffbea' : '#17389C') + '"' + (abertos[km] ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap"><b style="font-size:17px">▸ 📚 ' + esc(nomeDisc(d)) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pctM + '% concluído</b></span></div>' + barraPct(pctM) + '</summary>' + dentro + '</details>';
+  };
+  // as matérias em que o aluno está inscrito neste semestre vêm primeiro, em destaque; depois as outras do curso
+  var minhas = ordem.filter(function(d){ return (L.minhas || []).indexOf(d) !== -1; }), outras = ordem.filter(function(d){ return minhas.indexOf(d) === -1; });
+  var h = minhas.length ? '<p style="margin:4px 0 8px;font-weight:bold;color:#17389C">⭐ Suas matérias deste semestre</p>' + minhas.map(matHTML).join('') +
+      (outras.length ? '<p style="margin:18px 0 8px;font-weight:bold;color:#5b6b86">Outras matérias do curso</p>' + outras.map(matHTML).join('') : '')
+    : ordem.map(matHTML).join('');
   $('corpo').innerHTML = h;
-  document.querySelectorAll('[data-trgrupo]').forEach(function(d){ d.addEventListener('toggle', function(){ try{ var a = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; a[d.getAttribute('data-trgrupo')] = d.open; localStorage.setItem('trilha_grupos', JSON.stringify(a)); }catch(e){} }); });
-  document.querySelectorAll('[data-trmateria]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_materia', b.getAttribute('data-trmateria')); }catch(e){} desenharListaAluno(); }); });
+  document.querySelectorAll('[data-trgrupo]').forEach(function(d){ d.addEventListener('toggle', function(){ try{ var a = JSON.parse(sessionStorage.getItem('trilha_grupos') || '{}') || {}; a[d.getAttribute('data-trgrupo')] = d.open; sessionStorage.setItem('trilha_grupos', JSON.stringify(a)); }catch(e){} }); });
   document.querySelectorAll('[data-trestudar]').forEach(function(b){ b.addEventListener('click', function(){ abrirTrilha(b.getAttribute('data-trestudar')); }); });
 }
 function carregarAulasMaterial(){
