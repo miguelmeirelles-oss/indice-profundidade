@@ -261,6 +261,18 @@ function capSec(nome){ nome = String(nome || ''); var i = nome.indexOf(SEP_CAP);
 function emCapitulos(grupos){ var out = [], idx = {}; grupos.forEach(function(g){ var cs = capSec(g.nome); if(cs.cap){ if(idx[cs.cap] == null){ idx[cs.cap] = out.length; out.push({cap: cs.cap, grupos: []}); } out[idx[cs.cap]].grupos.push({nome: g.nome, sec: cs.sec, aulas: g.aulas}); } else out.push({cap: '', grupos: [{nome: g.nome, sec: g.nome, aulas: g.aulas}]}); }); return out; }
 // números: capítulo 1, tópico 1.1, aula 1.1.1 (tópico sem capítulo: 2 e aulas 2.1)
 function numeracao(caps){ var a = {}, sc = {}; caps.forEach(function(c, ci){ var n = ci + 1; if(c.cap) c.grupos.forEach(function(g, gi){ sc[g.nome] = n + '.' + (gi + 1); g.aulas.forEach(function(t, k){ a[t.id] = n + '.' + (gi + 1) + '.' + (k + 1); }); }); else { sc[c.grupos[0].nome] = String(n); c.grupos[0].aulas.forEach(function(t, k){ a[t.id] = n + '.' + (k + 1); }); } }); return {aulas: a, secoes: sc}; }
+// "nova versão de": as aulas na mesma organização da lista (matéria → 1. capítulo › 1.1 tópico → 1.1.1 aula)
+function opcoesDestino(){
+  var ds = {}; L.trilhas.forEach(function(t){ ds[t.disciplina_id || ''] = 1; });
+  var discs = Object.keys(ds).sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); }), varias = discs.length > 1;
+  return discs.map(function(d){
+    var caps = emCapitulos(gruposDaLista(d)), num = numeracao(caps), pre = varias ? nomeDisc(d) + ' — ' : '';
+    return caps.map(function(c, ci){ return c.grupos.map(function(g){
+      var rot = pre + (c.cap ? (ci + 1) + '. ' + c.cap + SEP_CAP + (num.secoes[g.nome] || '') + ' ' + g.sec : (ci + 1) + '. ' + g.sec);
+      return '<optgroup label="' + esc(rot) + '">' + g.aulas.map(function(t){ return '<option value="' + esc(t.id) + '">' + (num.aulas[t.id] ? num.aulas[t.id] + ' ' : '') + esc(t.titulo) + ' (v' + t.versao + ')</option>'; }).join('') + '</optgroup>';
+    }).join(''); }).join('');
+  }).join('');
+}
 function filtroProf(){
   var filtro = ''; try{ filtro = localStorage.getItem('trilha_filtro_prof') || ''; }catch(e){}
   var ds = {}; L.trilhas.forEach(function(t){ ds[t.disciplina_id || ''] = 1; });
@@ -398,7 +410,7 @@ function conferir(){
       h += '<div class="ok">✓ Formato certo' + (lote ? ': <b>' + conferida.length + ' aulas em trilha</b> neste arquivo' : '') + '.<ul class="t-erros" style="margin-bottom:0">' + (r.resumo || []).map(function(x){ return '<li><b>' + esc(x.titulo) + '</b> · ' + x.blocos + ' bloco(s) · ' + x.passos + ' passos</li>'; }).join('') + '</ul></div>' +
         '<div class="botoes">' + (lote ? '<select id="tr_selPrevia">' + conferida.map(function(t, i){ return '<option value="' + i + '">' + esc(t.titulo) + '</option>'; }).join('') + '</select>' : '') + '<button class="secundario" id="tr_btPrevia">▶ Ver antes de salvar</button>' +
         '<select id="tr_selDiscSalvar"><option value="">disciplina…</option>' + L.disciplinas.map(function(d){ return '<option value="' + esc(d.id) + '"' + (d.id === $('selDisc').value ? ' selected' : '') + '>' + esc(d.nome) + '</option>'; }).join('') + '</select>' +
-        (lote ? '' : '<select id="tr_selDestino"><option value="">salvar como trilha nova</option>' + L.trilhas.map(function(t){ return '<option value="' + esc(t.id) + '">nova versão de: ' + esc(t.titulo) + ' (v' + t.versao + ')</option>'; }).join('') + '</select>' +
+        (lote ? '' : '<select id="tr_selDestino"><option value="">salvar como trilha nova</option>' + opcoesDestino() + '</select>' +
           '<input type="text" id="tr_txtComVersao" maxlength="500" style="flex:1;min-width:200px" placeholder="comentário da nova versão (opcional): ex.: corrigi a seta do passo 3">') +
         '<button id="tr_btSalvar">' + (lote ? 'Salvar as ' + conferida.length + ' aulas' : 'Salvar') + '</button></div><div id="tr_msgSalvar"></div>';
     }
