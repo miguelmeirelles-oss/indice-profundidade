@@ -1089,7 +1089,7 @@ var Cena = (function () {
     caixa: "#e8e2d0", caixaFundo: "#ffffff12", estrutura: "#f2c79b", cadeia: "#e6c27a", o2: "#ff8a8a", fungo: "#b9d36b", levedura: "#e8c98a",
     giz: "#f4f1e8", dano: "#ff6b6b",
     azul: "#7cc4ff", laranja: "#ffb070", verde: "#8fe3b0", vermelho: "#ff8a8a",
-    roxo: "#c7a6ff", cinza: "#bdbdbd", ambar: "#ffd479", rosa: "#ff9fc7", hmais: "#ff6b6b", acido: "#c7a6ff", anion: "#9fd0ff"
+    roxo: "#c7a6ff", cinza: "#bdbdbd", ambar: "#ffd479", rosa: "#ff9fc7", hmais: "#ff6b6b", acido: "#c7a6ff", anion: "#9fd0ff", amino: "#69db7c", marrom: "#c08552", redutor: "#ffa94d"
   };
   const PAL_CLARO = {
     fundo: "#ffffff", agua: "#2b7fd4", gelo: "#cfe8fa", geloBorda: "#2b7fd4", H: "#ffffff", Hb: "#5d6b78", ligacao: "#2b7fd4",
@@ -1098,9 +1098,9 @@ var Cena = (function () {
     caixa: "#6b6a64", caixaFundo: "#0000000a", estrutura: "#b8742d", cadeia: "#a8741a", o2: "#d62828", fungo: "#5f7d1e", levedura: "#b07a1e",
     giz: "#1d1d1b", dano: "#d62828",
     azul: "#1f6fd1", laranja: "#d9650b", verde: "#1a8a47", vermelho: "#d62828",
-    roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6"
+    roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6", amino: "#2b8a3e", marrom: "#6b3a1a", redutor: "#e8590c"
   };
-  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9 };
+  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6 };
   const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
@@ -1212,6 +1212,10 @@ var Cena = (function () {
       else if (tipo === "h") { mk("circle", { r: 1.35, fill: PAL.hmais }, g); const t = mk("text", { "text-anchor": "middle", y: .75, "font-size": 2, "font-weight": 700, fill: "#fff", "font-family": "system-ui,sans-serif" }, g); t.textContent = "+"; }
       else if (tipo === "ha") { mk("circle", { r: 1.9, fill: PAL.acido + "33", stroke: PAL.acido, "stroke-width": .5 }, g); mk("circle", { cx: 1.75, cy: -1.2, r: .95, fill: PAL.hmais }, g); }
       else if (tipo === "a") { mk("circle", { r: 1.9, fill: PAL.anion + "26", stroke: PAL.anion, "stroke-width": .5, "stroke-dasharray": ".9 .6" }, g); const t = mk("text", { "text-anchor": "middle", y: .9, "font-size": 2.8, "font-weight": 700, fill: PAL.anion, "font-family": "system-ui,sans-serif" }, g); t.textContent = "−"; }
+      else if (tipo === "red") { hexagono(g, 2.2, PAL.acucar); mk("circle", { cx: 1.9, cy: -1.1, r: .8, fill: PAL.redutor }, g); }
+      else if (tipo === "sac") { const g1 = mk("g", { transform: "translate(-1.9,0)" }, g), g2 = mk("g", { transform: "translate(1.9,0)" }, g); hexagono(g1, 1.8, PAL.acucar); hexagono(g2, 1.8, PAL.acucar); }
+      else if (tipo === "amino") { mk("circle", { r: 1.55, fill: PAL.amino + "40", stroke: PAL.amino, "stroke-width": .45 }, g); const t = mk("text", { "text-anchor": "middle", y: .75, "font-size": 2, "font-weight": 700, fill: PAL.amino, "font-family": "system-ui,sans-serif" }, g); t.textContent = "N"; }
+      else if (tipo === "mel") { mk("path", { d: "M-2.4,-.6 C-2.2,-2.4 -.4,-2.6 .6,-1.8 C2,-2.6 2.9,-.8 2.2,.4 C2.8,1.8 .9,2.7 -.2,1.9 C-1.4,2.8 -2.9,1.4 -2.4,-.6Z", fill: PAL.marrom, opacity: .9 }, g); }
       else mk("circle", { r: RAIO.particula, fill: PAL.particula }, g);
       parts.push(p); return p;
     }
@@ -1490,7 +1494,7 @@ var Cena = (function () {
     };
     A.organizar = (a, an) => {
       const ar = a.area || [10, 10, 90, 50], sp = a.espaco || 5.5;
-      const ps = parts.filter(p => p.tipo === (a.especie || "acucar") && !p.morrer && (!a.de_area || dentro(a.de_area, p.x, p.y)));
+      const ps = parts.filter(p => p.tipo === (a.especie || "acucar") && !p.morrer && (!a.de_area || dentro(a.de_area, p.x, p.y))).slice(0, a.n == null ? 999 : a.n);
       const cols = Math.max(1, Math.floor((ar[2] - ar[0]) / sp));
       ps.forEach((p, i) => { const x = ar[0] + (i % cols) * sp + sp / 2, y = ar[1] + Math.floor(i / cols) * sp * .9 + sp / 2; p.casa = { x, y }; p.modo = an ? "indo" : "preso"; p.modoFinal = "preso"; if (!an) { p.x = x; p.y = y; } });
     };
@@ -1550,6 +1554,32 @@ var Cena = (function () {
     };
     // remover_especie: {especie, area|dentro, n}
     A.remover_especie = (a, an) => { const ar = (a.area || a.dentro) ? areaDe(a) : null; daEspecie(a.especie, ar, a.grupo).slice(0, a.n == null ? 999 : a.n).forEach(p => { remover(p); if (!an) { p.alfa = 0; } }); };
+    /* ---------- carboidratos ---------- */
+    // reagir: {area|dentro, n, duracao, de:"red", com:"amino", produto:"mel"} — açúcar redutor + grupo amino → melanoidina (Maillard)
+    A.reagir = (a, an) => {
+      const ar = (a.area || a.dentro) ? areaDe(a) : null, de = a.de || "red", com = a.com === "" ? null : (a.com || "amino"), prod = a.produto || "mel";
+      const lista = daEspecie(de, ar, a.grupo).slice(0, a.n == null ? 999 : a.n), dur = a.duracao || 3000;
+      lista.forEach((p, i) => {
+        const fazer = () => {
+          if (p.morrer) return; const q = com ? maisProxima(daEspecie(com, ar), p.x, p.y) : null; if (com && !q) return;
+          const mx = q ? (p.x + q.x) / 2 : p.x, my = q ? (p.y + q.y) / 2 : p.y;
+          const fim = () => { remover(p); if (q) remover(q); if (!an) { p.alfa = 0; if (q) q.alfa = 0; } const n = novaParte(prod, mx, my, { grupo: "prod", agit: .25, lim: p.lim }); if (!an) { n.alfa = 1; n.g.setAttribute("opacity", 1); } };
+          if (!an) { fim(); return; }
+          [p, q].forEach(r => { if (r) { r.modo = "indo"; r.modoFinal = "preso"; r.casa = { x: mx, y: my }; r.morrer = true; } });
+          timers.push(setTimeout(fim, 900));
+        };
+        if (!an) fazer(); else timers.push(setTimeout(fazer, dur * i / Math.max(1, lista.length)));
+      });
+    };
+    // inverter: {area|dentro, n, duracao} — sacarose → glicose + frutose (dois açúcares redutores)
+    A.inverter = (a, an) => {
+      const ar = (a.area || a.dentro) ? areaDe(a) : null, lista = daEspecie("sac", ar, a.grupo).slice(0, a.n == null ? 999 : a.n), dur = a.duracao || 2500;
+      lista.forEach((p, i) => {
+        const fazer = () => { if (p.morrer) return; remover(p); if (!an) p.alfa = 0;
+          [-2, 2].forEach(dx => { const n = novaParte("red", p.x + dx, p.y, { grupo: p.grupo, agit: p.agit, lim: p.lim }); n.alfa = 1; n.g.setAttribute("opacity", 1); n.vx = dx * 2; }); };
+        if (!an) fazer(); else timers.push(setTimeout(fazer, dur * i / Math.max(1, lista.length)));
+      });
+    };
     A.limpar_cena = () => limpar();
 
     function limpar() {
@@ -1614,7 +1644,10 @@ function desenharCena(b, passo, anim){
   for(var i = j0; i <= passo; i++){
     var ac = b.passos[i].cena_acoes || [], k = ultimo(ac); if(k >= 0) ac = ac.slice(k + 1);
     var an = !!anim && i === passo;
-    ac.forEach(function(a){ try{ CENA.executar(a, an); }catch(e){} });
+    ac.forEach(function(a){
+      var sabe = (CENA.acoes || acoesDoMotor()).indexOf(a.tipo) !== -1;
+      (sabe || !Array.isArray(a.reserva) ? [a] : a.reserva).forEach(function(x){ try{ CENA.executar(x, an); }catch(e){} });
+    });
   }
 }
 
