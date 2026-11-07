@@ -254,6 +254,13 @@ function gruposDaLista(filtro){
   return nomes.map(function(g){ return {nome: g, aulas: grupos[g].sort(function(a, b){ return ((a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem)) || a.titulo.localeCompare(b.titulo); })}; });
 }
 var SEM_TOPICO = 'Sem grande tema (ligue os subtemas na aula)';
+// capítulo › tópico: o capítulo vem antes do " › " no nome do tópico
+var SEP_CAP = ' › ';
+function capSec(nome){ nome = String(nome || ''); var i = nome.indexOf(SEP_CAP); return i > 0 ? {cap: nome.slice(0, i).trim(), sec: nome.slice(i + SEP_CAP.length).trim()} : {cap: '', sec: nome}; }
+// tópicos (já na ordem) juntos por capítulo: [{cap, grupos: [{nome, sec, aulas}]}]; tópico sem capítulo vira uma unidade sozinho
+function emCapitulos(grupos){ var out = [], idx = {}; grupos.forEach(function(g){ var cs = capSec(g.nome); if(cs.cap){ if(idx[cs.cap] == null){ idx[cs.cap] = out.length; out.push({cap: cs.cap, grupos: []}); } out[idx[cs.cap]].grupos.push({nome: g.nome, sec: cs.sec, aulas: g.aulas}); } else out.push({cap: '', grupos: [{nome: g.nome, sec: g.nome, aulas: g.aulas}]}); }); return out; }
+// números: capítulo 1, tópico 1.1, aula 1.1.1 (tópico sem capítulo: 2 e aulas 2.1)
+function numeracao(caps){ var a = {}, sc = {}; caps.forEach(function(c, ci){ var n = ci + 1; if(c.cap) c.grupos.forEach(function(g, gi){ sc[g.nome] = n + '.' + (gi + 1); g.aulas.forEach(function(t, k){ a[t.id] = n + '.' + (gi + 1) + '.' + (k + 1); }); }); else { sc[c.grupos[0].nome] = String(n); c.grupos[0].aulas.forEach(function(t, k){ a[t.id] = n + '.' + (k + 1); }); } }); return {aulas: a, secoes: sc}; }
 function filtroProf(){
   var filtro = ''; try{ filtro = localStorage.getItem('trilha_filtro_prof') || ''; }catch(e){}
   var ds = {}; L.trilhas.forEach(function(t){ ds[t.disciplina_id || ''] = 1; });
@@ -269,28 +276,36 @@ function desenharListaProf(){
   var bate = function(t){ if(!q) return true; return (t.titulo + ' ' + (t.tema || '') + ' ' + (t.subtemas || []).join(' ') + ' ' + (t.grandeTema || '')).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').indexOf(q) !== -1; };
   var lista = L.trilhas.filter(function(t){ return (t.disciplina_id || '') === filtro && bate(t); });
   if(!lista.length){ box.innerHTML = '<p class="aviso">' + (q ? 'Nenhuma aula com "' + esc(q) + '".' : 'Nenhuma aula nesta matéria.') + '</p>'; return; }
-  var grupos = {}, ordem = {}, nomes = [];
-  lista.forEach(function(t){ var g = t.grandeTema || SEM_TOPICO; if(!grupos[g]){ grupos[g] = []; nomes.push(g); } grupos[g].push(t); if(t.grandeOrdem) ordem[g] = Math.min(ordem[g] || 1e9, t.grandeOrdem); });
-  nomes.sort(function(a, b){ return ((ordem[a] || 1e6) - (ordem[b] || 1e6)) || a.localeCompare(b); });
+  // capítulos → tópicos → aulas, na ordem; com busca, a mesma estrutura só com o que bate
+  var okB = {}; lista.forEach(function(t){ okB[t.id] = 1; });
+  var caps = emCapitulos(gruposDaLista(filtro)), num = numeracao(caps);
+  caps = caps.map(function(c){ return {cap: c.cap, grupos: c.grupos.map(function(g){ return {nome: g.nome, sec: g.sec, aulas: g.aulas.filter(function(t){ return okB[t.id]; })}; }).filter(function(g){ return g.aulas.length; })}; }).filter(function(c){ return c.grupos.length; });
   var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos_prof') || '{}') || {}; }catch(e){}
   var tipoTxt = {video: '🎬 vídeo', cena: '🔬 cena', grafico: '📈 gráfico'};
-  box.innerHTML = nomes.map(function(g, gi){
-    var l = grupos[g].sort(function(a, b){ return ((a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem)) || a.titulo.localeCompare(b.titulo); });
-    var comVoz = l.filter(function(t){ return t.audios || t.tipo === 'video'; }).length;
-    return '<details class="convite" data-trgrupoprof="' + esc(g) + '" style="margin:0 0 8px;padding:8px 12px"' + (q || abertos[g] || nomes.length === 1 ? ' open' : '') + '>' +
-      '<summary style="cursor:pointer"><b>' + (q ? '' : (gi + 1) + '. ') + esc(g) + '</b> <span class="aviso">· ' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · ' + comVoz + ' com voz</span></summary>' +
-      l.map(function(t, k){
-        var voz = t.tipo === 'video' ? '' : t.fila ? '⏳ gravando (faltam ' + t.fila.faltam + ')' : t.audios ? '🔊 voz da IA' : '🔈 voz do navegador';
-        return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin-top:6px">' +
-          '<div style="flex:1 1 240px;min-width:0"><b>' + (q ? '' : '<span style="color:#6b7a99;font-weight:normal">' + (gi + 1) + '.' + (k + 1) + '</span> ') + esc(t.titulo) + '</b>' +
-            '<div class="aviso" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc((t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; }).join(' · ') || t.tema || '') + '</div>' +
-            '<div class="aviso" style="margin-top:2px">' + [tipoTxt[t.tipo] || '', voz, 'v' + t.versao, t.sessoes ? '👥 ' + t.alunos : ''].filter(Boolean).join(' · ') + '</div></div>' +
-          '<div style="display:flex;gap:6px;align-items:center"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button>' +
-            '<details style="position:relative"><summary class="link" style="list-style:none;cursor:pointer;font-size:18px;padding:0 6px" title="mais opções">⋯</summary>' +
-              '<div style="position:absolute;right:0;z-index:5;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:190px;box-shadow:0 4px 14px #0002">' +
-              (t.tipo === 'video' ? '' : '<button class="mini secundario" data-trgravar="' + esc(t.id) + '">🎙 ' + (t.audios ? 'Gravar as falas que faltam' : 'Gravar com a voz da IA') + '</button>') +
-              '<button class="mini secundario" data-trapagar="' + esc(t.id) + '">🗑 Apagar</button></div></details></div></div>';
-      }).join('') + '</details>';
+  var linha = function(t){
+    var voz = t.tipo === 'video' ? '' : t.fila ? '⏳ gravando (faltam ' + t.fila.faltam + ')' : t.audios ? '🔊 voz da IA' : '🔈 voz do navegador';
+    return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin-top:6px">' +
+      '<div style="flex:1 1 240px;min-width:0"><b>' + (num.aulas[t.id] ? '<span style="color:#6b7a99;font-weight:normal">' + num.aulas[t.id] + '</span> ' : '') + esc(t.titulo) + '</b>' +
+        '<div class="aviso" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc((t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; }).join(' · ') || t.tema || '') + '</div>' +
+        '<div class="aviso" style="margin-top:2px">' + [tipoTxt[t.tipo] || '', voz, 'v' + t.versao, t.sessoes ? '👥 ' + t.alunos : ''].filter(Boolean).join(' · ') + '</div></div>' +
+      '<div style="display:flex;gap:6px;align-items:center"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button>' +
+        '<details style="position:relative"><summary class="link" style="list-style:none;cursor:pointer;font-size:18px;padding:0 6px" title="mais opções">⋯</summary>' +
+          '<div style="position:absolute;right:0;z-index:5;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-width:190px;box-shadow:0 4px 14px #0002">' +
+          (t.tipo === 'video' ? '' : '<button class="mini secundario" data-trgravar="' + esc(t.id) + '">🎙 ' + (t.audios ? 'Gravar as falas que faltam' : 'Gravar com a voz da IA') + '</button>') +
+          '<button class="mini secundario" data-trapagar="' + esc(t.id) + '">🗑 Apagar</button></div></details></div></div>';
+  };
+  var topico = function(g, dentro, unico){
+    var l = g.aulas, comVoz = l.filter(function(t){ return t.audios || t.tipo === 'video'; }).length, n = num.secoes[g.nome];
+    return '<details class="convite" data-trgrupoprof="' + esc(g.nome) + '" style="margin:' + (dentro ? '8px 0 0' : '0 0 8px') + ';padding:8px 12px' + (dentro ? ';background:#fbfcfe' : '') + '"' + (q || abertos[g.nome] || unico ? ' open' : '') + '>' +
+      '<summary style="cursor:pointer"><b>' + (n ? n + (dentro ? ' ' : '. ') : '') + esc(g.sec) + '</b> <span class="aviso">· ' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · ' + comVoz + ' com voz</span></summary>' + l.map(linha).join('') + '</details>';
+  };
+  box.innerHTML = caps.map(function(c){
+    if(!c.cap) return topico(c.grupos[0], false, caps.length === 1);
+    var n = c.grupos.reduce(function(s, g){ return s + g.aulas.length; }, 0), k = 'cap:' + c.cap, ci = caps.indexOf(c);
+    var nc = num.secoes[c.grupos[0].nome] ? num.secoes[c.grupos[0].nome].split('.')[0] : String(ci + 1);
+    return '<details class="convite" data-trgrupoprof="' + esc(k) + '" style="margin:0 0 10px;padding:8px 12px;border-left-color:#17389C"' + (q || abertos[k] || caps.length === 1 ? ' open' : '') + '>' +
+      '<summary style="cursor:pointer"><b style="font-size:16px">' + nc + '. ' + esc(c.cap) + '</b> <span class="aviso">· ' + c.grupos.length + ' tópico' + (c.grupos.length > 1 ? 's' : '') + ' · ' + n + ' aula' + (n > 1 ? 's' : '') + '</span></summary>' +
+      c.grupos.map(function(g){ return topico(g, true, c.grupos.length === 1); }).join('') + '</details>';
   }).join('');
   box.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.addEventListener('toggle', function(){ if(q) return; try{ var a = JSON.parse(localStorage.getItem('trilha_grupos_prof') || '{}') || {}; a[d.getAttribute('data-trgrupoprof')] = d.open; localStorage.setItem('trilha_grupos_prof', JSON.stringify(a)); }catch(e){} }); });
   ligarBotoesListaProf();
@@ -325,23 +340,26 @@ function desenharListaAluno(){
     var l = porDisc[d], pct = Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length);
     return '<button class="t-chip' + (d === atual ? ' t-atual' : '') + '" data-trmateria="' + esc(d) + '">' + esc(nomeDisc(d)) + ' <span style="opacity:.75">· ' + pct + '%</span></button>';
   }).join('') + '</div>';
-  // grandes temas da matéria (ex.: Água), cada um com as suas aulas e o % concluído
-  var grupos = {}, ordG = [];
-  porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(!grupos[g]){ grupos[g] = []; ordG.push(g); } grupos[g].push(t); });
-  // na sequência do curso (a ordem que o professor deu aos grandes temas); sem ordem vão para o fim
-  var ordemG = {}; porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(t.grandeOrdem) ordemG[g] = Math.min(ordemG[g] || 1e9, t.grandeOrdem); });
-  ordG.forEach(function(g){ grupos[g].sort(function(a, b){ return ((a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem)) || a.titulo.localeCompare(b.titulo); }); });
-  ordG.sort(function(a, b){ return ((ordemG[a] || 1e6) - (ordemG[b] || 1e6)) || a.localeCompare(b); });
+  // capítulos → tópicos → aulas, na ordem que o professor deu, cada um com o % concluído
+  var caps = emCapitulos(gruposDaLista(atual)), num = numeracao(caps);
   var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; }catch(e){}
-  h += ordG.map(function(g, gi){
-    var l = grupos[g], pct = Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length);
-    return '<details class="convite" data-trgrupo="' + esc(g) + '" style="margin-bottom:10px"' + (abertos[g] || ordG.length === 1 ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:16px">' + (gi + 1) + '. ' + esc(g) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
-      l.map(function(t, k){
-        var subs = (t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; });
-        return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:9px 11px;margin-top:8px"><div style="flex:1 1 200px"><b>' + ((t.progresso || 0) >= 100 || t.estudei ? '✓ ' : '') + '<span style="color:#6b7a99;font-weight:normal">' + (gi + 1) + '.' + (k + 1) + '</span> ' + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') +
-          (subs.length ? '<div class="aviso">' + esc(subs.join(' · ')) + '</div>' : '') + barraPct(t.progresso || 0) + '<span class="aviso">' + (t.progresso || 0) + '% · vídeo, questões e Estudar com IA</span></div>' +
-          '<button class="mini' + (t.progresso ? ' secundario' : '') + '" data-trestudar="' + esc(t.id) + '">' + (t.progresso >= 100 ? '↻ Rever' : t.progresso ? '▶ Continuar' : '▶ Estudar') + '</button></div>';
-      }).join('') + '</details>';
+  var pctDe = function(l){ return l.length ? Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length) : 0; };
+  var linhaA = function(t){
+    var subs = (t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; });
+    return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:9px 11px;margin-top:8px"><div style="flex:1 1 200px"><b>' + ((t.progresso || 0) >= 100 || t.estudei ? '✓ ' : '') + (num.aulas[t.id] ? '<span style="color:#6b7a99;font-weight:normal">' + num.aulas[t.id] + '</span> ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') +
+      (subs.length ? '<div class="aviso">' + esc(subs.join(' · ')) + '</div>' : '') + barraPct(t.progresso || 0) + '<span class="aviso">' + (t.progresso || 0) + '% · vídeo, questões e Estudar com IA</span></div>' +
+      '<button class="mini' + (t.progresso ? ' secundario' : '') + '" data-trestudar="' + esc(t.id) + '">' + (t.progresso >= 100 ? '↻ Rever' : t.progresso ? '▶ Continuar' : '▶ Estudar') + '</button></div>';
+  };
+  var topicoA = function(g, dentro, unico){
+    var l = g.aulas, pct = pctDe(l), n = num.secoes[g.nome], nome = g.nome === SEM_TOPICO ? 'Outros assuntos' : g.sec;
+    return '<details class="convite" data-trgrupo="' + esc(g.nome) + '" style="margin:' + (dentro ? '8px 0 0' : '0 0 10px') + (dentro ? ';background:#fbfcfe' : '') + '"' + (abertos[g.nome] || unico ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:' + (dentro ? 15 : 16) + 'px">' + (n ? n + (dentro ? ' ' : '. ') : '') + esc(nome) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
+      l.map(linhaA).join('') + '</details>';
+  };
+  h += caps.map(function(c, ci){
+    if(!c.cap) return topicoA(c.grupos[0], false, caps.length === 1);
+    var todas = [].concat.apply([], c.grupos.map(function(g){ return g.aulas; })), pct = pctDe(todas), k = 'cap:' + c.cap;
+    return '<details class="convite" data-trgrupo="' + esc(k) + '" style="margin-bottom:12px;border-left-color:#17389C"' + (abertos[k] || caps.length === 1 ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:17px">' + (ci + 1) + '. ' + esc(c.cap) + '</b><span class="aviso">' + todas.length + ' aula' + (todas.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
+      c.grupos.map(function(g){ return topicoA(g, true, c.grupos.length === 1); }).join('') + '</details>';
   }).join('');
   $('corpo').innerHTML = h;
   document.querySelectorAll('[data-trgrupo]').forEach(function(d){ d.addEventListener('toggle', function(){ try{ var a = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; a[d.getAttribute('data-trgrupo')] = d.open; localStorage.setItem('trilha_grupos', JSON.stringify(a)); }catch(e){} }); });
@@ -820,7 +838,7 @@ function fimDoBloco(){
 var QT = {q: null, r: null, tema: ''};
 function notaDez(n){ return typeof window.dezEst === 'function' ? window.dezEst(n) : (n === null || n === undefined ? '—' : (Math.round(n) / 10).toFixed(1).replace('.', ',')); }
 // aulas da matéria na ordem da lista (1.1, 1.2, 2.1…), para ir à anterior / próxima no fim da aula
-function aulasEmOrdem(){ var l = []; if(!T || !L.trilhas.length) return l; gruposDaLista(T.disciplina_id || '').forEach(function(g, gi){ g.aulas.forEach(function(t, k){ l.push({id: t.id, titulo: t.titulo, num: (gi + 1) + '.' + (k + 1)}); }); }); return l; }
+function aulasEmOrdem(){ var l = []; if(!T || !L.trilhas.length) return l; var caps = emCapitulos(gruposDaLista(T.disciplina_id || '')), num = numeracao(caps); caps.forEach(function(c){ c.grupos.forEach(function(g){ g.aulas.forEach(function(t){ l.push({id: t.id, titulo: t.titulo, num: num.aulas[t.id] || ''}); }); }); }); return l; }
 function navAulas(){
   var l = aulasEmOrdem(), i = -1; l.forEach(function(x, k){ if(x.id === T.id) i = k; });
   var ant = i > 0 ? l[i - 1] : null, prox = i >= 0 && i < l.length - 1 ? l[i + 1] : null;
@@ -889,7 +907,7 @@ function desenharCorrecaoTrilha(txt){
 // ----- Organizar a lista: arrastar aulas e tópicos, renomear, novo tópico -----
 function comecarOrganizar(){
   var d = filtroProf();
-  ORG = {disc: d, grupos: gruposDaLista(d).map(function(g){ return {nome: g.nome === SEM_TOPICO ? '' : g.nome, ids: g.aulas.map(function(t){ return t.id; })}; })};
+  ORG = {disc: d, grupos: gruposDaLista(d).map(function(g){ var cs = capSec(g.nome); return {cap: cs.cap, nome: g.nome === SEM_TOPICO ? '' : cs.sec, ids: g.aulas.map(function(t){ return t.id; })}; })};
   if($('buscaTrilha')) $('buscaTrilha').value = '';
   desenharOrganizar();
 }
@@ -910,15 +928,24 @@ function lerArquivosTrilha(fs){
     return objs.length === 1 ? JSON.stringify(objs[0], null, 2) : JSON.stringify({formato: 'aula-trilha/1', trilhas: objs}, null, 1);
   });
 }
+// tópicos do mesmo capítulo ficam juntos (na posição do primeiro)
+function juntarCapitulos(G){ var out = [], feito = {}; G.forEach(function(g){ if(!g.cap){ out.push(g); return; } if(feito[g.cap]) return; feito[g.cap] = 1; G.forEach(function(x){ if(x.cap === g.cap) out.push(x); }); }); G.splice.apply(G, [0, G.length].concat(out)); }
+function capsDoOrg(){ var l = []; ORG.grupos.forEach(function(g){ if(g.cap && l.indexOf(g.cap) === -1) l.push(g.cap); }); return l; }
 function desenharOrganizar(){
   var box = $('listaTrilhasProf'); if(!box || !ORG) return;
-  var nG = ORG.grupos.length, mover = function(gi){ return '<select data-tromover="1" title="mover para outro tópico" style="max-width:150px">' + ORG.grupos.map(function(g, k){ return '<option value="' + k + '"' + (k === gi ? ' selected' : '') + '>' + esc(g.nome || 'sem nome') + '</option>'; }).join('') + '</select>'; };
-  box.innerHTML = '<div class="convite" style="margin:0 0 10px"><b>✏️ Organizando a lista</b><div class="aviso" style="margin:4px 0 8px">Arraste pelo <b>⠿</b> as aulas e os tópicos para mudar a ordem (pode soltar uma aula em outro tópico). No celular, use ↑ ↓ e “mover para”. Clique no nome do tópico para mudar. A ordem vale também para a lista dos alunos.</div>' +
+  juntarCapitulos(ORG.grupos);
+  var CAPS = capsDoOrg();
+  var nG = ORG.grupos.length, mover = function(gi){ return '<select data-tromover="1" title="mover para outro tópico" style="max-width:150px">' + ORG.grupos.map(function(g, k){ return '<option value="' + k + '"' + (k === gi ? ' selected' : '') + '>' + esc((g.cap ? g.cap + SEP_CAP : '') + (g.nome || 'sem nome')) + '</option>'; }).join('') + '</select>'; };
+  box.innerHTML = '<div class="convite" style="margin:0 0 10px"><b>✏️ Organizando a lista</b><div class="aviso" style="margin:4px 0 8px">Arraste pelo <b>⠿</b> as aulas e os tópicos para mudar a ordem (pode soltar uma aula em outro tópico). No celular, use ↑ ↓ e “mover para”. Clique no nome do tópico para mudar. Para juntar tópicos num <b>capítulo</b> (ex.: 1. Água → 1.1, 1.2…), escolha o capítulo no tópico (ou “➕ novo capítulo…”). A ordem vale também para a lista dos alunos.</div>' +
     '<div class="botoes" style="margin:0"><button class="mini" id="tr_btOrgSalvar">💾 Salvar organização</button><button class="mini secundario" id="tr_btOrgNovo">➕ Novo tópico</button><button class="mini secundario" id="tr_btOrgNumero" title="ordena as aulas e os tópicos pelo número das aulas (01a, 01b, 02a…)">🔢 Pôr na ordem dos números</button><button class="mini secundario" id="tr_btOrgSair">Cancelar</button><span id="tr_msgOrg" class="aviso"></span></div></div>' +
     ORG.grupos.map(function(g, gi){
-      return '<div data-trogrupo="' + gi + '" style="background:#f3f5f9;border:1px solid var(--linha);border-left:4px solid #E8B923;border-radius:8px;padding:8px 10px;margin:0 0 10px">' +
+      var cab = g.cap && (gi === 0 || ORG.grupos[gi - 1].cap !== g.cap) ? '<div data-trocap="' + esc(g.cap) + '" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:#e8eefb;border:1px solid #b9c8ea;border-left:4px solid #17389C;border-radius:8px;padding:8px 10px;margin:0 0 8px"><b>📚 Capítulo</b>' +
+        '<input type="text" data-trocapnome="' + esc(g.cap) + '" value="' + esc(g.cap) + '" maxlength="70" style="flex:1 1 200px;font-weight:bold" title="mudar o nome do capítulo (vale para todos os tópicos dele)">' +
+        '<button class="mini secundario" data-trocapsobe="' + esc(g.cap) + '">↑</button><button class="mini secundario" data-trocapdesce="' + esc(g.cap) + '">↓</button></div>' : '';
+      return cab + '<div data-trogrupo="' + gi + '" style="background:#f3f5f9;border:1px solid var(--linha);border-left:4px solid #E8B923;border-radius:8px;padding:8px 10px;margin:0 0 10px' + (g.cap ? ';margin-left:22px' : '') + '">' +
         '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><span draggable="true" data-troarrastag="' + gi + '" title="arraste para mudar a ordem do tópico" style="cursor:grab;font-size:18px;padding:0 4px;user-select:none">⠿</span>' +
           '<input type="text" data-tronome="' + gi + '" value="' + esc(g.nome) + '" placeholder="nome do tópico (ex.: Água)" maxlength="80" style="flex:1 1 200px;font-weight:bold">' +
+          '<select data-trocapsel="' + gi + '" title="em qual capítulo este tópico fica" style="max-width:170px"><option value="">— sem capítulo</option>' + CAPS.map(function(c){ return '<option' + (c === g.cap ? ' selected' : '') + '>' + esc(c) + '</option>'; }).join('') + '<option value="__novo__">➕ novo capítulo…</option></select>' +
           '<button class="mini secundario" data-trogsobe="' + gi + '"' + (gi ? '' : ' disabled') + '>↑</button><button class="mini secundario" data-trogdesce="' + gi + '"' + (gi < nG - 1 ? '' : ' disabled') + '>↓</button>' +
           (g.ids.length ? '<span class="aviso">' + g.ids.length + ' aula' + (g.ids.length > 1 ? 's' : '') + '</span>' : '<button class="mini secundario" data-trotira="' + gi + '">✕ tirar tópico vazio</button>') + '</div>' +
         (g.ids.length ? '' : '<div class="aviso" data-trovazio="' + gi + '" style="border:2px dashed var(--linha);border-radius:8px;padding:12px;margin-top:6px;text-align:center">solte uma aula aqui</div>') +
@@ -946,13 +973,28 @@ function ligarOrganizar(){
     var b = this, semNome = G.filter(function(g){ return g.ids.length && !g.nome.trim(); }).length;
     if(semNome && !confirm(semNome + ' tópico(s) sem nome: as aulas dele(s) aparecem como "' + SEM_TOPICO + '" (para o aluno, "Outros assuntos"). Salvar assim?')) return;
     b.disabled = true; $('msgOrg').textContent = 'Salvando…';
-    api('trilhaOrganizar', {disciplinaId: ORG.disc, grupos: G.filter(function(g){ return g.ids.length; }).map(function(g){ return {nome: g.nome.trim(), ids: g.ids}; })}).then(function(){
+    api('trilhaOrganizar', {disciplinaId: ORG.disc, grupos: G.filter(function(g){ return g.ids.length; }).map(function(g){ return {nome: (g.cap ? g.cap + SEP_CAP : '') + g.nome.trim(), ids: g.ids}; })}).then(function(){
       return api('trilhasListar').then(function(r2){ L = r2; ORG = null; desenharListaProf(); var bx = $('listaTrilhasProf'); if(bx) bx.insertAdjacentHTML('afterbegin', '<div class="ok">✓ Organização salva. Os alunos já veem nesta ordem.</div>'); });
     }).catch(function(e){ b.disabled = false; $('msgOrg').textContent = ''; erroGeral(e.message); });
   });
   box.querySelectorAll('[data-tronome]').forEach(function(inp){ inp.addEventListener('input', function(){ G[Number(inp.getAttribute('data-tronome'))].nome = inp.value; }); inp.addEventListener('change', redesenha); });
   box.querySelectorAll('[data-trogsobe]').forEach(function(b){ b.addEventListener('click', function(){ var i = Number(b.getAttribute('data-trogsobe')); G.splice(i - 1, 0, G.splice(i, 1)[0]); redesenha(); }); });
   box.querySelectorAll('[data-trogdesce]').forEach(function(b){ b.addEventListener('click', function(){ var i = Number(b.getAttribute('data-trogdesce')); G.splice(i + 1, 0, G.splice(i, 1)[0]); redesenha(); }); });
+  box.querySelectorAll('[data-trocapsel]').forEach(function(sel){ sel.addEventListener('change', function(){
+    var gi = Number(sel.getAttribute('data-trocapsel')), g = G[gi], v = sel.value;
+    if(v === '__novo__'){ v = (prompt('Nome do capítulo (ex.: Água):') || '').trim().slice(0, 70); if(!v){ redesenha(); return; } }
+    G.splice(gi, 1); g.cap = v;
+    var ult = -1; G.forEach(function(x, i){ if(v && x.cap === v) ult = i; });
+    G.splice(ult >= 0 ? ult + 1 : gi, 0, g); redesenha();
+  }); });
+  box.querySelectorAll('[data-trocapnome]').forEach(function(inp){ inp.addEventListener('change', function(){ var velho = inp.getAttribute('data-trocapnome'), novo = inp.value.trim().slice(0, 70); G.forEach(function(g){ if(g.cap === velho) g.cap = novo; }); redesenha(); }); });
+  var moverCap = function(cap, d){
+    var un = []; G.forEach(function(g){ var k = g.cap || ('#' + un.length); if(un.length && g.cap && un[un.length - 1].k === g.cap) un[un.length - 1].l.push(g); else un.push({k: k, l: [g]}); });
+    var i = -1; un.forEach(function(u, k){ if(u.k === cap) i = k; }); var j = i + d; if(i < 0 || j < 0 || j >= un.length) return;
+    var t = un[i]; un[i] = un[j]; un[j] = t; var flat = []; un.forEach(function(u){ flat = flat.concat(u.l); }); G.splice.apply(G, [0, G.length].concat(flat)); redesenha();
+  };
+  box.querySelectorAll('[data-trocapsobe]').forEach(function(b){ b.addEventListener('click', function(){ moverCap(b.getAttribute('data-trocapsobe'), -1); }); });
+  box.querySelectorAll('[data-trocapdesce]').forEach(function(b){ b.addEventListener('click', function(){ moverCap(b.getAttribute('data-trocapdesce'), 1); }); });
   box.querySelectorAll('[data-trotira]').forEach(function(b){ b.addEventListener('click', function(){ G.splice(Number(b.getAttribute('data-trotira')), 1); redesenha(); }); });
   box.querySelectorAll('[data-troaula]').forEach(function(row){
     var id = row.getAttribute('data-troaula'), gi = Number(row.getAttribute('data-trogi')), ai = Number(row.getAttribute('data-troai'));
@@ -988,7 +1030,7 @@ function ligarOrganizar(){
     gr.addEventListener('drop', function(ev){
       if(!arr) return; ev.preventDefault();
       if(arr.tipo === 'aula'){ tirar(arr.id); G[gi].ids.push(arr.id); }
-      else if(arr.gi !== gi){ var r = gr.getBoundingClientRect(), cima = ev.clientY < r.top + r.height / 2, g = G.splice(arr.gi, 1)[0], alvo = gi > arr.gi ? gi - 1 : gi; G.splice(cima ? alvo : alvo + 1, 0, g); }
+      else if(arr.gi !== gi){ var r = gr.getBoundingClientRect(), cima = ev.clientY < r.top + r.height / 2, capAlvo = G[gi].cap, g = G.splice(arr.gi, 1)[0], alvo = gi > arr.gi ? gi - 1 : gi; g.cap = capAlvo; G.splice(cima ? alvo : alvo + 1, 0, g); }
       arr = null; redesenha();
     });
   });
