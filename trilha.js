@@ -1764,7 +1764,7 @@ var G = (function(){
     }
     if(destaque && destaque !== s.id) gs.setAttribute('opacity', '0.28');
     // nome da curva perto do fim dela
-    if(s.nome){
+    if(s.nome && !s.sem_rotulo){
       var xf = s.marcadores ? s.params.pontos[s.params.pontos.length - 1][0] : s.ate, yf = valor(s, xf);
       if(isFinite(yf)) rotulo(px(xf) - 4, Math.max(Y1 + 14, Math.min(Y0 - 6, py(yf) - 8)), s.nome, s.cor, 'end', {fade: atraso !== undefined, atraso: (atraso || 0) + 1200});
     }
