@@ -53,7 +53,7 @@ var PROMPT_TRILHA = [
 "",
 "CENA DE MOLÉCULAS (parte de baixo da tela; mostre o que a fala está explicando, como num desenho animado do fenômeno):",
 "- Declare no bloco: \"cena\": {\"elementos\": [ … ]}. Coordenadas da cena: x de 0 a 100 (esquerda → direita), y de 0 a 60 (topo → base). Elementos começam escondidos.",
-"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\".",
+"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
 "- Em cada passo, \"cena_acoes\" (mesma regra de \"atraso\"; cada passo herda a cena dos anteriores até um \"limpar_cena\"):",
 "  {\"tipo\":\"aparecer\",\"elemento\":\"id\"} · {\"tipo\":\"sumir\",\"elemento\":\"id\"} · {\"tipo\":\"mover\",\"elemento\":\"id\",\"para\":[x,y],\"duracao\":1500}",
 "  {\"tipo\":\"destacar\",\"elemento\":\"id\"} · {\"tipo\":\"danificar\",\"alvo\":\"id\",\"rotulo\":\"texto\"} · {\"tipo\":\"vagar\",\"elemento\":\"id\",\"agitacao\":0.1}",
@@ -66,7 +66,7 @@ var PROMPT_TRILHA = [
 "  {\"tipo\":\"derreter\",\"centro\":[x,y],\"raio\":12,\"duracao\":3000} · {\"tipo\":\"evaporar\",\"duracao\":3000} (sai toda a água menos a ligada)",
 "  {\"tipo\":\"desidratar\",\"alvo\":\"id\",\"n\":8}  água sai de dentro de uma célula · {\"tipo\":\"prender\",\"grupo\":\"w\",\"dentro\":\"id\"}  água capturada por uma rede",
 "  {\"tipo\":\"coletar\",\"especie\":\"particula\",\"para\":[x,y]}",
-"  {\"tipo\":\"rotulo\",\"x\":x,\"y\":y,\"texto\":\"texto\",\"cor\":\"azul\"} · {\"tipo\":\"circulo\",\"x\":x,\"y\":y,\"r\":6,\"rotulo\":\"texto\"} · {\"tipo\":\"seta\",\"de\":[x,y],\"para\":[x,y],\"rotulo\":\"texto\"} · {\"tipo\":\"linha\",\"de\":[x,y],\"para\":[x,y]} · {\"tipo\":\"limpar_cena\"}",
+"  {\"tipo\":\"rotulo\",\"x\":x,\"y\":y,\"texto\":\"texto\",\"cor\":\"azul\"} · {\"tipo\":\"circulo\",\"x\":x,\"y\":y,\"r\":6,\"rotulo\":\"texto\"} · {\"tipo\":\"seta\",\"de\":[x,y],\"para\":[x,y],\"rotulo\":\"texto\"} · {\"tipo\":\"linha\",\"de\":[x,y],\"para\":[x,y]} · {\"tipo\":\"limpar_rotulos\"} (apaga só os textos, setas e círculos; os desenhos ficam) · {\"tipo\":\"limpar_cena\"} (apaga tudo). Use SÓ essas ações.",
 "- Para comparar dois casos, divida a cena ao meio com uma \"linha\" em x=50 e rótulos no topo de cada lado. Rótulos da cena também curtos (até ~30 caracteres). As cenas são esquemáticas (fora de escala); diga isso no campo \"fonte\".",
 "",
 "REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre a LISTA de trilhas na ordem do curso (ordem dos PDFs das aulas e da apostila no Google Drive, não a ordem das gravações), com o assunto de cada uma e de quais aulas gravadas vem. Depois de aprovada, mostre o ROTEIRO de cada trilha (tabela com nº do passo, título, o que a voz diz, o que aparece no gráfico e o que acontece na cena) e, se a sua interface permitir conteúdo visual, uma PRÉVIA animada no formato vertical. Liste as correções feitas (REGRA PRINCIPAL). Ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).",
@@ -268,15 +268,15 @@ function desenharListaProf(){
   nomes.sort(function(a, b){ return ((ordem[a] || 1e6) - (ordem[b] || 1e6)) || a.localeCompare(b); });
   var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos_prof') || '{}') || {}; }catch(e){}
   var tipoTxt = {video: '🎬 vídeo', cena: '🔬 cena', grafico: '📈 gráfico'};
-  box.innerHTML = nomes.map(function(g){
+  box.innerHTML = nomes.map(function(g, gi){
     var l = grupos[g].sort(function(a, b){ return ((a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem)) || a.titulo.localeCompare(b.titulo); });
     var comVoz = l.filter(function(t){ return t.audios || t.tipo === 'video'; }).length;
     return '<details class="convite" data-trgrupoprof="' + esc(g) + '" style="margin:0 0 8px;padding:8px 12px"' + (q || abertos[g] || nomes.length === 1 ? ' open' : '') + '>' +
-      '<summary style="cursor:pointer"><b>' + esc(g) + '</b> <span class="aviso">· ' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · ' + comVoz + ' com voz</span></summary>' +
-      l.map(function(t){
+      '<summary style="cursor:pointer"><b>' + (q ? '' : (gi + 1) + '. ') + esc(g) + '</b> <span class="aviso">· ' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · ' + comVoz + ' com voz</span></summary>' +
+      l.map(function(t, k){
         var voz = t.tipo === 'video' ? '' : t.fila ? '⏳ gravando (faltam ' + t.fila.faltam + ')' : t.audios ? '🔊 voz da IA' : '🔈 voz do navegador';
         return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin-top:6px">' +
-          '<div style="flex:1 1 240px;min-width:0"><b>' + esc(t.titulo) + '</b>' +
+          '<div style="flex:1 1 240px;min-width:0"><b>' + (q ? '' : '<span style="color:#6b7a99;font-weight:normal">' + (gi + 1) + '.' + (k + 1) + '</span> ') + esc(t.titulo) + '</b>' +
             '<div class="aviso" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc((t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; }).join(' · ') || t.tema || '') + '</div>' +
             '<div class="aviso" style="margin-top:2px">' + [tipoTxt[t.tipo] || '', voz, 'v' + t.versao, t.sessoes ? '👥 ' + t.alunos : ''].filter(Boolean).join(' · ') + '</div></div>' +
           '<div style="display:flex;gap:6px;align-items:center"><button class="mini" data-trabrir="' + esc(t.id) + '">▶ Abrir</button>' +
@@ -324,15 +324,15 @@ function desenharListaAluno(){
   porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(!grupos[g]){ grupos[g] = []; ordG.push(g); } grupos[g].push(t); });
   // na sequência do curso (a ordem que o professor deu aos grandes temas); sem ordem vão para o fim
   var ordemG = {}; porDisc[atual].forEach(function(t){ var g = t.grandeTema || 'Outros assuntos'; if(t.grandeOrdem) ordemG[g] = Math.min(ordemG[g] || 1e9, t.grandeOrdem); });
-  ordG.forEach(function(g){ grupos[g].sort(function(a, b){ return (a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem); }); });
+  ordG.forEach(function(g){ grupos[g].sort(function(a, b){ return ((a.subOrdem === undefined ? 9999 : a.subOrdem) - (b.subOrdem === undefined ? 9999 : b.subOrdem)) || a.titulo.localeCompare(b.titulo); }); });
   ordG.sort(function(a, b){ return ((ordemG[a] || 1e6) - (ordemG[b] || 1e6)) || a.localeCompare(b); });
   var abertos = {}; try{ abertos = JSON.parse(localStorage.getItem('trilha_grupos') || '{}') || {}; }catch(e){}
-  h += ordG.map(function(g){
+  h += ordG.map(function(g, gi){
     var l = grupos[g], pct = Math.round(l.reduce(function(a, t){ return a + (t.progresso || 0); }, 0) / l.length);
-    return '<details class="convite" data-trgrupo="' + esc(g) + '" style="margin-bottom:10px"' + (abertos[g] || ordG.length === 1 ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:16px">' + esc(g) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
-      l.map(function(t){
+    return '<details class="convite" data-trgrupo="' + esc(g) + '" style="margin-bottom:10px"' + (abertos[g] || ordG.length === 1 ? ' open' : '') + '><summary style="cursor:pointer;list-style:none"><div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><b style="font-size:16px">' + (gi + 1) + '. ' + esc(g) + '</b><span class="aviso">' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · <b>' + pct + '% concluído</b></span></div>' + barraPct(pct) + '</summary>' +
+      l.map(function(t, k){
         var subs = (t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; });
-        return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:9px 11px;margin-top:8px"><div style="flex:1 1 200px"><b>' + ((t.progresso || 0) >= 100 || t.estudei ? '✓ ' : '') + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') +
+        return '<div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:9px 11px;margin-top:8px"><div style="flex:1 1 200px"><b>' + ((t.progresso || 0) >= 100 || t.estudei ? '✓ ' : '') + '<span style="color:#6b7a99;font-weight:normal">' + (gi + 1) + '.' + (k + 1) + '</span> ' + esc(t.titulo) + '</b>' + (t.estudei ? ' <span class="t-tag">já estudei</span>' : '') +
           (subs.length ? '<div class="aviso">' + esc(subs.join(' · ')) + '</div>' : '') + barraPct(t.progresso || 0) + '<span class="aviso">' + (t.progresso || 0) + '% · vídeo, questões e Estudar com IA</span></div>' +
           '<button class="mini' + (t.progresso ? ' secundario' : '') + '" data-trestudar="' + esc(t.id) + '">' + (t.progresso >= 100 ? '↻ Rever' : t.progresso ? '▶ Continuar' : '▶ Estudar') + '</button></div>';
       }).join('') + '</details>';
@@ -662,7 +662,7 @@ function irPara(bi, pi, continuar){
   $('pontos').innerHTML = html || '<li class="aviso">—</li>';
   var ctl0 = document.querySelector('.t-app .t-controles'); if(ctl0) ctl0.style.position = '';
   if(ehVideo()){ mostrarNota(); if(!VID.seguindo && VID.p && VID.pronto) try{ VID.p.seekTo(p.inicio || 0, true); }catch(e){} }
-  else G.desenhar(b, P.passo);
+  else if(!(continuar && P.tocando)) G.desenhar(b, P.passo); // tocando: quem desenha é narrar(), quando a voz começa
   if(P.blocoAssunto !== P.bloco){ P.blocoAssunto = P.bloco; desenharAssunto(); }
   U.visto(b.id + ':' + P.passo);
   mostrarAjuste();
@@ -682,12 +682,13 @@ function liberarSom(){
 }
 function tocar(){
   if(ehVideo()){ P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; if(VID.p && VID.pronto) try{ VID.p.playVideo(); }catch(e){} return; }
-  liberarSom(); P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; G.desenhar(blocoAtual(), P.passo); narrar(); }
+  liberarSom(); P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; narrar(); }
 function pausar(){ if(ehVideo() && VID.p && VID.pronto) try{ VID.p.pauseVideo(); }catch(e){} P.tocando = false; $('btPlay').textContent = '▶ Continuar'; limparTimers(); pararSom(); }
 function limparTimers(){ P.timers.forEach(clearTimeout); P.timers = []; }
 function pararSom(){
+  P.falaId = (P.falaId || 0) + 1; // falas canceladas não podem mais mandar seguir
   try{ speechSynthesis.cancel(); }catch(e){}
-  if(P.aud){ try{ P.aud.onended = null; P.aud.onerror = null; P.aud.pause(); }catch(e){} P.aud = null; }
+  if(P.aud){ try{ P.aud.onended = null; P.aud.onerror = null; P.aud.onplaying = null; P.aud.pause(); }catch(e){} P.aud = null; }
 }
 function pararTudo(){ limparTimers(); pararSom(); P.tocando = false; pararVideo(); pararCena(); if(typeof encerrarDuvida === 'function' && wsD) encerrarDuvida(); }
 // narra o passo atual e, no fim (e depois das animações), segue para o próximo
@@ -705,18 +706,22 @@ function narrar(){
     }, falta + 900));
   };
   var tempoLeitura = Math.max(4000, p.fala.length * 62 / P.vel);
+  // o desenho do passo (gráfico e cena) começa junto com a voz; com a voz gravada, os atrasos acompanham a duração real da fala
+  var desenhou = false, comecar = function(k){ if(desenhou || !P.tocando || blocoAtual() !== b || b.passos[P.passo] !== p) return; desenhou = true; G.desenhar(comAtrasos(b, P.passo, k || 1), P.passo); };
+  P.timers.push(setTimeout(function(){ comecar(1); }, 4000)); // se a voz demorar demais, a aula não fica parada
   $('avisoVoz').classList.add('oculto');
-  if(P.modoVoz === 'mudo'){ P.timers.push(setTimeout(seguir, tempoLeitura)); return; }
+  if(P.modoVoz === 'mudo'){ comecar(1); P.timers.push(setTimeout(seguir, tempoLeitura)); return; }
   if(P.modoVoz === 'ia' && T.narracao[chave] === 'ok'){
     pegarAudio(chave).then(function(url){
       if(!P.tocando || blocoAtual() !== b || b.passos[P.passo] !== p) return;
       var a = AUD || new Audio(); a.src = url; a.playbackRate = P.vel; P.aud = a;
-      a.onended = seguir; a.onerror = function(){ falarNavegador(p.fala, seguir, tempoLeitura); };
-      a.play().catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura); });
-    }).catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura); });
+      a.onplaying = function(){ var d = a.duration, est = p.fala.length * 0.062; comecar(isFinite(d) && d > 0 ? Math.max(0.6, Math.min(1.6, (d / P.vel) / est)) : 1); };
+      a.onended = seguir; a.onerror = function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); };
+      a.play().catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); });
+    }).catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); });
     return;
   }
-  falarNavegador(p.fala, seguir, tempoLeitura);
+  falarNavegador(p.fala, seguir, tempoLeitura, comecar);
 }
 function melhorVozNavegador(){
   try{
@@ -726,21 +731,38 @@ function melhorVozNavegador(){
     return v[0] || null;
   }catch(e){ return null; }
 }
-function falarNavegador(texto, seguir, tempoLeitura){
-  if(!('speechSynthesis' in window)){ P.timers.push(setTimeout(seguir, tempoLeitura)); return; }
-  var andou = false, comecou = false;
-  var proximo = function(ms){ if(andou) return; andou = true; P.timers.push(setTimeout(seguir, ms)); };
+function frasesDe(texto){
+  var l = String(texto).match(/[^.!?;]+[.!?;]*\s*/g) || [String(texto)], out = [], cur = '';
+  l.forEach(function(f){ if((cur + f).length > 180 && cur){ out.push(cur); cur = f; } else cur += f; });
+  if(cur.trim()) out.push(cur);
+  return out;
+}
+function falarNavegador(texto, seguir, tempoLeitura, aoComecar){
+  var comecarAnim = function(){ if(aoComecar) aoComecar(1 / P.vel); };
+  if(!('speechSynthesis' in window)){ comecarAnim(); P.timers.push(setTimeout(seguir, tempoLeitura)); return; }
+  var andou = false, comecou = false, meu = P.falaId;
+  var proximo = function(ms){ if(andou || meu !== P.falaId) return; andou = true; P.timers.push(setTimeout(seguir, ms)); };
   try{
     speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance(texto); u.lang = 'pt-BR'; u.rate = 1.0 * P.vel;
-    var v = melhorVozNavegador(); if(v) u.voice = v;
-    u.onstart = function(){ comecou = true; };
-    u.onend = function(){ proximo(200); };
-    u.onerror = function(){ proximo(tempoLeitura); };
-    speechSynthesis.speak(u);
+    // frase por frase: o Chrome corta falas longas (~15 s) no meio e dá a fala por terminada
+    var fr = frasesDe(texto), v = melhorVozNavegador();
+    fr.forEach(function(t, i){
+      var u = new SpeechSynthesisUtterance(t); u.lang = 'pt-BR'; u.rate = 1.0 * P.vel; if(v) u.voice = v;
+      if(i === 0) u.onstart = function(){ if(meu !== P.falaId) return; comecou = true; comecarAnim(); };
+      if(i === fr.length - 1) u.onend = function(){ proximo(200); };
+      u.onerror = function(ev){ if(ev && (ev.error === 'interrupted' || ev.error === 'canceled')) return; proximo(tempoLeitura); };
+      speechSynthesis.speak(u);
+    });
     // se a voz do navegador não começar em 1,5 s (alguns navegadores ficam mudos), a aula segue no tempo de leitura
-    P.timers.push(setTimeout(function(){ if(!comecou){ $('avisoVoz').textContent = 'A voz do navegador não respondeu: a aula segue no tempo de leitura.'; $('avisoVoz').classList.remove('oculto'); proximo(tempoLeitura - 1500); } }, 1500));
-  }catch(e){ proximo(tempoLeitura); }
+    P.timers.push(setTimeout(function(){ if(!comecou && meu === P.falaId){ $('avisoVoz').textContent = 'A voz do navegador não respondeu: a aula segue no tempo de leitura.'; $('avisoVoz').classList.remove('oculto'); comecarAnim(); proximo(tempoLeitura - 1500); } }, 1500));
+  }catch(e){ comecarAnim(); proximo(tempoLeitura); }
+}
+// cópia do bloco com os atrasos do passo multiplicados por k (para acompanhar a duração real da voz)
+function comAtrasos(b, i, k){
+  if(!k || Math.abs(k - 1) < 0.05) return b;
+  var f = function(l){ return (l || []).map(function(a){ if(!a || !a.atraso) return a; var c = {}; for(var x in a) c[x] = a[x]; c.atraso = Math.round(a.atraso * k); return c; }); };
+  var p = b.passos[i], np = {}, nb = {}; for(var x in p) np[x] = p[x]; np.acoes = f(p.acoes); np.cena_acoes = f(p.cena_acoes);
+  for(var y in b) nb[y] = b[y]; nb.passos = b.passos.slice(); nb.passos[i] = np; return nb;
 }
 function pegarAudio(chave){
   if(P.cacheAud[chave]) return P.cacheAud[chave];
@@ -772,7 +794,7 @@ function fimDoBloco(){
   }
   if(tem && T.professorId && T.disciplina_id) h += '<div id="tr_questBox" class="convite" style="margin-top:12px"><b>📝 Questão aberta · ' + esc(tem.nome) + '</b><p class="aviso" style="margin:4px 0 0">Uma questão do estudo dirigido sobre o assunto do vídeo, com correção comentada. Não vale nota: é treino para a prova.</p><div class="botoes"><button class="mini" id="tr_btQuest">✍ Responder uma questão</button></div></div>';
   if(ass) h += '<p style="margin:16px 0 6px"><b>3 · Estudar com IA</b></p><div class="convite" id="tr_avalBox"><b>🎤 Agora explique com as suas palavras</b><p class="aviso" style="margin:4px 0 0">É a avaliação de profundidade do <b>Estudar com IA</b> sobre "' + esc(ass.nome) + '": você fala, ela conversa com você e dá a nota e o parecer. Fica guardada no seu histórico do Estudar com IA.</p><div class="botoes"><button class="mini" id="tr_btAvaliar">🎤 Fazer a avaliação</button></div></div>';
-  h += '<div class="botoes">' + (ultimo ? '<span class="ok" style="margin:0">🎉 Você chegou ao fim desta aula em trilha. Marque ✓ Já estudei aqui embaixo.</span>' : '<button id="tr_btProxBloco">Próximo bloco →</button>') + '</div></div>';
+  h += '<div class="botoes">' + (ultimo ? '<span class="ok" style="margin:0">🎉 Você chegou ao fim desta aula em trilha. Marque ✓ Já estudei aqui embaixo.</span>' : '<button id="tr_btProxBloco">Próximo bloco →</button>') + '</div>' + (ultimo && !T.previa ? navAulas() : '') + '</div>';
   $('checagem').innerHTML = h;
   document.querySelectorAll('[data-trop]').forEach(function(bt){ bt.addEventListener('click', function(){
     var i = Number(bt.getAttribute('data-trop')), certo = i === c.correta;
@@ -782,6 +804,7 @@ function fimDoBloco(){
     U.checagem(b.id, certo);
   }); });
   if($('btProxBloco')) $('btProxBloco').addEventListener('click', function(){ irPara(P.bloco + 1, 0, false); tocar(); });
+  document.querySelectorAll('[data-triraula]').forEach(function(bt){ bt.addEventListener('click', function(){ var id = bt.getAttribute('data-triraula'); pausar(); U.enviar(true); if(id) abrirTrilha(id); else inicio(); }); });
   if($('btAvaliar')) $('btAvaliar').addEventListener('click', function(){ abrirAvaliacao(ass); });
   if($('btQuest')) $('btQuest').addEventListener('click', function(){ pedirQuestaoTrilha(tem.id); });
   $('checagem').scrollIntoView({behavior: 'smooth', block: 'nearest'});
@@ -789,11 +812,21 @@ function fimDoBloco(){
 // questões do estudo dirigido dentro da trilha (mesmo banco, mesma correção e mesmo limite do dia)
 var QT = {q: null, r: null, tema: ''};
 function notaDez(n){ return typeof window.dezEst === 'function' ? window.dezEst(n) : (n === null || n === undefined ? '—' : (Math.round(n) / 10).toFixed(1).replace('.', ',')); }
+// aulas da matéria na ordem da lista (1.1, 1.2, 2.1…), para ir à anterior / próxima no fim da aula
+function aulasEmOrdem(){ var l = []; if(!T || !L.trilhas.length) return l; gruposDaLista(T.disciplina_id || '').forEach(function(g, gi){ g.aulas.forEach(function(t, k){ l.push({id: t.id, titulo: t.titulo, num: (gi + 1) + '.' + (k + 1)}); }); }); return l; }
+function navAulas(){
+  var l = aulasEmOrdem(), i = -1; l.forEach(function(x, k){ if(x.id === T.id) i = k; });
+  var ant = i > 0 ? l[i - 1] : null, prox = i >= 0 && i < l.length - 1 ? l[i + 1] : null;
+  return '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--linha)">' +
+    (ant ? '<button class="mini secundario" data-triraula="' + esc(ant.id) + '" style="flex:1 1 160px;text-align:left">← Aula anterior<br><span class="aviso">' + esc(ant.num + ' ' + ant.titulo) + '</span></button>' : '') +
+    '<button class="mini secundario" data-triraula="" style="flex:0 1 auto">☰ Todas as aulas</button>' +
+    (prox ? '<button class="mini" data-triraula="' + esc(prox.id) + '" style="flex:1 1 160px;text-align:right">Próxima aula →<br><span style="font-weight:normal;font-size:12.5px">' + esc(prox.num + ' ' + prox.titulo) + '</span></button>' : '') + '</div>';
+}
 function pedirQuestaoTrilha(temaId){
   var box = $('questBox'); if(!box) return;
   pausar(); QT.tema = temaId;
   box.innerHTML = '<p class="aviso">Preparando a questão… (a primeira do assunto pode levar uns 20 segundos)</p>';
-  api('estudoProxima', {professorId: T.professorId, disciplinaId: T.disciplina_id, temaId: temaId, daTrilha: !!temaId}).then(function(q){ QT.q = q; QT.r = null; desenharQuestaoTrilha(''); })
+  api('estudoProxima', {professorId: T.professorId, disciplinaId: T.disciplina_id, temaId: temaId, daTrilha: !!temaId, trilhaId: T.id, blocoId: blocoAtual().id}).then(function(q){ QT.q = q; QT.r = null; desenharQuestaoTrilha(''); })
     .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 function desenharQuestaoTrilha(rascunho){
@@ -1010,6 +1043,7 @@ var Cena = (function () {
     ion: "#f2b84b", ionMenos: "#b9a5ff", acucar: "#ff9fc7", particula: "#e9826f",
     gordura: "#f5d76e", bacteria: "#7ddc9a", bactBorda: "#3f8f5c", bactSeca: "#5fae7a", bactDano: "#6a3b3b",
     caixa: "#e8e2d0", caixaFundo: "#ffffff12", estrutura: "#f2c79b", cadeia: "#e6c27a", o2: "#ff8a8a",
+    levedura: "#f3d27a", levBorda: "#b8962f", fungo: "#b9cf8f", fungoEsporo: "#7f9a52",
     giz: "#f4f1e8", dano: "#ff6b6b",
     azul: "#7cc4ff", laranja: "#ffb070", verde: "#8fe3b0", vermelho: "#ff8a8a",
     roxo: "#c7a6ff", cinza: "#bdbdbd", ambar: "#ffd479", rosa: "#ff9fc7"
@@ -1019,12 +1053,14 @@ var Cena = (function () {
     ion: "#f0a91e", ionMenos: "#8b6be0", acucar: "#d6337a", particula: "#c9472f",
     gordura: "#d9a90f", bacteria: "#3fb46a", bactBorda: "#1f7a42", bactSeca: "#2d8a50", bactDano: "#8a3a3a",
     caixa: "#6b6a64", caixaFundo: "#0000000a", estrutura: "#b8742d", cadeia: "#a8741a", o2: "#d62828",
+    levedura: "#e8b931", levBorda: "#8a6a0c", fungo: "#5f8a3a", fungoEsporo: "#3d5c22",
     giz: "#1d1d1b", dano: "#d62828",
     azul: "#1f6fd1", laranja: "#d9650b", verde: "#1a8a47", vermelho: "#d62828",
     roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a"
   };
-  const RAIO = { agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6 };
-  const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
+  const RAIO = { agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, levedura: 4.2, fungo: 5.5 };
+  const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1, levedura: 1, fungo: 1 };
+  const CELULA = { bacteria: 1, levedura: 1, fungo: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
   function mk(tag, at, par) { const e = document.createElementNS(NS, tag); for (const k in at) e.setAttribute(k, at[k]); if (par) par.appendChild(e); return e; }
@@ -1084,6 +1120,25 @@ var Cena = (function () {
         e.corpo = mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: h / 2, fill: e.dano ? PAL.bactDano : PAL.bacteria, stroke: e.dano ? PAL.dano : PAL.bactBorda, "stroke-width": .5 }, g);
         if (e.dano) mk("path", { d: `M${-w / 4},${-h / 2} l1.4,2 l-1.6,1.4 l1.8,2`, stroke: PAL.dano, "stroke-width": .6, fill: "none" }, g);
         if (d.rotulo) rot(g, 0, h / 2 + 3.6, d.rotulo, 3.2);
+      }
+      else if (t === "levedura") {
+        // célula oval com um broto (gemulação) e o núcleo
+        const rx = 3.8 * tam, ry = 3.0 * tam, f = e.dano ? PAL.bactDano : PAL.levedura, b = e.dano ? PAL.dano : PAL.levBorda;
+        e.corpo = mk("ellipse", { rx, ry, fill: f, stroke: b, "stroke-width": .5 }, g);
+        mk("ellipse", { cx: rx * .95, cy: -ry * .55, rx: 1.5 * tam, ry: 1.2 * tam, fill: f, stroke: b, "stroke-width": .45 }, g);
+        mk("circle", { cx: -rx * .25, cy: ry * .1, r: .9 * tam, fill: b, opacity: .55 }, g);
+        if (e.dano) mk("path", { d: `M${-rx / 2},${-ry} l1.2,1.8 l-1.4,1.2 l1.6,1.8`, stroke: PAL.dano, "stroke-width": .6, fill: "none" }, g);
+        if (d.rotulo) rot(g, 0, ry + 3.8, d.rotulo, 3.2);
+      }
+      else if (t === "fungo") {
+        // bolor: filamentos (hifas) ramificados com esporos nas pontas
+        const c = e.dano ? PAL.dano : PAL.fungo, sp = e.dano ? PAL.bactDano : PAL.fungoEsporo, k = tam;
+        const ramos = [[0, 3, -3.5, -1.5], [-3.5, -1.5, -5.5, -4.5], [-3.5, -1.5, -1.5, -5], [0, 3, 3.2, -0.8], [3.2, -0.8, 5.5, -3.8], [3.2, -0.8, 1.8, -4.6], [0, 3, 0.4, -2.6]];
+        let pth = ""; ramos.forEach(r => { pth += `M${(r[0] * k).toFixed(2)},${(r[1] * k).toFixed(2)}Q${((r[0] + r[2]) / 2 * k + .6).toFixed(2)},${((r[1] + r[3]) / 2 * k).toFixed(2)} ${(r[2] * k).toFixed(2)},${(r[3] * k).toFixed(2)}`; });
+        mk("path", { d: pth, stroke: c, "stroke-width": .55 * Math.max(.7, k), fill: "none", "stroke-linecap": "round" }, g);
+        e.corpo = mk("ellipse", { cx: 0, cy: 3.3 * k, rx: 2.6 * k, ry: .8 * k, fill: c, opacity: .5 }, g);
+        [[-5.5, -4.5], [-1.5, -5], [5.5, -3.8], [1.8, -4.6], [0.4, -2.6]].forEach(q => mk("circle", { cx: q[0] * k, cy: q[1] * k, r: .85 * k, fill: sp }, g));
+        if (d.rotulo) rot(g, 0, 4.2 * k + 3.4, d.rotulo, 3.2);
       }
       else if (t === "caixa" || t === "estrutura") {
         const w = d.w || 20, h = d.h || 14;
@@ -1292,7 +1347,7 @@ var Cena = (function () {
         });
       } else if (a.expulsar !== false) {
         sol.forEach(s => {
-          if (s.el && s.el.tipo === "bacteria") return;
+          if (s.el && CELULA[s.el.tipo]) return;
           let x = s.x, y = s.y;
           for (let it = 0; it < 3; it++) for (const [nx, ny] of nuc) { const d = dist(x, y, nx, ny); if (d < R + 1.5) { const k = (R + 2.4) / (d || .01); x = nx + (x - nx) * k; y = ny + (y - ny) * k; } }
           x = Math.min(Math.max(x, ar[0] + 1), ar[2] - 1); y = Math.min(Math.max(y, ar[1] + 1), ar[3] - 1);
@@ -1307,7 +1362,7 @@ var Cena = (function () {
         const key = x.toFixed(1) + "," + y.toFixed(1); if (sites.has(key)) continue;
         let dn = 1e9; for (const [nx, ny] of nuc) dn = Math.min(dn, dist(x, y, nx, ny)); if (dn > R) continue;
         if (ev != null && sol.some(s => dist(x, y, s.x, s.y) < s.r + ev)) continue;
-        if (ev == null && sol.some(s => s.el && s.el.tipo === "bacteria" && dist(x, y, s.x, s.y) < 3.2)) { /* cristal atravessa a célula */ }
+        if (ev == null && sol.some(s => s.el && CELULA[s.el.tipo] && dist(x, y, s.x, s.y) < 3.2)) { /* cristal atravessa a célula */ }
         st.push({ x, y, key, dn });
       }
       st.sort((p, q) => p.dn - q.dn);
@@ -1356,11 +1411,11 @@ var Cena = (function () {
       ps.forEach((p, i) => { const r = 2.2 * Math.sqrt(i), t = i * 2.4; const x = cx + Math.cos(t) * r, y = cy + Math.sin(t) * r; p.casa = { x, y }; p.modo = an ? "indo" : "preso"; p.modoFinal = "preso"; if (!an) { p.x = x; p.y = y; } });
     };
 
-    A.rotulo = (a, an) => { const g = mk("g", {}, L.ann); rot(g, a.x, a.y, a.texto, a.tamanho || 3.9, PAL[a.cor] || PAL.giz); fade(g, an); };
-    A.circulo = (a, an) => { const g = mk("g", {}, L.ann); const c = PAL[a.cor] || PAL.ambar; mk("circle", { cx: a.x, cy: a.y, r: a.r || 6, fill: "none", stroke: c, "stroke-width": .5, "stroke-dasharray": "1.4 1" }, g); if (a.rotulo) rot(g, a.x, a.y - (a.r || 6) - 1.6, a.rotulo, 3.6, c); fade(g, an); };
+    A.rotulo = (a, an) => { const g = mk("g", { "data-trrot": 1 }, L.ann); rot(g, a.x, a.y, a.texto, a.tamanho || 3.9, PAL[a.cor] || PAL.giz); fade(g, an); };
+    A.circulo = (a, an) => { const g = mk("g", { "data-trrot": 1 }, L.ann); const c = PAL[a.cor] || PAL.ambar; mk("circle", { cx: a.x, cy: a.y, r: a.r || 6, fill: "none", stroke: c, "stroke-width": .5, "stroke-dasharray": "1.4 1" }, g); if (a.rotulo) rot(g, a.x, a.y - (a.r || 6) - 1.6, a.rotulo, 3.6, c); fade(g, an); };
     A.linha = (a, an) => { const g = mk("g", {}, L.ann); mk("line", { x1: a.de[0], y1: a.de[1], x2: a.para[0], y2: a.para[1], stroke: PAL[a.cor] || PAL.giz + "66", "stroke-width": .4, "stroke-dasharray": "1.5 1.2" }, g); fade(g, an); };
     A.seta = (a, an) => {
-      const g = mk("g", {}, L.ann); const c = PAL[a.cor] || PAL.giz;
+      const g = mk("g", { "data-trrot": 1 }, L.ann); const c = PAL[a.cor] || PAL.giz;
       const [x1, y1] = a.de, [x2, y2] = a.para, t = Math.atan2(y2 - y1, x2 - x1);
       mk("line", { x1, y1, x2, y2, stroke: c, "stroke-width": .55 }, g);
       mk("path", { d: `M${x2},${y2}L${x2 - 2 * Math.cos(t - .45)},${y2 - 2 * Math.sin(t - .45)}L${x2 - 2 * Math.cos(t + .45)},${y2 - 2 * Math.sin(t + .45)}Z`, fill: c }, g);
@@ -1398,6 +1453,7 @@ var Cena = (function () {
         e.x += vx * dt; e.y += vy * dt; if (e.x < ar[0] || e.x > ar[2]) { vx *= -1; e.x = Math.min(Math.max(e.x, ar[0]), ar[2]); } if (e.y < ar[1] || e.y > ar[3]) { vy *= -1; e.y = Math.min(Math.max(e.y, ar[1]), ar[3]); } posEl(e); });
     };
     A.limpar_cena = () => limpar();
+    A.limpar_rotulos = (a, an) => { L.ann.querySelectorAll("[data-trrot]").forEach(g => { if (an) { g.style.transition = "opacity .4s"; g.setAttribute("opacity", 0); setTimeout(() => g.remove(), 450); } else g.remove(); }); };
 
     function limpar() {
       timers.forEach(clearTimeout); timers = []; procs = [];
