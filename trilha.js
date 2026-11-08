@@ -228,6 +228,7 @@ function desenharLista(){
     h += (discsOrd.length > 1 ? '<div class="t-blocos">' + discsOrd.map(function(d){ return '<button class="t-chip' + (d === filtro ? ' t-atual' : '') + '" data-trfiltro="' + esc(d) + '">' + esc(nomeDisc(d)) + ' (' + discsCom[d] + ')</button>'; }).join('') + '</div>' : '') +
       '<div class="botoes" style="margin:4px 0 10px"><input type="text" id="tr_buscaTrilha" placeholder="🔎 buscar aula…" style="flex:1 1 200px;max-width:340px"><button class="mini secundario" id="tr_btAbrirTodos">abrir todos</button><button class="mini secundario" id="tr_btFecharTodos">fechar todos</button><button class="mini" id="tr_btOrganizar">✏️ Organizar</button></div>' +
       '<div id="tr_listaTrilhasProf"></div>' +
+      '<details class="convite" id="tr_atuLote" style="margin-top:12px"><summary class="link"><b>📦 Atualizar várias aulas de uma vez</b> (troca pela versão nova e mantém a sua organização)</summary><div id="tr_atuLoteCorpo" style="margin-top:8px"></div></details>' +
       '<div class="convite" style="margin-top:12px"><b>🎙 Voz da conversa (natural) em todas as aulas</b><div class="aviso" style="margin:4px 0 6px">Grava uma aula depois da outra com a mesma voz da gravação aula por aula. <b>Deixe esta aba aberta</b> até terminar (uns 3 a 5 minutos por aula); pode usar outras abas.</div><div class="botoes" style="margin:0"><button class="mini" id="tr_btGravarTodasLive">🎙 Gravar com a voz da conversa todas as aulas que faltam</button></div></div>' +
     '';
   } else h += '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
@@ -258,6 +259,7 @@ function desenharLista(){
   if($('btAbrirTodos')) $('btAbrirTodos').addEventListener('click', function(){ document.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.open = true; }); });
   if($('btFecharTodos')) $('btFecharTodos').addEventListener('click', function(){ document.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.open = false; }); });
   if($('btOrganizar')) $('btOrganizar').addEventListener('click', function(){ if(ORG) return; comecarOrganizar(); });
+  if($('atuLote')) $('atuLote').addEventListener('toggle', function(){ if(this.open && !$('atuLoteCorpo').innerHTML) atuLoteInicio(); });
   desenharListaProf();
   if($('btGravarTodasLive')) $('btGravarTodasLive').addEventListener('click', function(){
     var ids = []; gruposDaLista(filtroProf()).forEach(function(g){ g.aulas.forEach(function(t){ if(t.tipo !== 'video') ids.push(t.id); }); });
@@ -1018,6 +1020,105 @@ function tituloDe(id){ var t = L.trilhas.filter(function(x){ return x.id === id;
 function codigoDe(id){ var t = L.trilhas.filter(function(x){ return x.id === id; })[0]; return t && t.codigo || ''; }
 function chaveCodigo(c){ var m = String(c || '').trim().toLowerCase().match(/^(\d+)\s*([a-z]*)/); return m ? ('0000' + m[1]).slice(-4) + m[2] : 'zzzz'; }
 // arquivos escolhidos: o número da aula sai do nome (aula-trilha-03b-….json) quando o JSON não tem "ordem"; vários viram um lote
+// ===== Atualizar várias aulas de uma vez: cada arquivo vira NOVA VERSÃO da aula que já existe (mesmo código ou mesmo título) =====
+// A aula continua com o mesmo id: posição na lista, tópico, estatística e marcas dos alunos ficam iguais.
+var ATU = {itens: [], disc: ''};
+function normTit(x){ return String(x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim(); }
+function carregarJSZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  return new Promise(function(ok, nao){ var sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = function(){ ok(window.JSZip); }; sc.onerror = function(){ nao(new Error('Não deu para abrir o .zip aqui. Descompacte e escolha os arquivos .json.')); }; document.head.appendChild(sc); });
+}
+// lê .json e .zip (com vários .json dentro) e devolve [{nome, texto}]
+function lerArquivosLote(lista){
+  return Promise.all(lista.map(function(f){
+    if(/\.zip$/i.test(f.name)) return carregarJSZip().then(function(Z){ return Z.loadAsync(f); }).then(function(z){
+      var arqs = []; z.forEach(function(caminho, e){ if(!e.dir && /\.json$/i.test(caminho) && !/(^|\/)__MACOSX\//.test(caminho)) arqs.push(e); });
+      return Promise.all(arqs.map(function(e){ return e.async('string').then(function(t){ return {nome: e.name.split('/').pop(), texto: t}; }); }));
+    });
+    return f.text().then(function(t){ return [{nome: f.name, texto: t}]; });
+  })).then(function(ls){ return [].concat.apply([], ls).sort(function(a, b){ return a.nome.localeCompare(b.nome); }); });
+}
+function atuLoteInicio(){
+  var c = $('atuLoteCorpo'), filtro = filtroProf();
+  c.innerHTML = '<p class="aviso" style="margin:0 0 6px">Escolha o <b>.zip</b> que a IA mandou (ou vários <b>.json</b>). Cada arquivo substitui a aula que tem o <b>mesmo código</b> (02a, 02b…) ou o <b>mesmo título</b>, como <b>nova versão</b>: a aula fica no mesmo lugar e no mesmo tópico, e dá para voltar à versão anterior em "Versões desta aula". Você confere a lista antes de salvar.</p>' +
+    '<div class="botoes"><select id="tr_atuDisc">' + L.disciplinas.map(function(d){ return '<option value="' + esc(d.id) + '"' + (d.id === filtro ? ' selected' : '') + '>' + esc(d.nome) + '</option>'; }).join('') + '</select><input type="file" id="tr_atuArqs" multiple accept=".zip,.json,application/zip,application/json"></div><div id="tr_atuTabela"></div>';
+  $('atuArqs').addEventListener('change', function(){
+    var fs = Array.prototype.slice.call(this.files || []); if(!fs.length) return;
+    $('atuTabela').innerHTML = '<p class="t-carregando">Lendo os arquivos…</p>';
+    lerArquivosLote(fs).then(function(arqs){ atuLoteMontar(arqs, $('atuDisc').value); }).catch(function(e){ $('atuTabela').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  $('atuDisc').addEventListener('change', function(){ if(ATU.itens.length) atuLoteMontar(ATU.itens.map(function(i){ return i.arq; }), this.value); });
+}
+// título parecido: a parte antes do ':' igual, ou muitas palavras em comum (a IA às vezes muda o título na versão nova)
+function parecida(titulo, cands){
+  var base = function(x){ return normTit(String(x || '').split(/[:—–(]/)[0]); }, pal = function(x){ return normTit(x).split(' ').filter(function(p){ return p.length > 3; }); };
+  var b0 = base(titulo), p0 = pal(titulo), melhor = null, nota = 0;
+  cands.forEach(function(t){
+    if(b0 && base(t.titulo) === b0){ if(nota < 2){ melhor = t; nota = 2; } return; }
+    var p1 = pal(t.titulo), comum = p0.filter(function(p){ return p1.indexOf(p) !== -1; }).length, j = comum / Math.max(1, Math.min(p0.length, p1.length));
+    if(comum >= 2 && j >= 0.6 && j > nota && nota < 2){ melhor = t; nota = j; }
+  });
+  return melhor;
+}
+function semCercas(t){ return String(t).trim().replace(/^`{3}(?:json)?\s*/i, '').replace(/`{3}\s*$/, ''); }
+function atuLoteMontar(arqs, disc){
+  ATU = {itens: [], disc: disc};
+  var daDisc = L.trilhas.filter(function(t){ return (t.disciplina_id || '') === disc; }), usados = {};
+  var num = numeracao(emCapitulos(gruposDaLista(disc))).aulas;
+  arqs.forEach(function(a){
+    var o = null; try{ o = JSON.parse(semCercas(a.texto)); }catch(e){}
+    if(o && Array.isArray(o.trilhas) && o.trilhas.length === 1) o = o.trilhas[0];
+    var it = {arq: a, obj: o, erro: !o ? 'não é um JSON válido' : (Array.isArray(o) || o.trilhas) ? 'tem várias aulas num arquivo só' : '', destino: ''};
+    if(!it.erro){
+      if(!o.ordem){ var n = numeroDoArquivo(a.nome); if(n) o.ordem = n; }
+      var cod = String(o.ordem || '').toLowerCase(), tit = normTit(o.titulo);
+      var porCod = cod ? daDisc.filter(function(t){ return String(t.codigo || '').toLowerCase() === cod && !usados[t.id]; }) : [];
+      var alvo = porCod.filter(function(t){ return normTit(t.titulo) === tit; })[0] || (porCod.length === 1 ? porCod[0] : null) ||
+        daDisc.filter(function(t){ return normTit(t.titulo) === tit && !usados[t.id]; })[0] || parecida(o.titulo, daDisc.filter(function(t){ return !usados[t.id]; }));
+      it.destino = alvo ? alvo.id : 'nova'; it.como = alvo ? (cod && String(alvo.codigo || '').toLowerCase() === cod ? 'código' : 'título') : '';
+      if(alvo) usados[alvo.id] = true;
+    }
+    ATU.itens.push(it);
+  });
+  var ord = daDisc.slice().sort(function(a, b){ return String(num[a.id] || a.codigo || a.titulo).localeCompare(String(num[b.id] || b.codigo || b.titulo), undefined, {numeric: true}); });
+  var opc = function(sel){ return '<option value="nova"' + (sel === 'nova' ? ' selected' : '') + '>➕ salvar como aula nova</option><option value="pular"' + (sel === 'pular' ? ' selected' : '') + '>— pular este arquivo</option>' +
+    ord.map(function(t){ return '<option value="' + esc(t.id) + '"' + (sel === t.id ? ' selected' : '') + '>nova versão de: ' + esc((num[t.id] ? num[t.id] + ' ' : '') + t.titulo) + ' (v' + t.versao + ')</option>'; }).join(''); };
+  var nAt = ATU.itens.filter(function(i){ return !i.erro && i.destino !== 'nova'; }).length, nNov = ATU.itens.filter(function(i){ return !i.erro && i.destino === 'nova'; }).length;
+  var h = '<p style="margin:10px 0 6px"><b>' + ATU.itens.length + ' arquivo(s)</b>: ' + nAt + ' substituem aulas que já existem' + (nNov ? ', <b>' + nNov + ' sem par</b> (viram aulas novas; troque se for o caso)' : '') + '. Confira e ajuste antes de salvar.</p>' +
+    '<div style="display:flex;flex-direction:column;gap:6px">' + ATU.itens.map(function(it, i){
+      return '<div style="border:1px solid var(--linha);border-radius:8px;padding:6px 8px;background:' + (it.erro ? '#fff1f1' : it.destino === 'nova' ? '#fffbea' : '#fff') + '"><div style="font-size:13.5px"><b>' + esc(it.obj && it.obj.titulo || it.arq.nome) + '</b> <span class="aviso">' + esc(it.arq.nome) + (it.como ? ' · achada pelo ' + it.como : '') + '</span></div>' +
+        (it.erro ? '<div class="erro" style="margin:4px 0 0">' + esc(it.erro) + '</div>' : '<select data-tratudest="' + i + '" style="width:100%;margin-top:4px">' + opc(it.destino) + '</select>') + '<div data-tratumsg="' + i + '"></div></div>';
+    }).join('') + '</div>' +
+    '<input type="text" id="tr_atuCom" maxlength="300" style="width:100%;margin-top:8px" value="atualização em lote (' + new Date().toLocaleDateString('pt-BR') + ')" placeholder="comentário das versões novas">' +
+    '<div class="botoes"><button id="tr_btAtuSalvar">Salvar tudo</button><span class="aviso" id="tr_atuProg"></span></div>';
+  $('atuTabela').innerHTML = h;
+  document.querySelectorAll('[data-tratudest]').forEach(function(s){ s.addEventListener('change', function(){ ATU.itens[Number(s.getAttribute('data-tratudest'))].destino = s.value; }); });
+  $('btAtuSalvar').addEventListener('click', atuLoteSalvar);
+}
+function atuLoteSalvar(){
+  var fila = ATU.itens.map(function(it, i){ return {it: it, i: i}; }).filter(function(x){ return !x.it.erro && x.it.destino !== 'pular'; });
+  var ids = fila.map(function(x){ return x.it.destino; }).filter(function(d){ return d !== 'nova'; });
+  if(ids.some(function(d, k){ return ids.indexOf(d) !== k; })){ $('atuProg').textContent = '⚠ Dois arquivos estão indo para a mesma aula: corrija antes de salvar.'; return; }
+  if(!fila.length) return;
+  $('btAtuSalvar').disabled = true; document.querySelectorAll('[data-tratudest]').forEach(function(s){ s.disabled = true; });
+  var ok = 0, falhas = 0, total = fila.length, com = $('atuCom').value;
+  var msg = function(i, h){ var m = document.querySelector('[data-tratumsg="' + i + '"]'); if(m) m.innerHTML = h; };
+  var proxima = function(){
+    if(!fila.length){
+      $('atuProg').innerHTML = '✓ ' + ok + ' salva(s)' + (falhas ? ' · <b>' + falhas + ' com problema</b> (veja em vermelho)' : '') + '. A lista acima já está atualizada.';
+      api('trilhasListar').then(function(r){ L = r; desenharListaProf(); }).catch(function(){});
+      return;
+    }
+    var x = fila.shift(), dados = {texto: JSON.stringify(x.it.obj), salvar: true, motorAcoes: acoesDoMotor(), disciplinaId: ATU.disc, comentario: com};
+    if(x.it.destino !== 'nova') dados.id = x.it.destino;
+    $('atuProg').textContent = 'Salvando ' + (total - fila.length) + ' de ' + total + '…'; msg(x.i, '<span class="aviso">salvando…</span>');
+    api('trilhaEnviar', dados).then(function(r){
+      if(r.erros && r.erros.length){ falhas++; msg(x.i, '<div class="erro" style="margin:4px 0 0">Não salvou: ' + r.erros.slice(0, 5).map(esc).join(' · ') + '</div>'); return; }
+      ok++; msg(x.i, '<div class="ok" style="margin:4px 0 0">✓ ' + (x.it.destino === 'nova' ? 'aula nova' : 'v' + r.versao) + (r.avisos && r.avisos.length ? ' · ' + r.avisos.length + ' aviso(s): ' + r.avisos.slice(0, 3).map(esc).join(' · ') : '') + '</div>');
+    }).catch(function(e){ falhas++; msg(x.i, '<div class="erro" style="margin:4px 0 0">' + esc(e.message) + '</div>'); }).then(proxima);
+  };
+  proxima();
+}
 function numeroDoArquivo(nome){ var m = String(nome).match(/(?:^|[^0-9a-z])(\d{1,3}[a-z]?)(?=[-_ .])/i); return m ? m[1].toLowerCase() : ''; }
 function lerArquivosTrilha(fs){
   return Promise.all(fs.map(function(f){ return f.text().then(function(t){ return {nome: f.name, texto: t}; }); })).then(function(l){
