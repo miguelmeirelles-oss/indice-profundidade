@@ -251,7 +251,7 @@ function desenharLista(){
     '<select id="tr_selDiscVid"><option value="">— disciplina —</option>' + L.disciplinas.map(function(d){ return '<option value="' + esc(d.id) + '">' + esc(d.nome) + ' (' + esc(d.semestre) + ')</option>'; }).join('') + '</select>' +
     '<input type="text" id="tr_linkVid" placeholder="link do YouTube (ex.: https://youtu.be/…)" style="width:100%;margin-top:8px">' +
     '<div class="botoes"><input type="file" id="tr_arqVid" accept="video/mp4,video/*"><button id="tr_btVid">🎬 Enviar e montar o roteiro</button></div><div id="tr_msgVid"></div></div>';
-  h += '<div class="caixa"><h2>📊 Quem estudou</h2><div id="tr_boxUso"><p class="aviso">Carregando…</p></div></div>';
+  h += '<details class="caixa" id="tr_usoDet"><summary style="cursor:pointer"><h2 style="display:inline">📊 Quem estudou</h2> <span class="aviso">(clique para ver; só carrega quando abre)</span></summary><div id="tr_boxUso" style="margin-top:10px"></div></details>';
   $('corpo').innerHTML = h;
 
   document.querySelectorAll('[data-trfiltro]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_filtro_prof', b.getAttribute('data-trfiltro')); }catch(e){} desenharLista(); }); });
@@ -305,7 +305,7 @@ function desenharLista(){
       $('resConf').scrollIntoView({behavior: 'smooth', block: 'start'});
     }).catch(function(e){ bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
-  carregarUso();
+  if($('usoDet')) $('usoDet').addEventListener('toggle', function(){ if(this.open){ $('boxUso').innerHTML = '<p class="aviso">Carregando…</p>'; carregarUso(); } });
 }
 // lista do professor: grande tema (na ordem do curso) → aulas (na ordem dos subtemas)
 var ORG = null; // organizando a lista: {disc, grupos: [{nome, ids}]}
@@ -529,7 +529,7 @@ function carregarUso(){
         return '<tr><td>' + esc(a.aluno) + '</td><td>' + esc(nomeT(a.trilha_id)) + '</td><td>' + fmtTempo(a.segundos) + ' <span class="aviso">(' + a.sessoes + ' sessão' + (a.sessoes > 1 ? 'ões' : '') + ')</span></td>' +
           '<td>' + a.passos + ' de ' + a.total_passos + ' passos</td><td>' + (a.duvidas ? a.duvidas + ' · ' + fmtTempo(a.duvida_seg) : '—') + '</td>' +
           '<td>' + (a.checagens ? a.acertos + ' de ' + a.checagens + ' certas' : '—') + '</td><td>' + (a.profundidade !== undefined ? '<b>' + a.profundidade + '</b> <span class="aviso">(melhor de ' + a.avaliacoes + ')</span>' : '—') + '</td><td>' + (a.estudei ? '✓ ' + esc(a.estudei) : '—') + '</td><td style="max-width:260px">' + (a.comentario ? esc(a.comentario) : '—') + '</td><td>' + esc(a.ultimo || '—') + '</td></tr>';
-      }).join('') + '</table></div><p class="aviso">Tempo de estudo conta só com a aula aberta na tela e em uso. Por enquanto só você usa; quando liberarmos para os alunos, eles aparecem aqui.</p>' :
+      }).join('') + '</table></div><p class="aviso">Tempo de estudo conta só com a aula aberta na tela e em uso. Feche e abra de novo esta caixa (ou recarregue a página) para atualizar.</p>' :
       '<p class="aviso">Ninguém usou ainda. Aqui vai aparecer quem estudou, por quanto tempo, até onde chegou, as dúvidas por voz, os acertos nas checagens, quem marcou como estudada e os comentários.</p>';
   }).catch(function(e){ $('boxUso').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
