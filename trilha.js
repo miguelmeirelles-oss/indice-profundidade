@@ -9,7 +9,7 @@ function erroGeral(m){ var e = $('erroGeral'); if(!e) return; e.textContent = m 
 /* =====================================================================================
    PROMPT para a IA externa (Claude etc.): o professor cola junto com o material das aulas
    ===================================================================================== */
-// REGRAS v2 (06/11/2026), escritas pelo Claude que monta as aulas, a pedido do professor
+// REGRAS v2 (06/11/2026) + v3 (08/11/2026), escritas pelo Claude que monta as aulas, a pedido do professor
 var PROMPT_TRILHA = [
 "Você vai montar uma AULA EM TRILHA para a plataforma \"Aula por IA\". É uma aula interativa que o estudante assiste sozinho, no formato de vídeo vertical (celular): a plataforma desenha em cima um gráfico que se anima e embaixo uma CENA de moléculas animadas, uma voz de IA lê a sua \"fala\" de cada passo com legenda, e o estudante pode pausar e tirar dúvidas por voz com outra IA (que usa o seu \"contexto_ia\" como base).",
 "",
@@ -69,7 +69,67 @@ var PROMPT_TRILHA = [
 "  {\"tipo\":\"rotulo\",\"x\":x,\"y\":y,\"texto\":\"texto\",\"cor\":\"azul\"} · {\"tipo\":\"circulo\",\"x\":x,\"y\":y,\"r\":6,\"rotulo\":\"texto\"} · {\"tipo\":\"seta\",\"de\":[x,y],\"para\":[x,y],\"rotulo\":\"texto\"} · {\"tipo\":\"linha\",\"de\":[x,y],\"para\":[x,y]} · {\"tipo\":\"organizar\",\"especie\":\"acucar\",\"de_area\":[x1,y1,x2,y2],\"area\":[x1,y1,x2,y2],\"espaco\":6} (as partículas se arrumam numa grade: cristal) · {\"tipo\":\"congelar_solutos\",\"de_area\":[…]} (as partículas param de se mexer: vítreo) · {\"tipo\":\"limpar_rotulos\"} (apaga só os textos, setas e círculos; os desenhos ficam) · {\"tipo\":\"limpar_cena\"} (apaga tudo). Use SÓ essas ações.",
 "- Para comparar dois casos, divida a cena ao meio com uma \"linha\" em x=50 e rótulos no topo de cada lado. Rótulos da cena também curtos (até ~30 caracteres). As cenas são esquemáticas (fora de escala); diga isso no campo \"fonte\".",
 "",
-"REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre a LISTA de trilhas na ordem do curso (ordem dos PDFs das aulas e da apostila no Google Drive, não a ordem das gravações), com o assunto de cada uma e de quais aulas gravadas vem. Depois de aprovada, mostre o ROTEIRO de cada trilha (tabela com nº do passo, título, o que a voz diz, o que aparece no gráfico e o que acontece na cena) e, se a sua interface permitir conteúdo visual, uma PRÉVIA animada no formato vertical. Liste as correções feitas (REGRA PRINCIPAL). Ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).",
+"══════════════════════════════════════════════════════════════",
+"REGRAS v3 (08/11/2026): valem para todas as disciplinas",
+"══════════════════════════════════════════════════════════════",
+"1. FRASES-CHAVE NA CENA (trilhas COM gráfico)",
+"Nas trilhas que têm \"grafico\", os \"pontos\" não aparecem na tela. Para o estudante ver as frases-chave no momento em que a voz fala delas, repita cada ponto como texto na cena:",
+"- Faixa fixa embaixo da cena: {\"tipo\":\"rotulo\",\"x\":50,\"y\":57,\"texto\":\"<ponto>\",\"tamanho\":4.3} (sem \"cor\").",
+"- Momento: atraso = (posição, em caracteres, do trecho da \"fala\" que corresponde ao ponto ÷ 14,5) × 1000 + 300 ms.",
+"- Uma frase por vez: o primeiro item de \"cena_acoes\" de cada passo é {\"tipo\":\"limpar_rotulos\"}. Antes de cada frase seguinte, use {\"tipo\":\"limpar_rotulos\",\"atraso\":<atraso da frase − 1>} e, logo depois, recoloque com o mesmo atraso os rótulos, setas, círculos e linhas do passo que já estavam na tela (ex.: a equação), para eles não sumirem.",
+"- Deixe a faixa de baixo livre: nenhum elemento ou rótulo da cena abaixo de y = 50 nessas trilhas.",
+"- Frases de até ~40 caracteres (cabem na largura com tamanho 4,3).",
+"- Nas trilhas SEM gráfico, não faça isso: lá os pontos já aparecem no topo.",
+"",
+"2. NENHUM TEXTO DUPLICADO NA TELA",
+"- O título do passo não pode se repetir num ponto (ex.: título \"Dose depende do alvo\" e ponto \"A dose depende do alvo\"): reescreva um dos dois.",
+"- Rótulo da cena ou do gráfico não pode repetir um ponto do mesmo passo (ex.: rótulo \"pH interno cai\" e ponto \"pH interno cai, célula gasta ATP\").",
+"- Quando vários elementos sofrem a mesma ação (ex.: \"danificar\" em bolor, levedura e bactéria), use UM rótulo coletivo (\"bolor e levedura inibidos\") ou nenhum, nunca o mesmo rótulo em cada elemento.",
+"- Se a equação já está na cena, o ponto deve dizer outra coisa (ex.: equação \"AH + ROO• → ROOH + A•\" na cena; ponto \"Doa um átomo de H ao radical\").",
+"",
+"3. EQUAÇÕES E REAÇÕES QUÍMICAS",
+"- Mostre as reações sempre que a aula envolver química (ex.: NO₂⁻ + H⁺ ⇌ HNO₂; R₂NH + N₂O₃ → R₂N–NO + HNO₂).",
+"- Trilha COM gráfico: equação como rótulo azul no alto da cena (y entre 4 e 14, até ~30 caracteres por linha; use duas linhas se precisar).",
+"- Trilha SEM gráfico: equação nos \"pontos\" (aparecem grandes no topo).",
+"- Use os índices e sinais certos (₂, ³, ⁺, ⁻, •, ⇌, →).",
+"",
+"4. GRÁFICO E CENA: DETALHES QUE EVITAM ERRO VISUAL",
+"- Se o gráfico só seria usado em 1 passo, prefira a trilha sem gráfico (o topo fica vazio nos outros passos). Se ele é central para o conceito (ex.: curva de pKa, curva do peróxido, amido nativo × modificado), mantenha.",
+"- Nomes das curvas: use \"sem_rotulo\": true e coloque um \"texto\" da cor da curva numa área vazia do gráfico, longe das outras curvas e linhas. Rótulos de \"linha_v\" e \"regiao\" ficam no topo e se sobrepõem: prefira \"rotulo\":\"\" e um \"texto\" posicionado.",
+"- Pontos de série modelo \"pontos\" sempre em x crescente.",
+"- Elemento \"particula\" não mostra rótulo: para moléculas que precisam de nome (HA, NO, O₂, R₂NH), use \"ion\" com \"rotulo\".",
+"- Curvas e números criados para desenhar: marcar \"(ilustrativo)\" no gráfico e no \"fonte\".",
+"",
+"5. FALA",
+"- Escreva siglas e símbolos como se falam: \"pê agá\", \"pê ká á\", \"ingestão diária aceitável\", \"miligramas por quilo\", \"instrução normativa duzentos e onze\", \"graus Celsius\", números por extenso.",
+"- Nada de \"%\", \"°C\", \"µg\", \"mg/\" na fala (podem aparecer nos pontos e rótulos).",
+"",
+"6. ADITIVOS E LEGISLAÇÃO (quando houver limites e doses)",
+"- Todo limite legal vem com a fonte (ex.: IN 211/2023, RDC 08/2013, RTIQ) e com o aviso \"conferir a IN 211/2023 vigente para a categoria\". Sem confirmação, não dê número: diga para conferir a categoria.",
+"- Separe limite brasileiro de limite estrangeiro (ex.: vinho no Brasil 0,35 g/L de SO₂ total; 150 mg/L é o limite europeu para tintos).",
+"- Quando o limite é expresso como ácido ou íon, mostre a conversão do sal (ex.: sorbato de potássio ≈ 75% de ácido sórbico; metabissulfito de sódio ≈ 67% de SO₂).",
+"- Inclua contas resolvidas com números simples (ex.: 100 kg × 150 mg/kg = 15 g de nitrito; salmoura com injeção de 20% → 900 mg/kg).",
+"",
+"7. ESTRUTURA DAS TRILHAS POR ADITIVO",
+"- Uma trilha por aditivo, nesta sequência: o que é → espectro ou alvo → como age → cuidados no processamento → exemplos reais com dose e limite → cuidados finais.",
+"- Depois, trilhas só de exemplos, por produto (queijos, pães, bebidas, cárneos, polpas…), com mais detalhe e uma conta por trilha.",
+"- Assunto grande vira série (ex.: nitrito e nitrato: fundamento; uso e doses; saúde; controle de nitrosaminas).",
+"- Feche cada aula com uma trilha de exemplos por produto.",
+"",
+"8. ORDEM E NUMERAÇÃO",
+"- A ordem do curso vem do PLANO DE ENSINO (se houver no Drive), não da ordem alfabética dos PDFs nem da data das gravações. O número de \"ordem\" é o da aula no plano; a letra é a sequência dentro dela.",
+"- Assunto sem aula gravada: pode ser feito só pelos slides; diga isso no \"fonte\".",
+"",
+"9. CORREÇÕES E ACRÉSCIMOS NO \"fonte\"",
+"- Corrija também os erros dos SLIDES, não só da fala, e registre em \"AJUSTES FEITOS EM RELAÇÃO À FALA\" ou \"AJUSTES FEITOS EM RELAÇÃO AO SLIDE\".",
+"- Quando o professor pedir \"cuidados\" ou \"exemplos\" e você completar com algo que a aula não deu, registre em \"ACRÉSCIMOS\".",
+"- Omita afirmações que você não conseguir confirmar (número sem unidade, limite incerto, anedota sem fonte) e registre a omissão.",
+"",
+"10. CONFERÊNCIA ANTES DE ENTREGAR",
+"Para cada trilha, confira: 6 a 12 passos; fala ≤ 700 caracteres; título de passo ≤ 40; rótulos do gráfico ≤ 22; rótulos da cena ≤ 30; pontos ≤ 90; contexto_ia entre 800 e 3000; nenhum texto repetido (regra 2); nenhum rótulo sobreposto a curva ou a outro rótulo; faixa de baixo da cena livre nas trilhas com gráfico.",
+"",
+"",
+"REVISÃO COM O PROFESSOR (antes do arquivo final): primeiro mostre a LISTA de trilhas na ordem do curso (a do PLANO DE ENSINO, se houver no Drive; senão a dos slides e da apostila, nunca a ordem alfabética dos arquivos nem a das gravações), com o assunto de cada uma e de quais aulas gravadas vem. Depois de aprovada, mostre o ROTEIRO de cada trilha (tabela com nº do passo, título, o que a voz diz, o que aparece no gráfico e o que acontece na cena) e, se a sua interface permitir conteúdo visual, uma PRÉVIA animada no formato vertical. Liste as correções feitas (REGRA PRINCIPAL). Ajuste o que ele pedir e só entregue o JSON final quando ele aprovar (ou se ele pedir o JSON direto).",
 "",
 "LOTE: se o material tiver vários assuntos, faça várias trilhas curtas (uma por assunto, um bloco cada), na ordem do curso, e devolva um arquivo .json por trilha, com o número da aula no nome do arquivo e no campo \"ordem\" (01a, 01b, 02a…: o número é o da aula do curso, a letra é a sequência dentro dela); a plataforma usa esse número para pôr as aulas em ordem. Se a resposta for ficar longa demais, entregue algumas trilhas por vez e diga quais ainda faltam; o professor pede \"continue\".",
 "",
@@ -80,7 +140,7 @@ var PROMPT_TRILHA = [
 "  \"ordem\": \"número da aula na sequência do curso, o mesmo do nome do arquivo (ex.: 03b)\",",
 "  \"tema\": \"assuntos cobertos\",",
 "  \"visual\": {\"fundo\": \"branco\"},",
-"  \"fonte\": \"de quais aulas/slides veio. AJUSTES FEITOS EM RELAÇÃO À FALA: … As cenas de moléculas são esquemáticas (fora de escala).\",",
+"  \"fonte\": \"de quais aulas/slides veio. AJUSTES FEITOS EM RELAÇÃO À FALA: … AJUSTES FEITOS EM RELAÇÃO AO SLIDE: … ACRÉSCIMOS: … OMISSÕES: … As cenas de moléculas são esquemáticas (fora de escala).\",",
 "  \"blocos\": [",
 "    {",
 "      \"id\": \"b1\",",
@@ -279,6 +339,8 @@ function filtroProf(){
   if(!filtro || !ds[filtro]) filtro = Object.keys(ds).sort(function(a, b){ return nomeDisc(a).localeCompare(nomeDisc(b)); })[0] || '';
   return filtro;
 }
+// apagar várias de uma vez: modo seleção na lista do professor
+var SELP = {on: false, ids: {}};
 function desenharListaProf(){
   var box = $('listaTrilhasProf'); if(!box) return;
   if(ORG && ORG.disc === filtroProf()){ desenharOrganizar(); return; }
@@ -296,7 +358,8 @@ function desenharListaProf(){
   var tipoTxt = {video: '🎬 vídeo', cena: '🔬 cena', grafico: '📈 gráfico'};
   var linha = function(t){
     var voz = t.tipo === 'video' ? '' : t.fila ? '⏳ gravando (faltam ' + t.fila.faltam + ')' : t.audios ? '🔊 voz da IA' : '🔈 voz do navegador';
-    return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin-top:6px">' +
+    return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:' + (SELP.on && SELP.ids[t.id] ? '#fff4f4' : '#fff') + ';border:1px solid var(--linha);border-radius:8px;padding:8px 10px;margin-top:6px">' +
+      (SELP.on ? '<input type="checkbox" data-trselp="' + esc(t.id) + '"' + (SELP.ids[t.id] ? ' checked' : '') + ' style="width:20px;height:20px;flex:0 0 auto" aria-label="selecionar ' + esc(t.titulo) + '">' : '') +
       '<div style="flex:1 1 240px;min-width:0"><b>' + (num.aulas[t.id] ? '<span style="color:#6b7a99;font-weight:normal">' + num.aulas[t.id] + '</span> ' : '') + esc(t.titulo) + '</b>' +
         '<div class="aviso" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc((t.subtemas || []).filter(function(x, i, a){ return a.indexOf(x) === i; }).join(' · ') || t.tema || '') + '</div>' +
         '<div class="aviso" style="margin-top:2px">' + [tipoTxt[t.tipo] || '', voz, 'v' + t.versao, t.sessoes ? '👥 ' + t.alunos : ''].filter(Boolean).join(' · ') + '</div></div>' +
@@ -309,9 +372,14 @@ function desenharListaProf(){
   var topico = function(g, dentro, unico){
     var l = g.aulas, comVoz = l.filter(function(t){ return t.audios || t.tipo === 'video'; }).length, n = num.secoes[g.nome];
     return '<details class="convite" data-trgrupoprof="' + esc(g.nome) + '" style="margin:' + (dentro ? '8px 0 0' : '0 0 8px') + ';padding:8px 12px' + (dentro ? ';background:#fbfcfe' : '') + '"' + (q || abertos[g.nome] || unico ? ' open' : '') + '>' +
-      '<summary style="cursor:pointer"><b>' + (n ? n + (dentro ? ' ' : '. ') : '') + esc(g.sec) + '</b> <span class="aviso">· ' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · ' + comVoz + ' com voz</span></summary>' + l.map(linha).join('') + '</details>';
+      '<summary style="cursor:pointer"><b>' + (n ? n + (dentro ? ' ' : '. ') : '') + esc(g.sec) + '</b> <span class="aviso">· ' + l.length + ' aula' + (l.length > 1 ? 's' : '') + ' · ' + comVoz + ' com voz</span></summary>' +
+      (SELP.on ? '<button class="link" style="font-size:13px" data-trseltopico="' + esc(l.map(function(t){ return t.id; }).join(',')) + '">marcar / desmarcar todas deste tópico</button>' : '') + l.map(linha).join('') + '</details>';
   };
-  box.innerHTML = caps.map(function(c){
+  var nSel = Object.keys(SELP.ids).filter(function(id){ return SELP.ids[id]; }).length;
+  var barra = '<div class="botoes" style="margin:0 0 8px;position:sticky;top:0;z-index:6;background:#fff;padding:6px 0">' + (SELP.on
+    ? '<button class="mini" id="tr_btApagarSel" style="background:#8a1c1c;border-color:#8a1c1c"' + (nSel ? '' : ' disabled') + '>🗑 Apagar ' + nSel + ' selecionada' + (nSel === 1 ? '' : 's') + '</button><button class="mini secundario" id="tr_btSelVisiveis">marcar todas as que aparecem</button><button class="mini secundario" id="tr_btSelSair">cancelar</button><span class="aviso" id="tr_msgSel"></span>'
+    : '<button class="mini secundario" id="tr_btSelEntrar">☑ Selecionar várias</button>') + '</div>';
+  box.innerHTML = barra + caps.map(function(c){
     if(!c.cap) return topico(c.grupos[0], false, caps.length === 1);
     var n = c.grupos.reduce(function(s, g){ return s + g.aulas.length; }, 0), k = 'cap:' + c.cap, ci = caps.indexOf(c);
     var nc = num.secoes[c.grupos[0].nome] ? num.secoes[c.grupos[0].nome].split('.')[0] : String(ci + 1);
@@ -320,6 +388,24 @@ function desenharListaProf(){
       c.grupos.map(function(g){ return topico(g, true, c.grupos.length === 1); }).join('') + '</details>';
   }).join('');
   box.querySelectorAll('[data-trgrupoprof]').forEach(function(d){ d.addEventListener('toggle', function(){ if(q) return; try{ var a = JSON.parse(localStorage.getItem('trilha_grupos_prof') || '{}') || {}; a[d.getAttribute('data-trgrupoprof')] = d.open; localStorage.setItem('trilha_grupos_prof', JSON.stringify(a)); }catch(e){} }); });
+  var refazer = function(){ var y = window.scrollY; desenharListaProf(); window.scrollTo(0, y); };
+  if($('btSelEntrar')) $('btSelEntrar').addEventListener('click', function(){ SELP = {on: true, ids: {}}; refazer(); });
+  if($('btSelSair')) $('btSelSair').addEventListener('click', function(){ SELP = {on: false, ids: {}}; refazer(); });
+  if($('btSelVisiveis')) $('btSelVisiveis').addEventListener('click', function(){ lista.forEach(function(t){ SELP.ids[t.id] = true; }); refazer(); });
+  box.querySelectorAll('[data-trselp]').forEach(function(c){ c.addEventListener('change', function(){ SELP.ids[c.getAttribute('data-trselp')] = c.checked; refazer(); }); });
+  box.querySelectorAll('[data-trseltopico]').forEach(function(b){ b.addEventListener('click', function(){ var ids = b.getAttribute('data-trseltopico').split(','), todas = ids.every(function(id){ return SELP.ids[id]; }); ids.forEach(function(id){ SELP.ids[id] = !todas; }); refazer(); }); });
+  if($('btApagarSel')) $('btApagarSel').addEventListener('click', function(){
+    var ids = Object.keys(SELP.ids).filter(function(id){ return SELP.ids[id]; }), nomes = L.trilhas.filter(function(t){ return ids.indexOf(t.id) !== -1; }).map(function(t){ return '• ' + t.titulo; });
+    var NL = String.fromCharCode(10);
+    if(!ids.length || !confirm('Apagar ' + ids.length + ' aula' + (ids.length > 1 ? 's' : '') + ' em trilha?' + NL + NL + nomes.slice(0, 15).join(NL) + (nomes.length > 15 ? NL + '… e mais ' + (nomes.length - 15) : '') + NL + NL + 'As pastas vão para a lixeira do seu Drive (dá para recuperar por 30 dias).')) return;
+    var bt = this, feitas = 0, falhas = []; bt.disabled = true;
+    var proxima = function(){
+      if(!ids.length){ SELP = {on: false, ids: {}}; inicio(); if(falhas.length) setTimeout(function(){ erroGeral('Não deu para apagar ' + falhas.length + ': ' + falhas.join(' · ')); }, 800); return; }
+      var id = ids.shift(); $('msgSel').textContent = 'Apagando… ' + (feitas + 1) + ' de ' + (feitas + ids.length + 1);
+      api('trilhaApagar', {id: id}).then(function(){ feitas++; }).catch(function(e){ var t = L.trilhas.filter(function(x){ return x.id === id; })[0]; falhas.push((t ? t.titulo : id) + ' (' + e.message + ')'); }).then(proxima);
+    };
+    proxima();
+  });
   ligarBotoesListaProf();
 }
 function ligarBotoesListaProf(){
