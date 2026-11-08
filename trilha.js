@@ -2087,9 +2087,14 @@ var G = (function(){
 var wsD = null, ctxMic = null, ctxSom = null, fonteMic = null, noMic = null, streamMic = null, tocarAte = 0, tocandoD = [], tD0 = 0, relogioD = null;
 var tokenVoz = null, alcaRetomada = '', trocando = false, tentativasRetomar = 0, wsPendente = null, estavaTocando = false;
 var CODIGO_WORKLET = 'class Captura extends AudioWorkletProcessor{process(e){var c=e[0][0];if(c)this.port.postMessage(c.slice(0));return true;}}registerProcessor("captura",Captura);';
+// converte para 16 bits a 16 kHz; se o microfone estiver em outra taxa, faz a MÉDIA de cada janela (pegar 1 amostra a cada 3 distorcia a voz e a IA entendia pior)
 function paraPCM16(f32, de, para){
   var razao = de / para, n = Math.floor(f32.length / razao), out = new Int16Array(n);
-  for(var i = 0; i < n; i++){ var s = f32[Math.floor(i * razao)]; s = Math.max(-1, Math.min(1, s)); out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF; }
+  for(var i = 0; i < n; i++){
+    var a = Math.floor(i * razao), z = Math.min(f32.length, Math.max(a + 1, Math.floor((i + 1) * razao))), soma = 0;
+    for(var k = a; k < z; k++) soma += f32[k];
+    var s = Math.max(-1, Math.min(1, soma / (z - a))); out[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+  }
   return out;
 }
 function b64DeBytes(u8){ var s = '', k = 0x8000; for(var i = 0; i < u8.length; i += k) s += String.fromCharCode.apply(null, u8.subarray(i, i + k)); return btoa(s); }
@@ -2125,14 +2130,14 @@ function abrirDuvida(){
   var box = $('duvidaBox'); box.classList.remove('oculto');
   box.innerHTML = '<b>✋ Dúvida sobre: ' + esc(b.passos[P.passo].titulo || b.titulo) + '</b>' +
     '<div class="t-estado" id="tr_estadoD"></div><div class="t-nivel" id="tr_nivelMic"><div></div></div>' +
-    '<div class="aviso">Fale normalmente; pode interromper a IA. Se ela puxar um assunto que não estava na aula, ela avisa: "aprofundamento · não cai na prova".</div>' +
+    '<div class="aviso">Fale normalmente; pode interromper a IA. O texto do que você fala aparece com atraso e às vezes incompleto: é só a legenda, a IA ouve a sua voz direto. Se ela puxar um assunto que não estava na aula, ela avisa: "aprofundamento · não cai na prova".</div>' +
     '<div class="t-conversa" id="tr_conversaD"></div><div id="tr_msgD"></div>' +
     '<div class="botoes"><button class="mini" id="tr_btFimD">Encerrar e voltar para a aula</button></div>';
   $('btFimD').addEventListener('click', function(){ encerrarDuvida(); });
   ultimaFala = {ia: null, eu: null}; estadoD('preparando o microfone…');
   box.scrollIntoView({behavior: 'smooth', block: 'nearest'});
   try{ ctxSom = new AudioContext({sampleRate: 24000}); }catch(e){ ctxSom = new AudioContext(); }
-  ctxMic = new AudioContext();
+  try{ ctxMic = new AudioContext({sampleRate: 16000}); }catch(e){ ctxMic = new AudioContext(); }
   navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1}}).then(function(s){
     streamMic = s; estadoD('abrindo a conversa…');
     return api('trilhaToken', {id: T.id, blocoId: b.id, passo: P.passo, modo: 'duvida'});
@@ -2204,7 +2209,15 @@ function conectarD(primeira){
 function ligarMicrofone(){
   var url = URL.createObjectURL(new Blob([CODIGO_WORKLET], {type: 'application/javascript'}));
   ctxMic.audioWorklet.addModule(url).then(function(){
-    fonteMic = ctxMic.createMediaStreamSource(streamMic);
+    try{ fonteMic = ctxMic.createMediaStreamSource(streamMic); }
+    catch(e){   // navegador que não aceita o microfone a 16 kHz (ex.: Firefox): volta para a taxa normal e converte aqui
+      try{ ctxMic.close(); }catch(x){} ctxMic = new AudioContext(); try{ ctxMic.resume(); }catch(x){}
+      return ctxMic.audioWorklet.addModule(url).then(ligarMicrofoneNo);
+    }
+    ligarMicrofoneNo();
+  });
+  function ligarMicrofoneNo(){
+    if(!fonteMic || fonteMic.context !== ctxMic) fonteMic = ctxMic.createMediaStreamSource(streamMic);
     noMic = new AudioWorkletNode(ctxMic, 'captura');
     var acumulado = [], tam = 0, alvo = Math.round(ctxMic.sampleRate * 0.1);
     noMic.port.onmessage = function(e){
@@ -2216,7 +2229,7 @@ function ligarMicrofone(){
       wsD.send(JSON.stringify({realtimeInput: {audio: {data: b64DeBytes(new Uint8Array(paraPCM16(junto, ctxMic.sampleRate, 16000).buffer)), mimeType: 'audio/pcm;rate=16000'}}}));
     };
     fonteMic.connect(noMic);
-  });
+  }
 }
 // créditos de IA acabaram: passo a passo para o aluno cadastrar a própria chave (Minha conta, no site)
 function conviteChaveHTML(propria, msg){
