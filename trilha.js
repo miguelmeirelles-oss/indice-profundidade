@@ -812,15 +812,25 @@ function liberarSom(){
 }
 function tocar(){
   if(ehVideo()){ P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; if(VID.p && VID.pronto) try{ VID.p.playVideo(); }catch(e){} return; }
-  liberarSom(); P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; narrar(); }
-function pausar(){ if(ehVideo() && VID.p && VID.pronto) try{ VID.p.pauseVideo(); }catch(e){} P.tocando = false; $('btPlay').textContent = '▶ Continuar'; limparTimers(); pararSom(); }
+  liberarSom(); P.tocando = true; telaAcesa(true); $('btPlay').textContent = '⏸ Pausar'; narrar(); }
+function pausar(){ telaAcesa(false); if(ehVideo() && VID.p && VID.pronto) try{ VID.p.pauseVideo(); }catch(e){} P.tocando = false; $('btPlay').textContent = '▶ Continuar'; limparTimers(); pararSom(); }
 function limparTimers(){ P.timers.forEach(clearTimeout); P.timers = []; }
 function pararSom(){
   P.falaId = (P.falaId || 0) + 1; // falas canceladas não podem mais mandar seguir
   try{ speechSynthesis.cancel(); }catch(e){}
   if(P.aud){ try{ P.aud.onended = null; P.aud.onerror = null; P.aud.onplaying = null; P.aud.pause(); }catch(e){} P.aud = null; }
 }
-function pararTudo(){ limparTimers(); pararSom(); P.tocando = false; pararVideo(); pararCena(); if(typeof encerrarDuvida === 'function' && wsD) encerrarDuvida(); }
+// tela acesa só enquanto as cenas da aula estão passando (como num vídeo); pausou, acabou o bloco ou saiu: o celular volta ao normal
+var TELA = {lock: null, quer: false};
+function telaAcesa(on){
+  TELA.quer = !!on;
+  if(!on){ if(TELA.lock){ try{ TELA.lock.release(); }catch(e){} TELA.lock = null; } return; }
+  if(TELA.lock || !navigator.wakeLock || document.hidden) return;
+  navigator.wakeLock.request('screen').then(function(l){ if(!TELA.quer){ try{ l.release(); }catch(e){} return; } TELA.lock = l; l.addEventListener('release', function(){ if(TELA.lock === l) TELA.lock = null; }); }).catch(function(){});
+}
+// o celular solta a trava quando a aba sai da tela; ao voltar, pede de novo
+document.addEventListener('visibilitychange', function(){ if(!document.hidden && TELA.quer && P.tocando && !ehVideo()) telaAcesa(true); });
+function pararTudo(){ telaAcesa(false); limparTimers(); pararSom(); P.tocando = false; pararVideo(); pararCena(); if(typeof encerrarDuvida === 'function' && wsD) encerrarDuvida(); }
 // narra o passo atual e, no fim (e depois das animações), segue para o próximo
 function narrar(){
   if(ehVideo()) return;
@@ -911,7 +921,7 @@ function preCarregarAudio(n){
 // fim do bloco: 1) vídeo-aula (feito) 2) questões 3) Estudar com IA
 function temaDoBloco(b){ var a = (T.temasBlocos || []).filter(function(x){ return x.bloco === b.id; })[0]; return a && a.id ? a : null; }
 function fimDoBloco(){
-  P.tocando = false; P.fimDoBloco = true; $('btPlay').textContent = '↻ Rever o bloco';
+  P.tocando = false; P.fimDoBloco = true; telaAcesa(false); $('btPlay').textContent = '↻ Rever o bloco';
   var ctlF = document.querySelector('.t-app .t-controles'); if(ctlF) ctlF.style.position = 'static';   // nas questões a barra não fica presa no topo
   var b = blocoAtual(), c = b.checagem, ultimo = P.bloco >= T.trilha.blocos.length - 1, ass = assuntoDoBloco(b), tem = temaDoBloco(b);
   var passo = function(n, txt, feito){ return '<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px;font-weight:bold;color:' + (feito ? '#1a7a3c' : 'var(--navy)') + '"><span class="t-passoNum" style="background:' + (feito ? '#1a7a3c' : '') + '">' + (feito ? '✓' : n) + '</span>' + txt + '</span>'; };
