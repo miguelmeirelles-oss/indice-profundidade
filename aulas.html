@@ -742,7 +742,7 @@ window.addEventListener('focus', voltouATela);
 function abrirAluno(){
   voltarListaAluno();
   carregarMinhas(); carregarAbertas(); desenharCartaoAvisos(); carregarProvasAluno();
-  $('abaAlTrilha').classList.toggle('oculto', !(sessao && sessao.admin));   // prévia: por enquanto só o administrador vê a aula em trilha
+  $('abaAlTrilha').classList.remove('oculto');   // liberada para todos os alunos (07/11/2026)
   var lembrada = ''; try{ lembrada = localStorage.getItem('aulas_abaal') || ''; }catch(e){}
   abaAluno('mat');   // ao entrar, sempre Minhas matérias
   try{
@@ -1878,7 +1878,7 @@ function abrirAba(a){
   if(a === 'msgs') carregarMsgsProf();
 }
 
-// Aula em trilha (beta, só o administrador): o código só é carregado quando a aba abre
+// Aula em trilha (aberta a todos os alunos): o código só é carregado quando a aba abre
 // professor: monta as trilhas (aba); aluno: só assiste e interage (caixa na visão de aluno)
 function abrirTrilhaAba(){ carregarTrilha($('pTrilha'), 'prof'); }
 function abrirTrilhaAluno(){ var el = $('caixaTrilhaAluno'); el.classList.remove('oculto'); carregarTrilha(el, 'aluno'); }
@@ -1886,7 +1886,7 @@ function carregarTrilha(el, modo){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=38';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=39';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);

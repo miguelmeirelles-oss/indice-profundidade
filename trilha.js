@@ -868,7 +868,7 @@ function pedirQuestaoTrilha(temaId){
   var box = $('questBox'); if(!box) return;
   pausar(); QT.tema = temaId;
   box.innerHTML = '<p class="aviso">Preparando a questão… (a primeira do assunto pode levar uns 20 segundos)</p>';
-  api('estudoProxima', {professorId: T.professorId, disciplinaId: T.disciplina_id, temaId: temaId, daTrilha: !!temaId, trilhaId: T.id, blocoId: blocoAtual().id}).then(function(q){ QT.q = q; QT.r = null; desenharQuestaoTrilha(''); })
+  api('estudoProxima', {professorId: T.professorId, disciplinaId: T.disciplina_id, temaId: temaId, daTrilha: !!temaId, deTrilha: true, trilhaId: T.id, blocoId: blocoAtual().id}).then(function(q){ QT.q = q; QT.r = null; desenharQuestaoTrilha(''); })
     .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 function desenharQuestaoTrilha(rascunho){
@@ -891,7 +891,7 @@ function desenharQuestaoTrilha(rascunho){
     if(txt.length < 10){ $('qtMsg').innerHTML = '<div class="erro">Escreva sua resposta antes de enviar.</div>'; return; }
     var bt = this; bt.disabled = true; $('qtMsg').innerHTML = '<p class="aviso">Corrigindo… (uns 10 a 20 segundos)</p>';
     var tentar = function(n){
-      api('estudoResponder', {professorId: T.professorId, disciplinaId: T.disciplina_id, questaoId: q.id, resposta: txt, usouAjuda: $('qtAjuda').checked})
+      api('estudoResponder', {professorId: T.professorId, disciplinaId: T.disciplina_id, questaoId: q.id, resposta: txt, usouAjuda: $('qtAjuda').checked, deTrilha: true})
         .then(function(r){ QT.r = r; desenharCorrecaoTrilha(txt); })
         .catch(function(e){
           if(/ocupada/i.test(e.message) && n < 2){ $('qtMsg').innerHTML = '<p class="aviso">A IA está ocupada agora. Tento de novo sozinho em 40 segundos; sua resposta está guardada aqui.</p>'; setTimeout(function(){ if($('qtMsg')) tentar(n + 1); }, 40000); return; }
@@ -2246,8 +2246,8 @@ window.Trilha = {
     if(RAIZ && RAIZ !== el){ pararTudo(); RAIZ.innerHTML = ''; }   // já aberta: mantém onde estava
     RAIZ = el; el.classList.add('t-app');
     el.innerHTML = MODO === 'aluno' ?
-      '<h2>🎓 Aulas em trilha <span class="t-tag">prévia · só você vê</span></h2><p class="aviso" style="margin-top:-6px">Estude no seu ritmo: a aula anda sozinha, com narração, e você pode tirar dúvidas por voz.</p><div id="tr_erroGeral" class="erro oculto"></div><div id="tr_corpo"></div>' :
-      '<div class="caixa"><h2>🎓 Aula em trilha <span class="t-tag">beta · só você vê</span></h2>' +
+      '<h2>🎓 Aulas em trilha</h2><p class="aviso" style="margin-top:-6px">Estude no seu ritmo: a aula anda sozinha, com narração, e você pode tirar dúvidas por voz.</p><div id="tr_erroGeral" class="erro oculto"></div><div id="tr_corpo"></div>' :
+      '<div class="caixa"><h2>🎓 Aula em trilha <span class="t-tag">os alunos já veem</span></h2>' +
       '<p class="aviso" style="margin-top:-6px">Aqui você monta as aulas em trilha. Os alunos só assistem e interagem (na visão de aluno: Aluno → Aulas em trilha).</p>' +
       '<div id="tr_erroGeral" class="erro oculto"></div><div id="tr_corpo"></div></div>';
     inicio();
