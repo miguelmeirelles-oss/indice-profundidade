@@ -2475,7 +2475,7 @@ function ligarMicrofone(){
 function conviteChaveHTML(propria, msg){
   return '<div class="convite" style="margin-top:8px"><b>' + esc(msg) + '</b>' + (propria ? '' : "<ol style=\"margin:6px 0 8px 18px;padding:0;font-size:14px;line-height:1.5\"><li>Abra <a href=\"https://aistudio.google.com/apikey\" target=\"_blank\" rel=\"noopener\">aistudio.google.com/apikey</a> e entre com a sua conta Google.</li><li>Clique em <b>Criar chave de API</b> (<i>Create API key</i>) e aceite os termos, se pedir.</li><li>Copie a chave (começa com <b>AIza</b>).</li><li>Em <b>Minha conta</b> → <b>Sua chave do Gemini</b>, cole e clique em <b>Salvar chave</b>.</li></ol><p style=\"font-size:12.5px;margin:0 0 8px;opacity:.85\">É grátis e não pede cartão. No plano grátis o Google pode usar as conversas para melhorar os produtos dele.</p>") +
     '<div class="botoes" style="margin:0"><a class="mini" style="display:inline-block;text-decoration:none;padding:6px 12px;border-radius:8px;background:#E8B923;color:#17389C;font-weight:bold" href="index.html?conta=1" target="_blank" rel="noopener">' + (propria ? 'Abrir Minha conta' : 'Cadastrar minha chave') + '</a></div>' +
-    '<p class="aviso" style="margin:6px 0 0">Depois de salvar a chave, volte aqui e toque de novo em “Tenho uma dúvida”.</p></div>';
+    '<p class="aviso" style="margin:6px 0 0"><b>Não é obrigatório:</b> os créditos da plataforma voltam amanhã. Se cadastrar, depois de salvar a chave volte aqui e toque de novo em “Tenho uma dúvida”.</p></div>';
 }
 function encerrarDuvida(semFechar, manterCaixa){
   clearTimeout(vigiaD);
