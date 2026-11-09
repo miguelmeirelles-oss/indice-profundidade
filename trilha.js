@@ -2602,7 +2602,7 @@ function seguirLote(){
 
 /* ===================== REGISTRO DE USO (estatística para o professor) ===================== */
 var U = (function(){
-  var s = null, ultimoEnvio = 0, ativoAte = 0, tick = null;
+  var s = null, ultimoEnvio = 0, ativoAte = 0, tick = null, ultimoDado = '';
   function novo(){
     return {sessao: 'S' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), segundos: 0, vistos: {}, duvidas: 0, duvida_seg: 0, checks: {}};
   }
@@ -2627,6 +2627,8 @@ var U = (function(){
   function enviar(final){
     if(!s || s.segundos < 5) return;
     ultimoEnvio = Date.now();
+    var ass = s.sessao + JSON.stringify(dados()); if(ass === ultimoDado) return;   // nada mudou desde o último envio: não chama o servidor
+    ultimoDado = ass;
     var corpo = JSON.stringify({acao: 'trilhaRegistrar', dados: {token: H.token(), id: s.trilha, sessao: s.sessao, dados: dados()}});
     if(final){ try{ fetch(H.backend, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: corpo, keepalive: true}); }catch(e){} return; }
     api('trilhaRegistrar', {id: s.trilha, sessao: s.sessao, dados: dados()}).catch(function(){});

@@ -752,7 +752,10 @@ function abrirAluno(){
       history.replaceState(null, '', location.pathname);
     }
   }catch(e){}
-  if(!timerAbertas) timerAbertas = setInterval(function(){ if(!$('tAluno').classList.contains('oculto')) carregarAbertas(); }, 30000);
+  if(!timerAbertas){
+    timerAbertas = setInterval(function(){ if(!document.hidden && !$('tAluno').classList.contains('oculto')) carregarAbertas(); }, 30000);   // aba escondida ou tela apagada: não pergunta ao servidor
+    document.addEventListener('visibilitychange', function(){ if(!document.hidden && !$('tAluno').classList.contains('oculto')) carregarAbertas(); });
+  }
   if(!alunoCarregado){
     alunoCarregado = true;
     api('professores').then(function(lista){
@@ -1886,7 +1889,7 @@ function carregarTrilha(el, modo){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=46';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=47';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);
@@ -2818,8 +2821,10 @@ function encerrarGravacao(automatico){
     .catch(function(e){ G.statusEnvio = 'o encerramento será confirmado quando a internet voltar'; desenharEncerrada(); })
     .then(function(){
       if(G.poll) clearInterval(G.poll);
+      var voltasPoll = 0;
       G.poll = setInterval(function(){
-        if(G.fase !== 'encerrada'){ clearInterval(G.poll); return; }
+        if(G.fase !== 'encerrada' || ++voltasPoll > 60){ clearInterval(G.poll); return; }   // no máximo ~30 min esperando a ata
+        if(document.hidden) return;
         enviarPendentes().then(function(){ if(!G.encerrou) return api('encerrarAula', {aulaId: G.aula.id, totalBlocos: G.ordem}).then(function(){ G.encerrou = true; }); })
           .then(atualizarEstado).catch(function(){});
         if(G.estado && G.estado.ata) clearInterval(G.poll);
@@ -3178,7 +3183,7 @@ function desenharRevisao(){
 function abrirAcompanhamento(){
   if(Q.poll) clearInterval(Q.poll);
   carregarAcompanhamento();
-  Q.poll = setInterval(function(){ if(abaAtual === 'aula' && $('acomp')) carregarAcompanhamento(); else { clearInterval(Q.poll); Q.poll = null; } }, 15000);
+  Q.poll = setInterval(function(){ if(abaAtual === 'aula' && $('acomp')){ if(!document.hidden) carregarAcompanhamento(); } else { clearInterval(Q.poll); Q.poll = null; } }, 15000);
 }
 
 function filaCorrecao(abertas){
