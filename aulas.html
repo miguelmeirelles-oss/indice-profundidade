@@ -504,6 +504,7 @@
           </div>
         </div>
       </div>
+      <div class="caixa oculto" id="cfgChavesAlunos"></div>
       <div class="caixa oculto" id="cfgAvisos"></div>
       <div class="caixa">
         <h2>Chave do Gemini</h2>
@@ -2235,7 +2236,7 @@ function abrirAba(a){
   if(a === 'notas') abrirNotas();
   if(a === 'hist') abrirHistorico();
   if(a === 'insc') carregarInscricoes();
-  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); carregarAvisosAdmin(); }
+  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); carregarAvisosAdmin(); carregarChavesAlunosAdmin(); }
   if(a === 'chat') abrirChat($('pChat'));
   if(a === 'trilha') abrirTrilhaAba();
   if(a === 'msgs') carregarMsgsProf();
@@ -4655,6 +4656,25 @@ function desenharApostilaRef(d){
 }
 
 
+// Configurações: chaves do Gemini dos alunos (só o administrador vê; para os outros professores a caixa nem aparece)
+function carregarChavesAlunosAdmin(congelar){
+  var el = $('cfgChavesAlunos'); if(!el) return;
+  api('chavesAlunosAdmin', congelar === undefined ? {} : {congelar: congelar}).then(function(c){
+    el.classList.remove('oculto');
+    el.innerHTML = '<h2>🔒 Chaves do Gemini dos alunos</h2>' +
+      '<div class="' + (c.congeladas ? 'alerta' : 'ok') + '" style="margin:0 0 8px"><b>' + (c.congeladas ? '❄️ Congeladas' : '✓ Liberadas') + '</b> · ' + c.cadastradas + ' aluno(s) com chave cadastrada.</div>' +
+      (c.congeladas ? '<p style="margin:0 0 8px;font-size:14px"><b>Lembrete:</b> você congelou por medo de algum aluno cadastrar cartão de crédito no Google e acabar tendo cobrança na conta dele.</p>' : '') +
+      '<p class="aviso" style="margin:0 0 8px">' + (c.congeladas
+        ? 'Congeladas: as chaves já cadastradas ficam guardadas, mas <b>não são usadas</b>; nenhum aluno consegue cadastrar uma nova (aparece que a função está bloqueada) e os avisos de cota não convidam a cadastrar. Os alunos usam só os créditos da plataforma (a sua 1ª chave continua reservada para as suas aulas).'
+        : 'Liberadas: quem cadastrou a própria chave (opcional) usa ela primeiro; quando os créditos da plataforma acabam, aparece o convite (opcional) para cadastrar.') + '</p>' +
+      '<p class="aviso" style="margin:0 0 8px">Segurança: as chaves ficam só na planilha de login, no seu Drive; nunca voltam para a tela (o aluno vê só os 4 últimos caracteres) e nunca vão para o navegador. Cobrança só existe se o aluno ligar o faturamento (cartão) no projeto <b>dele</b> no Google; aí a cobrança é na conta dele, não na sua.</p>' +
+      '<div class="botoes"><button type="button" class="mini' + (c.congeladas ? ' secundario' : '') + '" id="btChAl">' + (c.congeladas ? 'Liberar as chaves dos alunos' : '❄️ Congelar as chaves dos alunos') + '</button></div>';
+    $('btChAl').addEventListener('click', function(){
+      if(c.congeladas && !confirm('Liberar o uso das chaves dos alunos?')) return;
+      this.disabled = true; carregarChavesAlunosAdmin(!c.congeladas);
+    });
+  }).catch(function(){ el.classList.add('oculto'); });
+}
 // Configurações: avisos no celular (só para o administrador da plataforma)
 function carregarAvisosAdmin(){
   var el = $('cfgAvisos'); if(!el) return;

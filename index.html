@@ -541,7 +541,7 @@ if (/[?&]embed=trilha\b/.test(location.search)) document.documentElement.classLi
       <label for="chaveNova">Colar a chave</label>
       <input type="password" id="chaveNova" autocomplete="off" placeholder="AIza…">
       <div class="botoes">
-        <button onclick="salvarChaveAluno(false)">Salvar chave</button>
+        <button id="btSalvarChave" onclick="salvarChaveAluno(false)">Salvar chave</button>
         <button class="secundario oculto" id="btTirarChave" onclick="salvarChaveAluno(true)">Remover minha chave</button>
       </div>
       <p id="chaveMsg" class="aviso"></p>
@@ -1096,7 +1096,11 @@ function abrirConta(){
 
 // chave do Gemini do próprio aluno (opcional): o servidor guarda e nunca devolve inteira
 function mostrarChaveAluno(c){
-  document.getElementById('chaveAtual').textContent = c.tem ? 'Chave guardada: ' + c.final + ' (as suas avaliações usam ela primeiro).' : 'Nenhuma chave guardada: as avaliações usam a cota da plataforma.';
+  var bl = !!c.bloqueada;
+  ['chaveNova', 'btSalvarChave'].forEach(function(id){ var x = document.getElementById(id); if(x) x.classList.toggle('oculto', bl); });
+  var lb = document.querySelector('label[for="chaveNova"]'); if(lb) lb.classList.toggle('oculto', bl);
+  document.getElementById('chaveAtual').innerHTML = bl ? '<b>🔒 Esta função está bloqueada pelo professor no momento.</b> Você não precisa de chave própria: a plataforma usa os créditos dela.' + (c.tem ? ' A chave que você cadastrou (' + esc(c.final) + ') está guardada, mas sem uso; se quiser, pode removê-la.' : '')
+    : esc(c.tem ? 'Chave guardada: ' + c.final + ' (as suas avaliações usam ela primeiro).' : 'Nenhuma chave guardada: as avaliações usam a cota da plataforma.');
   document.getElementById('btTirarChave').classList.toggle('oculto', !c.tem);
 }
 function carregarChaveAluno(){
