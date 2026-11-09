@@ -1549,6 +1549,11 @@ function desenharDesempenho(){
         '<span><span class="aviso">média ' + (m.parcial ? 'parcial ' : '') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + (m.media === null ? '—' : String(m.media).replace('.', ',')) + '</b></span></div>' +
       '<p style="margin:4px 0"><span class="tag">' + esc(m.prova.titulo) + (m.prova.estimada ? ' (data estimada)' : '') + '</span> <span class="aviso">' + (m.prova.dias === 0 ? 'hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + '</span></p>' +
       (m.aviso ? '<div class="' + (m.modoFinal ? 'erro' : 'alerta') + '" style="margin:6px 0">' + esc(m.aviso) + '</div>' : '') +
+      (m.conquistas && m.conquistas.length ? '<div style="margin:6px 0">' + m.conquistas.map(function(c){ return '<span style="display:inline-block;padding:3px 10px;margin:2px 4px 2px 0;border-radius:999px;background:#fff7d6;border:1px solid #E8B923;font-size:13px">' + esc(c) + '</span>'; }).join('') + '</div>' : '') +
+      (m.plano && m.plano.total ? '<div style="margin:8px 0 2px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><b>Plano da semana</b><span>' + m.plano.feitas + ' de ' + m.plano.total + ' tarefa' + (m.plano.total > 1 ? 's' : '') + ' feita' + (m.plano.feitas === 1 ? '' : 's') + (m.plano.feitas === m.plano.total ? ' 🎉' : '') + '</span></div>' +
+        '<div class="barraDom" style="margin:3px 0"><i style="width:' + Math.round(m.plano.feitas / m.plano.total * 100) + '%;background:#1a7a3c"></i></div>' +
+        (m.plano.feitasLista.length ? '<details><summary class="link" style="font-size:13px">o que você já fez</summary>' + m.plano.feitasLista.map(function(x){ return '<div class="aviso">✓ ' + esc(x) + '</div>'; }).join('') + '</details>' : '') + '</div>' : '') +
+      (m.modoFinal ? '<div class="convite" style="margin:8px 0" data-final="' + mi + '"><b>📝 O que você errou nas provas</b><div data-finalcorpo="' + mi + '"><p class="carregando">Analisando as suas provas corrigidas…</p></div></div>' : '') +
       (m.tarefas.length ? '<p style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' por dia até a prova)</span></p>' + hoje.map(function(t, k){ return tarefa(t, k); }).join('') +
         (depois.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + depois.length + ')</summary>' + depois.map(function(t, k){ return tarefa(t, k + m.porDia); }).join('') + '</details>' : '')
         : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
@@ -1563,6 +1568,17 @@ function desenharDesempenho(){
   el.innerHTML = h;
   var mDe = function(m){ return {nome: m.nome, professorId: m.professorId, disciplinaId: m.disciplinaId}; };
   $('btDesempAtual').addEventListener('click', function(){ carregarDesempenho(true); });
+  // prova final: a análise das provas (IA, guardada) carrega à parte para não atrasar a aba
+  el.querySelectorAll('[data-final]').forEach(function(box){
+    var m = r.materias[Number(box.dataset.final)], alvo = box.querySelector('[data-finalcorpo]');
+    api('analiseFinal', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(a){
+      if(!a.dados){ alvo.innerHTML = '<p class="aviso">' + esc(a.aviso || 'Sem prova corrigida para analisar.') + '</p>'; return; }
+      alvo.innerHTML = '<p style="margin:6px 0">' + esc(a.dados.resumo) + '</p>' + a.dados.erros.map(function(x){ return '<div class="eixo" style="border-color:#c62828"><b>' + esc(x.assunto) + '</b><br>' + esc(x.o_que_errou) + '<br><span style="color:#1a7a3c">→ ' + esc(x.como_estudar) + '</span></div>'; }).join('') +
+        '<p class="aviso">Esses assuntos já estão no topo do seu plano. Análise de ' + esc(a.atualizado || '') + '.</p>';
+      // análise nova: refaz o plano para os assuntos errados na prova irem para o topo (uma vez)
+      if(!DES.finalRecarregado && a.dados.temas && a.dados.temas.length && !m.tarefas.some(function(t){ return /errou isso na prova/.test(t.porque || ''); })){ DES.finalRecarregado = true; carregarDesempenho(true); }
+    }).catch(function(e){ alvo.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+  });
   el.querySelectorAll('[data-diag]').forEach(function(b){ b.addEventListener('click', function(){ abrirDiagnostico(mDe(r.materias[Number(b.dataset.diag)])); }); });
   el.querySelectorAll('[data-cad]').forEach(function(b){ b.addEventListener('click', function(){ abrirCaderno(mDe(r.materias[Number(b.dataset.cad)])); }); });
   el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha'); abrirTrilhaAluno(b.dataset.recaula); }); });
