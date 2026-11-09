@@ -400,6 +400,7 @@
     <div class="abas" role="group" aria-label="Seções do aluno">
       <button type="button" class="aba" data-abaal="mat" aria-pressed="true">Minhas matérias</button>
       <button type="button" class="aba" data-abaal="provas" aria-pressed="false">Minhas provas</button>
+      <button type="button" class="aba" data-abaal="desemp" aria-pressed="false">📈 Desempenho</button>
       <button type="button" class="aba oculto" data-abaal="trilha" id="abaAlTrilha" aria-pressed="false">🎓 Aulas em trilha</button>
       <button type="button" class="aba" data-abaal="insc" aria-pressed="false">Inscrever-se numa matéria</button>
     </div>
@@ -411,6 +412,7 @@
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
       </div>
+      <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>📈 Desempenho</h2><div id="desempCorpo"><p class="carregando">Carregando…</p></div></div>
       <div class="caixa oculto" id="caixaTrilhaAluno" data-painelal="trilha"></div>
       <div class="caixa" id="caixaProvas" data-painelal="provas">
         <h2>📝 Minhas provas</h2>
@@ -1283,12 +1285,13 @@ function carregarMaterias(){
 
 // abas da visão de aluno: Minhas matérias, Minhas provas, Aulas em trilha, Inscrever-se
 function abaAluno(a){
-  if(['mat', 'provas', 'trilha', 'insc'].indexOf(a) === -1) a = 'mat';
+  if(['mat', 'provas', 'desemp', 'trilha', 'insc'].indexOf(a) === -1) a = 'mat';
   if(a !== 'trilha' && window.Trilha) Trilha.parar();
   try{ localStorage.setItem('aulas_abaal', a); }catch(e){}
   document.querySelectorAll('[data-abaal]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.abaal === a)); });
   document.querySelectorAll('[data-painelal]').forEach(function(x){ x.classList.toggle('foraAba', x.dataset.painelal !== a); });
   if(a === 'trilha') abrirTrilhaAluno();
+  if(a === 'desemp') carregarDesempenho(false);
 }
 document.querySelectorAll('[data-abaal]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno(b.dataset.abaal); }); });
 function voltarListaAluno(){ if(typeof fimLeitura === 'function') fimLeitura(); $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
@@ -1467,7 +1470,7 @@ function htmlResumoEstudos(rs){
 function desenharCaderno(m, r){
   var el = $('alunoDetalhe'), media = function(l){ return l.length ? Math.round(l.reduce(function(s, q){ return s + q.melhor.nota; }, 0) / l.length) : null; };
   var h = cabEstudo(m) + '<div class="caixa"><h2>📒 Meu caderno · ' + esc(m.nome) + '</h2>' +
-    '<div class="convite" id="boxResumoEst" style="margin:0 0 14px"><b style="font-size:16px">📊 Resumo dos meus estudos</b>' + htmlResumoEstudos(r.resumo) + '</div>';
+    '<div class="botoes" style="margin:0 0 12px"><button type="button" class="mini" id="btIrDiag">📈 Ver meu diagnóstico</button><span class="aviso">pontos fortes, fracos e o que fazer agora</span></div>';
   if(!r.assuntos.length) h += '<p class="aviso">Você ainda não respondeu questões abertas nesta matéria. Elas aparecem aqui assim que você responder no <b>Estudo dirigido</b> ou no fim de uma <b>aula em trilha</b>.</p>';
   else {
     h += '<p class="aviso" style="margin:0 0 8px">' + r.questoes + ' questão(ões) respondida(s), ' + r.respostas + ' resposta(s) no total. Em cada assunto, as de nota mais baixa vêm primeiro: são as que mais valem refazer.</p>';
@@ -1503,6 +1506,7 @@ function desenharCaderno(m, r){
     });
   };
   ligarResumo();
+  if($('btIrDiag')) $('btIrDiag').addEventListener('click', function(){ abrirDiagnostico(m); });
   el.querySelectorAll('[data-refazer]').forEach(function(b){ b.addEventListener('click', function(){
     var k = b.dataset.refazer.split(':'), a = r.assuntos[Number(k[0])], q = a.questoes[Number(k[1])];
     var melhor = Math.max.apply(null, q.tentativas.map(function(t){ return t.nota; }));
@@ -1511,6 +1515,101 @@ function desenharCaderno(m, r){
     desenharQuestaoEstudo('');
     window.scrollTo(0, 0);
   }); });
+}
+/* ================= DESEMPENHO (09/11/2026) =================
+   Todas as matérias do aluno, a de maior risco primeiro: nota, próxima prova (marcada ou estimada), aviso, plano de
+   tarefas até a prova (assistir/rever aula em trilha, responder questões do assunto, refazer questão), recomendações a
+   partir das questões de sala e o diagnóstico (IA) de cada matéria. Na prova final, o plano junta tudo o que ele errou. */
+var DES = {r: null};
+function carregarDesempenho(atualizar){
+  var el = $('desempCorpo'); if(!el) return;
+  if(DES.r && !atualizar){ desenharDesempenho(); }
+  else el.innerHTML = '<p class="carregando">Montando o seu plano… (alguns segundos)</p>';
+  api('meuDesempenho', {atualizar: !!atualizar}).then(function(r){ DES.r = r; desenharDesempenho(); })
+    .catch(function(e){ if(!DES.r) el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+function notaCor(n){ return n === null || n === undefined ? '#6b7a99' : n >= 7 ? '#1a7a3c' : n >= 5 ? '#B8890A' : '#c62828'; }
+function desenharDesempenho(){
+  var r = DES.r, el = $('desempCorpo');
+  if(!r.materias.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria em andamento.</p>'; return; }
+  var h = '<div style="display:flex;gap:18px;flex-wrap:wrap;margin:0 0 12px">' +
+    '<div><span class="aviso">sequência</span><div class="numEst">' + (r.sequencia ? '🔥 ' + r.sequencia + ' dia' + (r.sequencia > 1 ? 's' : '') : '—') + '</div></div>' +
+    '<div><span class="aviso">questões na semana</span><div class="numEst">' + Math.min(r.semana, r.metaSemana) + '/' + r.metaSemana + '</div></div></div>' +
+    '<p class="aviso" style="margin:0 0 10px">A matéria que pede mais atenção vem primeiro. O plano é refeito com o que você estuda: tarefa feita sai da lista.</p>';
+  h += r.materias.map(function(m, mi){
+    var hoje = m.tarefas.slice(0, m.porDia), depois = m.tarefas.slice(m.porDia);
+    var tarefa = function(t, ti){
+      var ic = t.tipo === 'trilha' ? '🎓' : t.tipo === 'refazer' ? '↻' : '✍';
+      return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff">' +
+        '<div style="flex:1 1 200px"><b>' + ic + ' ' + esc(t.texto) + '</b>' + (t.detalhe ? '<div class="aviso">' + esc(t.detalhe) + '</div>' : '') + '<div class="aviso">' + esc(t.tema) + (t.porque ? ' · ' + esc(t.porque) : '') + '</div></div>' +
+        '<button type="button" class="mini" data-tarefa="' + mi + ':' + ti + '">' + (t.tipo === 'trilha' ? '▶ Abrir aula' : t.tipo === 'refazer' ? 'Refazer' : 'Responder') + '</button></div>';
+    };
+    return '<div class="caixa" style="margin:0 0 14px;border-left:6px solid ' + (m.modoFinal ? '#c62828' : notaCor(m.media)) + '">' +
+      '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">' + esc(m.nome) + '</h3>' +
+        '<span><span class="aviso">média ' + (m.parcial ? 'parcial ' : '') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + (m.media === null ? '—' : String(m.media).replace('.', ',')) + '</b></span></div>' +
+      '<p style="margin:4px 0"><span class="tag">' + esc(m.prova.titulo) + (m.prova.estimada ? ' (data estimada)' : '') + '</span> <span class="aviso">' + (m.prova.dias === 0 ? 'hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + '</span></p>' +
+      (m.aviso ? '<div class="' + (m.modoFinal ? 'erro' : 'alerta') + '" style="margin:6px 0">' + esc(m.aviso) + '</div>' : '') +
+      (m.tarefas.length ? '<p style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' por dia até a prova)</span></p>' + hoje.map(function(t, k){ return tarefa(t, k); }).join('') +
+        (depois.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + depois.length + ')</summary>' + depois.map(function(t, k){ return tarefa(t, k + m.porDia); }).join('') + '</details>' : '')
+        : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
+      (m.recomendacoes.length ? '<details style="margin-top:8px"><summary class="link">💡 Pelo que você respondeu em aula (' + m.recomendacoes.length + ')</summary>' + m.recomendacoes.map(function(x, k){
+        return '<div class="eixo" style="border-color:#8a6100">' + esc(x.texto) + '<br>' + esc(x.acao) + (x.trilhaId ? ' <button type="button" class="link" data-recaula="' + esc(x.trilhaId) + '">abrir a aula</button>' : '') + '</div>'; }).join('') + '</details>' : '') +
+      (m.temas.length ? '<details style="margin-top:6px"><summary class="link">Assuntos em ordem de prioridade</summary>' + m.temas.map(function(t){
+        return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--linha)"><span>' + (t.importante ? '⭐ ' : '') + esc(t.grupo ? t.grupo + ' › ' + t.nome : t.nome) + '</span><span class="aviso">' +
+          [t.sala !== null ? 'em aula ' + dezEst(t.sala) : '', t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'não estudou'].filter(Boolean).join(' · ') + '</span></div>'; }).join('') + '<p class="aviso">⭐ = o professor marcou como importante.</p></details>' : '') +
+      '<div class="botoes" style="margin-top:10px"><button type="button" class="secundario mini" data-diag="' + mi + '">🔎 Diagnóstico</button><button type="button" class="secundario mini" data-cad="' + mi + '">📒 Meu caderno</button></div></div>';
+  }).join('');
+  h += '<p class="aviso">Atualizado ' + esc(r.gerado) + ' · <button type="button" class="link" id="btDesempAtual">atualizar agora</button></p>';
+  el.innerHTML = h;
+  var mDe = function(m){ return {nome: m.nome, professorId: m.professorId, disciplinaId: m.disciplinaId}; };
+  $('btDesempAtual').addEventListener('click', function(){ carregarDesempenho(true); });
+  el.querySelectorAll('[data-diag]').forEach(function(b){ b.addEventListener('click', function(){ abrirDiagnostico(mDe(r.materias[Number(b.dataset.diag)])); }); });
+  el.querySelectorAll('[data-cad]').forEach(function(b){ b.addEventListener('click', function(){ abrirCaderno(mDe(r.materias[Number(b.dataset.cad)])); }); });
+  el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha'); abrirTrilhaAluno(b.dataset.recaula); }); });
+  el.querySelectorAll('[data-tarefa]').forEach(function(b){ b.addEventListener('click', function(){
+    var k = b.dataset.tarefa.split(':'), m = r.materias[Number(k[0])], t = m.tarefas[Number(k[1])], mm = mDe(m);
+    if(t.tipo === 'trilha'){ abaAluno('trilha'); abrirTrilhaAluno(t.trilhaId); window.scrollTo(0, 0); return; }
+    EST.m = mm; $('alunoLista').classList.add('oculto'); $('alunoDetalhe').classList.remove('oculto'); window.scrollTo(0, 0);
+    if(t.tipo === 'refazer'){
+      EST.q = {id: t.questao.id, enunciado: t.questao.enunciado, ajuda: t.questao.ajuda || [], tema: t.tema, naProva: false};
+      EST.ultima = {tentativa: 1, nota: t.questao.nota, melhorAntes: t.questao.nota};
+      desenharQuestaoEstudo('');
+    } else pedirQuestaoEstudo(t.temaId);
+  }); });
+}
+// diagnóstico da matéria: o resumo (IA, guardado) + números, domínio por assunto e "como você responde" do relatório
+function abrirDiagnostico(m){
+  EST.m = m;
+  var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto'); window.scrollTo(0, 0);
+  var topo = function(){ return cabEstudo(m) + '<div class="caixa"><h2>📈 Diagnóstico · ' + esc(m.nome) + '</h2>'; };
+  el.innerHTML = topo() + '<p class="carregando">Preparando o seu diagnóstico… (pode levar uns 15 s)</p></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  Promise.all([
+    api('estudoResumo', {professorId: m.professorId, disciplinaId: m.disciplinaId}).catch(function(e){ return {erro: e.message}; }),
+    api('estudoRelatorio', {professorId: m.professorId, disciplinaId: m.disciplinaId}).catch(function(e){ return {erro: e.message}; })
+  ]).then(function(x){
+    var rs = x[0], rel = x[1], h = topo();
+    h += rs.erro ? '<p class="aviso">' + esc(rs.erro) + '</p>' : htmlResumoEstudos(rs);
+    if(!rel.erro){
+      h += '<div style="display:flex;gap:24px;flex-wrap:wrap;margin:14px 0 8px"><div><span class="aviso">questões feitas</span><div class="numEst">' + rel.questoes + '</div></div><div><span class="aviso">média no estudo</span><div class="numEst">' + dezEst(rel.media) + '</div></div>' +
+        (rel.primeira !== null && rel.respostas >= 2 ? '<div><span class="aviso">1ª → última</span><div class="numEst">' + dezEst(rel.primeira) + ' → ' + dezEst(rel.ultima) + '</div></div>' : '') + '</div>';
+      if(rel.porTema.length) h += '<p style="margin:4px 0"><b>Domínio por assunto</b></p>' + rel.porTema.map(function(t){
+        return '<div style="display:flex;gap:10px;align-items:center;font-size:14px"><span style="flex:1 1 140px">' + esc(t.tema) + '</span><span class="barraDom" style="flex:1;max-width:220px;margin:0"><i style="width:' + t.dominio + '%;background:' + corDom(t.dominio) + '"></i></span><b>' + dezEst(t.dominio) + '</b></div>'; }).join('');
+      if(rel.ia && rel.ia.como_responde) h += '<div class="eixo" style="border-color:#8a6100;margin-top:12px"><b>Como você responde</b><br>' + esc(rel.ia.como_responde) + '</div>';
+    }
+    h += '<div class="botoes" style="margin-top:12px"><button type="button" class="secundario mini" id="btDiagCad">📒 Meu caderno</button><button type="button" class="secundario mini" id="btDiagEst">📚 Estudar agora</button></div></div>';
+    el.innerHTML = h;
+    el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+    $('btDiagCad').addEventListener('click', function(){ abrirCaderno(m); });
+    $('btDiagEst').addEventListener('click', function(){ abrirEstudo(m); });
+    var bt = $('btResumoEst');
+    if(bt) bt.addEventListener('click', function(){
+      bt.disabled = true; $('msgResumoEst').innerHTML = '<p class="carregando">Atualizando… (uns 10 a 20 segundos)</p>';
+      api('estudoResumo', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(){ abrirDiagnostico(m); })
+        .catch(function(e){ bt.disabled = false; $('msgResumoEst').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+    });
+  });
 }
 function htmlModelo(m){
   if(!m || !(m.passos || []).length) return '';
@@ -1555,7 +1654,7 @@ function abrirEstudo(m){
     if(r.temas.length){
       h += '<p style="margin:6px 0"><b>Seu domínio por assunto</b> <span class="aviso">(toque no assunto para estudar ele todo, ou abra ▸ para escolher um subassunto)</span></p>' + htmlTemasEstudo(r.temas);
     } else h += '<p class="aviso">Ainda não há assuntos liberados para estudo nesta matéria.</p>';
-    h += '<div class="botoes" style="margin-top:14px"><button type="button" id="estAgora"' + (r.temas.length && r.restantesHoje ? '' : ' disabled') + '>▶ Estudar agora</button><button type="button" class="secundario" id="estRelBt">📈 Meu relatório</button><button type="button" class="secundario" id="estCadBt">📒 Meu caderno</button></div>' +
+    h += '<div class="botoes" style="margin-top:14px"><button type="button" id="estAgora"' + (r.temas.length && r.restantesHoje ? '' : ' disabled') + '>▶ Estudar agora</button><button type="button" class="secundario" id="estRelBt">📈 Diagnóstico</button><button type="button" class="secundario" id="estCadBt">📒 Meu caderno</button></div>' +
       '<p class="aviso" style="margin-top:6px">"Estudar agora" escolhe a questão para você: prioriza os assuntos da prova, os mais fracos e os que você não vê há mais tempo. ' +
       (r.restantesHoje ? 'Hoje você ainda pode fazer ' + r.restantesHoje + ' correção(ões).' : '<b>Você usou as ' + r.limite + ' correções de hoje. Volte amanhã!</b>') + ' O estudo não vale nota: é treino para a prova.</p></div>';
     el.innerHTML = h;
@@ -1563,7 +1662,7 @@ function abrirEstudo(m){
     el.querySelectorAll('[data-tema]').forEach(function(b){ b.addEventListener('click', function(){ if(r.restantesHoje) pedirQuestaoEstudo(b.dataset.tema); }); });
     ligarAssuntosEstudo(el);
     var ag = $('estAgora'); if(ag) ag.addEventListener('click', function(){ pedirQuestaoEstudo(''); });
-    $('estRelBt').addEventListener('click', abrirRelatorioEstudo);
+    $('estRelBt').addEventListener('click', function(){ abrirDiagnostico(m); });
     $('estCadBt').addEventListener('click', function(){ abrirCaderno(m); });
   }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); });
 }
@@ -1958,12 +2057,12 @@ function abrirAba(a){
 // Aula em trilha (aberta a todos os alunos): o código só é carregado quando a aba abre
 // professor: monta as trilhas (aba); aluno: só assiste e interage (caixa na visão de aluno)
 function abrirTrilhaAba(){ carregarTrilha($('pTrilha'), 'prof'); }
-function abrirTrilhaAluno(){ var el = $('caixaTrilhaAluno'); el.classList.remove('oculto'); carregarTrilha(el, 'aluno'); }
-function carregarTrilha(el, modo){
-  var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); };
+function abrirTrilhaAluno(abrirId){ var el = $('caixaTrilhaAluno'); el.classList.remove('oculto'); carregarTrilha(el, 'aluno', abrirId); }
+function carregarTrilha(el, modo, abrirId){
+  var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo, abrirId: abrirId || ''}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=48';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=49';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);
