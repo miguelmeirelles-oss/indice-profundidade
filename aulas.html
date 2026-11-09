@@ -2901,8 +2901,12 @@ function desenharPF(){
   el.querySelectorAll('[data-pfedit]').forEach(function(b){ b.addEventListener('click', function(){
     var g = r.grupos.filter(function(x){ return x.id === b.dataset.pfedit; })[0], box = el.querySelector('[data-pfeditbox="' + g.id + '"]');
     if(box.innerHTML){ box.innerHTML = ''; return; }
-    box.innerHTML = '<div class="convite">' + camposPF(g) + '<div class="botoes" style="margin:0"><button type="button" class="mini" data-pfok>Salvar</button><button type="button" class="mini secundario" data-pfnao>Cancelar</button></div></div>';
+    box.innerHTML = '<div class="convite">' + camposPF(g) + '<div class="botoes" style="margin:0"><button type="button" class="mini" data-pfok>Salvar</button><button type="button" class="mini secundario" data-pfnao>Cancelar</button><button type="button" class="link" style="color:#c62828;margin-left:auto" data-pfapagar>Apagar este grupo</button></div></div>';
     box.querySelector('[data-pfnao]').addEventListener('click', function(){ box.innerHTML = ''; });
+    box.querySelector('[data-pfapagar]').addEventListener('click', function(){
+      var nd = Object.keys(g.docs).length;
+      if(!confirm('Apagar o grupo "' + g.alunos.map(function(a){ return a.nome; }).join(', ') + '" da tabela?' + (nd ? ' Os ' + nd + ' documento(s) dele continuam no Drive, mas saem da tabela.' : '') + ' Não dá para desfazer.')) return;
+      api('pfApagar', {disciplinaId: PFV.d.id, grupoId: g.id}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ alert(e.message); }); });
     box.querySelector('[data-pfok]').addEventListener('click', function(){ var bt = this; bt.disabled = true; var c = lerCamposPF(box); delete c.nota;
       api('pfEditar', {disciplinaId: PFV.d.id, grupoId: g.id, campos: c}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ bt.disabled = false; alert(e.message); }); });
   }); });
