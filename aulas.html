@@ -754,6 +754,7 @@ function abrirAluno(){
   abaAluno('mat');   // ao entrar, sempre Minhas matérias
   try{
     var qp = new URLSearchParams(location.search);
+    if(qp.get('aba') === 'desemp'){ abaAluno('desemp'); history.replaceState(null, '', location.pathname); }   // volta do "explicar para um colega"
     if(qp.get('recado') && qp.get('p')){
       api('marcarRecadosLidos', {itens: [{professorId: qp.get('p'), ids: [qp.get('recado')]}]}).catch(function(){});
       history.replaceState(null, '', location.pathname);
@@ -1623,6 +1624,7 @@ var BAL = {
   conquistas: 'Selos de motivação (não valem nota): dias seguidos estudando, assuntos dominados (nota 8 ou mais no estudo), aulas em trilha concluídas, plano da semana completo e questões em que você subiu muito a nota.',
   revisao: 'Para quem já estudou a matéria: liga uma revisão até a prova. O plano passa a ter <b>revisão espaçada</b> (os assuntos voltam antes de você esquecer), <b>simulado</b> no formato da prova, <b>revisão relâmpago</b> (3 questões rápidas de assuntos diferentes), <b>explicar para um colega</b> por voz e, nos 2 últimos dias, a <b>folha de véspera</b>. Dá para sair do modo revisão quando quiser.',
   simulado: 'Até 5 questões abertas, uma de cada assunto da prova (os mais fracos primeiro), com tempo de 10 minutos por questão. A IA corrige como o professor corrigiria e mostra a nota de 0 a 10 que você tiraria hoje. As respostas também contam no seu estudo.',
+  explicar: 'Você explica o assunto em voz alta no Estudar com IA, como se fosse para um colega, e a IA faz perguntas de volta ("mas por quê?"). Pode sair quando quiser: se já tiver nota, ela pergunta se você quer registrar. A nota vai de 0 a 10 e mede o quanto a sua explicação foi completa e certa; serve para você saber se sabe, <b>não entra na média</b>. A tarefa só sai da lista quando você registra.',
   enganos: 'Antes de responder uma questão do estudo dirigido você pode marcar se acha que sabe. Aqui aparecem os assuntos em que você marcou <b>"sei"</b> e tirou menos de 6: são os mais perigosos para a prova, porque você nem desconfia.'
 };
 function htmlModoRevisao(m, mi){
@@ -1631,6 +1633,7 @@ function htmlModoRevisao(m, mi){
   return '<div class="convite" style="margin:8px 0;border-left-color:#1a7a3c"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>🔁 Modo revisão para a ' + esc(m.prova.titulo) + ' ' + ajuda(BAL.revisao) + '</b><span class="aviso">desde ' + esc(r.desde) + ' · <button type="button" class="link" data-revdesligar="' + mi + '">sair</button></span></div>' +
     '<div class="botoes" style="margin:6px 0 0"><button type="button" class="mini" data-revsim="' + mi + '">📝 Simulado</button><button type="button" class="mini secundario" data-revrel="' + mi + '">⚡ Relâmpago</button><button type="button" class="mini secundario" data-revfolha="' + mi + '">📄 Folha de véspera</button><button type="button" class="mini secundario" data-revexp="' + mi + '">🎤 Explicar para um colega</button></div>' +
     (r.simulados.length ? '<div class="aviso" style="margin:6px 0 0">Simulados: ' + r.simulados.map(function(x){ return '<b>' + String(x.nota).replace('.', ',') + '</b> em ' + esc(x.data); }).join(' · ') + ' ' + ajuda(BAL.simulado) + '</div>' : '') +
+    (r.explicacoes && r.explicacoes.length ? '<div class="aviso" style="margin:6px 0 0">Explicações: ' + r.explicacoes.map(function(x){ return esc(x.tema) + ' <b>' + String(x.nota).replace('.', ',') + '</b>'; }).join(' · ') + ' ' + ajuda(BAL.explicar) + '</div>' : '') +
     (r.enganos.length ? '<div class="alerta" style="margin:6px 0 0">⚠️ Você achava que sabia, mas errou: <b>' + r.enganos.map(esc).join(', ') + '</b> ' + ajuda(BAL.enganos) + '</div>' : '') + '</div>';
 }
 function ligarModoRevisao(el, r){
@@ -1705,10 +1708,9 @@ function abrirFolhaVespera(m, temaIds){
   }).catch(function(e){ pinta('<p class="erro">' + esc(e.message) + '</p>'); });
 }
 // explicar para um colega: abre o Estudar com IA (fala livre) e marca a tarefa
+// abre o Estudar com IA já no assunto; o aluno sai quando quiser e, se tiver nota, escolhe se registra (só então a tarefa sai da lista)
 function explicarColega(m, tema){
-  api('revProvaMarcar', {professorId: m.professorId, disciplinaId: m.disciplinaId, tipo: 'explicar'}).catch(function(){});
-  alert('Vai abrir o Estudar com IA. Toque em falar e explique "' + tema + '" como se fosse para um colega, em uns 2 minutos. A IA diz o que ficou bom e o que faltou.');
-  window.open('index.html', '_blank');
+  location.href = 'index.html?colega=1&p=' + encodeURIComponent(m.professorId) + '&d=' + encodeURIComponent(m.disciplinaId) + '&mat=' + encodeURIComponent(m.nome || '') + '&tema=' + encodeURIComponent(tema || m.nome || '');
 }
 // diagnóstico da matéria: o resumo (IA, guardado) + números, domínio por assunto e "como você responde" do relatório
 function abrirDiagnostico(m){

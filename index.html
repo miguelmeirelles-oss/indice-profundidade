@@ -321,6 +321,11 @@ if (/[?&]embed=trilha\b/.test(location.search)) document.documentElement.classLi
   .hist{border-width:1.5px;border-radius:8px}
   .hist button{box-shadow:none}
   .passo{border-width:1px}
+  .modoColega .cabecalho{display:none}
+  #barraColega{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-left:5px solid #1a7a3c}
+  #dlgColega{position:fixed;inset:0;background:rgba(10,20,40,.55);display:flex;align-items:center;justify-content:center;z-index:200;padding:16px}
+  #dlgColega>div{background:#fff;border-radius:14px;padding:18px;max-width:380px;width:100%}
+  #dlgColega button{width:100%;margin:6px 0 0}
 </style>
 <style>
   input[type=number]{-moz-appearance:textfield;appearance:textfield}
@@ -838,6 +843,67 @@ if(embutido){
   if(!sessao.token) setTimeout(function(){ document.querySelector('.wrap').innerHTML = '<div class="caixa"><p>Entre na sua conta para fazer a avaliação.</p></div>'; }, 0);
 }
 
+// "Explicar para um colega" (modo revisão do Aula por IA): abre direto no assunto. O aluno sai quando quiser;
+// se já tiver nota, escolhe se registra (no histórico daqui e no plano do Aula por IA, onde a tarefa sai da lista).
+var colega = null;
+try{
+  var qc = new URLSearchParams(location.search);
+  if(qc.get('colega') === '1' && qc.get('tema')) colega = {tema: qc.get('tema').slice(0, 120), p: qc.get('p') || '', d: qc.get('d') || '', mat: (qc.get('mat') || '').slice(0, 80), registrado: false};
+}catch(e){}
+var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
+function apiAulas(acao, dados){
+  dados = dados || {}; dados.token = sessao.token;
+  return fetch(BACKEND_AULAS, {method: 'POST', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({acao: acao, dados: dados})})
+    .then(function(r){ return r.json(); }).then(function(j){ if(!j.ok) throw new Error(j.erro || 'Não deu para concluir.'); return j.resultado; });
+}
+if(colega){
+  document.documentElement.classList.add('modoColega');
+  setTimeout(function(){
+    var b = document.createElement('div'); b.className = 'caixa'; b.id = 'barraColega';
+    b.innerHTML = '<div><b>🎤 Explicar para um colega</b><div class="aviso" style="margin:2px 0 0"></div></div><button class="secundario" onclick="sairColega()">Sair</button>';
+    b.querySelector('.aviso').textContent = colega.tema + (colega.mat ? ' · ' + colega.mat : '');
+    var w = document.querySelector('.wrap'); w.insertBefore(b, w.firstChild);
+    if(!sessao.token) mostrar('pAuth');
+  }, 0);
+}
+function comecarColega(){
+  subtopicoAtual = null;
+  estado = {turnos:[], mapa:null, convite:'', rodada:0, indiceInicial:null, indiceAtual:null, segundos:0, rodadasMin:estado.rodadasMin, rodadasMax:estado.rodadasMax};
+  document.getElementById('conviteTitulo').textContent = 'Rodada 1 — explicando para um colega';
+  document.getElementById('conviteTexto').textContent = 'Explique "' + colega.tema + '" como se fosse para um colega que faltou à aula: o que é, por que acontece, um exemplo na indústria. Uns 2 minutos bastam. Depois a IA pergunta de volta, como o colega faria. Pode sair quando quiser.';
+  campo().value = '';
+  document.getElementById('erroFala').classList.add('oculto');
+  desenharPassos();
+  mostrar('pFala');
+}
+function voltarAulas(){ location.href = 'aulas.html?aba=desemp'; }
+function fecharDlgColega(){ var d = document.getElementById('dlgColega'); if(d) d.remove(); }
+function sairColega(){
+  if(gravando) pararGravacao();
+  if(telaAtual === 'pProcessando') return;
+  var r = estado.ultimoFinal || estado.ultimoParcial;
+  fecharDlgColega();
+  var d = document.createElement('div'); d.id = 'dlgColega';
+  if(r && !colega.registrado){
+    d.innerHTML = '<div><h2 style="margin-top:0">Sair da explicação</h2><p>A sua explicação sobre <b></b> está com nota <b style="font-size:20px">' + String(Math.round(r.indice) / 10).replace('.', ',') + '</b> de 10.</p><p class="aviso">Quer registrar essa nota? Ela fica no seu histórico e a tarefa sai do seu plano. Não entra na média da matéria.</p>' +
+      '<button onclick="registrarColega()">✓ Registrar a nota e sair</button><button class="secundario" onclick="voltarAulas()">Sair sem registrar</button><button class="link" onclick="fecharDlgColega()">Continuar explicando</button></div>';
+    d.querySelector('p b').textContent = colega.tema;
+  } else if(!colega.registrado && campo().value.trim().split(/\s+/).length > 10){
+    d.innerHTML = '<div><h2 style="margin-top:0">Sair da explicação</h2><p>Você ainda não enviou o que falou, então não há nota para registrar.</p><button class="secundario" onclick="voltarAulas()">Sair mesmo assim</button><button class="link" onclick="fecharDlgColega()">Continuar explicando</button></div>';
+  } else { voltarAulas(); return; }
+  document.body.appendChild(d);
+}
+function registrarColega(){
+  var r = estado.ultimoFinal || estado.ultimoParcial; if(!r) return voltarAulas();
+  fecharDlgColega();
+  var proc = document.querySelector('#pProcessando b'), txt = proc.textContent;
+  proc.textContent = 'Registrando a sua nota…'; mostrar('pProcessando');
+  api('encerrarConversa', {turnos: estado.turnos, resultado: r, parecerPronto: r.parecer || '', indiceInicial: estado.indiceInicial, segundosFala: estado.segundos, token: sessao.token, subtopicoId: '', assunto: colega.tema})
+    .then(function(){ return apiAulas('revProvaMarcar', {professorId: colega.p, disciplinaId: colega.d, tipo: 'explicar', nota: r.indice, tema: colega.tema}).catch(function(){}); })
+    .then(function(){ colega.registrado = true; voltarAulas(); })
+    .catch(function(e){ proc.textContent = txt; alert('Não deu para registrar agora: ' + e.message); mostrar(estado.ultimoFinal ? 'pFinal' : 'pParcial'); });
+}
+
 if(sessao.token){
   api('sessao', {token: sessao.token}).then(function(r){
     if(r.logado && voltarParaAulas){ irDeVolta(); return; }
@@ -848,6 +914,7 @@ if(sessao.token){
       document.getElementById('btProf').classList.toggle('oculto', !r.professor);
       document.getElementById('btConta').classList.remove('oculto');
       if(querConta){ querConta = false; abrirConta(); }
+      if(colega) comecarColega();
       if(embutido && subEmbutido) abrirSubtopico(subEmbutido);
     }
     else {
@@ -1583,7 +1650,7 @@ function comecar(){
   mostrar('pFala');
 }
 
-function recomecar(){ if(gravando) pararGravacao(); mostrar('pInicio'); }
+function recomecar(){ if(gravando) pararGravacao(); if(colega){ comecarColega(); return; } mostrar('pInicio'); }
 
 function continuar(){
   document.getElementById('conviteTitulo').textContent =
@@ -1617,7 +1684,8 @@ function enviarFala(encerrar){
     indiceInicial: estado.indiceInicial, segundosFala: estado.segundos,
     token: sessao.token,
     subtopicoId: subtopicoAtual ? subtopicoAtual.id : '',
-    assunto: subtopicoAtual ? subtopicoAtual.nome : ''
+    assunto: subtopicoAtual ? subtopicoAtual.nome : (colega ? colega.tema : ''),
+    colega: !!colega, naoGuardar: !!colega
   })
   .then(function(r){
     if(r.fora_do_escopo){
@@ -1669,7 +1737,8 @@ function encerrarAgora(){
     turnos: estado.turnos, resultado: r,
     indiceInicial: estado.indiceInicial, segundosFala: estado.segundos,
     token: sessao.token,
-    subtopicoId: subtopicoAtual ? subtopicoAtual.id : ''
+    subtopicoId: subtopicoAtual ? subtopicoAtual.id : '',
+    naoGuardar: !!colega
   })
   .then(function(saida){
     var final = {};
@@ -1737,7 +1806,7 @@ function mostrarParcial(r){
   // Sem login não há histórico para alimentar: o botão entrega o parecer, não
   // um registro. O nome acompanha o que ele realmente faz.
   document.getElementById('btEncerrarParcial').textContent =
-    (sessao.token && subtopicoAtual) ? 'Está bom, registrar'
+    colega ? 'Está bom, terminar' : (sessao.token && subtopicoAtual) ? 'Está bom, registrar'
                                      : 'Está bom, quero o parecer';
   document.getElementById('temaParcial').textContent = 'Tema: ' + r.tema +
     ' · rodada ' + r.rodada + ' de até ' + r.rodadasMax;
@@ -1792,6 +1861,12 @@ function mostrarFinal(r){
   document.getElementById('blocosFinal').innerHTML = html;
   document.getElementById('btVoltarMapa').classList
     .toggle('oculto', !(sessao.token && subtopicoAtual));
+  if(colega){
+    estado.ultimoFinal = r;
+    var bf = document.getElementById('btVoltarMapa').parentNode;
+    bf.innerHTML = '<button onclick="registrarColega()">✓ Registrar a nota e voltar</button><button class="secundario" onclick="voltarAulas()">Voltar sem registrar</button>' +
+      '<button id="btVoltarMapa" class="oculto"></button>';
+  }
   mostrar('pFinal');
 }
 
