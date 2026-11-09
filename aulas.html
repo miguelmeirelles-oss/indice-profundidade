@@ -1288,13 +1288,13 @@ function carregarMaterias(){
 }
 
 // abas da visão de aluno: Minhas matérias, Minhas provas, Aulas em trilha, Inscrever-se
-function abaAluno(a){
+function abaAluno(a, abrirId, questoes){
   if(['mat', 'provas', 'desemp', 'trilha', 'insc'].indexOf(a) === -1) a = 'mat';
   if(a !== 'trilha' && window.Trilha) Trilha.parar();
   try{ localStorage.setItem('aulas_abaal', a); }catch(e){}
   document.querySelectorAll('[data-abaal]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.abaal === a)); });
   document.querySelectorAll('[data-painelal]').forEach(function(x){ x.classList.toggle('foraAba', x.dataset.painelal !== a); });
-  if(a === 'trilha') abrirTrilhaAluno();
+  if(a === 'trilha') abrirTrilhaAluno(abrirId, questoes);   // abrirId: vindo do plano/revisão, abre direto a aula
   if(a === 'desemp') carregarDesempenho(false);
 }
 document.querySelectorAll('[data-abaal]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno(b.dataset.abaal); }); });
@@ -1544,14 +1544,16 @@ function desenharDesempenho(){
   h += r.materias.map(function(m, mi){
     var hoje = m.tarefas.slice(0, m.porDia), depois = m.tarefas.slice(m.porDia);
     var tarefa = function(t, ti){
-      var ic = t.tipo === 'trilha' ? '🎓' : t.tipo === 'refazer' ? '↻' : '✍';
-      return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff">' +
+      var ic = t.tipo === 'trilha' ? '🎓' : t.tipo === 'refazer' ? '↻' : '✍', aula = t.tipo === 'trilha' ? t.trilhaId : t.aula;
+      return '<div data-tarefa="' + mi + ':' + ti + '" style="cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff">' +
         '<div style="flex:1 1 200px"><b>' + ic + ' ' + esc(t.texto) + '</b>' + (t.detalhe ? '<div class="aviso">' + esc(t.detalhe) + '</div>' : '') + '<div class="aviso">' + esc(t.tema) + (t.porque ? ' · ' + esc(t.porque) : '') + '</div></div>' +
-        '<button type="button" class="mini" data-tarefa="' + mi + ':' + ti + '">' + (t.tipo === 'trilha' ? '▶ Abrir aula' : t.tipo === 'refazer' ? 'Refazer' : 'Responder') + '</button></div>';
+        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+        (t.tipo === 'trilha' ? '<button type="button" class="mini" data-iraula="' + esc(aula) + '">▶ Assistir a aula</button>' : '<button type="button" class="mini" data-fazer="' + mi + ':' + ti + '">' + (t.tipo === 'refazer' ? '↻ Refazer' : '✍ Responder') + '</button>') +
+        (aula ? '<button type="button" class="mini secundario" data-irquest="' + esc(aula) + '">📝 Ir direto às questões</button>' + (t.tipo !== 'trilha' ? '<button type="button" class="mini secundario" data-iraula="' + esc(aula) + '">▶ Ver a aula</button>' : '') : '') + '</div></div>';
     };
     return '<div class="caixa" style="margin:0 0 14px;border-left:6px solid ' + (m.modoFinal ? '#c62828' : notaCor(m.media)) + '">' +
       '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">' + esc(m.nome) + '</h3>' +
-        '<span><span class="aviso">média ' + (m.parcial ? 'parcial ' : '') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + (m.media === null ? '—' : String(m.media).replace('.', ',')) + '</b></span></div>' +
+        (m.media === null || (m.parcial && !m.media) ? '<span class="aviso">sem notas ainda</span></div>' : '<span><span class="aviso">média ' + (m.parcial ? 'parcial ' : '') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + String(m.media).replace('.', ',') + '</b></span></div>') +
       '<p style="margin:4px 0"><span class="tag">' + esc(m.prova.titulo) + (m.prova.estimada ? ' (data estimada)' : '') + '</span> <span class="aviso">' + (m.prova.dias === 0 ? 'hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + '</span></p>' +
       (m.foco ? '<p class="aviso" style="margin:0 0 4px">🎯 Foco do plano: ' + esc(m.foco) + '</p>' : '') +
       (m.aviso ? '<div class="' + (m.modoFinal ? 'erro' : 'alerta') + '" style="margin:6px 0">' + esc(m.aviso) + '</div>' : '') +
@@ -1564,7 +1566,7 @@ function desenharDesempenho(){
         (depois.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + depois.length + ')</summary>' + depois.map(function(t, k){ return tarefa(t, k + m.porDia); }).join('') + '</details>' : '')
         : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
       (m.recomendacoes.length ? '<details style="margin-top:8px"><summary class="link">💡 Pelo que você respondeu em aula (' + m.recomendacoes.length + ')</summary>' + m.recomendacoes.map(function(x, k){
-        return '<div class="eixo" style="border-color:#8a6100">' + esc(x.texto) + '<br>' + esc(x.acao) + (x.trilhaId ? ' <button type="button" class="link" data-recaula="' + esc(x.trilhaId) + '">abrir a aula</button>' : '') + '</div>'; }).join('') + '</details>' : '') +
+        return '<div class="eixo" style="border-color:#8a6100">' + esc(x.texto) + '<br>' + esc(x.acao) + (x.trilhaId ? ' <button type="button" class="link" data-recaula="' + esc(x.trilhaId) + '">abrir a aula</button> · <button type="button" class="link" data-irquest="' + esc(x.trilhaId) + '">ir às questões</button>' : '') + '</div>'; }).join('') + '</details>' : '') +
       (m.temas.length ? '<details style="margin-top:6px"><summary class="link">Assuntos em ordem de prioridade</summary>' + m.temas.map(function(t){
         return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--linha)"><span>' + (t.importante ? '⭐ ' : '') + esc(t.grupo ? t.grupo + ' › ' + t.nome : t.nome) + '</span><span class="aviso">' +
           [t.sala !== null ? 'em aula ' + dezEst(t.sala) : '', t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'não estudou'].filter(Boolean).join(' · ') + '</span></div>'; }).join('') + '<p class="aviso">⭐ = o professor marcou como importante.</p></details>' : '') +
@@ -1587,10 +1589,12 @@ function desenharDesempenho(){
   });
   el.querySelectorAll('[data-diag]').forEach(function(b){ b.addEventListener('click', function(){ abrirDiagnostico(mDe(r.materias[Number(b.dataset.diag)])); }); });
   el.querySelectorAll('[data-cad]').forEach(function(b){ b.addEventListener('click', function(){ abrirCaderno(mDe(r.materias[Number(b.dataset.cad)])); }); });
-  el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha'); abrirTrilhaAluno(b.dataset.recaula); }); });
+  el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha', b.dataset.recaula); }); });
+  el.querySelectorAll('[data-iraula],[data-irquest]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); var q = !!b.dataset.irquest; abaAluno('trilha', b.dataset.irquest || b.dataset.iraula, q); window.scrollTo(0, 0); }); });
+  el.querySelectorAll('[data-fazer]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); b.closest('[data-tarefa]').click(); }); });
   el.querySelectorAll('[data-tarefa]').forEach(function(b){ b.addEventListener('click', function(){
     var k = b.dataset.tarefa.split(':'), m = r.materias[Number(k[0])], t = m.tarefas[Number(k[1])], mm = mDe(m);
-    if(t.tipo === 'trilha'){ abaAluno('trilha'); abrirTrilhaAluno(t.trilhaId); window.scrollTo(0, 0); return; }
+    if(t.tipo === 'trilha'){ abaAluno('trilha', t.trilhaId); window.scrollTo(0, 0); return; }
     EST.m = mm; $('alunoLista').classList.add('oculto'); $('alunoDetalhe').classList.remove('oculto'); window.scrollTo(0, 0);
     if(t.tipo === 'refazer'){
       EST.q = {id: t.questao.id, enunciado: t.questao.enunciado, ajuda: t.questao.ajuda || [], tema: t.tema, naProva: false};
@@ -1652,7 +1656,7 @@ function desenharRevisaoBox(){
     '<div class="barraDom" style="margin:6px 0"><i style="width:' + v.progresso + '%;background:#7D3C98"></i></div><span class="aviso">' + v.progresso + '% concluído</span>' +
     (v.proximas.length ? '<p style="margin:8px 0 2px"><b>Próximas aulas</b></p>' + v.proximas.map(function(it){ return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:4px 0"><span style="font-size:14px">' + (it.prioridade === 'alta' ? '⭐ ' : '') + esc(it.titulo) + ' <span class="aviso">· ' + esc(it.materia) + '</span></span><button type="button" class="mini" data-revaula="' + esc(it.trilha) + '">▶ Abrir</button></div>'; }).join('') : '<div class="ok" style="margin:6px 0">Você concluiu todas as aulas da revisão! 🎉</div>') +
     '<div class="botoes" style="margin:8px 0 0"><button type="button" class="secundario mini" id="btRevVer">Ver a revisão completa</button></div></div>';
-  box.querySelectorAll('[data-revaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha'); abrirTrilhaAluno(b.dataset.revaula); window.scrollTo(0, 0); }); });
+  box.querySelectorAll('[data-revaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha', b.dataset.revaula); window.scrollTo(0, 0); }); });
   $('btRevVer').addEventListener('click', abrirRevisao);
 }
 function topoRevisao(titulo){
@@ -1788,7 +1792,7 @@ function abrirRevisao(){
   h += '<p class="aviso">⭐ = prioridade alta.</p><div class="botoes"><button type="button" class="secundario mini" id="btRevRefazer">Montar outra revisão</button><button type="button" class="link" style="color:#8a1c1c" id="btRevApagar">apagar esta revisão</button></div></div>';
   el.innerHTML = h;
   el.querySelector('[data-voltar]').addEventListener('click', voltarDaRevisao);
-  el.querySelectorAll('[data-revaula]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno('trilha'); abrirTrilhaAluno(b.dataset.revaula); window.scrollTo(0, 0); }); });
+  el.querySelectorAll('[data-revaula]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno('trilha', b.dataset.revaula); window.scrollTo(0, 0); }); });
   $('btRevRefazer').addEventListener('click', formRevisao);
   el.querySelectorAll('[data-revq]').forEach(function(b){ b.addEventListener('click', function(){
     var mi = Number(b.dataset.revq), box = el.querySelector('[data-revqbox="' + mi + '"]');
@@ -2246,12 +2250,12 @@ function abrirAba(a){
 // Aula em trilha (aberta a todos os alunos): o código só é carregado quando a aba abre
 // professor: monta as trilhas (aba); aluno: só assiste e interage (caixa na visão de aluno)
 function abrirTrilhaAba(){ carregarTrilha($('pTrilha'), 'prof'); }
-function abrirTrilhaAluno(abrirId){ var el = $('caixaTrilhaAluno'); el.classList.remove('oculto'); carregarTrilha(el, 'aluno', abrirId); }
-function carregarTrilha(el, modo, abrirId){
-  var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo, abrirId: abrirId || ''}); };
+function abrirTrilhaAluno(abrirId, questoes){ var el = $('caixaTrilhaAluno'); el.classList.remove('oculto'); carregarTrilha(el, 'aluno', abrirId, questoes); }
+function carregarTrilha(el, modo, abrirId, questoes){
+  var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); if(abrirId && Trilha.irPara) Trilha.irPara(abrirId, questoes); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=51';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=52';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);
