@@ -2863,6 +2863,13 @@ function desenharPF(){
         : numPF('com nota', conta(function(g){ return g.nota !== null; })) + numPF('aprovados', conta(function(g){ return g.nota !== null && g.nota >= r.aprova; }))) + '</div>' +
     '<div class="botoes" style="margin:0">' + (r.pastaUrl ? '<a class="botaoLink" href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">📁 Documentos de ' + esc(r.semestre) + '</a>' : '') +
     '<button type="button" class="mini secundario" id="pfSync">↻ Atualizar planilha de controle' + (e2 ? ' e formulário' : '') + '</button></div><div id="pfMsg" class="aviso"></div></div>';
+  if(e2 && r.podeEnviar){
+    var abertas = r.grupos.filter(function(g){ return !g.docs.B && g.cor !== 'ok'; }), marc = abertas.filter(function(g){ return g.defesa && g.defesa.data; });
+    if(abertas.length) h += '<div class="caixa" style="border-left:6px solid ' + (marc.length === abertas.length ? '#1a7a3c' : '#B8890A') + '">' +
+      (marc.length === abertas.length ? '<h2 style="margin:0 0 4px">✅ Todas as defesas foram marcadas</h2><p class="aviso" style="margin:0 0 8px">Os ' + abertas.length + ' grupos já preencheram o formulário. Já pode enviar o convite aos docentes.</p>'
+        : '<h2 style="margin:0 0 4px">📅 Defesas marcadas: ' + marc.length + ' de ' + abertas.length + '</h2><p class="aviso" style="margin:0 0 8px">Faltam: ' + abertas.filter(function(g){ return marc.indexOf(g) === -1; }).map(function(g){ return esc(g.rotulo); }).join(' · ') + '. Quando todos preencherem, você recebe um aviso aqui no site.</p>') +
+      '<button type="button" class="mini' + (marc.length === abertas.length ? '' : ' secundario') + '" id="pfConvite"' + (marc.length ? '' : ' disabled') + '>✉ Convite das defesas para os docentes</button><div id="pfConviteBox"></div></div>';
+  }
   h += '<div class="caixa"><h2>📎 Enviar documento assinado</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA descobre qual apêndice é (A proposta, C, F, J banca, B ata) e lê alunos, orientador, coorientador, título' + (e2 ? ' e banca' : ' e nota') + '. Você confere antes de salvar; o arquivo vai para Defesas documentos / ' + esc(r.semestre) + ' / pasta do grupo.</p>' +
     '<input type="file" id="pfArq" accept="application/pdf,image/*"><div id="pfLido"></div></div>';
   h += '<div class="caixa"><h2>Grupos</h2><p class="aviso" style="margin:0 0 4px">Documentos: A proposta · C termo de responsabilidade · F termo de ciência · J banca · B ata assinada. Toque numa letra verde para abrir o PDF.</p>';
@@ -2916,6 +2923,7 @@ function desenharPF(){
     box.querySelector('[data-pfok]').addEventListener('click', function(){ var bt = this; bt.disabled = true; var c = lerCamposPF(box); delete c.nota;
       api('pfEditar', {disciplinaId: PFV.d.id, grupoId: g.id, campos: c}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ bt.disabled = false; alert(e.message); }); });
   }); });
+  if($('pfConvite')) $('pfConvite').addEventListener('click', function(){ conviteDefesasPF(null); });
   el.querySelectorAll('[data-pfmail]').forEach(function(b){ b.addEventListener('click', function(){
     var k = b.dataset.pfmail.split(':'), box = el.querySelector('[data-pfeditbox="' + k[0] + '"]');
     box.innerHTML = '<p class="carregando">Montando o e-mail…</p>';
@@ -2925,6 +2933,32 @@ function desenharPF(){
   el.querySelectorAll('[data-pfnovo]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true;
     api('pfEditar', {disciplinaId: PFV.d.id, grupoId: '', campos: {alunos: [{nome: b.dataset.pfnovo}]}}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ b.disabled = false; alert(e.message); }); }); });
   if(PFV.lido) desenharLidoPF();
+}
+// convite das defesas: escolhe quais defesas entram (padrão: as ainda não convidadas), vê o e-mail e envia a todos os docentes
+function conviteDefesasPF(ids){
+  var box = $('pfConviteBox'); box.innerHTML = '<p class="carregando">Montando o convite…</p>';
+  api('pfConvitePrevia', {disciplinaId: PFV.d.id, ids: ids}).then(function(m){
+    box.innerHTML = '<div class="convite" style="margin-top:10px"><p style="margin:0 0 4px"><span class="aviso">Defesas no convite</span></p>' + m.defesas.map(function(d){
+        return '<label style="display:flex;gap:8px;align-items:center;margin:3px 0"><input type="checkbox" data-pfconvd="' + esc(d.id) + '"' + (d.escolhida ? ' checked' : '') + '> <span><b>' + esc(d.rotulo) + '</b> <span class="aviso">' + esc(d.quando) + (d.convidado ? ' · convite já enviado em ' + esc(d.convidado) : '') + '</span></span></label>'; }).join('') +
+      '<p style="margin:8px 0 2px"><span class="aviso">De</span> ' + esc(m.de) + ' · <span class="aviso">Para</span> <b>' + m.destinatarios + ' docentes</b> da aba Dados da banca (em cópia oculta)</p>' +
+      '<p style="margin:2px 0"><span class="aviso">Assunto</span> <b>' + esc(m.assunto) + '</b></p>' +
+      '<pre style="white-space:pre-wrap;font-family:inherit;font-size:13.5px;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:10px;margin:4px 0;max-height:320px;overflow:auto">' + esc(m.corpo) + '</pre>' +
+      '<label style="display:flex;gap:8px;align-items:center;margin:8px 0"><input type="checkbox" data-pfconvok> Conferi as defesas, as datas e o texto.</label>' +
+      '<div class="botoes" style="margin:0"><button type="button" class="mini" data-pfconvenv>Enviar para os ' + m.destinatarios + ' docentes</button><button type="button" class="mini secundario" data-pfconvcanc>Cancelar</button></div><div data-pfconvmsg class="aviso"></div></div>';
+    var marcados = function(){ return Array.prototype.map.call(box.querySelectorAll('[data-pfconvd]:checked'), function(c){ return c.dataset.pfconvd; }); };
+    box.querySelectorAll('[data-pfconvd]').forEach(function(c){ c.addEventListener('change', function(){ conviteDefesasPF(marcados()); }); });
+    box.querySelector('[data-pfconvcanc]').addEventListener('click', function(){ box.innerHTML = ''; });
+    box.querySelector('[data-pfconvenv]').addEventListener('click', function(){
+      var bt = this, msg = box.querySelector('[data-pfconvmsg]'), sel = marcados();
+      if(!sel.length){ msg.innerHTML = '<span class="t-err">Escolha pelo menos uma defesa.</span>'; return; }
+      if(!box.querySelector('[data-pfconvok]').checked){ msg.innerHTML = '<span class="t-err">Marque que conferiu antes de enviar.</span>'; return; }
+      var ja = m.defesas.filter(function(d){ return d.convidado && sel.indexOf(d.id) !== -1; });
+      if(ja.length && !confirm('O convite de ' + ja.map(function(d){ return d.rotulo; }).join(', ') + ' já foi enviado. Enviar de novo?')) return;
+      bt.disabled = true; msg.textContent = 'Enviando…';
+      api('pfConviteEnviar', {disciplinaId: PFV.d.id, ids: sel, reenviar: !!ja.length}).then(function(x){ PFV.r = x; desenharPF(); $('pfMsg').textContent = '✉ Convite enviado para ' + m.destinatarios + ' docentes.'; })
+        .catch(function(e){ bt.disabled = false; msg.innerHTML = '<span class="t-err">' + esc(e.message) + '</span>'; });
+    });
+  }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 // prévia do e-mail (texto e anexos fixos, montados no servidor): conferir, completar e-mail que faltar, enviar
 function previaEmailPF(box, grupoId, m){
