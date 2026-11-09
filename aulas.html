@@ -1540,29 +1540,31 @@ function desenharDesempenho(){
   var h = '<div style="display:flex;gap:18px;flex-wrap:wrap;margin:0 0 12px">' +
     '<div><span class="aviso">sequência</span><div class="numEst">' + (r.sequencia ? '🔥 ' + r.sequencia + ' dia' + (r.sequencia > 1 ? 's' : '') : '—') + '</div></div>' +
     '<div><span class="aviso">questões na semana</span><div class="numEst">' + Math.min(r.semana, r.metaSemana) + '/' + r.metaSemana + '</div></div></div>' +
-    '<p class="aviso" style="margin:0 0 10px">A matéria que pede mais atenção vem primeiro. O plano é refeito com o que você estuda: tarefa feita sai da lista.</p>';
+    '<div class="aviso" style="margin:0 0 10px">A matéria que pede mais atenção vem primeiro. O plano é refeito com o que você estuda: tarefa feita sai da lista. ' + ajuda(BAL.geral) + '</div>';
   h += r.materias.map(function(m, mi){
     var hoje = m.tarefas.slice(0, m.porDia), depois = m.tarefas.slice(m.porDia);
     var tarefa = function(t, ti){
-      var ic = t.tipo === 'trilha' ? '🎓' : t.tipo === 'refazer' ? '↻' : '✍', aula = t.tipo === 'trilha' ? t.trilhaId : t.aula;
+      var ic = {trilha: '🎓', refazer: '↻', simulado: '', relampago: '', vespera: '', explicar: '🎤'}[t.tipo]; if(ic === undefined) ic = '✍';
+      var aula = t.tipo === 'trilha' ? t.trilhaId : t.aula, rot = {refazer: '↻ Refazer', simulado: '📝 Começar o simulado', relampago: '⚡ Começar', vespera: '📄 Abrir a folha', explicar: '🎤 Explicar'}[t.tipo] || '✍ Responder';
       return '<div data-tarefa="' + mi + ':' + ti + '" style="cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff">' +
         '<div style="flex:1 1 200px"><b>' + ic + ' ' + esc(t.texto) + '</b>' + (t.detalhe ? '<div class="aviso">' + esc(t.detalhe) + '</div>' : '') + '<div class="aviso">' + esc(t.tema) + (t.porque ? ' · ' + esc(t.porque) : '') + '</div></div>' +
         '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-        (t.tipo === 'trilha' ? '<button type="button" class="mini" data-iraula="' + esc(aula) + '">▶ Assistir a aula</button>' : '<button type="button" class="mini" data-fazer="' + mi + ':' + ti + '">' + (t.tipo === 'refazer' ? '↻ Refazer' : '✍ Responder') + '</button>') +
-        (aula ? '<button type="button" class="mini secundario" data-irquest="' + esc(aula) + '">📝 Ir direto às questões</button>' + (t.tipo !== 'trilha' ? '<button type="button" class="mini secundario" data-iraula="' + esc(aula) + '">▶ Ver a aula</button>' : '') : '') + '</div></div>';
+        (t.tipo === 'trilha' ? '<button type="button" class="mini" data-iraula="' + esc(aula) + '">▶ Assistir a aula</button>' + (aula ? '<button type="button" class="mini secundario" data-irquest="' + esc(aula) + '">📝 Ir direto às questões</button>' : '')
+          : '<button type="button" class="mini" data-fazer="' + mi + ':' + ti + '">' + rot + '</button>' + (aula ? '<button type="button" class="mini secundario" data-iraula="' + esc(aula) + '">▶ Ver a aula</button>' : '')) + '</div></div>';
     };
     return '<div class="caixa" style="margin:0 0 14px;border-left:6px solid ' + (m.modoFinal ? '#c62828' : notaCor(m.media)) + '">' +
       '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">' + esc(m.nome) + '</h3>' +
-        (m.media === null || (m.parcial && !m.media) ? '<span class="aviso">sem notas ainda</span></div>' : '<span><span class="aviso">média ' + (m.parcial ? 'parcial ' : '') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + String(m.media).replace('.', ',') + '</b></span></div>') +
-      '<p style="margin:4px 0"><span class="tag">' + esc(m.prova.titulo) + (m.prova.estimada ? ' (data estimada)' : '') + '</span> <span class="aviso">' + (m.prova.dias === 0 ? 'hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + '</span></p>' +
-      (m.foco ? '<p class="aviso" style="margin:0 0 4px">🎯 Foco do plano: ' + esc(m.foco) + '</p>' : '') +
+        (m.media === null || (m.parcial && !m.media) ? '<span class="aviso">sem notas ainda ' + ajuda(BAL.media) + '</span></div>' : '<span><span class="aviso">média ' + (m.parcial ? 'parcial ' : '') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + String(m.media).replace('.', ',') + '</b> ' + ajuda(BAL.media) + '</span></div>') +
+      '<div style="margin:4px 0"><span class="tag">' + esc(m.prova.titulo) + (m.prova.estimada ? ' (data estimada)' : '') + '</span> <span class="aviso">' + (m.prova.dias === 0 ? 'hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + '</span> ' + ajuda(m.prova.estimada ? BAL.estimada : BAL.prova) + '</div>' +
+      (m.foco ? '<div class="aviso" style="margin:0 0 4px">🎯 Foco do plano: ' + esc(m.foco) + ' ' + ajuda(BAL.foco) + '</div>' : '') +
+      htmlModoRevisao(m, mi) +
       (m.aviso ? '<div class="' + (m.modoFinal ? 'erro' : 'alerta') + '" style="margin:6px 0">' + esc(m.aviso) + '</div>' : '') +
-      (m.conquistas && m.conquistas.length ? '<div style="margin:6px 0">' + m.conquistas.map(function(c){ return '<span style="display:inline-block;padding:3px 10px;margin:2px 4px 2px 0;border-radius:999px;background:#fff7d6;border:1px solid #E8B923;font-size:13px">' + esc(c) + '</span>'; }).join('') + '</div>' : '') +
-      (m.plano && m.plano.total ? '<div style="margin:8px 0 2px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><b>Plano da semana</b><span>' + m.plano.feitas + ' de ' + m.plano.total + ' tarefa' + (m.plano.total > 1 ? 's' : '') + ' feita' + (m.plano.feitas === 1 ? '' : 's') + (m.plano.feitas === m.plano.total ? ' 🎉' : '') + '</span></div>' +
+      (m.conquistas && m.conquistas.length ? '<div style="margin:6px 0">' + m.conquistas.map(function(c){ return '<span style="display:inline-block;padding:3px 10px;margin:2px 4px 2px 0;border-radius:999px;background:#fff7d6;border:1px solid #E8B923;font-size:13px">' + esc(c) + '</span>'; }).join('') + ' ' + ajuda(BAL.conquistas) + '</div>' : '') +
+      (m.plano && m.plano.total ? '<div style="margin:8px 0 2px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><b>Plano da semana ' + ajuda(BAL.plano) + '</b><span>' + m.plano.feitas + ' de ' + m.plano.total + ' tarefa' + (m.plano.total > 1 ? 's' : '') + ' feita' + (m.plano.feitas === 1 ? '' : 's') + (m.plano.feitas === m.plano.total ? ' 🎉' : '') + '</span></div>' +
         '<div class="barraDom" style="margin:3px 0"><i style="width:' + Math.round(m.plano.feitas / m.plano.total * 100) + '%;background:#1a7a3c"></i></div>' +
         (m.plano.feitasLista.length ? '<details><summary class="link" style="font-size:13px">o que você já fez</summary>' + m.plano.feitasLista.map(function(x){ return '<div class="aviso">✓ ' + esc(x) + '</div>'; }).join('') + '</details>' : '') + '</div>' : '') +
       (m.modoFinal ? '<div class="convite" style="margin:8px 0" data-final="' + mi + '"><b>📝 O que você errou nas provas</b><div data-finalcorpo="' + mi + '"><p class="carregando">Analisando as suas provas corrigidas…</p></div></div>' : '') +
-      (m.tarefas.length ? '<p style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' por dia até a prova)</span></p>' + hoje.map(function(t, k){ return tarefa(t, k); }).join('') +
+      (m.tarefas.length ? '<div style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' por dia até a prova)</span> ' + ajuda(m.revisao && m.revisao.ligado ? BAL.hojeRev : BAL.hoje) + '</div>' + hoje.map(function(t, k){ return tarefa(t, k); }).join('') +
         (depois.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + depois.length + ')</summary>' + depois.map(function(t, k){ return tarefa(t, k + m.porDia); }).join('') + '</details>' : '')
         : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
       (m.recomendacoes.length ? '<details style="margin-top:8px"><summary class="link">💡 Pelo que você respondeu em aula (' + m.recomendacoes.length + ')</summary>' + m.recomendacoes.map(function(x, k){
@@ -1587,6 +1589,7 @@ function desenharDesempenho(){
       if(!DES.finalRecarregado && a.dados.temas && a.dados.temas.length && !m.tarefas.some(function(t){ return /errou isso na prova/.test(t.porque || ''); })){ DES.finalRecarregado = true; carregarDesempenho(true); }
     }).catch(function(e){ alvo.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
   });
+  ligarModoRevisao(el, r);
   el.querySelectorAll('[data-diag]').forEach(function(b){ b.addEventListener('click', function(){ abrirDiagnostico(mDe(r.materias[Number(b.dataset.diag)])); }); });
   el.querySelectorAll('[data-cad]').forEach(function(b){ b.addEventListener('click', function(){ abrirCaderno(mDe(r.materias[Number(b.dataset.cad)])); }); });
   el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha', b.dataset.recaula); }); });
@@ -1595,6 +1598,10 @@ function desenharDesempenho(){
   el.querySelectorAll('[data-tarefa]').forEach(function(b){ b.addEventListener('click', function(){
     var k = b.dataset.tarefa.split(':'), m = r.materias[Number(k[0])], t = m.tarefas[Number(k[1])], mm = mDe(m);
     if(t.tipo === 'trilha'){ abaAluno('trilha', t.trilhaId); window.scrollTo(0, 0); return; }
+    if(t.tipo === 'simulado'){ abrirSimulado(mm, m.temaIds); return; }
+    if(t.tipo === 'relampago'){ abrirRelampago(mm, m.temaIds); return; }
+    if(t.tipo === 'vespera'){ abrirFolhaVespera(mm, m.temaIds); return; }
+    if(t.tipo === 'explicar'){ explicarColega(mm, t.tema); return; }
     EST.m = mm; $('alunoLista').classList.add('oculto'); $('alunoDetalhe').classList.remove('oculto'); window.scrollTo(0, 0);
     if(t.tipo === 'refazer'){
       EST.q = {id: t.questao.id, enunciado: t.questao.enunciado, ajuda: t.questao.ajuda || [], tema: t.tema, naProva: false};
@@ -1602,6 +1609,106 @@ function desenharDesempenho(){
       desenharQuestaoEstudo('');
     } else pedirQuestaoEstudo(t.temaId);
   }); });
+}
+// ===== balões "?" da aba Desempenho =====
+var BAL = {
+  geral: 'Cada matéria em que você está inscrito aparece aqui, a que pede mais atenção primeiro (nota baixa, prova perto, assuntos fracos). Nada aqui vale nota: é um guia para estudar.',
+  media: '<b>Média</b> = as notas das etapas (P1, P2… com as aulas, provas e trabalhos de cada uma), com os pesos que o professor definiu. <b>Parcial</b> = ainda faltam notas para lançar. Média 7 ou mais: aprovado direto; abaixo de 7: prova final, e passa com (média + final) ÷ 2 ≥ 5.',
+  prova: 'Data da próxima prova marcada pelo professor.',
+  estimada: 'O professor ainda não marcou a prova: a data é uma <b>estimativa</b> (a data de corte da etapa, se houver; senão, P1 no meio e P2 no fim do semestre). Quando ele marcar, a data certa aparece aqui.',
+  foco: 'O plano só cobra os assuntos da prova que vem. Se você foi mal num assunto da prova anterior, ele aparece como comentário, mas não entra nas tarefas.',
+  plano: 'As tarefas que aparecem nesta semana. Uma tarefa conta como <b>feita</b> quando você faz depois de ela aparecer: aula assistida até o fim (ou estudada de novo, no caso de "reveja"), 2 questões respondidas do assunto, a questão refeita, o simulado, a revisão relâmpago ou a folha de véspera. Recomeça toda semana.',
+  hoje: 'As tarefas mais urgentes, divididas pelos dias que faltam até a prova. A ordem segue: assunto que o professor marcou como importante → em que você foi mal nas questões de sala → fraco no estudo dirigido → ainda não estudado.<br><br><b>✍ Responder</b>: uma questão do estudo dirigido sobre o assunto. <b>📝 Ir direto às questões</b>: as questões da própria aula em trilha (feitas a partir do vídeo), sem precisar assistir.',
+  hojeRev: 'No modo revisão o plano muda: em vez de assistir aulas, você revisa. Os assuntos voltam em intervalos (o que você não vê há mais tempo e o que está mais fraco vêm antes), com simulado, revisão relâmpago e, na véspera, a folha de revisão.',
+  conquistas: 'Selos de motivação (não valem nota): dias seguidos estudando, assuntos dominados (nota 8 ou mais no estudo), aulas em trilha concluídas, plano da semana completo e questões em que você subiu muito a nota.',
+  revisao: 'Para quem já estudou a matéria: liga uma revisão até a prova. O plano passa a ter <b>revisão espaçada</b> (os assuntos voltam antes de você esquecer), <b>simulado</b> no formato da prova, <b>revisão relâmpago</b> (3 questões rápidas de assuntos diferentes), <b>explicar para um colega</b> por voz e, nos 2 últimos dias, a <b>folha de véspera</b>. Dá para sair do modo revisão quando quiser.',
+  simulado: 'Até 5 questões abertas, uma de cada assunto da prova (os mais fracos primeiro), com tempo de 10 minutos por questão. A IA corrige como o professor corrigiria e mostra a nota de 0 a 10 que você tiraria hoje. As respostas também contam no seu estudo.',
+  enganos: 'Antes de responder uma questão do estudo dirigido você pode marcar se acha que sabe. Aqui aparecem os assuntos em que você marcou <b>"sei"</b> e tirou menos de 6: são os mais perigosos para a prova, porque você nem desconfia.'
+};
+function htmlModoRevisao(m, mi){
+  var r = m.revisao; if(!r || !r.podeLigar) return '';
+  if(!r.ligado) return '<div style="margin:8px 0"><button type="button" class="mini secundario" data-revligar="' + mi + '">🔁 Já estudei: revisar para a ' + esc(m.prova.titulo) + '</button> ' + ajuda(BAL.revisao) + '</div>';
+  return '<div class="convite" style="margin:8px 0;border-left-color:#1a7a3c"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>🔁 Modo revisão para a ' + esc(m.prova.titulo) + ' ' + ajuda(BAL.revisao) + '</b><span class="aviso">desde ' + esc(r.desde) + ' · <button type="button" class="link" data-revdesligar="' + mi + '">sair</button></span></div>' +
+    '<div class="botoes" style="margin:6px 0 0"><button type="button" class="mini" data-revsim="' + mi + '">📝 Simulado</button><button type="button" class="mini secundario" data-revrel="' + mi + '">⚡ Relâmpago</button><button type="button" class="mini secundario" data-revfolha="' + mi + '">📄 Folha de véspera</button><button type="button" class="mini secundario" data-revexp="' + mi + '">🎤 Explicar para um colega</button></div>' +
+    (r.simulados.length ? '<div class="aviso" style="margin:6px 0 0">Simulados: ' + r.simulados.map(function(x){ return '<b>' + String(x.nota).replace('.', ',') + '</b> em ' + esc(x.data); }).join(' · ') + ' ' + ajuda(BAL.simulado) + '</div>' : '') +
+    (r.enganos.length ? '<div class="alerta" style="margin:6px 0 0">⚠️ Você achava que sabia, mas errou: <b>' + r.enganos.map(esc).join(', ') + '</b> ' + ajuda(BAL.enganos) + '</div>' : '') + '</div>';
+}
+function ligarModoRevisao(el, r){
+  var mDe = function(i){ var m = r.materias[Number(i)]; return {m: m, mm: {nome: m.nome, professorId: m.professorId, disciplinaId: m.disciplinaId}}; };
+  el.querySelectorAll('[data-revligar],[data-revdesligar]').forEach(function(b){ b.addEventListener('click', function(){
+    var lig = !!b.dataset.revligar, x = mDe(b.dataset.revligar || b.dataset.revdesligar); b.disabled = true;
+    api('revProvaLigar', {professorId: x.mm.professorId, disciplinaId: x.mm.disciplinaId, ligar: lig}).then(function(){ carregarDesempenho(true); }).catch(function(e){ b.disabled = false; alert(e.message); });
+  }); });
+  el.querySelectorAll('[data-revsim]').forEach(function(b){ b.addEventListener('click', function(){ var x = mDe(b.dataset.revsim); abrirSimulado(x.mm, x.m.temaIds); }); });
+  el.querySelectorAll('[data-revrel]').forEach(function(b){ b.addEventListener('click', function(){ var x = mDe(b.dataset.revrel); abrirRelampago(x.mm, x.m.temaIds); }); });
+  el.querySelectorAll('[data-revfolha]').forEach(function(b){ b.addEventListener('click', function(){ var x = mDe(b.dataset.revfolha); abrirFolhaVespera(x.mm, x.m.temaIds); }); });
+  el.querySelectorAll('[data-revexp]').forEach(function(b){ b.addEventListener('click', function(){ var x = mDe(b.dataset.revexp); explicarColega(x.mm, (x.m.temas[0] || {}).nome || x.m.nome); }); });
+}
+function telaRevisaoProva(m, titulo){
+  EST.m = m; var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto'); window.scrollTo(0, 0);
+  return function(corpo){ el.innerHTML = '<div class="caixa" style="margin-bottom:0"><button type="button" class="link" data-voltar>&#8592; voltar</button> <span class="aviso">🔁 Revisão · ' + esc(m.nome) + '</span></div><div class="caixa"><h2>' + titulo + '</h2>' + corpo + '</div>';
+    el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarListaAluno(); abaAluno('desemp'); carregarDesempenho(true); }); return el; };
+}
+// simulado: questões abertas com tempo; a IA corrige no fim
+function abrirSimulado(m, temaIds){
+  var pinta = telaRevisaoProva(m, '📝 Simulado ' + ajuda(BAL.simulado));
+  pinta('<p class="carregando">Montando o simulado… (pode levar uns 20 segundos)</p>');
+  api('simuladoMontar', {professorId: m.professorId, disciplinaId: m.disciplinaId, temaIds: temaIds || []}).then(function(sim){
+    var fim = Date.now() + sim.minutos * 60000;
+    var el = pinta('<p class="aviso" style="margin-top:0">' + sim.questoes.length + ' questões · tempo: <b><span id="simRelogio"></span></b> (o tempo é só um guia: você pode entregar depois). Responda como na prova, com suas palavras.</p>' +
+      sim.questoes.map(function(q, i){ return '<div style="border-top:1px dashed var(--linha);padding:10px 0"><p style="margin:0 0 4px"><span class="tag">' + esc(q.tema) + '</span></p><p style="margin:0 0 6px"><b>' + (i + 1) + '. ' + esc(q.enunciado) + '</b></p><textarea data-simresp="' + esc(q.id) + '" style="min-height:120px" placeholder="Sua resposta"></textarea></div>'; }).join('') +
+      '<div class="botoes"><button type="button" id="btSimEntregar">Entregar o simulado</button></div><div id="msgSim"></div>');
+    el.querySelectorAll('[data-simresp]').forEach(function(ta){ var b = function(e){ e.preventDefault(); }; ta.addEventListener('paste', b); ta.addEventListener('drop', b); });
+    var rel = setInterval(function(){ var x = $('simRelogio'); if(!x){ clearInterval(rel); return; } var r = Math.max(0, fim - Date.now()); x.textContent = Math.floor(r / 60000) + ':' + ('0' + Math.floor(r % 60000 / 1000)).slice(-2) + (r ? '' : ' (acabou o tempo)'); }, 1000);
+    $('btSimEntregar').addEventListener('click', function(){
+      var resp = {}; el.querySelectorAll('[data-simresp]').forEach(function(ta){ resp[ta.dataset.simresp] = ta.value; });
+      var bt = this; bt.disabled = true; $('msgSim').innerHTML = '<p class="carregando">Corrigindo o simulado… (uns 20 a 40 segundos)</p>';
+      api('simuladoEntregar', {professorId: m.professorId, disciplinaId: m.disciplinaId, respostas: resp}).then(function(r){
+        clearInterval(rel);
+        pinta('<div style="text-align:center;margin:6px 0 12px"><span class="aviso">a nota que você tiraria hoje</span><div class="numEst" style="font-size:42px;color:' + notaCor(r.nota) + '">' + String(r.nota).replace('.', ',') + '</div></div>' + (r.geral ? '<p>' + esc(r.geral) + '</p>' : '') +
+          r.itens.map(function(x, i){ return '<div class="eixo" style="border-color:' + corDom(x.nota) + '"><b>' + (i + 1) + '. ' + esc(x.enunciado) + '</b> <span class="aviso">· ' + dezEst(x.nota) + '</span>' + (x.acertos ? '<br><b>Acertou:</b> ' + esc(x.acertos) : '') + (x.faltou ? '<br><b>Faltou:</b> ' + esc(x.faltou) : '') + '</div>'; }).join('') +
+          '<p class="aviso">As respostas entraram no seu estudo: o plano e o caderno já usam essas notas.</p>');
+      }).catch(function(e){ bt.disabled = false; $('msgSim').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+    });
+  }).catch(function(e){ pinta('<p class="erro">' + esc(e.message) + '</p>'); });
+}
+// revisão relâmpago: 3 questões rápidas de assuntos diferentes
+function abrirRelampago(m, temaIds){
+  var pinta = telaRevisaoProva(m, '⚡ Revisão relâmpago');
+  pinta('<p class="carregando">Separando 3 questões rápidas…</p>');
+  api('relampago', {professorId: m.professorId, disciplinaId: m.disciplinaId, temaIds: temaIds || []}).then(function(r){
+    var qs = r.questoes || [], L = 'ABCDE', certas = 0, respondidas = 0;
+    var el = pinta('<p class="aviso" style="margin-top:0">Assuntos diferentes, uma atrás da outra, como na prova. Leva uns 3 minutos.</p>' + qs.map(function(q, qi){
+      return '<div style="border-top:1px dashed var(--linha);padding:10px 0"><p style="margin:0 0 4px"><span class="tag">' + esc(q.tema) + '</span>' + (q.aula ? ' <span class="aviso">· da aula ' + esc(q.aula) + '</span>' : '') + '</p><p style="margin:0 0 6px"><b>' + (qi + 1) + '. ' + esc(q.pergunta) + '</b></p>' +
+        q.alternativas.map(function(a, ai){ return '<button type="button" class="opRev" data-relq="' + qi + ':' + ai + '" style="display:block;width:100%;text-align:left;margin:4px 0"><b>' + L.charAt(ai) + ')</b> ' + esc(a) + '</button>'; }).join('') + '<div data-relret="' + qi + '"></div></div>';
+    }).join('') + '<div id="relFim"></div>');
+    el.querySelectorAll('[data-relq]').forEach(function(b){ b.addEventListener('click', function(){
+      var k = b.dataset.relq.split(':'), q = qs[Number(k[0])], ai = Number(k[1]), certo = ai === q.correta, box = el.querySelector('[data-relret="' + k[0] + '"]');
+      if(box.dataset.feita) return; box.dataset.feita = '1'; respondidas++; if(certo) certas++;
+      b.classList.add(certo ? 'certa' : 'errada'); if(!certo) el.querySelector('[data-relq="' + k[0] + ':' + q.correta + '"]').classList.add('certa');
+      box.innerHTML = '<div class="' + (certo ? 'ok' : 'erro') + '" style="margin:6px 0">' + (certo ? '✓ Isso! ' : '✗ A certa é a ' + L.charAt(q.correta) + '. ') + esc(q.explicacao || '') + '</div>';
+      if(respondidas === qs.length) $('relFim').innerHTML = '<div class="ok">Você acertou <b>' + certas + ' de ' + qs.length + '</b>. ' + (certas === qs.length ? 'Ótimo! 🎉' : 'Vale rever os assuntos que errou.') + '</div>';
+    }); });
+  }).catch(function(e){ pinta('<p class="erro">' + esc(e.message) + '</p>'); });
+}
+// folha de véspera: 1 página com o essencial e os seus erros
+function abrirFolhaVespera(m, temaIds){
+  var pinta = telaRevisaoProva(m, '📄 Folha de véspera');
+  pinta('<p class="carregando">Montando a sua folha de véspera… (uns 20 segundos)</p>');
+  api('folhaVespera', {professorId: m.professorId, disciplinaId: m.disciplinaId, temaIds: temaIds || []}).then(function(f){
+    pinta('<p class="aviso" style="margin-top:0">O essencial de cada assunto da prova, as equações e o erro que <b>você</b> mais comete. Leia na véspera, com calma.</p>' +
+      f.temas.map(function(t){ return '<div class="eixo" style="border-color:#2E62C6"><b>' + esc(t.tema) + '</b>' + t.pontos.map(function(p){ return '<br>• ' + esc(p); }).join('') +
+        (t.equacoes.length ? '<div style="margin-top:4px;color:#1F4FB8;font-weight:bold">' + t.equacoes.map(esc).join('<br>') + '</div>' : '') + (t.cuidado ? '<div style="margin-top:4px;color:#c62828">⚠️ ' + esc(t.cuidado) + '</div>' : '') + '</div>'; }).join('') +
+      (f.dicas.length ? '<div class="eixo" style="border-color:#1a7a3c"><b>No dia da prova</b>' + f.dicas.map(function(d){ return '<br>• ' + esc(d); }).join('') + '</div>' : '') +
+      '<div class="botoes"><button type="button" class="secundario mini" onclick="window.print()">🖨 Imprimir</button></div>');
+  }).catch(function(e){ pinta('<p class="erro">' + esc(e.message) + '</p>'); });
+}
+// explicar para um colega: abre o Estudar com IA (fala livre) e marca a tarefa
+function explicarColega(m, tema){
+  api('revProvaMarcar', {professorId: m.professorId, disciplinaId: m.disciplinaId, tipo: 'explicar'}).catch(function(){});
+  alert('Vai abrir o Estudar com IA. Toque em falar e explique "' + tema + '" como se fosse para um colega, em uns 2 minutos. A IA diz o que ficou bom e o que faltou.');
+  window.open('index.html', '_blank');
 }
 // diagnóstico da matéria: o resumo (IA, guardado) + números, domínio por assunto e "como você responde" do relatório
 function abrirDiagnostico(m){
@@ -1898,6 +2005,7 @@ function desenharQuestaoEstudo(rascunhoTxt){
   var h = cabEstudo(m) + '<div class="caixa"><p style="margin:0 0 6px"><span class="tag t-azul">' + esc(q.tema) + '</span>' + (q.naProva && q.prova ? ' <span class="aviso">· cai na ' + esc(q.prova) + '</span>' : '') + '</p>' +
     '<p style="font-weight:bold;font-size:16px">' + esc(q.enunciado) + '</p>' +
     (u ? '<p class="aviso" style="margin:0 0 6px">Tentativa ' + (u.tentativa + 1) + ' · sua melhor nota até agora: <b>' + dezEst(Math.max(u.nota, u.melhorAntes || 0)) + '</b>. Explique de novo, com suas palavras, para tentar aumentar.</p>' : '') +
+    '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0;font-size:14px"><span>Você acha que sabe? ' + ajuda(BAL.enganos) + '</span><button type="button" class="mini secundario" data-conf="sei">Sei bem</button><button type="button" class="mini secundario" data-conf="meio">Mais ou menos</button><button type="button" class="mini secundario" data-conf="nao">Não sei</button></div>' +
     '<label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:14.5px;margin:6px 0"><input type="checkbox" id="estAjuda" style="width:18px;height:18px"> 💡 Quero ajuda para montar a resposta</label>' +
     '<div class="ajudaEst oculto" id="estAjudaBox"><b>Sua resposta deve passar por:</b>' + q.ajuda.map(function(t){ return '<br>• ' + esc(t); }).join('') + '</div>' +
     '<textarea id="estResp" placeholder="Escreva sua resposta com suas palavras…" style="min-height:140px">' + esc(rascunhoTxt || '') + '</textarea>' +
@@ -1910,13 +2018,15 @@ function desenharQuestaoEstudo(rascunhoTxt){
   ta.addEventListener('paste', barrar); ta.addEventListener('drop', barrar);
   ta.addEventListener('beforeinput', function(e){ if(/^insertFrom(Paste|Drop)/.test(e.inputType || '')) barrar(e); });
   $('estAjuda').addEventListener('change', function(){ $('estAjudaBox').classList.toggle('oculto', !this.checked); });
+  EST.conf = '';
+  el.querySelectorAll('[data-conf]').forEach(function(b){ b.addEventListener('click', function(){ EST.conf = b.dataset.conf; el.querySelectorAll('[data-conf]').forEach(function(x){ x.classList.toggle('secundario', x !== b); }); }); });
   $('estPular').addEventListener('click', function(){ pedirQuestaoEstudo(''); });
   $('estEnviar').addEventListener('click', function(){
     var txt = ta.value.trim();
     if(txt.length < 10){ $('estMsg').innerHTML = '<div class="erro">Escreva sua resposta antes de enviar.</div>'; return; }
     var b = this; b.disabled = true; $('estMsg').innerHTML = '<p class="carregando">Corrigindo… (uns 10 a 20 segundos)</p>';
     var tentar = function(n){
-      api('estudoResponder', {professorId: m.professorId, disciplinaId: m.disciplinaId, questaoId: q.id, resposta: txt, usouAjuda: $('estAjuda').checked})
+      api('estudoResponder', {professorId: m.professorId, disciplinaId: m.disciplinaId, questaoId: q.id, resposta: txt, usouAjuda: $('estAjuda').checked, confianca: EST.conf || ''})
         .then(function(r){ EST.ultima = r; desenharCorrecaoEstudo(txt); })
         .catch(function(e){
           if(/ocupada/i.test(e.message) && n < 2){
@@ -2344,6 +2454,9 @@ function desenharEstudoTurma(disc, r){
   var t = r.turma, c = r.compilado || {temTrilhas: false, temAvaliacoes: false, turma: {}, porAluno: {}, temas: []};
   var pa = c.porAluno || {}, temV = c.temTrilhas, temA = c.temAvaliacoes;
   var h = '<h2>Estudo dos alunos · ' + esc(disc.nome) + ' ' + ajuda('O <b>estudo dirigido</b> é o treino dos alunos para a prova (em "Minhas matérias" → 📚 Estudar). Não conta na nota. As questões são criadas pela IA a partir das aulas, da sua apostila e das suas regras, e ficam num banco reaproveitado por todos. Aqui você acompanha quem está estudando, os temas mais fracos da turma e o relatório de cada aluno.') + '</h2>';
+  // quem está no modo revisão para a prova (o aluno marca na aba Desempenho)
+  if((r.revisando || []).length) h += '<div class="convite" style="margin:0 0 12px;border-left-color:#1a7a3c"><b>🔁 Revisando para a prova (' + r.revisando.length + ')</b> ' + ajuda('Alunos que marcaram, na aba Desempenho, que já estudaram e entraram no modo revisão: revisão espaçada, simulado, revisão relâmpago e folha de véspera. A nota do simulado é a que eles tirariam se a prova fosse hoje (não vale nota).') +
+    '<div class="tabelaBox" style="margin-top:6px"><table><tr><th>Aluno</th><th>Desde</th><th>Simulados</th><th>Último simulado</th></tr>' + r.revisando.map(function(x){ return '<tr><td>' + esc(x.nome) + '</td><td>' + esc(x.desde) + '</td><td>' + x.simulados + '</td><td>' + (x.ultimo === null ? '—' : '<b>' + String(x.ultimo).replace('.', ',') + '</b>') + '</td></tr>'; }).join('') + '</table></div></div>';
   // 1) a semana em números
   var card = function(ic, tit, val, sub){ return '<div style="background:#f5f8fe;border:1px solid var(--linha);border-radius:10px;padding:10px 12px;flex:1 1 150px;min-width:140px"><div class="aviso">' + ic + ' ' + tit + '</div><div style="font-size:22px;font-weight:bold;color:var(--navy);line-height:1.2">' + val + '</div><div class="aviso">' + (sub || '') + '</div></div>'; };
   var ativos = c.turma && c.turma.ativos7 !== undefined ? c.turma.ativos7 : t.estudaramSemana;
