@@ -2862,16 +2862,8 @@ function desenharPF(){
     (e2 ? numPF('com banca', conta(function(g){ return g.banca.length; })) + numPF('defenderam', conta(function(g){ return g.cor === 'ok'; }))
         : numPF('com nota', conta(function(g){ return g.nota !== null; })) + numPF('aprovados', conta(function(g){ return g.nota !== null && g.nota >= r.aprova; }))) + '</div>' +
     '<div class="botoes" style="margin:0">' + (r.pastaUrl ? '<a class="botaoLink" href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">📁 Documentos de ' + esc(r.semestre) + '</a>' : '') +
-    '<button type="button" class="mini secundario" id="pfSync">↻ Atualizar planilha de controle' + (e2 ? ' e formulário' : '') + '</button></div><div id="pfMsg" class="aviso"></div></div>';
-  if(e2 && r.podeEnviar){
-    var abertas = r.grupos.filter(function(g){ return !g.docs.B && g.cor !== 'ok' && !g.semDefesa; }), marc = abertas.filter(function(g){ return g.defesa && g.defesa.data; });
-    if(abertas.length) h += '<div class="caixa" style="border-left:6px solid ' + (marc.length === abertas.length ? '#1a7a3c' : '#B8890A') + '">' +
-      (marc.length === abertas.length ? '<h2 style="margin:0 0 4px">✅ Todas as defesas foram marcadas</h2><p class="aviso" style="margin:0 0 8px">Os ' + abertas.length + ' grupos já preencheram o formulário. Já pode enviar o convite aos docentes.</p>'
-        : '<h2 style="margin:0 0 4px">📅 Defesas marcadas: ' + marc.length + ' de ' + abertas.length + '</h2><p class="aviso" style="margin:0 0 4px">Ainda sem a ficha de defesa online (ficam fora do convite):</p>' +
-          abertas.filter(function(g){ return marc.indexOf(g) === -1; }).map(function(g){ return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:3px 0 3px 10px"><span>' + esc(g.rotulo) + '</span><button type="button" class="link" data-pfsemdef="' + esc(g.id) + '">não vai defender neste semestre</button></div>'; }).join('') +
-          '<p class="aviso" style="margin:6px 0 8px">Você pode enviar o convite já, só com as defesas marcadas. Quando todos preencherem (ou você marcar quem não vai defender), recebe um aviso aqui no site.</p>') +
-      '<button type="button" class="mini' + (marc.length === abertas.length ? '' : ' secundario') + '" id="pfConvite"' + (marc.length ? '' : ' disabled') + '>✉ Convite das defesas para os docentes</button><div id="pfConviteBox"></div></div>';
-  }
+    '<button type="button" class="mini secundario" id="pfSync">↻ Atualizar planilha de controle' + (e2 ? ' e formulário' : '') + '</button>' +
+    (e2 && r.podeEnviar ? '<button type="button" class="mini" id="pfConvite">✉ Convite das defesas</button>' : '') + '</div><div id="pfMsg" class="aviso"></div><div id="pfConviteBox"></div></div>';
   h += '<div class="caixa"><h2>📎 Enviar documento assinado</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA descobre qual apêndice é (A proposta, C, F, J banca, B ata) e lê alunos, orientador, coorientador, título' + (e2 ? ' e banca' : ' e nota') + '. Você confere antes de salvar; o arquivo vai para Defesas documentos / ' + esc(r.semestre) + ' / pasta do grupo.</p>' +
     '<input type="file" id="pfArq" accept="application/pdf,image/*"><div id="pfLido"></div></div>';
   h += '<div class="caixa"><h2>Grupos</h2><p class="aviso" style="margin:0 0 4px">Documentos: A proposta · C termo de responsabilidade · F termo de ciência · J banca · B ata assinada. Toque numa letra verde para abrir o PDF.</p>';
@@ -2925,7 +2917,28 @@ function desenharPF(){
     box.querySelector('[data-pfok]').addEventListener('click', function(){ var bt = this; bt.disabled = true; var c = lerCamposPF(box); delete c.nota;
       api('pfEditar', {disciplinaId: PFV.d.id, grupoId: g.id, campos: c}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ bt.disabled = false; alert(e.message); }); });
   }); });
-  if($('pfConvite')) $('pfConvite').addEventListener('click', function(){ conviteDefesasPF(null); });
+  if($('pfConvite')) $('pfConvite').addEventListener('click', function(){
+    var abertas = r.grupos.filter(function(g){ return !g.docs.B && g.cor !== 'ok' && !g.semDefesa; });
+    var pend = abertas.filter(function(g){ return !(g.defesa && g.defesa.data); }), box = $('pfConviteBox');
+    if(!pend.length){ conviteDefesasPF(null); return; }
+    box.innerHTML = '<div class="convite" style="margin-top:10px"><b>' + (pend.length === 1 ? 'Este grupo ainda não preencheu' : 'Estes ' + pend.length + ' grupos ainda não preencheram') + ' a ficha de defesa online.</b><p class="aviso" style="margin:2px 0 8px">Vai defender neste semestre? Quem vai defender fica fora deste convite (entra num próximo, quando preencher).</p>' +
+      pend.map(function(g){ return '<div style="border-top:1px dashed var(--linha);padding:6px 0"><b>' + esc(g.rotulo) + '</b> <span class="aviso">· orient. ' + esc(g.orientador || '—') + '</span><div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:4px">' +
+        '<label style="display:flex;gap:6px;align-items:center"><input type="radio" name="pfvai_' + esc(g.id) + '" value="nao" data-pfvai="' + esc(g.id) + '"> não vai defender</label>' +
+        '<label style="display:flex;gap:6px;align-items:center"><input type="radio" name="pfvai_' + esc(g.id) + '" value="sim" data-pfvai="' + esc(g.id) + '"> vai defender (fica fora deste convite)</label></div></div>'; }).join('') +
+      '<div class="botoes" style="margin:8px 0 0"><button type="button" class="mini" id="pfVaiOk">Continuar</button><button type="button" class="mini secundario" id="pfVaiCanc">Cancelar</button></div><div id="pfVaiMsg" class="aviso"></div></div>';
+    $('pfVaiCanc').addEventListener('click', function(){ box.innerHTML = ''; });
+    $('pfVaiOk').addEventListener('click', function(){
+      var bt = this, nao = [], falta = 0;
+      pend.forEach(function(g){ var x = box.querySelector('input[name="pfvai_' + g.id + '"]:checked'); if(!x) falta++; else if(x.value === 'nao') nao.push(g.id); });
+      if(falta){ $('pfVaiMsg').innerHTML = '<span class="t-err">Responda para cada grupo.</span>'; return; }
+      if(abertas.length === pend.length && nao.length === pend.length){ $('pfVaiMsg').innerHTML = '<span class="t-err">Nenhum grupo preencheu a ficha de defesa ainda: não há defesa para convidar.</span>'; return; }
+      if(abertas.length === pend.length){ $('pfVaiMsg').innerHTML = '<span class="t-err">Ainda não há defesa com a ficha preenchida para convidar.</span>'; return; }
+      bt.disabled = true; $('pfVaiMsg').textContent = nao.length ? 'Marcando quem não vai defender…' : '';
+      var seq = Promise.resolve();
+      nao.forEach(function(id){ seq = seq.then(function(){ return api('pfSemDefesa', {disciplinaId: PFV.d.id, grupoId: id, valor: true}).then(function(x){ PFV.r = x; }); }); });
+      seq.then(function(){ conviteDefesasPF(null); }).catch(function(e){ bt.disabled = false; $('pfVaiMsg').innerHTML = '<span class="t-err">' + esc(e.message) + '</span>'; });
+    });
+  });
   el.querySelectorAll('[data-pfsemdef],[data-pfvoltadef]').forEach(function(b){ b.addEventListener('click', function(){
     var sim = !!b.dataset.pfsemdef, id = b.dataset.pfsemdef || b.dataset.pfvoltadef;
     if(sim && !confirm('Marcar que este grupo não vai defender neste semestre? Ele sai da contagem das defesas e do convite (dá para desfazer).')) return;
@@ -2954,7 +2967,7 @@ function conviteDefesasPF(ids){
       '<div class="botoes" style="margin:0"><button type="button" class="mini" data-pfconvenv>Enviar para os ' + m.destinatarios + ' docentes</button><button type="button" class="mini secundario" data-pfconvcanc>Cancelar</button></div><div data-pfconvmsg class="aviso"></div></div>';
     var marcados = function(){ return Array.prototype.map.call(box.querySelectorAll('[data-pfconvd]:checked'), function(c){ return c.dataset.pfconvd; }); };
     box.querySelectorAll('[data-pfconvd]').forEach(function(c){ c.addEventListener('change', function(){ conviteDefesasPF(marcados()); }); });
-    box.querySelector('[data-pfconvcanc]').addEventListener('click', function(){ box.innerHTML = ''; });
+    box.querySelector('[data-pfconvcanc]').addEventListener('click', function(){ desenharPF(); });
     box.querySelector('[data-pfconvenv]').addEventListener('click', function(){
       var bt = this, msg = box.querySelector('[data-pfconvmsg]'), sel = marcados();
       if(!sel.length){ msg.innerHTML = '<span class="t-err">Escolha pelo menos uma defesa.</span>'; return; }
