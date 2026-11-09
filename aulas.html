@@ -505,6 +505,7 @@
         </div>
       </div>
       <div class="caixa oculto" id="cfgChavesAlunos"></div>
+      <div class="caixa oculto" id="cfgMatProf"></div>
       <div class="caixa oculto" id="cfgAvisos"></div>
       <div class="caixa">
         <h2>Chave do Gemini</h2>
@@ -2236,7 +2237,7 @@ function abrirAba(a){
   if(a === 'notas') abrirNotas();
   if(a === 'hist') abrirHistorico();
   if(a === 'insc') carregarInscricoes();
-  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); carregarAvisosAdmin(); carregarChavesAlunosAdmin(); }
+  if(a === 'cfg'){ carregarChaves(); carregarAudiosGuardados(); desenharQRCadastro(); carregarAvisosAdmin(); carregarChavesAlunosAdmin(); carregarMatProfAdmin(); }
   if(a === 'chat') abrirChat($('pChat'));
   if(a === 'trilha') abrirTrilhaAba();
   if(a === 'msgs') carregarMsgsProf();
@@ -4656,6 +4657,21 @@ function desenharApostilaRef(d){
 }
 
 
+// Configurações: matéria das aulas em trilha → professor (as chaves dele vão antes das suas). Só o administrador vê.
+function carregarMatProfAdmin(dados){
+  var el = $('cfgMatProf'); if(!el) return;
+  api('materiasProfAdmin', dados || {}).then(function(r){
+    el.classList.remove('oculto');
+    if(!r.materias.length){ el.innerHTML = '<h2>🔗 Matérias das aulas em trilha → professor</h2><p class="aviso">Nenhuma aula em trilha ainda.</p>'; return; }
+    var opc = function(m){ return '<option value=""' + (!m.manual ? ' selected' : '') + '>automático' + (m.detectadoNome ? ' (' + esc(m.detectadoNome) + ')' : ' (ninguém)') + '</option><option value="-"' + (m.manual === '-' ? ' selected' : '') + '>só as minhas chaves</option>' +
+      r.professores.map(function(p){ return '<option value="' + esc(p.id) + '"' + (m.manual === p.id ? ' selected' : '') + '>' + esc(p.nome) + ' (' + p.chaves + ' chave' + (p.chaves === 1 ? '' : 's') + ')</option>'; }).join(''); };
+    el.innerHTML = '<h2>🔗 Matérias das aulas em trilha → professor</h2>' +
+      '<p class="aviso" style="margin-top:0">Nas aulas em trilha de cada matéria, os alunos usam primeiro as chaves do professor dela (menos a 1ª dele) e, quando acabam, as suas (menos a sua 1ª). O "automático" acha o professor pelo nome da disciplina; se estiver errado, escolha aqui.</p>' +
+      '<div class="tabelaBox"><table><tr><th>Matéria</th><th>Aulas</th><th>Professor</th><th>Chaves usadas</th></tr>' + r.materias.map(function(m){
+        return '<tr><td>' + esc(m.nome) + '<br><span class="aviso">' + esc(m.semestre) + '</span></td><td>' + m.aulas + '</td><td><select data-matprof="' + esc(m.id) + '">' + opc(m) + '</select></td><td class="aviso">' + esc(m.usa) + '</td></tr>'; }).join('') + '</table></div><div id="msgMatProf" class="aviso"></div>';
+    el.querySelectorAll('[data-matprof]').forEach(function(s){ s.addEventListener('change', function(){ s.disabled = true; $('msgMatProf').textContent = 'Salvando…'; carregarMatProfAdmin({disciplinaId: s.dataset.matprof, profId: s.value}); }); });
+  }).catch(function(){ el.classList.add('oculto'); });
+}
 // Configurações: chaves do Gemini dos alunos (só o administrador vê; para os outros professores a caixa nem aparece)
 function carregarChavesAlunosAdmin(congelar){
   var el = $('cfgChavesAlunos'); if(!el) return;
