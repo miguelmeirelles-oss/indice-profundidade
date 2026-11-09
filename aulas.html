@@ -1733,6 +1733,34 @@ function questoesRevisao(mi, mais, box){
     var bm = box.querySelector('[data-qmais]'); if(bm) bm.addEventListener('click', function(){ questoesRevisao(mi, true, box); });
   }).catch(function(e){ box.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
+// discursivas: texto-base + comando em itens; o aluno escreve e a IA corrige pelo padrão de resposta
+function discursivasRevisao(mi, mais, box){
+  box.innerHTML = '<p class="carregando">' + (mais ? 'Criando mais discursivas…' : 'Preparando as discursivas…') + ' (uns 20 segundos)</p>';
+  api('revisaoQuestoes', {modulo: mi, mais: !!mais, tipo: 'aberta'}).then(function(r){
+    var qs = r.questoes || [], resp = r.respostas || {};
+    var correcao = function(c, padrao){ return '<div class="eixo" style="border-color:' + (c.nota >= 7 ? '#1a7a3c' : c.nota >= 5 ? '#B8890A' : '#c62828') + '"><b>Nota ' + String(c.nota).replace('.', ',') + '</b>' + (c.em ? ' <span class="aviso">· ' + esc(c.em) + '</span>' : '') +
+      (c.acertos ? '<br><b>Acertou:</b> ' + esc(c.acertos) : '') + (c.faltou ? '<br><b>Faltou:</b> ' + esc(c.faltou) : '') + (c.dica ? '<br><b>Dica:</b> ' + esc(c.dica) : '') + '</div>' +
+      '<details><summary class="link">Ver o padrão de resposta</summary><p style="white-space:pre-wrap;font-size:14px">' + esc(padrao) + '</p></details>'; };
+    box.innerHTML = qs.map(function(q, qi){
+      var c = resp[qi];
+      return '<div style="border-top:1px dashed var(--linha);padding:10px 0">' + (q.texto_base ? '<p style="margin:0 0 6px;font-size:14px;background:#f6f8fc;border-radius:8px;padding:8px 10px;white-space:pre-wrap">' + esc(q.texto_base) + '</p>' : '') +
+        '<p style="margin:0 0 6px;white-space:pre-wrap"><b>' + (qi + 1) + '. ' + esc(q.enunciado) + '</b></p>' +
+        '<textarea data-dresp="' + qi + '" style="min-height:140px" placeholder="Escreva a sua resposta, item por item (a, b…)">' + esc(c ? c.resposta : '') + '</textarea>' +
+        '<div class="botoes" style="margin:4px 0"><button type="button" class="mini" data-dcorr="' + qi + '">' + (c ? 'Corrigir de novo' : 'Corrigir minha resposta') + '</button></div>' +
+        '<div data-dret="' + qi + '">' + (c ? correcao(c, q.padrao) : '') + '</div></div>';
+    }).join('') + (r.aviso ? '<p class="aviso">' + esc(r.aviso) + '</p>' : '') + (qs.length < 6 ? '<div class="botoes"><button type="button" class="secundario mini" data-dmais="1">＋ Mais 2 discursivas</button></div>' : '');
+    box.querySelectorAll('[data-dresp]').forEach(function(ta){
+      var barrar = function(e){ e.preventDefault(); }; ta.addEventListener('paste', barrar); ta.addEventListener('drop', barrar);
+    });
+    box.querySelectorAll('[data-dcorr]').forEach(function(b){ b.addEventListener('click', function(){
+      var qi = Number(b.dataset.dcorr), ta = box.querySelector('[data-dresp="' + qi + '"]'), ret = box.querySelector('[data-dret="' + qi + '"]');
+      b.disabled = true; ret.innerHTML = '<p class="carregando">Corrigindo… (uns 15 segundos)</p>';
+      api('revisaoCorrigir', {modulo: mi, indice: qi, resposta: ta.value}).then(function(x){ b.disabled = false; b.textContent = 'Corrigir de novo'; ret.innerHTML = correcao(x.correcao, x.padrao); })
+        .catch(function(e){ b.disabled = false; ret.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+    }); });
+    var bm = box.querySelector('[data-dmais]'); if(bm) bm.addEventListener('click', function(){ discursivasRevisao(mi, true, box); });
+  }).catch(function(e){ box.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
 function abrirRevisao(){
   var el = $('alunoDetalhe'), v = REV.r && REV.r.revisao;
   if(!v){ formRevisao(); return; }
@@ -1751,7 +1779,7 @@ function abrirRevisao(){
           '<div class="barraDom" style="margin:3px 0 0;max-width:220px"><i style="width:' + it.progresso + '%;background:#7D3C98"></i></div></div>' +
           '<button type="button" class="mini' + (it.progresso ? ' secundario' : '') + '" data-revaula="' + esc(it.trilha) + '">' + (it.progresso >= 100 ? '↻ Rever' : it.progresso ? '▶ Continuar' : '▶ Estudar') + '</button></div>';
       }).join('') +
-      '<div class="botoes" style="margin:8px 0 0"><button type="button" class="mini secundario" data-revq="' + mi + '">✍ ' + (v.objetivo === 'enade' ? 'Treinar questões estilo ENADE' : 'Treinar questões de múltipla escolha') + '</button></div><div data-revqbox="' + mi + '"></div></details>';
+      '<p style="margin:10px 0 2px"><b>✍ Treinar ' + (v.objetivo === 'enade' ? 'no estilo do ENADE' : 'questões de prova') + '</b></p><div class="botoes" style="margin:0"><button type="button" class="mini secundario" data-revq="' + mi + '" data-tipoq="fechada">Fechadas (A a E)</button><button type="button" class="mini secundario" data-revq="' + mi + '" data-tipoq="aberta">Discursivas</button></div><div data-revqbox="' + mi + '"></div></details>';
   }).join('');
   if(v.plano.fora && v.plano.fora.length) h += '<div class="eixo" style="border-color:#8a6100;margin-top:12px"><b>Estude também por fora</b> <span class="aviso">(cai nessa prova e não está nas aulas da plataforma)</span>' + v.plano.fora.map(function(x){ return '<br>• ' + esc(x); }).join('') + '</div>';
   if(v.plano.dicas && v.plano.dicas.length) h += '<div class="eixo" style="border-color:#2E62C6"><b>Dicas para essa prova</b>' + v.plano.dicas.map(function(x){ return '<br>• ' + esc(x); }).join('') + '</div>';
@@ -1760,7 +1788,11 @@ function abrirRevisao(){
   el.querySelector('[data-voltar]').addEventListener('click', voltarDaRevisao);
   el.querySelectorAll('[data-revaula]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno('trilha'); abrirTrilhaAluno(b.dataset.revaula); window.scrollTo(0, 0); }); });
   $('btRevRefazer').addEventListener('click', formRevisao);
-  el.querySelectorAll('[data-revq]').forEach(function(b){ b.addEventListener('click', function(){ b.style.display = 'none'; questoesRevisao(Number(b.dataset.revq), false, el.querySelector('[data-revqbox="' + b.dataset.revq + '"]')); }); });
+  el.querySelectorAll('[data-revq]').forEach(function(b){ b.addEventListener('click', function(){
+    var mi = Number(b.dataset.revq), box = el.querySelector('[data-revqbox="' + mi + '"]');
+    el.querySelectorAll('[data-revq="' + mi + '"]').forEach(function(x){ x.classList.toggle('secundario', x !== b); });
+    if(b.dataset.tipoq === 'aberta') discursivasRevisao(mi, false, box); else questoesRevisao(mi, false, box);
+  }); });
   $('btRevApagar').addEventListener('click', function(){
     if(!confirm('Apagar esta revisão? Você pode montar outra quando quiser.')) return;
     api('revisaoApagar', {}).then(function(){ REV.r = {revisao: null, objetivos: REV.r.objetivos}; voltarDaRevisao(); }).catch(function(e){ alert(e.message); });
