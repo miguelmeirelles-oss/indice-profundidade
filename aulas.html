@@ -2873,7 +2873,8 @@ function desenharPF(){
       '<div class="aviso">Orient.: ' + esc(g.orientador || '—') + (g.coorientadores.length ? ' · coorient.: ' + esc(g.coorientadores.join(', ')) : '') + '</div>' +
       (g.titulo ? '<div class="aviso" style="font-style:italic">' + esc(g.titulo) + '</div>' : '<div class="aviso t-warn">sem título</div>') +
       (e2 && g.banca.length ? '<div class="aviso">Banca: ' + esc(g.banca.join(' · ')) + '</div>' : '') +
-      (e2 && g.ata ? '<div class="aviso" style="margin-top:4px">📄 Ata gerada pelo formulário em ' + esc(g.ata.em) + (g.ata.defesa ? ' · defesa ' + esc(g.ata.defesa) : '') + ' · ' +
+      (e2 && g.defesa ? '<div style="font-size:14px;margin-top:2px"><b>📅 Defesa:</b> ' + esc(g.defesa.data || 'data a definir') + (g.defesa.hora ? ' às ' + esc(g.defesa.hora) : '') + (g.defesa.local ? ' · ' + esc(g.defesa.local) : '') + '</div>' : '') +
+      (e2 && g.ata ? '<div class="aviso" style="margin-top:4px">📄 Ata gerada pelo formulário em ' + esc(g.ata.em) + ' · ' +
         (g.ata.ataUrl ? '<a href="' + esc(g.ata.ataUrl) + '" target="_blank" rel="noopener">ata</a>' : '') + (g.ata.planilhaUrl ? ' · <a href="' + esc(g.ata.planilhaUrl) + '" target="_blank" rel="noopener">planilha</a>' : '') + (g.ata.pastaUrl ? ' · <a href="' + esc(g.ata.pastaUrl) + '" target="_blank" rel="noopener">pasta</a>' : '') + '</div>' : '') +
       (e2 && r.podeEnviar && ((g.ata && !g.docs.B) || g.docs.B) ? '<div class="botoes" style="margin:6px 0 0">' +
         (g.ata && !g.docs.B ? '<button type="button" class="mini' + (g.envios.banca.length ? ' secundario' : '') + '" data-pfmail="' + esc(g.id) + ':banca">✉ Enviar ata para a banca</button>' + (g.envios.banca.length ? '<span class="aviso">enviada em ' + esc(g.envios.banca[g.envios.banca.length - 1]) + '</span>' : '') : '') +
