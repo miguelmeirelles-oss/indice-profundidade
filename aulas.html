@@ -2864,10 +2864,12 @@ function desenharPF(){
     '<div class="botoes" style="margin:0">' + (r.pastaUrl ? '<a class="botaoLink" href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">📁 Documentos de ' + esc(r.semestre) + '</a>' : '') +
     '<button type="button" class="mini secundario" id="pfSync">↻ Atualizar planilha de controle' + (e2 ? ' e formulário' : '') + '</button></div><div id="pfMsg" class="aviso"></div></div>';
   if(e2 && r.podeEnviar){
-    var abertas = r.grupos.filter(function(g){ return !g.docs.B && g.cor !== 'ok'; }), marc = abertas.filter(function(g){ return g.defesa && g.defesa.data; });
+    var abertas = r.grupos.filter(function(g){ return !g.docs.B && g.cor !== 'ok' && !g.semDefesa; }), marc = abertas.filter(function(g){ return g.defesa && g.defesa.data; });
     if(abertas.length) h += '<div class="caixa" style="border-left:6px solid ' + (marc.length === abertas.length ? '#1a7a3c' : '#B8890A') + '">' +
       (marc.length === abertas.length ? '<h2 style="margin:0 0 4px">✅ Todas as defesas foram marcadas</h2><p class="aviso" style="margin:0 0 8px">Os ' + abertas.length + ' grupos já preencheram o formulário. Já pode enviar o convite aos docentes.</p>'
-        : '<h2 style="margin:0 0 4px">📅 Defesas marcadas: ' + marc.length + ' de ' + abertas.length + '</h2><p class="aviso" style="margin:0 0 8px">Faltam: ' + abertas.filter(function(g){ return marc.indexOf(g) === -1; }).map(function(g){ return esc(g.rotulo); }).join(' · ') + '. Quando todos preencherem, você recebe um aviso aqui no site.</p>') +
+        : '<h2 style="margin:0 0 4px">📅 Defesas marcadas: ' + marc.length + ' de ' + abertas.length + '</h2><p class="aviso" style="margin:0 0 4px">Ainda sem a ficha de defesa online (ficam fora do convite):</p>' +
+          abertas.filter(function(g){ return marc.indexOf(g) === -1; }).map(function(g){ return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:3px 0 3px 10px"><span>' + esc(g.rotulo) + '</span><button type="button" class="link" data-pfsemdef="' + esc(g.id) + '">não vai defender neste semestre</button></div>'; }).join('') +
+          '<p class="aviso" style="margin:6px 0 8px">Você pode enviar o convite já, só com as defesas marcadas. Quando todos preencherem (ou você marcar quem não vai defender), recebe um aviso aqui no site.</p>') +
       '<button type="button" class="mini' + (marc.length === abertas.length ? '' : ' secundario') + '" id="pfConvite"' + (marc.length ? '' : ' disabled') + '>✉ Convite das defesas para os docentes</button><div id="pfConviteBox"></div></div>';
   }
   h += '<div class="caixa"><h2>📎 Enviar documento assinado</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA descobre qual apêndice é (A proposta, C, F, J banca, B ata) e lê alunos, orientador, coorientador, título' + (e2 ? ' e banca' : ' e nota') + '. Você confere antes de salvar; o arquivo vai para Defesas documentos / ' + esc(r.semestre) + ' / pasta do grupo.</p>' +
@@ -2889,7 +2891,7 @@ function desenharPF(){
       '<div style="max-width:230px">' + docs + '<div style="margin-top:4px"><span class="tag t-' + g.cor + '">' + esc(g.situacao) + '</span></div></div>' +
       '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">' +
       (!e2 ? '<label class="aviso" style="display:flex;gap:6px;align-items:center">nota <input type="number" min="0" max="10" step="0.1" data-pfnota="' + esc(g.id) + '" value="' + (g.nota === null ? '' : g.nota) + '" style="width:76px"></label>' : '') +
-      '<button type="button" class="link" data-pfedit="' + esc(g.id) + '">editar</button></div>' +
+      '<button type="button" class="link" data-pfedit="' + esc(g.id) + '">editar</button>' + (g.semDefesa ? '<button type="button" class="link" data-pfvoltadef="' + esc(g.id) + '">vai defender sim</button>' : '') + '</div>' +
       '<div data-pfeditbox="' + esc(g.id) + '" style="flex-basis:100%"></div></div>';
   }).join('');
   if(r.semProjeto.length) h += '<div class="convite" style="margin-top:10px"><b>Inscritos sem projeto</b> <span class="aviso">(envie a proposta assinada, ou crie o grupo à mão)</span>' + r.semProjeto.map(function(n){ return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:6px"><span>' + esc(n) + '</span><button type="button" class="mini secundario" data-pfnovo="' + esc(n) + '">Criar o grupo</button></div>'; }).join('') + '</div>';
@@ -2924,6 +2926,10 @@ function desenharPF(){
       api('pfEditar', {disciplinaId: PFV.d.id, grupoId: g.id, campos: c}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ bt.disabled = false; alert(e.message); }); });
   }); });
   if($('pfConvite')) $('pfConvite').addEventListener('click', function(){ conviteDefesasPF(null); });
+  el.querySelectorAll('[data-pfsemdef],[data-pfvoltadef]').forEach(function(b){ b.addEventListener('click', function(){
+    var sim = !!b.dataset.pfsemdef, id = b.dataset.pfsemdef || b.dataset.pfvoltadef;
+    if(sim && !confirm('Marcar que este grupo não vai defender neste semestre? Ele sai da contagem das defesas e do convite (dá para desfazer).')) return;
+    b.disabled = true; api('pfSemDefesa', {disciplinaId: PFV.d.id, grupoId: id, valor: sim}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ b.disabled = false; alert(e.message); }); }); });
   el.querySelectorAll('[data-pfmail]').forEach(function(b){ b.addEventListener('click', function(){
     var k = b.dataset.pfmail.split(':'), box = el.querySelector('[data-pfeditbox="' + k[0] + '"]');
     box.innerHTML = '<p class="carregando">Montando o e-mail…</p>';
@@ -2940,6 +2946,7 @@ function conviteDefesasPF(ids){
   api('pfConvitePrevia', {disciplinaId: PFV.d.id, ids: ids}).then(function(m){
     box.innerHTML = '<div class="convite" style="margin-top:10px"><p style="margin:0 0 4px"><span class="aviso">Defesas no convite</span></p>' + m.defesas.map(function(d){
         return '<label style="display:flex;gap:8px;align-items:center;margin:3px 0"><input type="checkbox" data-pfconvd="' + esc(d.id) + '"' + (d.escolhida ? ' checked' : '') + '> <span><b>' + esc(d.rotulo) + '</b> <span class="aviso">' + esc(d.quando) + (d.convidado ? ' · convite já enviado em ' + esc(d.convidado) : '') + '</span></span></label>'; }).join('') +
+      (m.fora && m.fora.length ? '<p class="aviso" style="margin:6px 0 0">Fora do convite (sem ficha de defesa): ' + m.fora.map(esc).join(' · ') + '</p>' : '') +
       '<p style="margin:8px 0 2px"><span class="aviso">De</span> ' + esc(m.de) + ' · <span class="aviso">Para</span> <b>' + m.destinatarios + ' docentes</b> da aba Dados da banca (em cópia oculta)</p>' +
       '<p style="margin:2px 0"><span class="aviso">Assunto</span> <b>' + esc(m.assunto) + '</b></p>' +
       '<pre style="white-space:pre-wrap;font-family:inherit;font-size:13.5px;background:#fff;border:1px solid var(--linha);border-radius:8px;padding:10px;margin:4px 0;max-height:320px;overflow:auto">' + esc(m.corpo) + '</pre>' +
