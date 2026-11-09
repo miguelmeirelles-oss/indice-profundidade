@@ -566,6 +566,7 @@ function abrirPlayer(t){
       (tr.video ? '' : '<select id="tr_selVoz" title="voz da narração"></select>') +
       (tr.video ? '<select id="tr_selVel" title="velocidade"><option value="0.75">0,75×</option><option value="1">1×</option><option value="1.25">1,25×</option><option value="1.5">1,5×</option></select>' : '<select id="tr_selVel" title="velocidade"><option value="0.9">0,9×</option><option value="1">1×</option><option value="1.15">1,15×</option><option value="1.3">1,3×</option></select>') +
       '<button class="mini vermelho" id="tr_btDuvida">✋ Tenho uma dúvida</button>' +
+      (MODO === 'prof' && !t.previa && !tr.video ? '<button class="mini secundario" id="tr_btDemoQ" title="demonstração do quadro (sem IA)">🧪 Quadro</button>' : '') +
     '</div>' +
     (MODO === 'prof' && !t.previa && !tr.video && !temNarracaoIA() ? '<div class="convite" id="tr_avisoNarr" style="margin-top:10px">🔈 Esta aula ainda está com a <b>voz do navegador</b> (robótica). Grave uma vez com a <b>voz da conversa</b> (a mesma voz natural da dúvida por voz); depois ela toca para todos. <button class="mini" id="tr_btIrNarr">🎙 Gravar com a voz da IA</button></div>' : '') +
     '<div id="tr_duvidaBox" class="t-duvidaBox oculto"></div>' +
@@ -622,6 +623,7 @@ function abrirPlayer(t){
     api('trilhaNota', {id: T.id, chave: k, texto: v}).then(function(n){ T.notas = n; mostrarNota(); $('msgNota').textContent = '✓ salva'; }).catch(function(e){ $('msgNota').textContent = e.message; });
   });
   $('btDuvida').addEventListener('click', abrirDuvida);
+  if($('btDemoQ')) $('btDemoQ').addEventListener('click', demoQuadro);
   if($('btIrNarr')) $('btIrNarr').addEventListener('click', function(){ var d = $('admNarr'); d.open = true; desenharNarracao(); d.scrollIntoView({behavior: 'smooth', block: 'start'}); });
   if($('admNarr')) $('admNarr').addEventListener('toggle', function(){ if(this.open) desenharNarracao(); });
   irPara(0, 0, false);
@@ -2080,8 +2082,197 @@ var G = (function(){
     b.passos[passo].acoes.forEach(function(a){ acao(a, anim); });
     G.fimAcoes = animarAte;
   }
-  return {desenhar: desenhar, fimAcoes: 0};
+  return {desenhar: desenhar, fimAcoes: 0,
+    temGrafico: function(){ return !!(b && b.grafico && svg && svg.isConnected && gAnot && gAnot.isConnected); },
+    aoVivo: function(a){ if(!(b && b.grafico && svg && svg.isConnected)) return false; a.atraso = 0; acao(a, true); return true; }};
 })();
+/* ===================== QUADRO NA DÚVIDA POR VOZ (08/11/2026) =====================
+   A IA chama a ferramenta "quadro" enquanto fala. Ações de escrita apagam a área de cima da aula (com apagador)
+   e escrevem à mão, uma linha embaixo da outra; ações de gráfico desenham por cima do gráfico do passo.
+   Quando o aluno volta para a aula, o passo é redesenhado como estava. */
+var Q = (function(){
+  var NS = 'http://www.w3.org/2000/svg', svg = null, W = 800, H = 440, y = 0, itens = {}, usado = false, quadro = false, fila = Promise.resolve(), seq = 0;
+  var CORQ = {azul: '#1F4FB8', vermelho: '#C0392B', verde: '#1E8A4C', laranja: '#D9731A', roxo: '#7D3C98', preto: '#1d2433'};
+  var GRAF = {ponto: 1, seta: 1, linha_v: 1, linha_h: 1, regiao: 1, destacar_curva: 1, texto_grafico: 1};
+  function el(tag, at, pai){ var e = document.createElementNS(NS, tag); for(var k in at) e.setAttribute(k, at[k]); if(pai) pai.appendChild(e); return e; }
+  function cel(){ return W < 600; }
+  function tam(estilo){ var c = cel(); return estilo === 'titulo' ? (c ? 30 : 38) : (c ? 26 : 32); }
+  function espera(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+  function vivo(){ return svg && svg.isConnected; }
+  // apagador: uma faixa branca passa da esquerda para a direita e leva tudo
+  function apagarTudo(){
+    svg = $('svg'); if(!svg) return Promise.resolve();
+    var vb = (svg.getAttribute('viewBox') || '0 0 800 440').split(/\s+/).map(Number); W = vb[2] || 800; H = Math.max(vb[3] || 440, cel() ? 300 : 400);
+    usado = true;
+    var faixa = el('rect', {x: 0, y: 0, width: 0, height: H, fill: '#fff'}, svg);
+    var borda = el('rect', {x: -14, y: 0, width: 14, height: H, fill: '#e6e9ef'}, svg);
+    var ini = performance.now(), dur = 650;
+    return new Promise(function(ok){
+      var passo = function(t){
+        var f = Math.min(1, (t - ini) / dur), w = W * f;
+        faixa.setAttribute('x', 0); faixa.setAttribute('width', w); borda.setAttribute('x', Math.max(0, w - 14));
+        if(f < 1 && vivo()) requestAnimationFrame(passo); else ok();
+      };
+      requestAnimationFrame(passo);
+    }).then(function(){
+      if(!vivo()) return;
+      svg.innerHTML = ''; svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+      el('rect', {x: 0, y: 0, width: W, height: H, fill: '#fff'}, svg);
+      itens = {}; y = cel() ? 14 : 18; quadro = true;
+    });
+  }
+  function precisaQuadro(){ return quadro && vivo() ? Promise.resolve() : apagarTudo(); }
+  // quebra o texto na largura do quadro (mede no próprio SVG)
+  function linhas(texto, tamanho, larg){
+    var t = el('text', {x: 0, y: -100, 'font-size': tamanho, 'font-family': 'Caveat, "Patrick Hand", cursive'}, svg), out = [], cur = '';
+    String(texto).split(/\s+/).forEach(function(w){ t.textContent = (cur ? cur + ' ' : '') + w; if(t.getComputedTextLength() > larg && cur){ out.push(cur); cur = w; } else cur = (cur ? cur + ' ' : '') + w; });
+    if(cur) out.push(cur); t.remove(); return out.length ? out : [''];
+  }
+  // escreve à mão: o texto aparece da esquerda para a direita, na velocidade de quem escreve (~16 letras/s)
+  function escreverLinhas(id, texto, estilo, cor, recuo){
+    return precisaQuadro().then(function(){
+      if(!vivo()) return;
+      var tm = tam(estilo), lh = Math.round(tm * 1.22), larg = W - 28 - (recuo || 0), ls = linhas(texto, tm, larg);
+      if(y + lh * ls.length > H - 6) return apagarTudo().then(function(){ return escreverLinhas(id, texto, estilo, cor, recuo); });   // virou a página
+      var g = el('g', {'data-trq': id || ''}, svg), cadeia = Promise.resolve();
+      ls.forEach(function(l){
+        y += lh;
+        var cid = 'qc' + (++seq), clip = el('clipPath', {id: cid}, el('defs', {}, g)), r = el('rect', {x: 0, y: y - tm * 1.1, width: 0, height: tm * 1.5}, clip);
+        var t = el('text', {x: 14 + (recuo || 0), y: y - tm * 0.18, 'font-size': tm, 'font-weight': estilo === 'titulo' || estilo === 'equacao' ? 700 : 500, fill: CORQ[cor] || (estilo === 'equacao' ? CORQ.azul : CORQ.preto),
+          'font-family': estilo === 'equacao' ? '"Patrick Hand", Caveat, cursive' : 'Caveat, "Patrick Hand", cursive', 'clip-path': 'url(#' + cid + ')'}, g);
+        t.textContent = l;
+        cadeia = cadeia.then(function(){
+          var w = t.getComputedTextLength() + 30, x0 = 14 + (recuo || 0), dur = Math.max(350, l.length / 16 * 1000), ini = performance.now();
+          return new Promise(function(ok){ var p = function(tt){ var f = Math.min(1, (tt - ini) / dur); r.setAttribute('width', x0 + w * f); if(f < 1 && vivo()) requestAnimationFrame(p); else ok(); }; requestAnimationFrame(p); });
+        });
+      });
+      if(estilo === 'titulo') cadeia = cadeia.then(function(){ var bb = g.getBBox(); return traco(g, maoLivre([[bb.x, bb.y + bb.height + 3], [bb.x + bb.width, bb.y + bb.height + 1]]), CORQ.azul, 2.4); });
+      y += Math.round(tm * 0.25);
+      if(id) itens[id] = g;
+      return cadeia;
+    });
+  }
+  // traço "feito à mão": pontos com um leve tremido, desenhado com animação
+  function maoLivre(pts){ var d = ''; pts.forEach(function(p, i){ var j = i && i < pts.length - 1 ? 1.6 : 0.6; d += (i ? 'L' : 'M') + (p[0] + (Math.random() - .5) * j).toFixed(1) + ' ' + (p[1] + (Math.random() - .5) * j).toFixed(1); }); return d; }
+  function traco(pai, d, cor, larg, seta){
+    var p = el('path', {d: d, fill: 'none', stroke: cor, 'stroke-width': larg || 2.6, 'stroke-linecap': 'round', 'stroke-linejoin': 'round'}, pai);
+    var L = p.getTotalLength(); p.style.strokeDasharray = L; p.style.strokeDashoffset = L;
+    return new Promise(function(ok){
+      requestAnimationFrame(function(){ p.style.transition = 'stroke-dashoffset ' + Math.min(900, 250 + L * 1.4) + 'ms ease-out'; p.style.strokeDashoffset = 0; });
+      setTimeout(function(){ if(seta) el('path', {d: seta, fill: cor}, pai); ok(); }, Math.min(900, 250 + L * 1.4) + 30);
+    });
+  }
+  function caixaDe(alvo){ var g = itens[alvo]; if(!g || !g.isConnected) return null; var b = g.getBBox(); return {g: g, x: b.x, y: b.y, w: b.width, h: b.height}; }
+  function circular(alvo, cor){
+    var c = caixaDe(alvo); if(!c) return Promise.resolve();
+    var cx = c.x + c.w / 2, cy = c.y + c.h / 2, rx = c.w / 2 + 12, ry = c.h / 2 + 8, pts = [];
+    for(var i = 0; i <= 26; i++){ var a = -Math.PI * 0.6 + i / 24 * Math.PI * 2; pts.push([cx + Math.cos(a) * rx * (1 + (i > 24 ? .04 : 0)), cy + Math.sin(a) * ry]); }
+    return traco(svg, maoLivre(pts), CORQ[cor] || CORQ.vermelho, 2.6);
+  }
+  function sublinhar(alvo, cor){ var c = caixaDe(alvo); if(!c) return Promise.resolve(); var yy = c.y + c.h + 2, pts = []; for(var i = 0; i <= 8; i++) pts.push([c.x + c.w * i / 8, yy + (i % 2 ? 1.5 : -1)]); return traco(svg, maoLivre(pts), CORQ[cor] || CORQ.vermelho, 2.6); }
+  function riscar(alvo){ var c = caixaDe(alvo); if(!c) return Promise.resolve(); return traco(svg, maoLivre([[c.x - 4, c.y + c.h * .55], [c.x + c.w / 2, c.y + c.h * .5], [c.x + c.w + 4, c.y + c.h * .45]]), CORQ.vermelho, 3); }
+  function setaPara(alvo, texto, cor){
+    var c = caixaDe(alvo); if(!c) return escreverLinhas('', texto, 'normal', cor || 'vermelho', 40);
+    var y0 = y;
+    return escreverLinhas('', texto, 'normal', cor || 'vermelho', 64).then(function(){
+      var ty = y0 + tam('normal') * 0.75, x1 = Math.min(c.x + c.w * 0.3, 40), y1 = c.y + c.h + 4, x2 = 72, y2 = ty;
+      var cor2 = CORQ[cor] || CORQ.vermelho, ang = Math.atan2(y2 - (y1 + y2) / 2, x2 - x1), s = 9;
+      var cab = 'M' + x2 + ' ' + y2 + 'L' + (x2 - s * Math.cos(ang - .45)) + ' ' + (y2 - s * Math.sin(ang - .45)) + 'L' + (x2 - s * Math.cos(ang + .45)) + ' ' + (y2 - s * Math.sin(ang + .45)) + 'Z';
+      return traco(svg, 'M' + x1 + ' ' + y1 + 'Q' + x1 + ' ' + y2 + ' ' + (x2 - 2) + ' ' + y2, cor2, 2.4, cab);
+    });
+  }
+  function caixa(id, lista, cor){
+    var y0 = y, cad = Promise.resolve(), g;
+    cad = cad.then(function(){ return precisaQuadro(); }).then(function(){ y0 = y; });
+    (lista || []).slice(0, 5).forEach(function(t){ cad = cad.then(function(){ return escreverLinhas('', '• ' + t, 'normal', cor, 10); }); });
+    return cad.then(function(){
+      if(!vivo()) return;
+      var x0 = 8, x1 = W - 10, y1 = y + 4; y += 6;
+      g = el('g', {'data-trq': id || ''}, svg); if(id) itens[id] = g;
+      return traco(g, maoLivre([[x0, y0 + 4], [x1, y0 + 2], [x1 + 1, y1], [x0 - 1, y1 + 1], [x0, y0 + 3]]), CORQ.azul, 2);
+    });
+  }
+  function apagar(alvo){
+    if(!alvo || alvo === 'tudo') return apagarTudo();
+    var g = itens[alvo]; if(!g) return Promise.resolve();
+    g.style.transition = 'opacity .4s'; g.style.opacity = 0; delete itens[alvo];
+    return espera(420).then(function(){ g.remove(); });
+  }
+  // ação de gráfico: só se o gráfico do passo ainda está na tela (sem ter virado quadro)
+  function noGrafico(a){
+    if(quadro || !G.temGrafico()) return Promise.resolve();
+    var n = function(v){ return typeof v === 'number' && isFinite(v); }, x;
+    switch(a.tipo){
+      case 'ponto': if(!n(a.x) || !(a.serie || n(a.y))) return Promise.resolve(); x = {tipo: 'ponto', x: a.x, serie: a.serie, y: a.y, rotulo: a.rotulo || '', cor: a.cor || 'vermelho'}; break;
+      case 'seta': if(![a.de_x, a.de_y, a.para_x, a.para_y].every(n)) return Promise.resolve(); x = {tipo: 'seta', de: [a.de_x, a.de_y], para: [a.para_x, a.para_y], rotulo: a.rotulo || '', cor: a.cor || 'vermelho'}; break;
+      case 'linha_v': if(!n(a.x)) return Promise.resolve(); x = {tipo: 'linha_v', x: a.x, rotulo: a.rotulo || '', cor: a.cor || 'vermelho'}; break;
+      case 'linha_h': if(!n(a.y)) return Promise.resolve(); x = {tipo: 'linha_h', y: a.y, rotulo: a.rotulo || '', cor: a.cor || 'vermelho'}; break;
+      case 'regiao': if(!n(a.de) || !n(a.ate)) return Promise.resolve(); x = {tipo: 'regiao', de: a.de, ate: a.ate, rotulo: a.rotulo || '', cor: a.cor || 'laranja'}; break;
+      case 'destacar_curva': if(!a.serie) return Promise.resolve(); x = {tipo: 'serie', serie: a.serie}; G.aoVivo(x); x = {tipo: 'destacar', serie: a.serie}; break;
+      case 'texto_grafico': if(!n(a.x) || !n(a.y) || !a.texto) return Promise.resolve(); x = {tipo: 'texto', x: a.x, y: a.y, texto: a.texto, cor: a.cor || 'vermelho'}; break;
+    }
+    usado = true;
+    try{ G.aoVivo(x); }catch(e){}
+    return espera(700);
+  }
+  function uma(a){
+    if(!a || !a.tipo) return Promise.resolve();
+    var tx = String(a.texto || '').slice(0, 120);
+    if(GRAF[a.tipo]) return noGrafico(a);
+    switch(a.tipo){
+      case 'titulo': return escreverLinhas(a.id, tx, 'titulo', a.cor);
+      case 'escrever': return escreverLinhas(a.id, tx, 'normal', a.cor);
+      case 'equacao': return escreverLinhas(a.id, tx, 'equacao', a.cor);
+      case 'circular': return circular(a.alvo, a.cor);
+      case 'sublinhar': return sublinhar(a.alvo, a.cor);
+      case 'riscar': return riscar(a.alvo);
+      case 'seta_para': return setaPara(a.alvo, tx, a.cor);
+      case 'caixa': return caixa(a.id, (a.itens || []).map(function(t){ return String(t).slice(0, 60); }), a.cor);
+      case 'apagar': return apagar(a.alvo);
+    }
+    return Promise.resolve();
+  }
+  return {
+    // executa em fila: uma ação de cada vez, na ordem em que a IA mandou (as falas seguem em paralelo)
+    executar: function(acoes){ (Array.isArray(acoes) ? acoes : []).slice(0, 8).forEach(function(a){ fila = fila.then(function(){ return uma(a); }).catch(function(){}); }); return fila; },
+    usado: function(){ return usado; },
+    // volta a tela da aula como estava no passo
+    restaurar: function(){ var u = usado; usado = false; quadro = false; itens = {}; fila = Promise.resolve(); if(u && T && !ehVideo() && $('svg')) G.desenhar(blocoAtual(), P.passo); }
+  };
+})();
+// demonstração do quadro (só o professor): sem conexão e sem gastar cota
+function demoQuadro(){
+  if(wsD) return;
+  carregarFonteGiz();
+  var b = blocoAtual(), g = b.grafico, box = $('duvidaBox'); estavaTocando = P.tocando; pausar();
+  box.classList.remove('oculto');
+  box.innerHTML = '<b>🧪 Demonstração do quadro</b> <span class="aviso">(respostas gravadas, sem IA e sem gastar cota)</span><div class="t-conversa" id="tr_conversaD"></div>' +
+    '<div class="botoes"><button class="mini" id="tr_btFimDemo">Voltar para a aula</button></div>';
+  ultimaFala = {ia: null, eu: null};
+  var parar = false;
+  $('btFimDemo').addEventListener('click', function(){ parar = true; Q.restaurar(); box.classList.add('oculto'); });
+  var roteiro = [];
+  if(g && g.series && g.series.length){
+    var s = g.series[0], xm = (g.x.min + g.x.max) / 2;
+    roteiro.push({eu: 'Por que a curva muda aqui no meio?'},
+      {ia: 'Olha este ponto da curva.', q: [{tipo: 'destacar_curva', serie: s.id}, {tipo: 'ponto', x: xm, serie: s.id, rotulo: 'aqui'}]},
+      {ia: 'Daqui para a direita é a região que interessa.', q: [{tipo: 'regiao', de: xm, ate: g.x.max, rotulo: 'região'}]});
+  }
+  roteiro.push({eu: 'E a reação, como fica?'},
+    {ia: 'Vou escrever a reação no quadro.', q: [{tipo: 'titulo', texto: 'Nitrosação'}, {tipo: 'equacao', id: 'eq1', texto: 'R₂NH + HNO₂ → R₂N–N=O + H₂O'}]},
+    {ia: 'Repare neste grupo: é ele que preocupa.', q: [{tipo: 'circular', alvo: 'eq1'}, {tipo: 'seta_para', alvo: 'eq1', texto: 'nitrosamina (risco)'}]},
+    {ia: 'Para evitar, a indústria usa três cuidados.', q: [{tipo: 'caixa', id: 'c1', itens: ['ascorbato junto', 'dose dentro do limite', 'sem fritura forte']}]});
+  var i = 0;
+  var proximo = function(){
+    if(parar || i >= roteiro.length) return;
+    var r = roteiro[i++];
+    if(r.eu){ escrever('eu', r.eu); setTimeout(proximo, 900); return; }
+    escrever('ia', r.ia + ' ');
+    Q.executar(r.q).then(function(){ if(!parar) setTimeout(proximo, 900); });
+  };
+  proximo();
+}
+
 
 /* ===================== DÚVIDA POR VOZ (Live, token temporário vindo do servidor) ===================== */
 var wsD = null, ctxMic = null, ctxSom = null, fonteMic = null, noMic = null, streamMic = null, tocarAte = 0, tocandoD = [], tD0 = 0, relogioD = null;
@@ -2134,7 +2325,7 @@ function abrirDuvida(){
     '<div class="t-conversa" id="tr_conversaD"></div><div id="tr_msgD"></div>' +
     '<div class="botoes"><button class="mini" id="tr_btFimD">Encerrar e voltar para a aula</button></div>';
   $('btFimD').addEventListener('click', function(){ encerrarDuvida(); });
-  ultimaFala = {ia: null, eu: null}; estadoD('preparando o microfone…');
+  ultimaFala = {ia: null, eu: null}; estadoD('preparando o microfone…'); carregarFonteGiz();
   box.scrollIntoView({behavior: 'smooth', block: 'nearest'});
   try{ ctxSom = new AudioContext({sampleRate: 24000}); }catch(e){ ctxSom = new AudioContext(); }
   try{ ctxMic = new AudioContext({sampleRate: 16000}); }catch(e){ ctxMic = new AudioContext(); }
@@ -2159,7 +2350,7 @@ function conectarD(primeira){
   var nova = new WebSocket('wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=' + encodeURIComponent(t.token));
   nova.onopen = function(){
     nova.send(JSON.stringify({setup: {model: t.modelo, generationConfig: {responseModalities: c.responseModalities, speechConfig: c.speechConfig}, systemInstruction: c.systemInstruction,
-      inputAudioTranscription: {}, outputAudioTranscription: {}, sessionResumption: alcaRetomada ? {handle: alcaRetomada} : {}, contextWindowCompression: c.contextWindowCompression || {slidingWindow: {}}}}));
+      inputAudioTranscription: {}, outputAudioTranscription: {}, sessionResumption: alcaRetomada ? {handle: alcaRetomada} : {}, contextWindowCompression: c.contextWindowCompression || {slidingWindow: {}}, tools: c.tools || undefined}}));
   };
   nova.onmessage = function(ev){
     (typeof ev.data === 'string' ? Promise.resolve(ev.data) : ev.data.text()).then(function(txt){
@@ -2169,9 +2360,15 @@ function conectarD(primeira){
         var velha = wsD; wsD = nova; wsPendente = null; trocando = false; tentativasRetomar = 0;
         if(primeira){
           ligarMicrofone(); estadoD('ouvindo você… pode falar', 'on'); tD0 = Date.now();
+          if(MODO === 'prof' && $('msgD')) $('msgD').innerHTML = '<p class="aviso" style="margin:4px 0 0">modelo: ' + esc(String(tokenVoz.modelo || '').replace('models/', '')) + (tokenVoz.quadro ? ' · quadro ligado' : '') + '</p>';
           relogioD = setInterval(function(){ if(tD0 && Date.now() - tD0 > tokenVoz.duracaoMin * 60000){ if($('msgD')) $('msgD').innerHTML = '<div class="convite">A conversa chegou ao tempo máximo.</div>'; encerrarDuvida(); } }, 5000);
           nova.send(JSON.stringify({clientContent: {turns: [{role: 'user', parts: [{text: 'Olá, apertei o botão de dúvida.'}]}], turnComplete: true}}));
         } else if(velha && velha !== nova){ velha.onclose = null; try{ velha.close(1000); }catch(e){} }
+        return;
+      }
+      if(m.toolCall && m.toolCall.functionCalls){
+        var resps = m.toolCall.functionCalls.map(function(fc){ if(fc.name === 'quadro') Q.executar(fc.args && fc.args.acoes); return {id: fc.id, name: fc.name, response: {result: 'ok'}}; });
+        try{ nova.send(JSON.stringify({toolResponse: {functionResponses: resps}})); }catch(e){}
         return;
       }
       if(m.sessionResumptionUpdate && m.sessionResumptionUpdate.resumable && m.sessionResumptionUpdate.newHandle) alcaRetomada = m.sessionResumptionUpdate.newHandle;
@@ -2248,6 +2445,7 @@ function encerrarDuvida(semFechar, manterCaixa){
   try{ streamMic && streamMic.getTracks().forEach(function(t){ t.stop(); }); }catch(e){}
   try{ ctxMic && ctxMic.close(); ctxSom && ctxSom.close(); }catch(e){}
   ctxMic = ctxSom = null; streamMic = null; clearInterval(relogioD); tD0 = 0;
+  Q.restaurar();
   if(seg > 3) U.duvida(seg);
   var box = $('duvidaBox');
   if(box && !manterCaixa){
