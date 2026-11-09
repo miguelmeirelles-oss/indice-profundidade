@@ -190,6 +190,10 @@
 
   /* notas */
   .tabelaBox{overflow-x:auto;border:2px solid var(--linha);border-radius:12px}
+  .pfLinha{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-start;border-top:1px dashed var(--linha);padding:10px 0}
+  .pfLinha>div:first-child{flex:1 1 260px;min-width:0}
+  .pfCampos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px 12px;margin:8px 0}
+  .pfCampos label{font-size:13px;color:var(--cinza)} .pfCampos input,.pfCampos textarea,.pfCampos select{width:100%;box-sizing:border-box}
   table{border-collapse:collapse;width:100%;font-size:13.5px}
   th,td{padding:8px;border-bottom:1px solid var(--linha);text-align:center;white-space:nowrap}
   th{background:var(--bloco);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--cinza)}
@@ -2818,6 +2822,116 @@ function abrirDarAula(){
   }).catch(function(e){ $('aulaTopo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
+// ===== Projeto Final I e II: disciplina sem aulas. Em "Dar aula" ficam os grupos dos alunos inscritos, os documentos
+// assinados (a IA lê e você confere), a nota da PF I e, na PF II, a banca e a defesa (que vai pré-preenchida para o formulário da ata).
+function etapaPF(nome){ var m = String(nome || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').match(/(?:projeto final|tcc)\s*(ii|2|i|1)\b/); return !m ? 0 : (m[1] === 'ii' || m[1] === '2') ? 2 : 1; }
+var PFV = {d: null, r: null, lido: null};
+var DOCS_PF = {A: 'A · proposta', C: 'C · termo de responsabilidade', F: 'F · termo de ciência', J: 'J · formação de banca', B: 'B · ata de defesa', outro: 'outro documento'};
+function abrirProjetoFinal(d){
+  PFV.d = d; $('aulaLista').innerHTML = '';
+  $('aulaTopo').innerHTML = '<div class="caixa"><p class="carregando">Carregando os projetos…</p></div>';
+  api('pfListar', {disciplinaId: d.id}).then(function(r){ PFV.r = r; desenharPF(); })
+    .catch(function(e){ $('aulaTopo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+function numPF(rot, n){ return '<div><span class="aviso">' + rot + '</span><div class="numEst">' + n + '</div></div>'; }
+// campos do grupo (para conferir o que a IA leu e para editar)
+function camposPF(c, tipoSel){
+  c = c || {}; var al = (c.alunos || []).slice(0, 3); while(al.length < 3) al.push({nome: '', matricula: ''});
+  var h = '<div class="pfCampos">' + al.map(function(a, i){
+    return '<div><label>Aluno ' + (i + 1) + (i ? ' (se houver)' : '') + '</label><input data-pfc="nome' + i + '" value="' + esc(a.nome || '') + '" placeholder="Nome completo"></div>' +
+      '<div><label>Matrícula do aluno ' + (i + 1) + '</label><input data-pfc="mat' + i + '" value="' + esc(a.matricula || '') + '" placeholder="GEAL214504"></div>'; }).join('') + '</div>' +
+    '<div class="pfCampos"><div><label>Orientador(a)</label><input data-pfc="orientador" value="' + esc(c.orientador || '') + '"></div>' +
+    '<div><label>Coorientador(es) · separe com vírgula</label><input data-pfc="coor" value="' + esc((c.coorientadores || []).join(', ')) + '"></div></div>' +
+    '<div class="pfCampos" style="grid-template-columns:1fr"><div><label>Título do projeto</label><textarea data-pfc="titulo" rows="2">' + esc(c.titulo || '') + '</textarea></div></div>' +
+    '<div class="pfCampos"><div><label>Banca (sem o orientador) · separe com vírgula</label><input data-pfc="banca" value="' + esc((c.banca || []).join(', ')) + '"></div>' +
+    (tipoSel !== undefined ? '<div><label>Nota lida (0 a 10)</label><input data-pfc="nota" type="number" min="0" max="10" step="0.1" value="' + (c.nota === null || c.nota === undefined ? '' : c.nota) + '"></div>' : '') + '</div>';
+  return h;
+}
+function lerCamposPF(box){
+  var v = function(k){ var x = box.querySelector('[data-pfc="' + k + '"]'); return x ? x.value.trim() : ''; };
+  var lista = function(t){ return t.split(',').map(function(x){ return x.trim(); }).filter(Boolean); };
+  var alunos = [0, 1, 2].map(function(i){ return {nome: v('nome' + i), matricula: v('mat' + i)}; }).filter(function(a){ return a.nome; });
+  return {alunos: alunos, orientador: v('orientador'), coorientadores: lista(v('coor')), titulo: v('titulo'), banca: lista(v('banca')), nota: v('nota')};
+}
+function desenharPF(){
+  var r = PFV.r, e2 = r.etapa === 2, el = $('aulaTopo');
+  var conta = function(f){ return r.grupos.filter(f).length; };
+  var h = '<div class="caixa"><h2>🎓 ' + esc(r.disciplina) + ' · ' + esc(r.semestre) + '</h2>' +
+    '<p class="aviso" style="margin-top:0">Disciplina sem aulas: aqui ficam os grupos dos alunos inscritos e os documentos assinados' + (e2 ? ', a banca e a defesa. Os grupos com banca já aparecem prontos no formulário online da ata (só faltam data, horário e sala).' : ' e a nota (de 0 a 10; ' + r.aprova + ' ou mais aprova, e o grupo passa para Projeto Final II).') + '</p>' +
+    '<div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px">' + numPF('inscritos', r.inscritos) + numPF('grupos', r.grupos.length) +
+    (e2 ? numPF('com banca', conta(function(g){ return g.banca.length; })) + numPF('defenderam', conta(function(g){ return g.cor === 'ok'; }))
+        : numPF('com nota', conta(function(g){ return g.nota !== null; })) + numPF('aprovados', conta(function(g){ return g.nota !== null && g.nota >= r.aprova; }))) + '</div>' +
+    '<div class="botoes" style="margin:0">' + (r.pastaUrl ? '<a class="botaoLink" href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">📁 Documentos de ' + esc(r.semestre) + '</a>' : '') +
+    '<button type="button" class="mini secundario" id="pfSync">↻ Atualizar planilha de controle' + (e2 ? ' e formulário' : '') + '</button></div><div id="pfMsg" class="aviso"></div></div>';
+  h += '<div class="caixa"><h2>📎 Enviar documento assinado</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA descobre qual apêndice é (A proposta, C, F, J banca, B ata) e lê alunos, orientador, coorientador, título' + (e2 ? ' e banca' : ' e nota') + '. Você confere antes de salvar; o arquivo vai para Defesas documentos / ' + esc(r.semestre) + ' / pasta do grupo.</p>' +
+    '<input type="file" id="pfArq" accept="application/pdf,image/*"><div id="pfLido"></div></div>';
+  h += '<div class="caixa"><h2>Grupos</h2><p class="aviso" style="margin:0 0 4px">Documentos: A proposta · C termo de responsabilidade · F termo de ciência · J banca · B ata assinada. Toque numa letra verde para abrir o PDF.</p>';
+  if(!r.grupos.length) h += '<p class="aviso">Nenhum grupo ainda. Envie a proposta (Apêndice A) de cada grupo.</p>';
+  h += r.grupos.map(function(g){
+    var docs = ['A', 'C', 'F', 'J', 'B'].map(function(k){ var x = g.docs[k]; return x ? '<a class="tag t-ok" style="text-decoration:none;margin:0 3px 3px 0" href="' + esc(x.url) + '" target="_blank" rel="noopener" title="' + esc(x.nome + ' · ' + x.em) + '">' + k + ' ✓</a>' : '<span class="tag t-cinza" style="margin:0 3px 3px 0">' + k + '</span>'; }).join('');
+    return '<div class="pfLinha"><div><b>' + g.alunos.map(function(a){ return esc(a.nome) + (a.matricula ? ' <span class="aviso">' + esc(a.matricula) + '</span>' : '') + (a.inscrito ? '' : ' <span class="tag t-cinza">não inscrito</span>'); }).join('<br>') + '</b>' +
+      '<div class="aviso">Orient.: ' + esc(g.orientador || '—') + (g.coorientadores.length ? ' · coorient.: ' + esc(g.coorientadores.join(', ')) : '') + '</div>' +
+      (g.titulo ? '<div class="aviso" style="font-style:italic">' + esc(g.titulo) + '</div>' : '<div class="aviso t-warn">sem título</div>') +
+      (e2 && g.banca.length ? '<div class="aviso">Banca: ' + esc(g.banca.join(' · ')) + '</div>' : '') + '</div>' +
+      '<div style="max-width:230px">' + docs + '<div style="margin-top:4px"><span class="tag t-' + g.cor + '">' + esc(g.situacao) + '</span></div></div>' +
+      '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-start">' +
+      (!e2 ? '<label class="aviso" style="display:flex;gap:6px;align-items:center">nota <input type="number" min="0" max="10" step="0.1" data-pfnota="' + esc(g.id) + '" value="' + (g.nota === null ? '' : g.nota) + '" style="width:76px"></label>' : '') +
+      '<button type="button" class="link" data-pfedit="' + esc(g.id) + '">editar</button></div>' +
+      '<div data-pfeditbox="' + esc(g.id) + '" style="flex-basis:100%"></div></div>';
+  }).join('');
+  if(r.semProjeto.length) h += '<div class="convite" style="margin-top:10px"><b>Inscritos sem projeto</b> <span class="aviso">(envie a proposta assinada, ou crie o grupo à mão)</span>' + r.semProjeto.map(function(n){ return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin-top:6px"><span>' + esc(n) + '</span><button type="button" class="mini secundario" data-pfnovo="' + esc(n) + '">Criar o grupo</button></div>'; }).join('') + '</div>';
+  if(r.foraDaTurma && r.foraDaTurma.length) h += '<p class="aviso" style="margin-top:10px">Aprovados em Projeto Final I que ainda não estão inscritos aqui: ' + r.foraDaTurma.map(esc).join(' · ') + '. Inscreva-os em <b>Inscrições</b> para aparecerem na tabela.</p>';
+  h += '</div>';
+  el.innerHTML = h;
+  // eventos
+  $('pfSync').addEventListener('click', function(){ var b = this; b.disabled = true; $('pfMsg').textContent = 'Atualizando…';
+    api('pfSincronizar', {disciplinaId: PFV.d.id}).then(function(x){ b.disabled = false; $('pfMsg').textContent = 'Planilha de controle: ' + x.controle + ' célula(s) atualizada(s)' + (e2 ? ' · formulário da ata: ' + x.form + ' projeto(s) com banca' : '') + (x.erros.length ? ' · ' + x.erros.join('; ') : '') + '.'; })
+      .catch(function(e){ b.disabled = false; $('pfMsg').textContent = e.message; }); });
+  $('pfArq').addEventListener('change', function(){
+    var f = this.files[0]; this.value = ''; if(!f) return;
+    if(f.size > 10 * 1024 * 1024){ $('pfLido').innerHTML = '<div class="erro">Arquivo grande demais (máximo de 10 MB).</div>'; return; }
+    $('pfLido').innerHTML = '<p class="carregando">Lendo "' + esc(f.name) + '" com a IA… (uns 20 segundos)</p>';
+    var fr = new FileReader();
+    fr.onload = function(){ api('pfAnalisar', {disciplinaId: PFV.d.id, nome: f.name, dados: String(fr.result), mime: f.type || 'application/pdf'})
+      .then(function(l){ PFV.lido = l; desenharLidoPF(); }).catch(function(e){ $('pfLido').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); };
+    fr.readAsDataURL(f);
+  });
+  el.querySelectorAll('[data-pfnota]').forEach(function(inp){ inp.addEventListener('change', function(){ inp.disabled = true;
+    api('pfNota', {disciplinaId: PFV.d.id, grupoId: inp.dataset.pfnota, nota: inp.value}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ inp.disabled = false; alert(e.message); }); }); });
+  el.querySelectorAll('[data-pfedit]').forEach(function(b){ b.addEventListener('click', function(){
+    var g = r.grupos.filter(function(x){ return x.id === b.dataset.pfedit; })[0], box = el.querySelector('[data-pfeditbox="' + g.id + '"]');
+    if(box.innerHTML){ box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="convite">' + camposPF(g) + '<div class="botoes" style="margin:0"><button type="button" class="mini" data-pfok>Salvar</button><button type="button" class="mini secundario" data-pfnao>Cancelar</button></div></div>';
+    box.querySelector('[data-pfnao]').addEventListener('click', function(){ box.innerHTML = ''; });
+    box.querySelector('[data-pfok]').addEventListener('click', function(){ var bt = this; bt.disabled = true; var c = lerCamposPF(box); delete c.nota;
+      api('pfEditar', {disciplinaId: PFV.d.id, grupoId: g.id, campos: c}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ bt.disabled = false; alert(e.message); }); });
+  }); });
+  el.querySelectorAll('[data-pfnovo]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true;
+    api('pfEditar', {disciplinaId: PFV.d.id, grupoId: '', campos: {alunos: [{nome: b.dataset.pfnovo}]}}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ b.disabled = false; alert(e.message); }); }); });
+  if(PFV.lido) desenharLidoPF();
+}
+// o que a IA leu do documento: o professor confere, corrige e salva (ou descarta)
+function desenharLidoPF(){
+  var l = PFV.lido, r = PFV.r, box = $('pfLido'); if(!box) return;
+  var grupos = r.grupos.map(function(g){ return {id: g.id, rotulo: g.rotulo}; }).concat(r.outros || []);
+  box.innerHTML = '<div class="convite" style="margin-top:10px"><b>A IA leu "' + esc(l.nomeArquivo) + '"</b> <span class="aviso">confira e corrija se precisar</span>' +
+    (l.campos.observacao ? '<div class="alerta" style="margin:6px 0">' + esc(l.campos.observacao) + '</div>' : '') +
+    '<div class="pfCampos"><div><label>Documento</label><select data-pft>' + Object.keys(DOCS_PF).map(function(k){ return '<option value="' + k + '"' + (k === l.tipo ? ' selected' : '') + '>' + esc(DOCS_PF[k]) + '</option>'; }).join('') + '</select></div>' +
+    '<div><label>Grupo</label><select data-pfg><option value="novo"' + (l.grupoId ? '' : ' selected') + '>novo grupo</option>' + grupos.map(function(g){ return '<option value="' + esc(g.id) + '"' + (g.id === l.grupoId ? ' selected' : '') + '>' + esc(g.rotulo) + '</option>'; }).join('') + '</select></div></div>' +
+    camposPF(l.campos, l.tipo) +
+    (l.campos.parecer ? '<p class="aviso" style="margin:0 0 6px">Parecer marcado no documento: <b>' + esc(l.campos.parecer) + '</b></p>' : '') +
+    '<div class="botoes" style="margin:0"><button type="button" class="mini" id="pfSalvar">✓ Confirmar e salvar</button><button type="button" class="mini secundario" id="pfDescartar">Descartar</button></div><div id="pfMsgLido" class="aviso"></div></div>';
+  $('pfDescartar').addEventListener('click', function(){ api('pfDescartar', {disciplinaId: PFV.d.id, arquivoId: l.arquivoId}).catch(function(){}); PFV.lido = null; box.innerHTML = ''; });
+  $('pfSalvar').addEventListener('click', function(){
+    var b = this, c = lerCamposPF(box);
+    if(!c.alunos.length){ $('pfMsgLido').innerHTML = '<span class="t-err">Informe pelo menos um aluno.</span>'; return; }
+    b.disabled = true; $('pfMsgLido').textContent = 'Salvando e arquivando no Drive…';
+    api('pfSalvar', {disciplinaId: PFV.d.id, arquivoId: l.arquivoId, tipo: box.querySelector('[data-pft]').value, campos: c, grupoId: box.querySelector('[data-pfg]').value})
+      .then(function(x){ PFV.lido = null; PFV.r = x; desenharPF(); $('pfMsg').textContent = 'Documento salvo na pasta do grupo e planilhas atualizadas.'; })
+      .catch(function(e){ b.disabled = false; $('pfMsgLido').innerHTML = '<span class="t-err">' + esc(e.message) + '</span>'; });
+  });
+}
+
 function bannerPendentes(pend){
   if(!pend.length) return '';
   return '<div class="convite">Há <b>' + pend.length + ' trecho(s) de áudio</b> guardado(s) neste computador esperando envio. <button type="button" class="mini" id="btEnviarPend">Enviar agora</button> <span id="msgPend" class="aviso"></span></div>';
@@ -2864,6 +2978,7 @@ function desenharInicioAula(pend){
   var d = G.disc ? discPorId(G.disc) : null;
   if(!G.tempos && d) G.tempos = d.tempos;
   if(!ds.length){ $('aulaTopo').innerHTML = '<div class="caixa"><h2>Dar aula</h2><p>Crie uma disciplina em <b>Disciplinas</b> para começar.</p></div>'; $('aulaLista').innerHTML = ''; return; }
+  if(d && etapaPF(d.nome)){ abrirProjetoFinal(d); return; }   // Projeto Final I / II: não tem aula
   var sem = !resumo.temChave, pip = 'documentPictureInPicture' in window;
   $('aulaTopo').innerHTML = bannerPendentes(pend) + '<div class="caixa"><h2>Iniciar aula</h2><label class="rot">Disciplina</label>' +
     (d ? '<p style="margin:0;font-size:16px"><b>' + esc(d.nome) + ' · ' + esc(d.semestre) + '</b> <span class="aviso">(troque no quadro de disciplinas acima)</span></p>'
