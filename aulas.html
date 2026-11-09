@@ -396,16 +396,17 @@
   <!-- ================= ALUNO ================= -->
   <section id="tAluno" class="oculto">
     <div id="qAbertas"></div>
+    <!-- as abas ficam sempre à vista, também dentro do estudo, do caderno e das notas -->
+    <div class="abas" role="group" aria-label="Seções do aluno">
+      <button type="button" class="aba" data-abaal="mat" aria-pressed="true">Minhas matérias</button>
+      <button type="button" class="aba" data-abaal="provas" aria-pressed="false">Minhas provas</button>
+      <button type="button" class="aba oculto" data-abaal="trilha" id="abaAlTrilha" aria-pressed="false">🎓 Aulas em trilha</button>
+      <button type="button" class="aba" data-abaal="insc" aria-pressed="false">Inscrever-se numa matéria</button>
+    </div>
     <div id="alunoLista">
       <div id="cartaoAvisos"></div>
       <div id="correio" style="margin-bottom:12px"></div>
       <div id="avisoVista"></div>
-      <div class="abas" role="group" aria-label="Seções do aluno">
-        <button type="button" class="aba" data-abaal="mat" aria-pressed="true">Minhas matérias</button>
-        <button type="button" class="aba" data-abaal="provas" aria-pressed="false">Minhas provas</button>
-        <button type="button" class="aba oculto" data-abaal="trilha" id="abaAlTrilha" aria-pressed="false">🎓 Aulas em trilha</button>
-        <button type="button" class="aba" data-abaal="insc" aria-pressed="false">Inscrever-se numa matéria</button>
-      </div>
       <div class="caixa" data-painelal="mat">
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
