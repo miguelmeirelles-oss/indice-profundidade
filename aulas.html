@@ -115,6 +115,8 @@
   .diaLinha .faltasTxt{flex:1;min-width:220px;font-size:14px}
   .diaLinha .chk{display:flex;gap:5px;align-items:center;font-size:13px;cursor:pointer;white-space:nowrap}
   .diaLinha .chk input{width:17px;height:17px;accent-color:#1a7a3c}
+  .opRev{border:1.5px solid var(--linha);border-radius:10px;padding:8px 10px;background:#fff;color:var(--navy);font-weight:normal;box-shadow:none;font-size:14.5px}
+  .opRev.certa{border-color:#1a7a3c;background:#e9f6ee}.opRev.errada{border-color:#c62828;background:#fdeceb}
   .eixo{border-left:5px solid;border-radius:0 12px 12px 0;padding:8px 12px;margin:8px 0;background:#fafbfd;font-size:14.5px}
   .modeloEst{background:#e6f5ea;border-left:5px solid #1a7a3c;border-radius:0 12px 12px 0;padding:10px 14px;margin:10px 0;font-size:14.5px}
   .ajudaEst{background:#eef4ff;border-left:5px solid var(--azul);border-radius:0 12px 12px 0;padding:10px 14px;margin:10px 0;font-size:14.5px}
@@ -412,7 +414,7 @@
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
       </div>
-      <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>📈 Desempenho</h2><div id="desempCorpo"><p class="carregando">Carregando…</p></div></div>
+      <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>📈 Desempenho</h2><div id="revisaoBox"></div><div id="desempCorpo"><p class="carregando">Carregando…</p></div></div>
       <div class="caixa oculto" id="caixaTrilhaAluno" data-painelal="trilha"></div>
       <div class="caixa" id="caixaProvas" data-painelal="provas">
         <h2>📝 Minhas provas</h2>
@@ -1523,6 +1525,7 @@ function desenharCaderno(m, r){
 var DES = {r: null};
 function carregarDesempenho(atualizar){
   var el = $('desempCorpo'); if(!el) return;
+  carregarRevisaoCurso();
   if(DES.r && !atualizar){ desenharDesempenho(); }
   else el.innerHTML = '<p class="carregando">Montando o seu plano… (alguns segundos)</p>';
   api('meuDesempenho', {atualizar: !!atualizar}).then(function(r){ DES.r = r; desenharDesempenho(); })
@@ -1626,6 +1629,141 @@ function abrirDiagnostico(m){
       api('estudoResumo', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(){ abrirDiagnostico(m); })
         .catch(function(e){ bt.disabled = false; $('msgResumoEst').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
     });
+  });
+}
+/* ================= REVISÃO DO CURSO: ENADE, MESTRADO, DOUTORADO (09/11/2026) =================
+   A IA escolhe, entre todas as aulas em trilha do curso (de qualquer matéria e semestre), só o que mais cai na prova
+   que o aluno vai fazer, em módulos por prioridade. Fica guardada; o professor é avisado. */
+var REV = {r: null};
+function carregarRevisaoCurso(){
+  var box = $('revisaoBox'); if(!box) return;
+  if(REV.r) desenharRevisaoBox();
+  api('revisaoMinha', {}).then(function(r){ REV.r = r; desenharRevisaoBox(); }).catch(function(){ box.innerHTML = ''; });
+}
+function desenharRevisaoBox(){
+  var box = $('revisaoBox'), v = REV.r && REV.r.revisao;
+  if(!v){
+    box.innerHTML = '<div class="convite" style="margin:0 0 14px"><b>🎯 Vai fazer ENADE, seleção de mestrado ou de doutorado?</b><p class="aviso" style="margin:4px 0 8px">Monte uma revisão direcionada: a IA escolhe só as aulas do curso que mais caem nesse tipo de prova (inclusive de matérias que você cursou há tempos), na ordem de prioridade.</p><button type="button" class="mini" id="btRevNova">🎯 Montar minha revisão</button></div>';
+    $('btRevNova').addEventListener('click', formRevisao); return;
+  }
+  box.innerHTML = '<div class="convite" style="margin:0 0 14px;border-left-color:#7D3C98"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>🎯 Sua revisão: ' + esc(v.nomeObjetivo) + (v.detalhe ? ' · ' + esc(v.detalhe) : '') + '</b><span class="aviso">' + v.aulas + ' aulas' + (v.dias !== null ? ' · prova em ' + v.dias + ' dia' + (v.dias === 1 ? '' : 's') : '') + '</span></div>' +
+    '<div class="barraDom" style="margin:6px 0"><i style="width:' + v.progresso + '%;background:#7D3C98"></i></div><span class="aviso">' + v.progresso + '% concluído</span>' +
+    (v.proximas.length ? '<p style="margin:8px 0 2px"><b>Próximas aulas</b></p>' + v.proximas.map(function(it){ return '<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;margin:4px 0"><span style="font-size:14px">' + (it.prioridade === 'alta' ? '⭐ ' : '') + esc(it.titulo) + ' <span class="aviso">· ' + esc(it.materia) + '</span></span><button type="button" class="mini" data-revaula="' + esc(it.trilha) + '">▶ Abrir</button></div>'; }).join('') : '<div class="ok" style="margin:6px 0">Você concluiu todas as aulas da revisão! 🎉</div>') +
+    '<div class="botoes" style="margin:8px 0 0"><button type="button" class="secundario mini" id="btRevVer">Ver a revisão completa</button></div></div>';
+  box.querySelectorAll('[data-revaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha'); abrirTrilhaAluno(b.dataset.revaula); window.scrollTo(0, 0); }); });
+  $('btRevVer').addEventListener('click', abrirRevisao);
+}
+function topoRevisao(titulo){
+  var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto'); window.scrollTo(0, 0);
+  return '<div class="caixa" style="margin-bottom:0"><button type="button" class="link" data-voltar>&#8592; voltar</button> <span class="aviso">🎯 Revisão do curso</span></div><div class="caixa"><h2>' + titulo + '</h2>';
+}
+function voltarDaRevisao(){ voltarListaAluno(); abaAluno('desemp'); }
+function formRevisao(){
+  var el = $('alunoDetalhe'), o = (REV.r && REV.r.objetivos) || {enade: 'ENADE', mestrado: 'mestrado', doutorado: 'doutorado', outra: 'outra prova'};
+  el.innerHTML = topoRevisao('🎯 Montar minha revisão') +
+    '<p class="aviso" style="margin-top:0">Não é para rever o curso inteiro: a revisão escolhe o que mais cai na prova que você vai fazer.</p>' +
+    '<label class="rot">Para qual prova?</label><select id="revObj">' + Object.keys(o).map(function(k){ return '<option value="' + k + '">' + esc(o[k].charAt(0).toUpperCase() + o[k].slice(1)) + '</option>'; }).join('') + '</select>' +
+    '<label class="rot" style="margin-top:8px">Qual programa ou instituição? <span class="aviso">(opcional)</span></label><input type="text" id="revDet" maxlength="200" placeholder="ex.: Mestrado em Ciência de Alimentos da UFRJ">' +
+    '<label class="rot" style="margin-top:8px">Edital ou conteúdo programático <span class="aviso">(opcional, mas ajuda muito: cole o texto)</span></label><textarea id="revEdital" style="min-height:110px" placeholder="Cole aqui a parte do edital com os assuntos da prova"></textarea>' +
+    '<label class="rot" style="margin-top:8px">Data da prova <span class="aviso">(opcional)</span></label><input type="date" id="revData">' +
+    '<div class="botoes"><button type="button" id="btRevMontar">🎯 Montar a revisão</button></div><div id="msgRev"></div></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', voltarDaRevisao);
+  $('btRevMontar').addEventListener('click', function(){
+    var b = this, ped = {objetivo: $('revObj').value, detalhe: $('revDet').value, edital: $('revEdital').value, dataAlvo: $('revData').value};
+    b.disabled = true; $('msgRev').innerHTML = '<p class="carregando">Escolhendo as aulas do curso que mais caem nessa prova… (uns 20 a 40 segundos)</p>';
+    api('revisaoSugerir', ped).then(function(r){ conferirRevisao(ped, r); })
+      .catch(function(e){ b.disabled = false; $('msgRev').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+  });
+}
+// a IA sugeriu: o aluno tira o que não quer, acrescenta outras aulas e só então salva
+function conferirRevisao(ped, r){
+  var el = $('alunoDetalhe'), plano = r.rascunho, cat = r.catalogo || [];
+  var porMat = {}; cat.forEach(function(t){ (porMat[t.materia + ' · ' + t.semestre] = porMat[t.materia + ' · ' + t.semestre] || []).push(t); });
+  var opcoes = '<option value="">＋ acrescentar outra aula…</option>' + Object.keys(porMat).sort().map(function(k){ return '<optgroup label="' + esc(k) + '">' + porMat[k].map(function(t){ return '<option value="' + esc(t.id) + '">' + esc(t.titulo) + '</option>'; }).join('') + '</optgroup>'; }).join('');
+  var nomeDe = {}; cat.forEach(function(t){ nomeDe[t.id] = t; });
+  var desenhar = function(){
+    var h = topoRevisao('🎯 Confira a sua revisão') +
+      '<p class="aviso" style="margin-top:0">A IA pré-selecionou as aulas que mais caem nessa prova. <b>Desmarque</b> o que você já domina ou não quer, <b>acrescente</b> outras aulas se quiser e salve.</p>' +
+      (plano.resumo ? '<p style="margin:6px 0 10px">' + esc(plano.resumo) + '</p>' : '');
+    h += plano.modulos.map(function(m, mi){
+      return '<div class="convite" style="margin:8px 0;background:#fff"><b>' + (mi + 1) + '. ' + esc(m.titulo) + '</b>' + (m.porque ? '<p class="aviso" style="margin:4px 0">' + esc(m.porque) + '</p>' : '') +
+        m.itens.map(function(it, ii){ var t = nomeDe[it.trilha] || {titulo: it.titulo || it.trilha, materia: it.materia || '', semestre: it.semestre || ''};
+          return '<label style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px dashed var(--linha);cursor:pointer"><input type="checkbox" data-revit="' + mi + ':' + ii + '"' + (it.fora ? '' : ' checked') + ' style="width:20px;height:20px;flex:0 0 auto;margin-top:2px">' +
+            '<span><b>' + (it.prioridade === 'alta' ? '⭐ ' : '') + esc(t.titulo) + '</b><br><span class="aviso">' + esc(t.materia + (t.semestre ? ' · ' + t.semestre : '')) + (it.motivo ? ' · ' + esc(it.motivo) : '') + '</span></span></label>'; }).join('') +
+        '<select data-revadd="' + mi + '" style="width:100%;margin-top:6px">' + opcoes + '</select></div>';
+    }).join('');
+    if(plano.fora && plano.fora.length) h += '<div class="eixo" style="border-color:#8a6100"><b>Estude também por fora</b> <span class="aviso">(cai e não está nas aulas da plataforma)</span>' + plano.fora.map(function(x){ return '<br>• ' + esc(x); }).join('') + '</div>';
+    h += '<div class="botoes"><button type="button" id="btRevSalvar">✓ Salvar minha revisão</button><button type="button" class="secundario" id="btRevPedido">mudar o pedido</button></div><div id="msgRev"></div></div>';
+    el.innerHTML = h;
+    el.querySelector('[data-voltar]').addEventListener('click', voltarDaRevisao);
+    el.querySelectorAll('[data-revit]').forEach(function(c){ c.addEventListener('change', function(){ var k = c.dataset.revit.split(':'); plano.modulos[Number(k[0])].itens[Number(k[1])].fora = !c.checked; }); });
+    el.querySelectorAll('[data-revadd]').forEach(function(sel){ sel.addEventListener('change', function(){
+      if(!sel.value) return; var m = plano.modulos[Number(sel.dataset.revadd)];
+      if(!m.itens.some(function(it){ return it.trilha === sel.value; })) m.itens.push({trilha: sel.value, prioridade: 'media', motivo: 'acrescentada por você'});
+      desenhar();
+    }); });
+    $('btRevPedido').addEventListener('click', formRevisao);
+    $('btRevSalvar').addEventListener('click', function(){
+      var final = JSON.parse(JSON.stringify(plano)); final.modulos.forEach(function(m){ m.itens = m.itens.filter(function(it){ return !it.fora; }); });
+      var b = this; b.disabled = true; $('msgRev').innerHTML = '<p class="carregando">Salvando…</p>';
+      api('revisaoSalvar', {objetivo: ped.objetivo, detalhe: ped.detalhe, dataAlvo: ped.dataAlvo, plano: final}).then(function(x){ REV.r = x; abrirRevisao(); })
+        .catch(function(e){ b.disabled = false; $('msgRev').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+    });
+  };
+  desenhar();
+}
+// questões de múltipla escolha do módulo (estilo ENADE no ENADE): geradas uma vez e guardadas
+function questoesRevisao(mi, mais, box){
+  box.innerHTML = '<p class="carregando">' + (mais ? 'Criando mais questões…' : 'Preparando as questões…') + ' (uns 20 segundos)</p>';
+  api('revisaoQuestoes', {modulo: mi, mais: !!mais}).then(function(r){
+    var qs = r.questoes || [], L = 'ABCDE';
+    box.innerHTML = qs.map(function(q, qi){
+      return '<div style="border-top:1px dashed var(--linha);padding:10px 0">' + (q.texto_base ? '<p style="margin:0 0 6px;font-size:14px;background:#f6f8fc;border-radius:8px;padding:8px 10px">' + esc(q.texto_base) + '</p>' : '') +
+        '<p style="margin:0 0 6px"><b>' + (qi + 1) + '. ' + esc(q.enunciado) + '</b></p>' +
+        q.alternativas.map(function(a, ai){ return '<button type="button" class="opRev" data-qrev="' + qi + ':' + ai + '" style="display:block;width:100%;text-align:left;margin:4px 0"><b>' + L.charAt(ai) + ')</b> ' + esc(a) + '</button>'; }).join('') +
+        '<div data-qret="' + qi + '"></div></div>';
+    }).join('') + (r.aviso ? '<p class="aviso">' + esc(r.aviso) + '</p>' : '') + (qs.length < 12 ? '<div class="botoes"><button type="button" class="secundario mini" data-qmais="1">＋ Mais 3 questões</button></div>' : '');
+    box.querySelectorAll('[data-qrev]').forEach(function(b){ b.addEventListener('click', function(){
+      var k = b.dataset.qrev.split(':'), q = qs[Number(k[0])], ai = Number(k[1]), certo = ai === q.correta;
+      box.querySelectorAll('[data-qrev^="' + k[0] + ':"]').forEach(function(x){ x.classList.remove('certa', 'errada'); });
+      b.classList.add(certo ? 'certa' : 'errada');
+      box.querySelector('[data-qret="' + k[0] + '"]').innerHTML = '<div class="' + (certo ? 'ok' : 'erro') + '" style="margin:6px 0">' + (certo ? '✓ Correta! ' : '✗ A correta é a ' + L.charAt(q.correta) + '. ') + esc(q.comentario) + '</div>';
+    }); });
+    var bm = box.querySelector('[data-qmais]'); if(bm) bm.addEventListener('click', function(){ questoesRevisao(mi, true, box); });
+  }).catch(function(e){ box.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+}
+function abrirRevisao(){
+  var el = $('alunoDetalhe'), v = REV.r && REV.r.revisao;
+  if(!v){ formRevisao(); return; }
+  var h = topoRevisao('🎯 Revisão para ' + esc(v.nomeObjetivo)) +
+    (v.detalhe ? '<p style="margin:0 0 4px"><b>' + esc(v.detalhe) + '</b></p>' : '') +
+    '<p class="aviso" style="margin:0 0 6px">Montada em ' + esc(v.criado) + (v.dataAlvo ? ' · prova em ' + esc(v.dataAlvo) + (v.dias !== null ? ' (' + v.dias + ' dias)' : '') : '') + '</p>' +
+    (v.plano.resumo ? '<p style="margin:6px 0 10px">' + esc(v.plano.resumo) + '</p>' : '') +
+    '<div class="barraDom"><i style="width:' + v.progresso + '%;background:#7D3C98"></i></div><p class="aviso" style="margin:2px 0 12px">' + v.progresso + '% concluído · ' + v.aulas + ' aulas</p>';
+  h += v.plano.modulos.map(function(m, mi){
+    return '<details class="convite" style="margin:8px 0;background:#fff"' + (mi === 0 ? ' open' : '') + '><summary style="cursor:pointer"><b>' + (mi + 1) + '. ' + esc(m.titulo) + '</b> <span class="aviso">· ' + m.itens.length + ' aula' + (m.itens.length > 1 ? 's' : '') + ' · ' + m.progresso + '%</span>' +
+      '<div class="barraDom" style="margin-top:4px"><i style="width:' + m.progresso + '%;background:#7D3C98"></i></div></summary>' +
+      (m.porque ? '<p class="aviso" style="margin:6px 0">' + esc(m.porque) + '</p>' : '') +
+      m.itens.map(function(it){
+        return '<div style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border-top:1px dashed var(--linha);padding:8px 0">' +
+          '<div style="flex:1 1 200px"><b>' + (it.progresso >= 100 ? '✓ ' : '') + (it.prioridade === 'alta' ? '⭐ ' : '') + esc(it.titulo) + '</b><div class="aviso">' + esc(it.materia) + ' · ' + esc(it.semestre) + '</div>' + (it.motivo ? '<div class="aviso">' + esc(it.motivo) + '</div>' : '') +
+          '<div class="barraDom" style="margin:3px 0 0;max-width:220px"><i style="width:' + it.progresso + '%;background:#7D3C98"></i></div></div>' +
+          '<button type="button" class="mini' + (it.progresso ? ' secundario' : '') + '" data-revaula="' + esc(it.trilha) + '">' + (it.progresso >= 100 ? '↻ Rever' : it.progresso ? '▶ Continuar' : '▶ Estudar') + '</button></div>';
+      }).join('') +
+      '<div class="botoes" style="margin:8px 0 0"><button type="button" class="mini secundario" data-revq="' + mi + '">✍ ' + (v.objetivo === 'enade' ? 'Treinar questões estilo ENADE' : 'Treinar questões de múltipla escolha') + '</button></div><div data-revqbox="' + mi + '"></div></details>';
+  }).join('');
+  if(v.plano.fora && v.plano.fora.length) h += '<div class="eixo" style="border-color:#8a6100;margin-top:12px"><b>Estude também por fora</b> <span class="aviso">(cai nessa prova e não está nas aulas da plataforma)</span>' + v.plano.fora.map(function(x){ return '<br>• ' + esc(x); }).join('') + '</div>';
+  if(v.plano.dicas && v.plano.dicas.length) h += '<div class="eixo" style="border-color:#2E62C6"><b>Dicas para essa prova</b>' + v.plano.dicas.map(function(x){ return '<br>• ' + esc(x); }).join('') + '</div>';
+  h += '<p class="aviso">⭐ = prioridade alta.</p><div class="botoes"><button type="button" class="secundario mini" id="btRevRefazer">Montar outra revisão</button><button type="button" class="link" style="color:#8a1c1c" id="btRevApagar">apagar esta revisão</button></div></div>';
+  el.innerHTML = h;
+  el.querySelector('[data-voltar]').addEventListener('click', voltarDaRevisao);
+  el.querySelectorAll('[data-revaula]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno('trilha'); abrirTrilhaAluno(b.dataset.revaula); window.scrollTo(0, 0); }); });
+  $('btRevRefazer').addEventListener('click', formRevisao);
+  el.querySelectorAll('[data-revq]').forEach(function(b){ b.addEventListener('click', function(){ b.style.display = 'none'; questoesRevisao(Number(b.dataset.revq), false, el.querySelector('[data-revqbox="' + b.dataset.revq + '"]')); }); });
+  $('btRevApagar').addEventListener('click', function(){
+    if(!confirm('Apagar esta revisão? Você pode montar outra quando quiser.')) return;
+    api('revisaoApagar', {}).then(function(){ REV.r = {revisao: null, objetivos: REV.r.objetivos}; voltarDaRevisao(); }).catch(function(e){ alert(e.message); });
   });
 }
 function htmlModelo(m){
@@ -2079,7 +2217,7 @@ function carregarTrilha(el, modo, abrirId){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo, abrirId: abrirId || ''}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=49';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=50';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);

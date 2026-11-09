@@ -27,7 +27,7 @@ var PROMPT_TRILHA = [
 "4. \"fala\" é para ser OUVIDA: frases curtas e naturais, como o professor falando, 2 a 5 frases por passo (no máximo ~700 caracteres). Sem símbolos nem siglas soltas: escreva \"atividade de água\" e não \"Aw\", \"trinta por cento\" e não \"30%\", \"graus Celsius\" e não \"°C\". Os \"pontos\" (texto na tela) podem usar símbolos.",
 "5. UM BLOCO POR TRILHA: cada aula em trilha (cada arquivo JSON) tem UM ÚNICO bloco, sobre um assunto, com 6 a 12 passos (uns 5 a 8 minutos). Assuntos diferentes viram trilhas diferentes, nunca blocos juntos no mesmo arquivo. Cada passo mostra uma coisa nova no gráfico e/ou na cena.",
 "6. \"contexto_ia\" (800 a 3000 caracteres): resumo fiel e CORRETO do que a aula ensina naquele bloco, com os exemplos e números usados (já corrigidos). É a base da IA que tira as dúvidas, então escreva tudo o que ela precisa saber para não contradizer a aula nem repetir um erro.",
-"7. Feche o bloco com uma \"checagem\" (múltipla escolha que exige entender, não decorar) e uma \"pergunta_falada\" (o estudante responde falando).",
+"7. Feche o bloco com uma \"checagem\" (múltipla escolha que exige entender, não decorar, com EXATAMENTE 4 alternativas, como as questões de sala; varie a posição da certa) e uma \"pergunta_falada\" (o estudante responde falando).",
 "8. No fim do bloco o estudante faz a avaliação de profundidade do \"Estudar com IA\" sobre o assunto. Em \"subtopico_id\", ponha o id do assunto do CATÁLOGO DO ESTUDAR COM IA (no fim deste prompt) que melhor corresponde ao bloco; se nenhum servir, deixe vazio.",
 "9. Em \"tema_id\", ponha o id do SUBTEMA DA DISCIPLINA (lista no fim deste prompt) do assunto do bloco: as questões abertas do estudo dirigido no fim do bloco saem desse subtema. Se nenhum servir, deixe vazio.",
 "10. VISUAL: toda trilha leva \"visual\": {\"fundo\": \"branco\"}. Use as cores pelo nome (a plataforma escolhe o tom com contraste para o fundo branco).",
@@ -161,7 +161,7 @@ var PROMPT_TRILHA = [
 "         \"acoes\": [{\"tipo\": \"serie\", \"serie\": \"ads\"}],",
 "         \"cena_acoes\": [{\"tipo\": \"aguas\", \"grupo\": \"w\", \"n\": 30}, {\"tipo\": \"aparecer\", \"elemento\": \"na\"}, {\"tipo\": \"hidratar\", \"alvo\": \"na\", \"camadas\": 2, \"n\": 14, \"atraso\": 2000}]}",
 "      ],",
-"      \"checagem\": {\"tipo\": \"multipla\", \"pergunta\": \"…\", \"alternativas\": [\"…\", \"…\", \"…\"], \"correta\": 0, \"explicacao\": \"por que a certa é a certa\"},",
+"      \"checagem\": {\"tipo\": \"multipla\", \"pergunta\": \"…\", \"alternativas\": [\"…\", \"…\", \"…\", \"…\"], \"correta\": 2, \"explicacao\": \"por que a certa é a certa\"},",
 "      \"pergunta_falada\": {\"pergunta\": \"…\", \"esperado\": \"o que uma boa resposta contém\"}",
 "    }",
 "  ]",
@@ -253,6 +253,7 @@ function desenharLista(){
     '<input type="text" id="tr_linkVid" placeholder="link do YouTube (ex.: https://youtu.be/…)" style="width:100%;margin-top:8px">' +
     '<div class="botoes"><input type="file" id="tr_arqVid" accept="video/mp4,video/*"><button id="tr_btVid">🎬 Enviar e montar o roteiro</button></div><div id="tr_msgVid"></div></div>';
   h += '<details class="caixa" id="tr_usoDet"><summary style="cursor:pointer"><h2 style="display:inline">📊 Quem estudou</h2> <span class="aviso">(clique para ver; só carrega quando abre)</span></summary><div id="tr_boxUso" style="margin-top:10px"></div></details>';
+  h += '<details class="caixa" id="tr_revDet"><summary style="cursor:pointer"><h2 style="display:inline">🎯 Revisões do curso</h2> <span class="aviso">(alunos estudando para ENADE, mestrado, doutorado…)</span></summary><div id="tr_boxRev" style="margin-top:10px"></div></details>';
   $('corpo').innerHTML = h;
 
   document.querySelectorAll('[data-trfiltro]').forEach(function(b){ b.addEventListener('click', function(){ try{ localStorage.setItem('trilha_filtro_prof', b.getAttribute('data-trfiltro')); }catch(e){} desenharLista(); }); });
@@ -305,6 +306,13 @@ function desenharLista(){
       conferir();
       $('resConf').scrollIntoView({behavior: 'smooth', block: 'start'});
     }).catch(function(e){ bt.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  if($('revDet')) $('revDet').addEventListener('toggle', function(){
+    if(!this.open) return;
+    $('boxRev').innerHTML = '<p class="aviso">Carregando…</p>';
+    api('revisoesTurma', {}).then(function(l){
+      $('boxRev').innerHTML = l.length ? '<div class="tabelaBox"><table><tr><th>Aluno</th><th>Para</th><th>Data da prova</th><th>Progresso</th><th>Desde</th></tr>' + l.map(function(r){ return '<tr><td>' + esc(r.aluno) + '</td><td>' + esc(r.objetivo) + (r.detalhe ? '<br><span class="aviso">' + esc(r.detalhe) + '</span>' : '') + '</td><td>' + esc(r.dataAlvo || '—') + '</td><td>' + r.progresso + '% de ' + r.aulas + ' aulas</td><td>' + esc(r.criado) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="aviso">Nenhum aluno montou uma revisão ainda. Quando montar, você recebe um aviso nas Mensagens.</p>';
+    }).catch(function(e){ $('boxRev').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
   if($('usoDet')) $('usoDet').addEventListener('toggle', function(){ if(this.open){ $('boxUso').innerHTML = '<p class="aviso">Carregando…</p>'; carregarUso(); } });
 }
