@@ -1230,6 +1230,7 @@ function carregarMinhas(){
         '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') + '</div>' +
         '<div class="botoes" style="margin-top:8px">' +
         (m.situacao === 'aprovada' && m.ativa ? '<button type="button" class="mini" data-estudar="' + i + '">📚 Estudar</button>' : '') +
+        (m.situacao === 'aprovada' ? '<button type="button" class="secundario mini" data-caderno="' + i + '">📒 Meu caderno</button>' : '') +
         (m.situacao === 'aprovada' ? '<button type="button" class="' + (m.ativa ? 'secundario ' : '') + 'mini" data-abrir="' + i + '">Notas</button>' +
           '<button type="button" class="secundario mini" data-apost="' + i + '">Apostila</button>' : '') +
         (m.material ? '<a class="botaoLink" href="' + esc(m.material) + '" target="_blank" rel="noopener">📁 Material no Drive</a>' : '') +
@@ -1242,6 +1243,7 @@ function carregarMinhas(){
       (encerradas.length ? '<details class="encerradas" style="margin-top:6px"><summary>📦 Matérias encerradas (' + encerradas.length + ')</summary><div style="margin-top:10px">' + encerradas.join('') + '</div></details>' : '');
     el.querySelectorAll('[data-abrir]').forEach(function(b){ b.addEventListener('click', function(){ abrirMateria(lista[Number(b.dataset.abrir)]); }); });
     el.querySelectorAll('[data-estudar]').forEach(function(b){ b.addEventListener('click', function(){ abrirEstudo(lista[Number(b.dataset.estudar)]); }); });
+    el.querySelectorAll('[data-caderno]').forEach(function(b){ b.addEventListener('click', function(){ abrirCaderno(lista[Number(b.dataset.caderno)]); }); });
     el.querySelectorAll('[data-apost]').forEach(function(b){ b.addEventListener('click', function(){ abrirApostilaAluno(lista[Number(b.dataset.apost)]); }); });
     el.querySelectorAll('[data-cancelar]').forEach(function(b){
       b.addEventListener('click', function(){
@@ -1439,6 +1441,76 @@ function abrirProvaAluno(i){
 var EST = {m: null, q: null, ultima: null};
 function dezEst(n){ return n === null || n === undefined ? '—' : (Math.round(n) / 10).toFixed(1).replace('.', ','); }
 function corDom(n){ return n === null ? '#cbd5e1' : n >= 70 ? '#1a7a3c' : n >= 50 ? '#b07d00' : '#c62828'; }
+/* ================= MEU CADERNO (09/11/2026) =================
+   As questões abertas que o aluno já respondeu (estudo dirigido e aulas em trilha), por assunto, com a melhor
+   resposta, a correção, a evolução e "refazer"; no topo, o Resumo dos meus estudos (IA, guardado). */
+function abrirCaderno(m){
+  EST.m = m;
+  var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
+  el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Abrindo o seu caderno…</p></div>';
+  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  window.scrollTo(0, 0);
+  api('estudoCaderno', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){ desenharCaderno(m, r); })
+    .catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); });
+}
+function htmlResumoEstudos(rs){
+  if(!rs || !rs.dados) return '<p class="aviso" style="margin:4px 0 8px">Junte o que você já estudou nesta matéria (aulas em trilha e questões) num resumo com seus pontos fortes, fracos e o que fazer agora.</p><div class="botoes" style="margin:0"><button type="button" class="mini" id="btResumoEst">✨ Montar meu resumo</button></div><div id="msgResumoEst"></div>';
+  var d = rs.dados, li = function(l, cor, ic){ return (l || []).map(function(x){ return '<div style="display:flex;gap:8px;margin:4px 0;font-size:14.5px"><span style="color:' + cor + ';font-weight:bold">' + ic + '</span><span>' + esc(x) + '</span></div>'; }).join(''); };
+  return (d.frase ? '<p style="margin:6px 0 10px;font-size:15.5px"><b>' + esc(d.frase) + '</b></p>' : '') +
+    '<div class="eixo" style="border-color:#1a7a3c;margin:6px 0"><b>Pontos fortes</b>' + li(d.fortes, '#1a7a3c', '✓') + '</div>' +
+    '<div class="eixo" style="border-color:#c62828;margin:6px 0"><b>Pontos fracos</b>' + li(d.fracos, '#c62828', '!') + '</div>' +
+    '<div class="eixo" style="border-color:#2E62C6;margin:6px 0"><b>O que fazer agora</b>' + (d.proximos || []).map(function(x, i){ return '<div style="display:flex;gap:8px;margin:4px 0;font-size:14.5px"><span style="color:#2E62C6;font-weight:bold">' + (i + 1) + '.</span><span>' + esc(x) + '</span></div>'; }).join('') + '</div>' +
+    '<p class="aviso" style="margin:6px 0 0">Atualizado em ' + esc(rs.atualizado || '') + (rs.velho ? ' · você estudou mais desde então. <button type="button" class="link" id="btResumoEst">↻ Atualizar</button>' : '') + '</p>' + (rs.aviso ? '<p class="aviso">' + esc(rs.aviso) + '</p>' : '') + '<div id="msgResumoEst"></div>';
+}
+function desenharCaderno(m, r){
+  var el = $('alunoDetalhe'), media = function(l){ return l.length ? Math.round(l.reduce(function(s, q){ return s + q.melhor.nota; }, 0) / l.length) : null; };
+  var h = cabEstudo(m) + '<div class="caixa"><h2>📒 Meu caderno · ' + esc(m.nome) + '</h2>' +
+    '<div class="convite" id="boxResumoEst" style="margin:0 0 14px"><b style="font-size:16px">📊 Resumo dos meus estudos</b>' + htmlResumoEstudos(r.resumo) + '</div>';
+  if(!r.assuntos.length) h += '<p class="aviso">Você ainda não respondeu questões abertas nesta matéria. Elas aparecem aqui assim que você responder no <b>Estudo dirigido</b> ou no fim de uma <b>aula em trilha</b>.</p>';
+  else {
+    h += '<p class="aviso" style="margin:0 0 8px">' + r.questoes + ' questão(ões) respondida(s), ' + r.respostas + ' resposta(s) no total. Em cada assunto, as de nota mais baixa vêm primeiro: são as que mais valem refazer.</p>';
+    h += r.assuntos.map(function(a, ai){
+      var md = media(a.questoes);
+      return '<details class="convite" style="margin:8px 0;background:#fff"' + (r.assuntos.length === 1 ? ' open' : '') + '><summary style="cursor:pointer"><b>' + esc(a.grupo ? a.grupo + ' › ' + a.tema : a.tema) + '</b> <span class="aviso">· ' + a.questoes.length + ' questão(ões) · média ' + dezEst(md) + '</span>' +
+        '<div class="barraDom" style="margin-top:4px"><i style="width:' + (md || 0) + '%;background:' + corDom(md) + '"></i></div></summary>' +
+        a.questoes.map(function(q, qi){
+          var mel = q.melhor, evo = q.tentativas.map(function(t, k){ return '<span style="display:inline-block;padding:1px 7px;border-radius:999px;background:' + corDom(t.nota) + '22;border:1px solid ' + corDom(t.nota) + ';font-size:12.5px;margin:2px 3px 2px 0" title="' + esc(t.data) + '">' + (k + 1) + 'ª ' + dezEst(t.nota) + '</span>'; }).join('');
+          return '<div style="border-top:1px dashed var(--linha);padding:10px 0 4px">' +
+            '<p style="margin:0 0 4px;font-weight:bold">' + esc(q.enunciado) + '</p>' +
+            (q.aula ? '<p class="aviso" style="margin:0 0 4px">da aula em trilha: ' + esc(q.aula) + '</p>' : '') +
+            '<div style="margin:2px 0 6px">' + evo + '</div>' +
+            '<details><summary class="link">Sua melhor resposta (' + dezEst(mel.nota) + (mel.ajuda ? ', com ajuda' : '') + ')</summary><p style="white-space:pre-wrap;margin:6px 0;background:#f6f8fc;border-radius:8px;padding:8px 10px;font-size:14px">' + esc(mel.resposta) + '</p>' +
+              (mel.acertos ? '<div class="eixo" style="border-color:#1a7a3c"><b>Acertou</b><br>' + esc(mel.acertos) + '</div>' : '') +
+              (mel.conteudo ? '<div class="eixo" style="border-color:#c62828"><b>Faltou no conteúdo</b><br>' + esc(mel.conteudo) + '</div>' : '') +
+              (mel.estrutura ? '<div class="eixo" style="border-color:#2E62C6"><b>Estrutura</b><br>' + esc(mel.estrutura) + '</div>' : '') +
+              (mel.pensamento ? '<div class="eixo" style="border-color:#8a6100"><b>Raciocínio</b><br>' + esc(mel.pensamento) + '</div>' : '') + '</details>' +
+            ((q.modelo && (q.modelo.passos || []).length) ? '<details style="margin-top:4px"><summary class="link">📘 Resposta comentada</summary>' + htmlModelo(q.modelo) + '</details>' : '') +
+            (r.inscrito !== false ? '<div class="botoes" style="margin:6px 0 0"><button type="button" class="mini secundario" data-refazer="' + ai + ':' + qi + '"' + (r.restantesHoje ? '' : ' disabled title="limite de correções de hoje"') + '>↻ Refazer esta questão</button></div>' : '') + '</div>';
+        }).join('') + '</details>';
+    }).join('');
+  }
+  el.innerHTML = h + '</div>';
+  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  var ligarResumo = function(){
+    var bt = $('btResumoEst'); if(!bt) return;
+    bt.addEventListener('click', function(){
+      bt.disabled = true; $('msgResumoEst').innerHTML = '<p class="carregando">Montando o seu resumo… (uns 10 a 20 segundos)</p>';
+      api('estudoResumo', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(rs){
+        r.resumo = rs; $('boxResumoEst').innerHTML = '<b style="font-size:16px">📊 Resumo dos meus estudos</b>' + htmlResumoEstudos(rs); ligarResumo();
+      }).catch(function(e){ bt.disabled = false; $('msgResumoEst').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+    });
+  };
+  ligarResumo();
+  el.querySelectorAll('[data-refazer]').forEach(function(b){ b.addEventListener('click', function(){
+    var k = b.dataset.refazer.split(':'), a = r.assuntos[Number(k[0])], q = a.questoes[Number(k[1])];
+    var melhor = Math.max.apply(null, q.tentativas.map(function(t){ return t.nota; }));
+    EST.m = m; EST.q = {id: q.id, enunciado: q.enunciado, ajuda: q.ajuda || [], tema: a.grupo ? a.grupo + ' › ' + a.tema : a.tema, naProva: false};
+    EST.ultima = {tentativa: q.tentativas.length, nota: melhor, melhorAntes: melhor};
+    desenharQuestaoEstudo('');
+    window.scrollTo(0, 0);
+  }); });
+}
 function htmlModelo(m){
   if(!m || !(m.passos || []).length) return '';
   return '<div class="modeloEst"><b>📘 Resposta comentada</b>' + m.passos.map(function(p, i){ return '<p style="margin:6px 0 0"><b>' + (i + 1) + '. ' + esc(p.titulo) + ':</b> ' + esc(p.texto) + '</p>'; }).join('') +
@@ -1482,7 +1554,7 @@ function abrirEstudo(m){
     if(r.temas.length){
       h += '<p style="margin:6px 0"><b>Seu domínio por assunto</b> <span class="aviso">(toque no assunto para estudar ele todo, ou abra ▸ para escolher um subassunto)</span></p>' + htmlTemasEstudo(r.temas);
     } else h += '<p class="aviso">Ainda não há assuntos liberados para estudo nesta matéria.</p>';
-    h += '<div class="botoes" style="margin-top:14px"><button type="button" id="estAgora"' + (r.temas.length && r.restantesHoje ? '' : ' disabled') + '>▶ Estudar agora</button><button type="button" class="secundario" id="estRelBt">📈 Meu relatório</button></div>' +
+    h += '<div class="botoes" style="margin-top:14px"><button type="button" id="estAgora"' + (r.temas.length && r.restantesHoje ? '' : ' disabled') + '>▶ Estudar agora</button><button type="button" class="secundario" id="estRelBt">📈 Meu relatório</button><button type="button" class="secundario" id="estCadBt">📒 Meu caderno</button></div>' +
       '<p class="aviso" style="margin-top:6px">"Estudar agora" escolhe a questão para você: prioriza os assuntos da prova, os mais fracos e os que você não vê há mais tempo. ' +
       (r.restantesHoje ? 'Hoje você ainda pode fazer ' + r.restantesHoje + ' correção(ões).' : '<b>Você usou as ' + r.limite + ' correções de hoje. Volte amanhã!</b>') + ' O estudo não vale nota: é treino para a prova.</p></div>';
     el.innerHTML = h;
@@ -1491,6 +1563,7 @@ function abrirEstudo(m){
     ligarAssuntosEstudo(el);
     var ag = $('estAgora'); if(ag) ag.addEventListener('click', function(){ pedirQuestaoEstudo(''); });
     $('estRelBt').addEventListener('click', abrirRelatorioEstudo);
+    $('estCadBt').addEventListener('click', function(){ abrirCaderno(m); });
   }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); });
 }
 // assuntos (na ordem da matéria) → subassuntos; o assunto inteiro também pode ser escolhido
