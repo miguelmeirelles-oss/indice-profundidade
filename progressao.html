@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Progressão docente — Aula por IA</title>
+<link rel="icon" href="favicon.ico" sizes="any">
+<style>
+  :root{--menu:#17389C;--azul:#2E62C6;--navy:#0E2A5C;--bloco:#EFF1F5;--cinza:#5b6b86;--verde:#1a7a3c;--vermelho:#8a1c1c;--ocre:#8a6100;--linha:#d7deea}
+  *{box-sizing:border-box}
+  body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:var(--navy);background:#fff;font-size:15px;line-height:1.45}
+  .wrap{max-width:980px;margin:0 auto}
+  .oculto{display:none!important}
+  .cab{background:var(--menu);border:2.5px solid var(--navy);border-radius:18px;box-shadow:4px 5px 0 var(--navy);padding:18px 22px;margin-bottom:16px;color:#fff}
+  .cab h1{margin:0;font-size:24px} .cab p{margin:6px 0 0;opacity:.9} .cab a{color:#fff}
+  .caixa{border:2px solid var(--navy);border-radius:14px;padding:16px 18px;margin:0 0 14px;background:#fff}
+  .caixa h2{margin:0 0 8px;font-size:17px}
+  .aviso{color:var(--cinza);font-size:13.5px}
+  .erro{color:var(--vermelho);background:#fdecec;border-radius:8px;padding:8px 10px;margin:6px 0}
+  .ok{color:var(--verde)} .warn{color:var(--ocre)}
+  button,.btn{font:inherit;font-size:14px;font-weight:bold;cursor:pointer;border:2px solid var(--navy);border-radius:10px;padding:7px 13px;background:#F5C518;color:var(--navy);text-decoration:none;display:inline-block}
+  button.sec,.btn.sec{background:#fff} button.link{border:0;background:none;padding:0;color:var(--azul);text-decoration:underline;font-weight:normal}
+  button:disabled{opacity:.55;cursor:default}
+  .botoes{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0}
+  input,select,textarea{font:inherit;font-size:14px;border:1.5px solid var(--linha);border-radius:8px;padding:6px 8px;width:100%;background:#fff;color:var(--navy)}
+  label{font-size:12.5px;color:var(--cinza);display:block;margin-bottom:2px}
+  .grade{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px 12px}
+  .chip{display:inline-block;font-size:12.5px;padding:3px 10px;border-radius:999px;background:var(--bloco);margin:0 4px 4px 0}
+  .barra{height:9px;border-radius:5px;background:var(--bloco);overflow:hidden} .barra i{display:block;height:100%;background:var(--azul)}
+  .area{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 80px;gap:10px;align-items:center;padding:7px 0;border-top:1px dashed var(--linha)}
+  .item{display:flex;gap:10px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;border-top:1px dashed var(--linha);padding:7px 0;font-size:14px}
+  .item>div:first-child{flex:1 1 280px;min-width:0}
+  .num{font-size:28px;font-weight:bold}
+  .abas{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 14px}
+  .abas button[aria-pressed="true"]{background:var(--navy);color:#fff}
+  table{border-collapse:collapse;width:100%;font-size:13.5px} td,th{border-bottom:1px solid var(--linha);padding:5px 6px;text-align:left;vertical-align:top}
+  .tbox{overflow-x:auto}
+  .carregando{color:var(--cinza)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="cab"><h1>📈 Progressão docente</h1><p>Planilha RAD, comprovantes e CCO, montados aos poucos. · <a href="aulas.html">voltar ao Aula por IA</a></p></div>
+  <div class="abas"><button type="button" aria-pressed="true">Progressão</button><button type="button" class="sec" disabled title="Em breve">Plano de trabalho / relatório (em breve)</button></div>
+  <div id="corpo"><p class="carregando">Carregando…</p></div>
+</div>
+<script>
+var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
+function tokenSalvo(){ try{ return localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){ return ''; } }
+var token = tokenSalvo(), R = null, LIDO = null, CAL = null;
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+function num(n, c){ return (Math.round(Number(n || 0) * Math.pow(10, c === undefined ? 2 : c)) / Math.pow(10, c === undefined ? 2 : c)).toString().replace('.', ','); }
+function api(acao, dados){
+  dados = dados || {}; dados.token = token;
+  return fetch(BACKEND_AULAS, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({acao: acao, dados: dados})})
+    .then(function(r){ return r.json(); }).then(function(j){ if(!j.ok){ if(j.erro === 'SESSAO') throw new Error('Sua sessão expirou. Entre de novo pelo Aula por IA.'); throw new Error(j.erro || 'Não deu para concluir.'); } return j.resultado; });
+}
+function lerArquivo(f){ return new Promise(function(ok, falha){ var fr = new FileReader(); fr.onload = function(){ ok(String(fr.result)); }; fr.onerror = falha; fr.readAsDataURL(f); }); }
+var NOMES_AREA = {docencia: 'Docência', orientacoes: 'Orientações', outras: 'Outras atividades acadêmicas', artisticas: 'Atividades artísticas', complementares: 'Atividades complementares', extensao: 'Extensão', pesquisa: 'Pesquisa'};
+var TETO_AREA = {docencia: 40, orientacoes: 20};
+function rotuloChave(k){
+  var c = R.catalogo; if(k === 'doc') return 'Disciplinas (relatório de turmas do Portal)';
+  if(/^ori_/.test(k)) return 'Orientação: ' + ((c.orient[k.slice(4)] || [''])[0]);
+  if(c.itens[k]) return c.itens[k][1]; if(c.cargos[k]) return c.cargos[k][0]; return k;
+}
+function abrir(){
+  if(!token){ $('corpo').innerHTML = '<div class="caixa"><p>Entre na sua conta pelo <a href="aulas.html">Aula por IA</a> e volte aqui.</p></div>'; return; }
+  api('progAbrir').then(function(r){ R = r; desenhar(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+function desenhar(){
+  var p = R.perfil, per = R.periodo, rs = R.resumo, h = '';
+  // ---------- período e pontuação ----------
+  if(per){
+    h += '<div class="caixa"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div style="font-size:19px;font-weight:bold">' + esc(p.nivelAtual || '?') + ' → ' + esc(p.nivelPretendido || '?') + '</div>' +
+      '<div class="aviso">período avaliado ' + esc(per.inicio) + ' a ' + esc(per.solicitacao) + ' · solicitação em ' + esc(per.solicitacao) + ' (dia e mês da admissão)</div></div>' +
+      '<div style="text-align:right"><div class="num">' + (per.diasFaltam > 0 ? per.diasFaltam + ' dias' : 'já pode pedir') + '</div><div class="aviso">' + (per.diasFaltam > 0 ? 'até poder pedir' : '') + '</div></div></div>' +
+      '<div style="margin-top:8px">' + [p.nome, p.siape && 'SIAPE ' + p.siape, (p.carreira || 'EBTT') + ' · ' + (p.regime || '40h / DE'), p.campus, p.colegiado, p.admissao && 'admissão ' + p.admissao, p.titulacao, p.instituicao].filter(Boolean).map(function(x){ return '<span class="chip">' + esc(x) + '</span>'; }).join('') +
+      (R.pastaUrl ? ' <a class="chip" href="' + esc(R.pastaUrl) + '" target="_blank" rel="noopener">📁 pasta</a>' : '') + '</div></div>';
+    var fora = rs.foraDocencia >= rs.minFora;
+    h += '<div class="caixa"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-end"><div><span class="aviso">pontuação RAD até agora</span><div class="num">' + num(rs.total) + ' <span style="font-size:16px" class="' + (rs.nota >= 3 ? 'ok' : 'warn') + '">nota ' + rs.nota + '</span></div></div>' +
+      '<div style="font-size:13.5px;line-height:1.8"><div class="' + (rs.total >= (p.regime === '20h' ? 20 : 40) ? 'ok' : 'warn') + '">' + (rs.total >= (p.regime === '20h' ? 20 : 40) ? '✓' : '•') + ' ' + (p.regime === '20h' ? '20' : '40') + ' pontos ou mais (nota ≥ 3)</div>' +
+      '<div class="' + (fora ? 'ok' : 'warn') + '">' + (fora ? '✓' : '•') + ' ' + rs.minFora + ' pontos fora da docência: ' + num(rs.foraDocencia) + '</div>' +
+      (R.faltaCal.length ? '<div class="warn">• falta o calendário de ' + R.faltaCal.map(esc).join(', ') + '</div>' : '') + '</div></div>' +
+      Object.keys(rs.areas).map(function(k){ var t = TETO_AREA[k] || 0, v = rs.areas[k];
+        return '<div class="area"><span>' + NOMES_AREA[k] + (k === 'docencia' && rs.docBruta > 40 ? ' <span class="aviso">(' + num(rs.docBruta) + ' na média, limitado a 40)</span>' : '') + '</span><div class="barra"><i style="width:' + Math.min(100, t ? v / t * 100 : Math.min(100, v * 5)) + '%"></i></div><b>' + num(v) + (t ? ' / ' + t : '') + '</b></div>'; }).join('') +
+      '<p class="aviso" style="margin:8px 0 0">Nota de produtividade (40h/DE): 45 ou mais = 4 · 40 a 44,9 = 3 · 20 a 39,9 = 2. A docência é a média por semestre do período (4 semestres), até 40; orientações até 20; os demais itens têm os tetos da planilha oficial.</p></div>';
+  }
+  // ---------- perfil ----------
+  var incompleto = !per || !p.siape || !p.pastaId;
+  h += '<details class="caixa"' + (incompleto ? ' open' : '') + '><summary style="cursor:pointer"><b>👤 Seu perfil</b> <span class="aviso">' + (incompleto ? '— complete para começar' : '— dados que mudam pouco') + '</span></summary>' +
+    '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('admissao', 'Data de admissão (dd/mm/aaaa)', p.admissao) +
+    sel('regime', 'Regime', p.regime || '40h / DE', ['40h / DE', '20h']) + sel('carreira', 'Carreira', p.carreira || 'EBTT', ['EBTT', 'MS']) + sel('campus', 'Unidade', p.campus || 'VA', ['MA', 'MG', 'NI', 'NF', 'PE', 'IT', 'AR', 'VA']) +
+    campo('colegiado', 'Colegiado / lotação (ex.: CCEAL-VA)', p.colegiado) + campo('titulacao', 'Titulação', p.titulacao) + campo('nivelAtual', 'Nível atual (ex.: D4.1 ou D 401)', p.nivelAtual) +
+    campo('nivelPretendido', 'Nível pretendido (ex.: D4.2)', p.nivelPretendido) + campo('anoProgressao', 'Ano da progressão (vazio = o próximo)', p.anoProgressao) + '</div>' +
+    '<div style="margin-top:8px">' + campo('pastaLink', 'Link da sua pasta de progressão no Google Drive', p.pastaLink) + '<p class="aviso" style="margin:4px 0 0">A pasta é sua, no seu Drive. Se você não é o administrador, compartilhe-a com <b>miguelmeirelles@gmail.com</b> como <b>editor</b> antes de colar o link. A plataforma cria dentro dela a pasta do ciclo (ex.: "D4.1 para D4.2") e guarda os comprovantes.</p></div>' +
+    '<div class="botoes"><button type="button" id="btPerfil">Salvar perfil</button><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📥 Importar minha RAD anterior (.xlsx)<input type="file" id="impRad" accept=".xlsx" class="oculto"></label></div><div id="msgPerfil" class="aviso"></div></details>';
+  if(per){
+    // ---------- calendário ----------
+    h += '<details class="caixa"' + (R.faltaCal.length ? ' open' : '') + '><summary style="cursor:pointer"><b>📅 Calendário acadêmico</b> <span class="aviso">— semanas de cada semestre (vale para todos os docentes do campus)</span></summary>' +
+      (R.calendarios.length ? '<div class="tbox" style="margin-top:8px"><table><tr><th>Ano</th><th>Semestre</th><th>Nível</th><th>Semanas</th><th>Enviado por</th></tr>' + R.calendarios.sort(function(a, b){ return (b.ano - a.ano) || (a.semestre - b.semestre) || a.nivel.localeCompare(b.nivel); }).map(function(c){ return '<tr><td>' + c.ano + '</td><td>' + c.semestre + 'º</td><td>' + (c.nivel === 'G' ? 'Graduação' : 'Técnico/EPTNM') + '</td><td><b>' + c.semanas + '</b></td><td class="aviso">' + esc(c.por) + ' · ' + esc(c.em) + '</td></tr>'; }).join('') + '</table></div>' : '<p class="aviso">Nenhum calendário ainda.</p>') +
+      (R.faltaCal.length ? '<p class="warn" style="margin:8px 0 0">Falta: ' + R.faltaCal.map(esc).join(', ') + '. Sem ele, a docência desses semestres não é calculada.</p>' : '') +
+      '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar calendário (PDF)<input type="file" id="arqCal" accept="application/pdf,image/*" class="oculto"></label></div><div id="calBox"></div></details>';
+    // ---------- enviar comprovante ----------
+    h += '<div class="caixa"><h2>📎 Enviar comprovante</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA lê, classifica no item certo da planilha RAD e calcula os pontos (com os tetos e a proporção do tempo dentro do período). Você confere antes de salvar. Comece pelo relatório <b>"Turmas Ministradas por Docente para CPPD"</b> do Portal do Professor: ele preenche toda a docência.</p>' +
+      (R.estrelas.length ? '<div class="aviso" style="margin-bottom:6px">Você costuma enviar: ' + R.estrelas.map(function(k){ return '<span class="chip">★ ' + esc(rotuloChave(k)) + '</span>'; }).join('') + '</div>' : '') +
+      '<input type="file" id="arqComp" accept="application/pdf,image/*" multiple><div id="lidoBox"></div></div>';
+    // ---------- itens lançados ----------
+    h += '<div class="caixa"><h2>🧾 O que já está na sua RAD</h2>' + listaItens() + '<div class="botoes"><button type="button" class="sec" id="btManual">+ Lançar item à mão</button></div><div id="manualBox"></div></div>';
+    // ---------- CCO ----------
+    h += desenharCCO();
+  }
+  if(R.admin && R.adminDados) h += desenharAdmin();
+  $('corpo').innerHTML = h;
+  ligar();
+}
+function campo(k, rot, v){ return '<div><label>' + rot + '</label><input data-pf="' + k + '" value="' + esc(v || '') + '"></div>'; }
+function sel(k, rot, v, ops){ return '<div><label>' + rot + '</label><select data-pf="' + k + '">' + ops.map(function(o){ return '<option' + (o === v ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>'; }
+function descricaoItem(it){
+  var d = it.dados || {}, c = R.catalogo;
+  if(it.aba === 'doc') return '<b>' + esc(d.disciplina) + '</b> <span class="aviso">' + esc(d.semestre) + ' · ' + esc(d.nivel) + ' · ' + esc(d.ch) + ' h-a/sem · ' + esc(d.duracao) + ' · ' + esc(d.alunos) + ' alunos' + (it.info && it.info.semCal ? ' · <span class="warn">sem calendário</span>' : it.info ? ' · ' + it.info.semanasAtuacao + '/' + it.info.semanasTotal + ' semanas' : '') + '</span>';
+  if(it.aba === 'ori') return '<b>' + esc((c.orient[d.tipo] || ['?'])[0]) + '</b>: ' + esc(d.nome) + (Number(d.orientadores) > 1 ? ' <span class="chip">coorientação</span>' : '') + ' <span class="aviso">' + esc(d.inicio || '') + (d.fim ? ' a ' + esc(d.fim) : '') + (d.descricao ? ' · ' + esc(d.descricao) : '') + '</span>';
+  return '<b>' + esc(rotuloChave(it.chave)) + '</b> <span class="aviso">' + esc(d.descricao || '') + (d.quantidade !== undefined ? ' · qtd ' + esc(d.quantidade) : '') + (d.inicio ? ' · ' + esc(d.inicio) + (d.fim ? ' a ' + esc(d.fim) : '') : '') + '</span>';
+}
+function listaItens(){
+  var grupos = {doc: 'Docência', ori: 'Orientações', out: 'Outras atividades acadêmicas', comp: 'Atividades complementares', pes: 'Pesquisa', ext: 'Extensão', art: 'Atividades artísticas'};
+  if(!R.itens.length) return '<p class="aviso">Nada ainda. Envie o primeiro comprovante.</p>';
+  return Object.keys(grupos).map(function(g){
+    var l = R.itens.filter(function(it){ return it.aba === g; }); if(!l.length) return '';
+    return '<p style="margin:12px 0 2px"><b>' + grupos[g] + '</b> <span class="aviso">(' + l.length + ')</span></p>' + l.map(function(it){
+      return '<div class="item"><div>' + descricaoItem(it) + (it.arquivoNome ? '<div class="aviso">📄 ' + esc(it.arquivoNome) + '</div>' : '') + (it.origem === 'plataforma' ? '<div class="aviso">da plataforma (' + esc(it.documento) + ')</div>' : '') + '</div>' +
+        '<div style="display:flex;gap:10px;align-items:center"><b>' + num(it.pts, 3) + '</b>' + (it.origem !== 'plataforma' ? '<button type="button" class="link" data-apagar="' + esc(it.id) + '">apagar</button>' : '') + '</div></div>';
+    }).join('');
+  }).join('') + '<p class="aviso" style="margin:8px 0 0">Pontos por item antes dos tetos. Na docência, o total da área é a soma dividida pelos 4 semestres.</p>';
+}
+// ---------- leitura de comprovante ----------
+function enviarComprovantes(files){
+  var fila = Array.prototype.slice.call(files), box = $('lidoBox');
+  var proximo = function(){
+    var f = fila.shift(); if(!f){ return; }
+    if(f.size > 10 * 1024 * 1024){ box.insertAdjacentHTML('beforeend', '<div class="erro">' + esc(f.name) + ': grande demais (máx. 10 MB).</div>'); proximo(); return; }
+    box.innerHTML = '<p class="carregando">Lendo "' + esc(f.name) + '" com a IA… (uns 20 a 40 s)' + (fila.length ? ' · faltam ' + fila.length : '') + '</p>';
+    lerArquivo(f).then(function(b64){ return api('progAnalisar', {nome: f.name, dados: b64, mime: f.type || 'application/pdf'}); })
+      .then(function(l){ LIDO = l; LIDO.fila = fila; desenharLido(proximo); })
+      .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(f.name) + ': ' + esc(e.message) + '</div>'; proximo(); });
+  };
+  proximo();
+}
+function opcoesChave(atual){
+  var c = R.catalogo, h = '<option value="doc"' + (atual === 'doc' ? ' selected' : '') + '>Disciplina (docência)</option>';
+  Object.keys(c.orient).forEach(function(t){ h += '<option value="ori_' + t + '"' + (atual === 'ori_' + t ? ' selected' : '') + '>Orientação: ' + esc(c.orient[t][0]) + '</option>'; });
+  Object.keys(c.itens).forEach(function(k){ h += '<option value="' + k + '"' + (atual === k ? ' selected' : '') + '>' + esc(c.itens[k][1]) + '</option>'; });
+  Object.keys(c.cargos).forEach(function(k){ h += '<option value="' + k + '"' + (atual === k ? ' selected' : '') + '>Cargo: ' + esc(c.cargos[k][0]) + '</option>'; });
+  return h;
+}
+function linhaEditavel(it, i){
+  var d = it.dados || {}, k = it.aba === 'doc' ? 'doc' : it.aba === 'ori' ? 'ori_' + d.tipo : it.chave, inp = function(c, rot, w){ return '<label style="display:inline-block;margin:0 6px 4px 0;width:' + (w || 110) + 'px">' + rot + '<input data-li="' + i + '" data-c="' + c + '" value="' + esc(d[c] === undefined ? '' : d[c]) + '"></label>'; };
+  var campos = it.aba === 'doc' ? inp('disciplina', 'disciplina', 200) + inp('semestre', 'semestre', 80) + inp('nivel', 'nível', 60) + inp('ch', 'h-a/sem', 70) + inp('duracao', 'duração', 80) + inp('alunos', 'alunos', 70) + inp('docentes', 'docentes', 70)
+    : it.aba === 'ori' ? inp('nome', 'aluno', 200) + inp('orientadores', 'nº orient.', 80) + inp('inicio', 'início', 100) + inp('fim', 'fim', 100)
+    : R.catalogo.cargos[k] ? inp('descricao', 'descrição', 220) + inp('carga', 'h/semana', 80) + inp('semanas', 'semanas no período', 120)
+    : inp('descricao', 'descrição', 220) + inp('quantidade', 'quantidade', 80) + inp('inicio', 'início', 100) + inp('fim', 'fim', 100);
+  return '<div style="border-top:1px dashed var(--linha);padding:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="checkbox" data-usar="' + i + '" checked style="width:18px;height:18px">' +
+    '<select data-chave="' + i + '" style="max-width:420px">' + opcoesChave(k) + '</select><b>' + num(it.pts, 3) + ' pts</b></div><div style="margin:4px 0 0 26px">' + campos + '</div></div>';
+}
+function desenharLido(proximo){
+  var l = LIDO, box = $('lidoBox');
+  box.innerHTML = '<div style="background:var(--bloco);border-radius:10px;padding:10px 12px;margin-top:10px"><b>🤖 ' + esc(l.documento || l.arquivoNome) + '</b> <a class="aviso" href="' + esc(l.arquivoUrl) + '" target="_blank" rel="noopener">abrir</a>' +
+    (l.resumo ? '<div class="aviso">' + esc(l.resumo) + '</div>' : '') + (l.duvida ? '<div class="warn" style="margin-top:4px">⚠ ' + esc(l.duvida) + '</div>' : '') +
+    (l.itens.length ? l.itens.map(linhaEditavel).join('') : '<p class="warn">A IA não achou nenhum item da RAD neste documento. Lance à mão se precisar.</p>') +
+    '<div class="botoes"><button type="button" id="btSalvarLido"' + (l.itens.length ? '' : ' disabled') + '>✓ Confirmar e salvar</button><button type="button" class="sec" id="btDescLido">Descartar</button></div><div id="msgLido" class="aviso"></div></div>';
+  var coletar = function(){
+    return l.itens.map(function(it, i){
+      if(!box.querySelector('[data-usar="' + i + '"]').checked) return null;
+      var k = box.querySelector('[data-chave="' + i + '"]').value, d = JSON.parse(JSON.stringify(it.dados || {}));
+      box.querySelectorAll('[data-li="' + i + '"]').forEach(function(x){ var v = x.value.trim(); d[x.dataset.c] = /^-?\d+([.,]\d+)?$/.test(v) ? Number(v.replace(',', '.')) : v; });
+      if(k === 'doc') return {aba: 'doc', chave: 'doc', dados: d};
+      if(/^ori_/.test(k)){ d.tipo = Number(k.slice(4)); return {aba: 'ori', chave: 'ori', dados: d}; }
+      return {aba: (R.catalogo.itens[k] || ['comp'])[0], chave: k, dados: d};
+    }).filter(Boolean);
+  };
+  $('btDescLido').addEventListener('click', function(){ api('progDescartar', {arquivoId: l.arquivoId}).catch(function(){}); LIDO = null; box.innerHTML = ''; if(proximo) proximo(); });
+  $('btSalvarLido').addEventListener('click', function(){
+    var b = this, itens = coletar(); if(!itens.length){ $('msgLido').innerHTML = '<span class="warn">Marque pelo menos um item.</span>'; return; }
+    b.disabled = true; $('msgLido').textContent = 'Salvando…';
+    api('progSalvarItens', {arquivoId: l.arquivoId, documento: l.documento, itens: itens}).then(function(r){ R = r; var resto = LIDO && LIDO.fila; LIDO = null; desenhar(); if(resto && resto.length) enviarComprovantes(resto); })
+      .catch(function(e){ b.disabled = false; $('msgLido').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
+  });
+}
+// ---------- CCO ----------
+function docentePorNome(n){ return R.docentes.filter(function(d){ return d.nome === n; })[0] || null; }
+function cartaoDocente(papel, i, nome){
+  var d = docentePorNome(nome) || {nome: nome || ''};
+  return '<div style="background:var(--bloco);border-radius:10px;padding:8px 10px"><label>' + papel + '</label><input list="listaDoc" data-cco="' + i + '" value="' + esc(nome || '') + '" placeholder="nome do docente">' +
+    (nome ? '<div class="grade" style="margin-top:6px;grid-template-columns:repeat(2,minmax(0,1fr))">' +
+      ['siape:SIAPE', 'lotacao:Lotação', 'titulacao:Titulação', 'admissao:Admissão'].map(function(x){ var k = x.split(':'); return '<div><label>' + k[1] + '</label><input data-doc="' + i + '" data-c="' + k[0] + '" value="' + esc(d[k[0]] || '') + '"></div>'; }).join('') + '</div>' +
+      '<div class="botoes" style="margin-top:6px"><button type="button" class="sec" data-salvadoc="' + i + '">Salvar na lista</button>' + (!d.admissao ? '<button type="button" class="sec" data-portal="' + i + '">🔎 Buscar admissão no Portal da Transparência</button>' : '') + '</div><div data-docmsg="' + i + '" class="aviso"></div>' +
+      (d.atualizadoPor ? '<div class="aviso">atualizado por ' + esc(d.atualizadoPor) + '</div>' : '') : '') + '</div>';
+}
+function desenharCCO(){
+  var p = R.perfil, cco = p.cco || ['', '', ''];
+  return '<div class="caixa"><h2>👥 Comissão (CCO) e chefia imediata</h2><p class="aviso" style="margin-top:0">Três docentes de classe e titulação iguais ou superiores à pretendida: dois do seu colegiado e um de fora. Os dados (SIAPE, lotação, titulação, admissão) ficam numa lista que todos vão completando.</p>' +
+    '<datalist id="listaDoc">' + R.docentes.map(function(d){ return '<option value="' + esc(d.nome) + '">'; }).join('') + '</datalist>' +
+    '<div class="grade" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">' + cartaoDocente('Membro 1 (seu colegiado)', 0, cco[0]) + cartaoDocente('Membro 2 (seu colegiado)', 1, cco[1]) + cartaoDocente('Membro 3 (externo ao colegiado)', 2, cco[2]) + cartaoDocente('Chefia imediata', 3, p.chefia) + '</div>' +
+    '<div class="botoes"><button type="button" id="btCCO">Salvar comissão</button></div><div id="msgCCO" class="aviso"></div></div>';
+}
+function desenharAdmin(){
+  var a = R.adminDados;
+  return '<details class="caixa"><summary style="cursor:pointer"><b>⚙️ Administrador</b> <span class="aviso">— só você vê</span></summary>' +
+    '<p style="margin:10px 0 4px"><b>Liberar a progressão para:</b></p>' + a.professores.map(function(p){ return '<label style="display:flex;gap:8px;align-items:center;font-size:14px;color:var(--navy)"><input type="checkbox" data-lib="' + esc(p.id) + '" style="width:18px;height:18px"' + (a.liberados.indexOf(p.id) !== -1 ? ' checked' : '') + '> ' + esc(p.nome) + '</label>'; }).join('') +
+    '<div class="grade" style="margin-top:10px"><div><label>Chave da API do Portal da Transparência ' + (a.temChavePortal ? '(cadastrada)' : '(não cadastrada)') + '</label><input type="password" id="chavePT" placeholder="' + (a.temChavePortal ? 'deixe vazio para manter' : 'cole a chave recebida por e-mail') + '" autocomplete="off"></div>' +
+    '<div><label>Nome da instituição nos documentos</label><input id="nomeInst" value="' + esc(a.instituicao) + '"></div></div>' +
+    '<p class="aviso" style="margin:6px 0 0">A chave é gratuita: portaldatransparencia.gov.br/api-de-dados/cadastrar-email (com o seu gov.br). Fica guardada só no servidor. Quando o CEFET/RJ virar UFCI/RJ, troque o nome aqui.</p>' +
+    '<div class="botoes"><button type="button" id="btAdmin">Salvar</button></div><div id="msgAdmin" class="aviso"></div></details>';
+}
+// ---------- importar a RAD anterior (para as estrelas) ----------
+var LINHAS_RAD = {
+  comp: {6: 'comp_dg', 7: 'comp_dir', 8: 'comp_cd', 9: 'comp_coordcurso', 10: 'comp_coorddisc', 11: 'comp_fg', 12: 'comp_polo', 13: 'comp_progpesq', 14: 'comp_lab', 15: 'comp_cppd', 16: 'comp_cadd', 17: 'comp_editor_idx', 18: 'comp_editor_nidx',
+    21: 'comp_conselho', 22: 'comp_comissao_port', 23: 'comp_comissao_decl', 24: 'comp_rep_ext', 25: 'comp_rep_cient', 26: 'comp_aval_mec', 27: 'comp_evt10', 28: 'comp_evt20', 29: 'comp_evt_mais', 30: 'comp_b_qualimest', 31: 'comp_b_pf', 32: 'comp_b_concurso', 33: 'comp_b_lato', 34: 'comp_b_mest', 35: 'comp_b_qualidout', 36: 'comp_b_dout',
+    37: 'comp_proj_acad', 38: 'comp_cpa', 39: 'comp_nde', 40: 'comp_proj_inst', 41: 'comp_editor_conv_idx', 42: 'comp_editor_conv_nidx', 45: 'comp_cap_parcial', 46: 'comp_cap_total', 47: 'comp_formacao'},
+  pes: ['pes_pub1', 'pes_pub2', 'pes_pub3', 'pes_anais', 'pes_livro', 'pes_org', 'pes_cap', 'pes_trad', 'pes_comissao', 'pes_projfom_coord', 'pes_projfom_part', 'pes_proj_coord', 'pes_proj_part', 'pes_pq', 'pes_lider', 'pes_par_proj', 'pes_par_art', 'pes_par_cong', 'pes_carta', 'pes_deposito', 'pes_software', 'pes_produto', 'pes_material', 'pes_comunic', 'pes_tecsocial', 'pes_coop_coord', 'pes_coop_part', 'pes_intl_coord', 'pes_intl_part'],
+  ext: ['ext_pub1', 'ext_pub2', 'ext_pub3', 'ext_anais', 'ext_livro', 'ext_org', 'ext_cap', 'ext_trad', 'ext_comissao', 'ext_projfom_coord', 'ext_projfom_part', 'ext_proj_coord', 'ext_proj_part', 'ext_direx', 'ext_palestra', 'ext_curso8', 'ext_curso30'],
+  out: ['out_projeto', 'out_ap100', 'out_ap50', 'out_ap25', 'out_multimidia', 'out_evento', 'out_cultural', 'out_campo']
+};
+function importarRad(f){
+  $('msgPerfil').textContent = 'Lendo a planilha…';
+  var go = function(){ lerArquivo(f).then(function(u){
+    var wb = XLSX.read(u.split(',')[1], {type: 'base64'}), ch = [], v = function(sh, a){ var w = wb.Sheets[sh]; var c = w && w[a]; return c ? c.v : null; };
+    for(var r = 5; r <= 57; r++){ if(v('Docência - Disciplinas', 'B' + r)) ch.push('doc'); }
+    for(r = 5; r <= 60; r++){ var t = v('Orientações no Período', 'D' + r); if(t) ch.push('ori_' + t); }
+    for(r = 6; r <= 29; r++){ var n = v('Outras Atividades Acadêmicas', 'B' + r); if(n && LINHAS_RAD.out[n - 1]) ch.push(LINHAS_RAD.out[n - 1]); }
+    Object.keys(LINHAS_RAD.comp).forEach(function(lin){ if(Number(v('Atividades Complementares', 'I' + lin)) > 0) ch.push(LINHAS_RAD.comp[lin]); });
+    LINHAS_RAD.pes.forEach(function(k, i){ if(Number(v('Atividades de Pesquisa', 'G' + (6 + i))) > 0) ch.push(k); });
+    LINHAS_RAD.ext.forEach(function(k, i){ if(Number(v('Atividades de Extensão', 'G' + (6 + i))) > 0) ch.push(k); });
+    return api('progImportarHistorico', {chaves: ch}).then(function(x){ R = x; desenhar(); $('msgPerfil').textContent = 'Importado: ' + ch.length + ' itens da RAD anterior viraram suas ★.'; });
+  }).catch(function(e){ $('msgPerfil').textContent = e.message; }); };
+  if(window.XLSX) go(); else { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = go; document.head.appendChild(s); }
+}
+// ---------- eventos ----------
+function ligar(){
+  var lerPerfil = function(){ var o = {}; document.querySelectorAll('[data-pf]').forEach(function(x){ o[x.dataset.pf] = x.value; }); return o; };
+  $('btPerfil').addEventListener('click', function(){ var b = this; b.disabled = true; $('msgPerfil').textContent = 'Salvando…';
+    api('progPerfil', {perfil: lerPerfil()}).then(function(r){ R = r; desenhar(); }).catch(function(e){ b.disabled = false; $('msgPerfil').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+  $('impRad').addEventListener('change', function(){ if(this.files[0]) importarRad(this.files[0]); });
+  if($('arqComp')) $('arqComp').addEventListener('change', function(){ if(this.files.length) enviarComprovantes(this.files); this.value = ''; });
+  if($('arqCal')) $('arqCal').addEventListener('change', function(){
+    var f = this.files[0]; this.value = ''; if(!f) return; $('calBox').innerHTML = '<p class="carregando">Lendo o calendário com a IA…</p>';
+    lerArquivo(f).then(function(b){ return api('progCalendario', {nome: f.name, dados: b, mime: f.type || 'application/pdf'}); }).then(function(x){ CAL = x.lido; desenharCal(); })
+      .catch(function(e){ $('calBox').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  document.querySelectorAll('[data-apagar]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Apagar este item da sua RAD? (o arquivo continua no Drive)')) return;
+    api('progApagarItem', {id: b.dataset.apagar}).then(function(r){ R = r; desenhar(); }).catch(function(e){ alert(e.message); }); }); });
+  if($('btManual')) $('btManual').addEventListener('click', function(){ LIDO = {arquivoId: '', arquivoNome: 'lançamento manual', arquivoUrl: '#', documento: 'Lançamento manual', resumo: 'Escolha o item e preencha. Depois envie o comprovante quando tiver.', duvida: '', itens: [{aba: 'comp', chave: 'comp_nde', dados: {descricao: '', quantidade: 1}, pts: 0}]};
+    $('lidoBox').scrollIntoView({behavior: 'smooth'}); desenharLido(null); });
+  document.querySelectorAll('[data-cco]').forEach(function(x){ x.addEventListener('change', function(){ var p = R.perfil; p.cco = p.cco || ['', '', '']; var i = Number(x.dataset.cco); if(i === 3) p.chefia = x.value; else p.cco[i] = x.value; desenhar(); }); });
+  document.querySelectorAll('[data-salvadoc]').forEach(function(b){ b.addEventListener('click', function(){
+    var i = b.dataset.salvadoc, nome = document.querySelector('[data-cco="' + i + '"]').value, d = docentePorNome(nome) || {}, o = {id: d.id || '', nome: nome};
+    document.querySelectorAll('[data-doc="' + i + '"]').forEach(function(x){ o[x.dataset.c] = x.value; });
+    b.disabled = true; api('progDocente', {docente: o}).then(function(x){ R.docentes = x.docentes; desenhar(); }).catch(function(e){ b.disabled = false; alert(e.message); }); }); });
+  document.querySelectorAll('[data-portal]').forEach(function(b){ b.addEventListener('click', function(){
+    var i = b.dataset.portal, nome = document.querySelector('[data-cco="' + i + '"]').value, msg = document.querySelector('[data-docmsg="' + i + '"]');
+    b.disabled = true; msg.textContent = 'Buscando no Portal da Transparência…';
+    api('progBuscarPortal', {nome: nome}).then(function(x){
+      b.disabled = false;
+      if(!x.resultados.length){ msg.textContent = 'Não encontrei esse nome entre os servidores da instituição. Digite a data à mão.'; return; }
+      var ds = []; x.resultados.forEach(function(r){ r.datas.forEach(function(d){ ds.push(d); }); });
+      if(!ds.length){ msg.textContent = 'Encontrei o servidor, mas o portal não informa a data de ingresso. Digite à mão.'; return; }
+      var data = String(ds[0].data).match(/(\d{2})\/(\d{2})\/(\d{4})/) ? ds[0].data : String(ds[0].data).replace(/^(\d{4})-(\d{2})-(\d{2}).*/, '$3/$2/$1');
+      document.querySelector('[data-doc="' + i + '"][data-c="admissao"]').value = data;
+      msg.innerHTML = 'Portal: <b>' + esc(data) + '</b> (' + esc(ds[0].campo) + '). Confira — o portal mostra o ingresso no serviço público, que pode ser diferente da admissão na instituição — e clique em "Salvar na lista".';
+    }).catch(function(e){ b.disabled = false; msg.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); }); });
+  if($('btCCO')) $('btCCO').addEventListener('click', function(){ var b = this, cco = [0, 1, 2].map(function(i){ return document.querySelector('[data-cco="' + i + '"]').value; });
+    b.disabled = true; api('progPerfil', {perfil: {cco: cco, chefia: document.querySelector('[data-cco="3"]').value, chefiaSiape: (docentePorNome(document.querySelector('[data-cco="3"]').value) || {}).siape || ''}})
+      .then(function(r){ R = r; desenhar(); $('msgCCO').textContent = 'Comissão salva.'; }).catch(function(e){ b.disabled = false; $('msgCCO').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+  if($('btAdmin')) $('btAdmin').addEventListener('click', function(){ var b = this, lib = [];
+    document.querySelectorAll('[data-lib]').forEach(function(x){ if(x.checked) lib.push(x.dataset.lib); });
+    var ch = $('chavePT').value.trim(); b.disabled = true;
+    api('progAdmin', {liberar: lib, chavePortal: ch ? ch : null, instituicao: $('nomeInst').value.trim()}).then(function(r){ R = r; desenhar(); }).catch(function(e){ b.disabled = false; $('msgAdmin').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+}
+function desenharCal(){
+  var c = CAL, box = $('calBox'), lin = [{n: 'G', s: 1}, {n: 'G', s: 2}, {n: 'T', s: 1}, {n: 'T', s: 2}].map(function(x){ var a = (c.semestres || []).filter(function(y){ return y.nivel === x.n && Number(y.semestre) === x.s; })[0] || {}; return {nivel: x.n, semestre: x.s, semanas: a.semanas || '', inicio: a.inicio || '', fim: a.fim || ''}; });
+  box.innerHTML = '<div style="background:var(--bloco);border-radius:10px;padding:10px 12px;margin-top:10px"><b>A IA leu o calendário</b> <span class="aviso">— confira e corrija</span><div class="grade" style="margin:6px 0"><div><label>Ano</label><input id="calAno" value="' + esc(c.ano || '') + '"></div><div><label>Campus</label><input id="calCampus" value="' + esc(c.campus || '') + '"></div></div>' +
+    '<table><tr><th>Nível</th><th>Semestre</th><th>Semanas</th><th>Início</th><th>Fim</th></tr>' + lin.map(function(l, i){ return '<tr><td>' + (l.nivel === 'G' ? 'Graduação' : 'Técnico/EPTNM') + '</td><td>' + l.semestre + 'º</td><td><input data-cal="' + i + '" data-c="semanas" value="' + esc(l.semanas) + '" style="width:70px"></td><td><input data-cal="' + i + '" data-c="inicio" value="' + esc(l.inicio) + '"></td><td><input data-cal="' + i + '" data-c="fim" value="' + esc(l.fim) + '"></td></tr>'; }).join('') + '</table>' +
+    '<div class="botoes"><button type="button" id="btCalOk">✓ Salvar para todos do campus</button><button type="button" class="sec" id="btCalNao">Cancelar</button></div></div>';
+  $('btCalNao').addEventListener('click', function(){ box.innerHTML = ''; });
+  $('btCalOk').addEventListener('click', function(){ var b = this;
+    var sem = lin.map(function(l, i){ var o = {nivel: l.nivel, semestre: l.semestre}; box.querySelectorAll('[data-cal="' + i + '"]').forEach(function(x){ o[x.dataset.c] = x.value.trim(); }); return o; });
+    b.disabled = true; api('progCalendario', {salvar: {ano: $('calAno').value, campus: $('calCampus').value, arquivoId: c.arquivoId, semestres: sem}}).then(function(r){ R = r; CAL = null; desenhar(); }).catch(function(e){ b.disabled = false; alert(e.message); }); });
+}
+abrir();
+</script>
+</body>
+</html>

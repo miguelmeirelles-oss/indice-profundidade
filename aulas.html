@@ -681,7 +681,7 @@ function iniciar(){
     sessao = r;
     if(r.admin){ $('abaTrilha').classList.remove('oculto'); if(/[?&]aba=trilha/.test(location.search)) abaAtual = 'trilha'; }
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      (r.professor ? '<a href="provas.html">Prova por IA</a> · <a href="progressao.html">Progressão/PT</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
