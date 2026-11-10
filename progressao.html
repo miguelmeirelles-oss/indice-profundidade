@@ -87,13 +87,13 @@ function desenhar(){
       '<p class="aviso" style="margin:8px 0 0">Nota de produtividade (40h/DE): 45 ou mais = 4 · 40 a 44,9 = 3 · 20 a 39,9 = 2. A docência é a média por semestre do período (4 semestres), até 40; orientações até 20; os demais itens têm os tetos da planilha oficial.</p></div>';
   }
   // ---------- perfil ----------
-  var incompleto = !per || !p.siape || !p.pastaId;
+  var incompleto = !per || !p.siape || (!p.pastaId && !R.admin);
   h += '<details class="caixa"' + (incompleto ? ' open' : '') + '><summary style="cursor:pointer"><b>👤 Seu perfil</b> <span class="aviso">' + (incompleto ? '— complete para começar' : '— dados que mudam pouco') + '</span></summary>' +
-    '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('email', 'E-mail institucional', p.email) + campo('celular', 'Celular, ex.: (24) 98183-9748', p.celular) + campo('telefone', 'Telefone (opcional)', p.telefone) + campo('admissao', 'Data de admissão (dd/mm/aaaa)', p.admissao) +
+    '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('email', 'E-mail institucional', p.email) + campo('celular', 'Celular, ex.: (24) 98183-9748', p.celular) + campo('telefone', 'Telefone (opcional)', p.telefone) + campo('admissao', 'Data de admissão (dd/mm/aaaa)' + (p.admissao && !/\d{4}/.test(p.admissao) ? ' — falta o ano' : ''), p.admissao) +
     sel('regime', 'Regime', p.regime || '40h / DE', ['40h / DE', '40h', '20h']) + sel('carreira', 'Carreira', p.carreira || 'EBTT', ['EBTT', 'MS']) + sel('campus', 'Unidade', p.campus || 'VA', ['MA', 'MG', 'NI', 'NF', 'PE', 'IT', 'AR', 'VA']) +
     campo('colegiado', 'Colegiado / lotação (ex.: CCEAL-VA)', p.colegiado) + campo('titulacao', 'Titulação', p.titulacao) + campo('nivelAtual', 'Nível atual (ex.: D4.1 ou D 401)', p.nivelAtual) +
     campo('nivelPretendido', 'Nível pretendido (ex.: D4.2)', p.nivelPretendido) + campo('anoProgressao', 'Ano da progressão (vazio = o próximo)', p.anoProgressao) + '</div>' +
-    '<div style="margin-top:8px">' + campo('pastaLink', 'Link da sua pasta de progressão no Google Drive', p.pastaLink) + '<p class="aviso" style="margin:4px 0 0">A pasta é sua, no seu Drive. Se você não é o administrador, compartilhe-a com <b>miguelmeirelles@gmail.com</b> como <b>editor</b> antes de colar o link. A plataforma cria dentro dela a pasta do ciclo (ex.: "D4.1 para D4.2") e guarda os comprovantes.</p></div>' +
+    '<div style="margin-top:8px">' + campo('pastaLink', 'Link da sua pasta de progressão no Google Drive' + (R.admin ? ' (opcional)' : ''), p.pastaLink) + '<p class="aviso" style="margin:4px 0 0">' + (R.admin ? 'Opcional: se ficar em branco, a plataforma cria a pasta "Progressão docente (Aula por IA)" no seu Drive. Se colar a sua pasta de progressões, ela usa a do ciclo que já existe lá (ex.: "D4.1 para D4.2") — escreva os níveis do mesmo jeito do nome da pasta.' : 'A pasta é sua, no seu Drive: compartilhe-a com <b>miguelmeirelles@gmail.com</b> como <b>editor</b> antes de colar o link. A plataforma cria dentro dela a pasta do ciclo (ex.: "D4.1 para D4.2") e guarda os comprovantes.') + '</p></div>' +
     '<div class="botoes"><button type="button" id="btPerfil">Salvar perfil</button><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📥 Importar minha RAD anterior (.xlsx)<input type="file" id="impRad" accept=".xlsx" class="oculto"></label></div><div id="msgPerfil" class="aviso"></div></details>';
   if(per){
     // ---------- calendário ----------
@@ -227,13 +227,19 @@ function importarRad(f){
   $('msgPerfil').textContent = 'Lendo a planilha…';
   var go = function(){ lerArquivo(f).then(function(u){
     var wb = XLSX.read(u.split(',')[1], {type: 'base64'}), ch = [], v = function(sh, a){ var w = wb.Sheets[sh]; var c = w && w[a]; return c ? c.v : null; };
+    // perfil: o nível pretendido da RAD anterior é o seu nível atual; o próximo é o seguinte
+    var prox = function(n){ n = String(n || '').trim(); var m = n.match(/^(.*?)(\d)(\D?)(\d)$/); if(m && Number(m[4]) < 4) return m[1] + m[2] + m[3] + (Number(m[4]) + 1); var m2 = n.match(/^(.*?)(\d)(\D?)0?(\d)$/); return ''; };
+    var ser = Number(v('Total', 'W2')), dt = ser ? new Date(Math.round((ser - 25569) * 86400000)) : null;
+    var dois = function(x){ return ('0' + x).slice(-2); };
+    var pf = {nome: v('Total', 'O4'), siape: v('Total', 'V4'), regime: v('Total', 'H5'), carreira: v('Total', 'H6'), campus: v('Total', 'F8'), nivelAtual: v('Total', 'N10'), nivelPretendido: prox(v('Total', 'N10')),
+      colegiado: String(v('Docência - Disciplinas', 'C5') || '').replace(/_/g, '-'), admissao: dt ? dois(dt.getUTCDate()) + '/' + dois(dt.getUTCMonth() + 1) : '', anoProgressao: dt ? String(dt.getUTCFullYear() + 2) : ''};
     for(var r = 5; r <= 57; r++){ if(v('Docência - Disciplinas', 'B' + r)) ch.push('doc'); }
     for(r = 5; r <= 60; r++){ var t = v('Orientações no Período', 'D' + r); if(t) ch.push('ori_' + t); }
     for(r = 6; r <= 29; r++){ var n = v('Outras Atividades Acadêmicas', 'B' + r); if(n && LINHAS_RAD.out[n - 1]) ch.push(LINHAS_RAD.out[n - 1]); }
     Object.keys(LINHAS_RAD.comp).forEach(function(lin){ if(Number(v('Atividades Complementares', 'I' + lin)) > 0) ch.push(LINHAS_RAD.comp[lin]); });
     LINHAS_RAD.pes.forEach(function(k, i){ if(Number(v('Atividades de Pesquisa', 'G' + (6 + i))) > 0) ch.push(k); });
     LINHAS_RAD.ext.forEach(function(k, i){ if(Number(v('Atividades de Extensão', 'G' + (6 + i))) > 0) ch.push(k); });
-    return api('progImportarHistorico', {chaves: ch}).then(function(x){ R = x; desenhar(); $('msgPerfil').textContent = 'Importado: ' + ch.length + ' itens da RAD anterior viraram suas ★.'; });
+    return api('progImportarHistorico', {chaves: ch, perfil: pf}).then(function(x){ R = x; desenhar(); $('msgPerfil').textContent = 'Importado: perfil completado com a RAD anterior e ' + ch.length + ' itens viraram suas ★. Confira os campos e salve.'; });
   }).catch(function(e){ $('msgPerfil').textContent = e.message; }); };
   if(window.XLSX) go(); else { var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = go; document.head.appendChild(s); }
 }
