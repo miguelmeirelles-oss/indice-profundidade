@@ -121,7 +121,7 @@ function campo(k, rot, v){ return '<div><label>' + rot + '</label><input data-pf
 function sel(k, rot, v, ops){ return '<div><label>' + rot + '</label><select data-pf="' + k + '">' + ops.map(function(o){ return '<option' + (o === v ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>'; }
 function descricaoItem(it){
   var d = it.dados || {}, c = R.catalogo;
-  if(it.aba === 'doc') return '<b>' + esc(d.disciplina) + '</b> <span class="aviso">' + esc(d.semestre) + ' · ' + esc(d.nivel) + ' · ' + esc(d.ch) + ' h-a/sem · ' + esc(d.duracao) + ' · ' + esc(d.alunos) + ' alunos' + (it.info && it.info.semCal ? ' · <span class="warn">sem calendário</span>' : it.info ? ' · ' + it.info.semanasAtuacao + '/' + it.info.semanasTotal + ' semanas' : '') + '</span>';
+  if(it.aba === 'doc') return '<b>' + esc(d.disciplina) + '</b> <span class="aviso">' + esc(d.semestre) + ' · ' + esc(d.nivel) + ' · ' + esc(d.ch) + ' h-a/sem · ' + esc(d.duracao) + ' · ' + esc(d.alunos) + ' alunos' + (it.info && it.info.semCal ? ' · <span class="aviso">semestre inteiro (sem calendário)</span>' : it.info ? ' · ' + it.info.semanasAtuacao + '/' + it.info.semanasTotal + ' semanas' : '') + '</span>';
   if(it.aba === 'ori') return '<b>' + esc((c.orient[d.tipo] || ['?'])[0]) + '</b>: ' + esc(d.nome) + (Number(d.orientadores) > 1 ? ' <span class="chip">coorientação</span>' : '') + ' <span class="aviso">' + esc(d.inicio || '') + (d.fim ? ' a ' + esc(d.fim) : '') + (d.descricao ? ' · ' + esc(d.descricao) : '') + '</span>';
   return '<b>' + esc(rotuloChave(it.chave)) + '</b> <span class="aviso">' + esc(d.descricao || '') + (d.quantidade !== undefined ? ' · qtd ' + esc(d.quantidade) : '') + (d.inicio ? ' · ' + esc(d.inicio) + (d.fim ? ' a ' + esc(d.fim) : '') : '') + '</span>';
 }
@@ -163,7 +163,7 @@ function linhaEditavel(it, i){
     : R.catalogo.cargos[k] ? inp('descricao', 'descrição', 220) + inp('carga', 'h/semana', 80) + inp('semanas', 'semanas no período', 120)
     : inp('descricao', 'descrição', 220) + inp('quantidade', 'quantidade', 80) + inp('inicio', 'início', 100) + inp('fim', 'fim', 100);
   return '<div style="border-top:1px dashed var(--linha);padding:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="checkbox" data-usar="' + i + '" checked style="width:18px;height:18px">' +
-    '<select data-chave="' + i + '" style="max-width:420px">' + opcoesChave(k) + '</select><b>' + num(it.pts, 3) + ' pts</b></div><div style="margin:4px 0 0 26px">' + campos + '</div></div>';
+    '<select data-chave="' + i + '" style="max-width:420px">' + opcoesChave(k) + '</select><b>' + num(it.pts, 3) + ' pts</b>' + (it.info && it.info.semCal ? ' <span class="aviso">(sem o calendário deste semestre: considerei o semestre inteiro)</span>' : '') + '</div><div style="margin:4px 0 0 26px">' + campos + '</div></div>';
 }
 function desenharLido(proximo){
   var l = LIDO, box = $('lidoBox');
