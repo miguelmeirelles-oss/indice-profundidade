@@ -201,7 +201,31 @@ function linhaEditavel(it, i){
     : R.catalogo.cargos[k] ? inp('descricao', 'descrição', 220) + inp('carga', 'h/semana', 80) + inp('semanas', 'semanas no período', 120)
     : inp('descricao', 'descrição', 220) + inp('quantidade', 'quantidade', 80) + inp('inicio', 'início', 100) + inp('fim', 'fim', 100);
   return '<div style="border-top:1px dashed var(--linha);padding:6px 0"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input type="checkbox" data-usar="' + i + '" checked style="width:18px;height:18px">' +
-    '<select data-chave="' + i + '" style="max-width:420px">' + opcoesChave(k) + '</select><b>' + num(it.pts, 3) + ' pts</b>' + (it.info && it.info.semCal ? ' <span class="aviso">(sem o calendário deste semestre: considerei o semestre inteiro)</span>' : '') + '</div><div style="margin:4px 0 0 26px">' + campos + '</div></div>';
+    '<select data-chave="' + i + '" style="max-width:420px">' + opcoesChave(k) + '</select><b data-pts="' + i + '">' + num(it.pts, 3) + ' pts</b>' + (it.info && it.info.semCal ? ' <span class="aviso">(sem o calendário deste semestre: considerei o semestre inteiro)</span>' : '') + '</div><div style="margin:4px 0 0 26px">' + campos + '</div>' + blocoIndexacao(it, i) + '</div>';
+}
+// conta dos pontos de uma linha (igual à do servidor), para atualizar na hora quando a pessoa muda algo
+function ptsLinha(k, d, info){
+  var c = R.catalogo, n = function(x){ return Number(String(x == null ? '' : x).replace(',', '.')) || 0; };
+  if(k === 'doc'){ var G = n(d.ch), J = n(d.docentes) || 1, al = n(d.alunos), N = /60/.test(String(d.duracao)) ? 1.8 : 1.5, O = al <= 30 ? 1 : al <= 50 ? al / 30 : 1.7, fp = info && info.f_p ? info.f_p : 1; return fp * (N + O) * G / J; }
+  if(/^ori_/.test(k)){ var t = c.orient[k.slice(4)] || [0, 0]; var fr = info && info.semanasTotal ? Math.min(1, (info.semanasPeriodo || info.semanasTotal) / info.semanasTotal) : 1; return t[1] * fr / (n(d.orientadores) || 1); }
+  if(c.cargos[k]) return (n(d.semanas) || 104) * ((n(d.carga) || c.cargos[k][1]) / 104);
+  if(c.itens[k]) return n(d.quantidade) * (k === 'comp_formacao' && R.perfil.regime === '20h' ? 0.05 : c.itens[k][2]);
+  return 0;
+}
+function recalcularLinha(box, i, it){
+  var k = box.querySelector('[data-chave="' + i + '"]').value, d = JSON.parse(JSON.stringify(it.dados || {}));
+  box.querySelectorAll('[data-li="' + i + '"]').forEach(function(x){ d[x.dataset.c] = x.value; });
+  var el = box.querySelector('[data-pts="' + i + '"]'); if(el){ el.textContent = num(ptsLinha(k, d, it.info), 3) + ' pts'; el.classList.add('mudou'); setTimeout(function(){ el.classList.remove('mudou'); }, 900); }
+}
+// comprovante de indexação/Qualis de uma publicação (print colado ou arquivo)
+function blocoIndexacao(it, i){
+  var k = it.chave || ''; if(!/_pub|_anais/.test(k)) return '';
+  var x = it.indexacao, d = it.dados || {};
+  return '<div style="margin:6px 0 0 26px;border-left:3px solid var(--azul);padding:4px 10px"><b style="font-size:13.5px">📎 Comprovante de indexação / Qualis</b> <span class="aviso">' + esc(d.revista || '') + (d.issn ? ' · ISSN ' + esc(d.issn) : '') + '</span>' +
+    (x ? '<div style="margin:4px 0"><label style="display:flex;gap:6px;align-items:center;color:var(--navy);font-size:13.5px"><input type="checkbox" data-ixusar="' + i + '" checked style="width:16px;height:16px"> usar o já enviado por ' + esc(x.por) + ' em ' + esc(x.em) + ': <b>' + esc(x.indexador) + (x.estrato ? ' · ' + esc(x.estrato) : '') + '</b> (<a href="' + esc(x.url) + '" target="_blank" rel="noopener">ver</a>)</label><div class="warn" style="font-size:12.5px">Confira no site oficial da revista se a indexação mudou.</div></div>' : '') +
+    '<div data-ixcola="' + i + '" tabindex="0" style="margin:4px 0;border:1.5px dashed var(--linha);border-radius:8px;padding:8px;font-size:13px;color:var(--cinza);cursor:text">' + (x ? 'Ou cole aqui (Ctrl+V) um print novo' : 'Clique aqui e cole (Ctrl+V) o print da indexação (Latindex, DOAJ, Scopus, Qualis…)') + ' — ou <label class="link" style="display:inline;color:var(--azul);text-decoration:underline;cursor:pointer">escolha o arquivo<input type="file" data-ixarq="' + i + '" accept="image/*,application/pdf" class="oculto"></label></div>' +
+    '<div data-ixmsg="' + i + '" class="aviso"></div>' +
+    '<label style="display:inline-block;margin-top:4px;width:260px">No PDF entram só as páginas 1 até<input data-li="' + i + '" data-c="paginas" value="' + esc(d.paginas || 1) + '" style="width:70px;display:inline-block;margin-left:6px"></label></div>';
 }
 function desenharLido(proximo){
   var l = LIDO, box = $('lidoBox');
@@ -214,11 +238,28 @@ function desenharLido(proximo){
       if(!box.querySelector('[data-usar="' + i + '"]').checked) return null;
       var k = box.querySelector('[data-chave="' + i + '"]').value, d = JSON.parse(JSON.stringify(it.dados || {}));
       box.querySelectorAll('[data-li="' + i + '"]').forEach(function(x){ var v = x.value.trim(); d[x.dataset.c] = /^-?\d+([.,]\d+)?$/.test(v) ? Number(v.replace(',', '.')) : v; });
+      var ix = it.indexacaoNova ? it.indexacaoNova.id : (it.indexacao && box.querySelector('[data-ixusar="' + i + '"]') && box.querySelector('[data-ixusar="' + i + '"]').checked ? it.indexacao.id : ''); if(ix) d.indexacaoId = ix;
       if(k === 'doc') return {aba: 'doc', chave: 'doc', dados: d};
       if(/^ori_/.test(k)){ d.tipo = Number(k.slice(4)); return {aba: 'ori', chave: 'ori', dados: d}; }
       return {aba: (R.catalogo.itens[k] || ['comp'])[0], chave: k, dados: d};
     }).filter(Boolean);
   };
+  l.itens.forEach(function(it, i){
+    var sel = box.querySelector('[data-chave="' + i + '"]'); if(sel) sel.addEventListener('change', function(){ it.chave = sel.value; recalcularLinha(box, i, it); });
+    box.querySelectorAll('[data-li="' + i + '"]').forEach(function(x){ x.addEventListener('input', function(){ recalcularLinha(box, i, it); }); });
+    var enviarPrint = function(f){
+      var msg = box.querySelector('[data-ixmsg="' + i + '"]'); msg.textContent = 'Lendo o comprovante de indexação…';
+      lerArquivo(f).then(function(b64){ return api('progIndexacao', {nome: f.name || 'print.png', dados: b64, mime: f.type || 'image/png', revista: (it.dados || {}).revista || '', issn: (it.dados || {}).issn || ''}); }).then(function(x){
+        it.indexacaoNova = x; var u = box.querySelector('[data-ixusar="' + i + '"]'); if(u) u.checked = false;
+        var mapa = {pub1: '_pub1', pub2: '_pub2', pub3: '_pub3'}, base = (it.chave || 'pes_pub1').replace(/_pub[0-9]$|_anais$/, '');
+        if(mapa[x.chave] && /_pub/.test(it.chave || sel.value)){ sel.value = base + mapa[x.chave]; it.chave = sel.value; recalcularLinha(box, i, it); }
+        msg.innerHTML = '✓ <b>' + esc(x.indexador) + (x.estrato ? ' · ' + esc(x.estrato) : '') + '</b> → ' + esc(rotuloChave(sel.value)) + ' (<a href="' + esc(x.url) + '" target="_blank" rel="noopener">ver print</a>)' + (x.observacao ? '<div class="warn">' + esc(x.observacao) + '</div>' : '');
+      }).catch(function(e){ msg.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
+    };
+    var cola = box.querySelector('[data-ixcola="' + i + '"]');
+    if(cola) cola.addEventListener('paste', function(ev){ var its = (ev.clipboardData || {}).items || []; for(var q = 0; q < its.length; q++){ if(its[q].type.indexOf('image/') === 0){ ev.preventDefault(); enviarPrint(its[q].getAsFile()); return; } } });
+    var arq = box.querySelector('[data-ixarq="' + i + '"]'); if(arq) arq.addEventListener('change', function(){ if(this.files[0]) enviarPrint(this.files[0]); });
+  });
   $('btDescLido').addEventListener('click', function(){ api('progDescartar', {arquivoId: l.arquivoId}).catch(function(){}); LIDO = null; box.innerHTML = ''; if(proximo) proximo(); });
   $('btSalvarLido').addEventListener('click', function(){
     var b = this, itens = coletar(); if(!itens.length){ $('msgLido').innerHTML = '<span class="warn">Marque pelo menos um item.</span>'; return; }
@@ -460,7 +501,7 @@ function montarComprovantes(msg){
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
       return api('progArquivo', {id: c.id}).then(function(a){
         var bytes = b64ParaBytes(a.dados);
-        if(/pdf/.test(a.mime)) return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ return saida.copyPages(d, d.getPageIndices()); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); });
+        if(/pdf/.test(a.mime)) return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(c.paginas > 0) ix = ix.slice(0, c.paginas); return saida.copyPages(d, ix); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); });
         if(/image\/(png|jpe?g)/.test(a.mime)) return (/png/.test(a.mime) ? saida.embedPng(bytes) : saida.embedJpg(bytes)).then(function(img){ var pg = saida.addPage([595, 842]), e = Math.min(555 / img.width, 802 / img.height); pg.drawImage(img, {x: (595 - img.width * e) / 2, y: (842 - img.height * e) / 2, width: img.width * e, height: img.height * e}); });
         falhas.push(c.nome);
       }).catch(function(){ falhas.push(c.nome); }).then(proximo);
