@@ -72,7 +72,7 @@ function desenhar(){
   var p = R.perfil, per = R.periodo, rs = R.resumo, h = '';
   // ---------- período e pontuação ----------
   if(per){
-    h += '<div class="caixa"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div style="font-size:19px;font-weight:bold">' + esc(p.nivelAtual || '?') + ' → ' + esc(p.nivelPretendido || '?') + '</div>' +
+    h += '<div class="caixa"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><div><div style="font-size:19px;font-weight:bold">' + esc((converterNivel(p.nivelAtual) || {}).rotulo || p.nivelAtual || '?') + ' → ' + esc((converterNivel(p.nivelPretendido || proximoNivel(p.nivelAtual)) || {}).rotulo || p.nivelPretendido || '?') + '</div>' + ((converterNivel(p.nivelAtual) || {}).antigo ? '<div class="aviso">código antigo: ' + esc(converterNivel(p.nivelAtual).antigo) + ' → ' + esc((converterNivel(p.nivelPretendido || proximoNivel(p.nivelAtual)) || {}).antigo || '') + '</div>' : '') +
       '<div class="aviso">período avaliado ' + esc(per.inicio) + ' a ' + esc(per.solicitacao) + ' · solicitação em ' + esc(per.solicitacao) + ' (dia e mês da admissão)</div></div>' +
       '<div style="text-align:right"><div class="num">' + (per.diasFaltam > 0 ? per.diasFaltam + ' dias' : 'já pode pedir') + '</div><div class="aviso">' + (per.diasFaltam > 0 ? 'até poder pedir' : '') + '</div></div></div>' +
       '<div style="margin-top:8px">' + [p.nome, p.siape && 'SIAPE ' + p.siape, (p.carreira || 'EBTT') + ' · ' + (p.regime || '40h / DE'), p.campus, p.colegiado, p.admissao && 'admissão ' + p.admissao, p.titulacao, p.instituicao].filter(Boolean).map(function(x){ return '<span class="chip">' + esc(x) + '</span>'; }).join('') +
@@ -91,8 +91,8 @@ function desenhar(){
   h += '<details class="caixa"' + (incompleto ? ' open' : '') + '><summary style="cursor:pointer"><b>👤 Seu perfil</b> <span class="aviso">' + (incompleto ? '— complete para começar' : '— dados que mudam pouco') + '</span></summary>' +
     '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('email', 'E-mail institucional', p.email) + campo('celular', 'Celular, ex.: (24) 98183-9748', p.celular) + campo('telefone', 'Telefone (opcional)', p.telefone) + campo('admissao', 'Data de admissão (dd/mm/aaaa)' + (p.admissao && !/\d{4}/.test(p.admissao) ? ' — falta o ano' : ''), p.admissao) +
     sel('regime', 'Regime', p.regime || '40h / DE', ['40h / DE', '40h', '20h']) + sel('carreira', 'Carreira', p.carreira || 'EBTT', ['EBTT', 'MS']) + sel('campus', 'Unidade', p.campus || 'VA', ['MA', 'MG', 'NI', 'NF', 'PE', 'IT', 'AR', 'VA']) +
-    campo('colegiado', 'Colegiado / lotação (ex.: CCEAL-VA)', p.colegiado) + campo('titulacao', 'Titulação', p.titulacao) + campo('nivelAtual', 'Nível atual (ex.: D4.1 ou D 401)', p.nivelAtual) +
-    campo('nivelPretendido', 'Nível pretendido (ex.: D4.2)', p.nivelPretendido) + campo('anoProgressao', 'Ano da progressão (vazio = o próximo)', p.anoProgressao) + '</div>' +
+    campo('colegiado', 'Colegiado / lotação (ex.: CCEAL-VA)', p.colegiado) + campo('titulacao', 'Titulação', p.titulacao) + campoNivel('nivelAtual', 'Nível atual (antigo D 401 / D4.1 ou novo C1)', p.nivelAtual) +
+    campoNivel('nivelPretendido', 'Nível pretendido (vazio = o próximo)', p.nivelPretendido || proximoNivel(p.nivelAtual)) + campo('anoProgressao', 'Ano da progressão (vazio = o próximo)', p.anoProgressao) + '</div>' +
     '<div style="margin-top:8px">' + campo('pastaLink', 'Link da sua pasta de progressão no Google Drive' + (R.admin ? ' (opcional)' : ''), p.pastaLink) + '<p class="aviso" style="margin:4px 0 0">' + (R.admin ? 'Opcional: se ficar em branco, a plataforma cria a pasta "Progressão docente (Aula por IA)" no seu Drive. Se colar a sua pasta de progressões, ela usa a do ciclo que já existe lá (ex.: "D4.1 para D4.2") — escreva os níveis do mesmo jeito do nome da pasta.' : 'A pasta é sua, no seu Drive: compartilhe-a com <b>miguelmeirelles@gmail.com</b> como <b>editor</b> antes de colar o link. A plataforma cria dentro dela a pasta do ciclo (ex.: "D4.1 para D4.2") e guarda os comprovantes.') + '</p></div>' +
     '<div class="botoes"><button type="button" id="btPerfil">Salvar perfil</button><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📥 Importar minha RAD anterior (.xlsx)<input type="file" id="impRad" accept=".xlsx" class="oculto"></label></div><div id="msgPerfil" class="aviso"></div></details>';
   if(per){
@@ -116,6 +116,7 @@ function desenhar(){
   ligar();
   if(per) carregarPacote();
 }
+function campoNivel(k, rot, v){ var c = converterNivel(v); return '<div><label>' + rot + '</label><input data-pf="' + k + '" value="' + esc(v || '') + '">' + (c ? '<div class="aviso" style="margin-top:2px">= <b>' + esc(c.rotulo) + '</b>' + (c.antigo && c.antigo !== 'Titular' ? ' (antigo ' + esc(c.antigo) + ')' : '') + '</div>' : v ? '<div class="warn" style="font-size:12.5px">não reconheci o código</div>' : '') + '</div>'; }
 function campo(k, rot, v){ return '<div><label>' + rot + '</label><input data-pf="' + k + '" value="' + esc(v || '') + '"></div>'; }
 function sel(k, rot, v, ops){ return '<div><label>' + rot + '</label><select data-pf="' + k + '">' + ops.map(function(o){ return '<option' + (o === v ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>'; }
 function descricaoItem(it){
@@ -231,7 +232,7 @@ function importarRad(f){
     var prox = function(n){ n = String(n || '').trim(); var m = n.match(/^(.*?)(\d)(\D?)(\d)$/); if(m && Number(m[4]) < 4) return m[1] + m[2] + m[3] + (Number(m[4]) + 1); var m2 = n.match(/^(.*?)(\d)(\D?)0?(\d)$/); return ''; };
     var ser = Number(v('Total', 'W2')), dt = ser ? new Date(Math.round((ser - 25569) * 86400000)) : null;
     var dois = function(x){ return ('0' + x).slice(-2); };
-    var pf = {nome: v('Total', 'O4'), siape: v('Total', 'V4'), regime: v('Total', 'H5'), carreira: v('Total', 'H6'), campus: v('Total', 'F8'), nivelAtual: v('Total', 'N10'), nivelPretendido: prox(v('Total', 'N10')),
+    var pf = {nome: v('Total', 'O4'), siape: v('Total', 'V4'), regime: v('Total', 'H5'), carreira: v('Total', 'H6'), campus: v('Total', 'F8'), nivelAtual: ((converterNivel(v('Total', 'N10')) || {}).rotulo || v('Total', 'N10')), nivelPretendido: proximoNivel(v('Total', 'N10')),
       colegiado: String(v('Docência - Disciplinas', 'C5') || '').replace(/_/g, '-'), admissao: dt ? dois(dt.getUTCDate()) + '/' + dois(dt.getUTCMonth() + 1) : '', anoProgressao: dt ? String(dt.getUTCFullYear() + 2) : ''};
     for(var r = 5; r <= 57; r++){ if(v('Docência - Disciplinas', 'B' + r)) ch.push('doc'); }
     for(r = 5; r <= 60; r++){ var t = v('Orientações no Período', 'D' + r); if(t) ch.push('ori_' + t); }
@@ -294,6 +295,28 @@ function desenharCal(){
     var sem = lin.map(function(l, i){ var o = {nivel: l.nivel, semestre: l.semestre}; box.querySelectorAll('[data-cal="' + i + '"]').forEach(function(x){ o[x.dataset.c] = x.value.trim(); }); return o; });
     b.disabled = true; api('progCalendario', {salvar: {ano: $('calAno').value, campus: $('calCampus').value, arquivoId: c.arquivoId, semestres: sem}}).then(function(r){ R = r; CAL = null; desenhar(); }).catch(function(e){ b.disabled = false; alert(e.message); }); });
 }
+// Níveis da carreira EBTT: aceita o código antigo (D 401, DIV.1, D4.1, D IV 1…) ou o novo (C1, Classe C nível 1) e
+// devolve a nomenclatura nova (MP 1.286/2024): D IV → Classe C · D III → Classe B · D II → Classe A (nível único) ·
+// D I → extinto (ingressa na A) · Titular → Titular. Os níveis 1 a 4 das classes B e C não mudam.
+function converterNivel(txt) {
+  var t = String(txt || '').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/CLASSE|NIVEL|NÍVEL/g, '').replace(/[\s.\-–_\/]/g, '');
+  if (!t) return null;
+  if (/^TITULAR/.test(t)) return { classe: 'Titular', nivel: 0, rotulo: 'Titular', curto: 'Titular', antigo: 'Titular' };
+  var rom = { IV: 4, III: 3, II: 2, I: 1 }, m = t.match(/^D(IV|III|II|I|[1-4])0?([1-4])$/), cl = 0, nv = 0;
+  if (m) { cl = rom[m[1]] || Number(m[1]); nv = Number(m[2]); }
+  else { var n = t.match(/^([ABC])([1-4])?$/); if (!n) return null; cl = { A: 2, B: 3, C: 4 }[n[1]]; nv = Number(n[2] || 1); }
+  var letra = { 4: 'C', 3: 'B', 2: 'A', 1: 'A' }[cl], nivelNovo = cl <= 2 ? 1 : nv;
+  var romano = { 4: 'IV', 3: 'III', 2: 'II', 1: 'I' }[cl];
+  return { classe: letra, nivel: nivelNovo, rotulo: 'Classe ' + letra + ' – Nível ' + nivelNovo + (cl <= 2 ? ' (único)' : ''), curto: letra + nivelNovo, antigo: 'D ' + romano + ' – ' + nv, antigoCurto: 'D' + cl + '.' + nv };
+}
+function proximoNivel(txt) {
+  var c = converterNivel(txt); if (!c) return '';
+  if (c.classe === 'Titular') return '';
+  if (c.classe === 'A') return 'Classe B – Nível 1';
+  if (c.nivel < 4) return 'Classe ' + c.classe + ' – Nível ' + (c.nivel + 1);
+  return c.classe === 'B' ? 'Classe C – Nível 1' : 'Titular';
+}
+
 // ===================== etapa 2: o pacote para a CCO =====================
 var PAC = null;
 function carregarPacote(){
