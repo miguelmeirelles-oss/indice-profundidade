@@ -89,8 +89,8 @@ function desenhar(){
   // ---------- perfil ----------
   var incompleto = !per || !p.siape || !p.pastaId;
   h += '<details class="caixa"' + (incompleto ? ' open' : '') + '><summary style="cursor:pointer"><b>👤 Seu perfil</b> <span class="aviso">' + (incompleto ? '— complete para começar' : '— dados que mudam pouco') + '</span></summary>' +
-    '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('admissao', 'Data de admissão (dd/mm/aaaa)', p.admissao) +
-    sel('regime', 'Regime', p.regime || '40h / DE', ['40h / DE', '20h']) + sel('carreira', 'Carreira', p.carreira || 'EBTT', ['EBTT', 'MS']) + sel('campus', 'Unidade', p.campus || 'VA', ['MA', 'MG', 'NI', 'NF', 'PE', 'IT', 'AR', 'VA']) +
+    '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('email', 'E-mail institucional', p.email) + campo('celular', 'Celular, ex.: (24) 98183-9748', p.celular) + campo('telefone', 'Telefone (opcional)', p.telefone) + campo('admissao', 'Data de admissão (dd/mm/aaaa)', p.admissao) +
+    sel('regime', 'Regime', p.regime || '40h / DE', ['40h / DE', '40h', '20h']) + sel('carreira', 'Carreira', p.carreira || 'EBTT', ['EBTT', 'MS']) + sel('campus', 'Unidade', p.campus || 'VA', ['MA', 'MG', 'NI', 'NF', 'PE', 'IT', 'AR', 'VA']) +
     campo('colegiado', 'Colegiado / lotação (ex.: CCEAL-VA)', p.colegiado) + campo('titulacao', 'Titulação', p.titulacao) + campo('nivelAtual', 'Nível atual (ex.: D4.1 ou D 401)', p.nivelAtual) +
     campo('nivelPretendido', 'Nível pretendido (ex.: D4.2)', p.nivelPretendido) + campo('anoProgressao', 'Ano da progressão (vazio = o próximo)', p.anoProgressao) + '</div>' +
     '<div style="margin-top:8px">' + campo('pastaLink', 'Link da sua pasta de progressão no Google Drive', p.pastaLink) + '<p class="aviso" style="margin:4px 0 0">A pasta é sua, no seu Drive. Se você não é o administrador, compartilhe-a com <b>miguelmeirelles@gmail.com</b> como <b>editor</b> antes de colar o link. A plataforma cria dentro dela a pasta do ciclo (ex.: "D4.1 para D4.2") e guarda os comprovantes.</p></div>' +
@@ -300,7 +300,7 @@ function desenharPacote(){
   var nomesArea = {doc: 'Docência', ori: 'Orientações', out: 'Outras acadêmicas', art: 'Artísticas', comp: 'Complementares', ext: 'Extensão', pes: 'Pesquisa'};
   var passo = function(n, tit, conteudo, botoes){ return '<div class="item"><div><b>' + n + ' · ' + tit + '</b><div style="margin-top:3px">' + conteudo + '</div></div><div class="botoes" style="margin:0">' + (botoes || '') + '</div></div>'; };
   b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso" style="margin-top:0">Tudo vai para <a href="' + esc(p.pasta) + '" target="_blank" rel="noopener">a pasta do ciclo no seu Drive</a>, numerado como o SUAP pede. Depois é só assinar pelo gov.br e mandar para a CCO.</p>' +
-    passo(1, 'Folha de protocolo', '<a href="' + esc(p.modelos.protocolo) + '" target="_blank" rel="noopener">modelo oficial em branco</a> <span class="aviso">— preencha, date e assine; salve na pasta como "1 - Folha de protocolo.pdf"</span><br>' + linkArq(1)) +
+    passo(1, 'Folha de protocolo', linkArq(1) + '<div class="grade" style="margin-top:4px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"><div><label>CPF (não fica guardado)</label><input id="protCpf" placeholder="000.000.000-00" autocomplete="off"></div><div><label>Data</label><input id="protData" value="' + new Date().toLocaleDateString('pt-BR') + '"></div><div><label>Local</label><input id="protLocal" value="' + esc(({VA: 'Valença', MA: 'Rio de Janeiro', MG: 'Rio de Janeiro', NI: 'Nova Iguaçu', NF: 'Nova Friburgo', PE: 'Petrópolis', IT: 'Itaguaí', AR: 'Angra dos Reis'}[p.perfil.campus] || 'Valença') + ' - RJ') + '"></div></div><div class="aviso">Modelo oficial da CPPD com "Progressão/Promoção" marcado. Abra no Word, confira, salve em PDF e assine. Para o CPF ir no documento, digite acima (ele não é guardado na plataforma).</div>', '<button type="button" id="btProt">Gerar folha</button>') +
     passo(2, 'Portaria da última progressão', linkArq(2) + ' <span class="aviso">(na 1ª progressão, o termo de posse)</span>', '<label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar<input type="file" id="arqPortaria" accept="application/pdf,image/*" class="oculto"></label>') +
     passo(3, 'Planilha RAD preenchida', linkArq(3) + '<div class="aviso">Total ' + num(p.resumo.total) + ' · nota ' + p.resumo.nota + '. Abra no Excel, confira, salve em PDF (aba TOTAL primeiro) e assine.</div>', '<button type="button" id="btRad">Gerar planilha</button>') +
     passo(4, 'Comprovantes da RAD (um PDF, na ordem da planilha)', linkArq(4) + '<div class="aviso">' + (p.comprovantes.length ? p.comprovantes.length + ' arquivo(s): ' + p.comprovantes.map(function(c){ return nomesArea[c.area] + ': ' + esc(c.nome); }).join(' · ') : 'nenhum comprovante ainda') + '</div>', p.comprovantes.length ? '<button type="button" id="btComp">Montar PDF</button>' : '') +
@@ -311,6 +311,7 @@ function desenharPacote(){
   var ok = function(){ carregarPacote(); };
   if($('arqPortaria')) $('arqPortaria').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; msg('Enviando…');
     (/^image\//.test(f.type) ? imagemParaPdf(f) : lerArquivo(f)).then(function(b64){ return api('progSalvarGerado', {nome: '2 - Portaria da última progressão.pdf', dados: b64, mime: 'application/pdf'}); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btProt')) $('btProt').addEventListener('click', function(){ this.disabled = true; gerarProtocolo(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btComp')) $('btComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btCco')) $('btCco').addEventListener('click', function(){ this.disabled = true; preencherCCO(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
@@ -326,6 +327,43 @@ function emailCCO(){
     '<p class="aviso" style="margin:6px 0 2px">Para: ' + esc(cco.map(function(c){ return c.nome + (c.email ? ' <' + c.email + '>' : ' (sem e-mail na lista)'); }).join(', ')) + '<br>Assunto: <b>' + esc(assunto) + '</b></p>' +
     '<textarea rows="8" id="txtEmailCCO">' + esc(corpo) + '</textarea><div class="botoes"><a class="btn sec" id="lnkMail" href="mailto:' + encodeURIComponent(mails.join(',')) + '?subject=' + encodeURIComponent(assunto) + '&body=' + encodeURIComponent(corpo) + '">Abrir no meu e-mail</a></div>' +
     '<p class="aviso">Anexe os arquivos 1 a 6 da pasta do ciclo.</p></details>';
+}
+// preenche o protocolo da CPPD (docx com campos de formulário antigos do Word): textos em ordem, caixas em ordem, campus
+function preencherProtocoloXml(xml, textos, caixas, campusIdx) {
+  var i = 0, pos = 0;
+  while (true) {
+    var k = xml.indexOf('FORMTEXT', pos); if (k < 0) break;
+    var sepTag = '<w:fldChar w:fldCharType="separate"/>', endTag = '<w:fldChar w:fldCharType="end"/>';
+    var s = xml.indexOf(sepTag, k), e = xml.indexOf(endTag, s); if (s < 0 || e < 0) break;
+    var sFim = xml.indexOf('</w:r>', s) + 6, eIni = xml.lastIndexOf('<w:r', e);
+    var seg = xml.slice(sFim, eIni), rpr = (seg.match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0];
+    var v = textos[i] === undefined || textos[i] === null || textos[i] === '' ? '     ' : String(textos[i]);
+    v = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var novo = '<w:r>' + rpr + '<w:t xml:space="preserve">' + v + '</w:t></w:r>';
+    xml = xml.slice(0, sFim) + novo + xml.slice(eIni);
+    pos = sFim + novo.length; i++;
+  }
+  var j = 0;
+  xml = xml.replace(/<w:checkBox>([\s\S]*?)<\/w:checkBox>/g, function (a, dentro) {
+    dentro = dentro.replace(/<w:checked(?:\s[^>]*)?\/>/g, ''); var marcar = !!caixas[j++];
+    return '<w:checkBox>' + dentro + (marcar ? '<w:checked/>' : '') + '</w:checkBox>';
+  });
+  if (campusIdx !== undefined && campusIdx !== null) xml = xml.replace(/(<w:ddList><w:result w:val=")\d+("\/>)/, '$1' + campusIdx + '$2');
+  return xml;
+}
+
+// 1 · folha de protocolo: o modelo oficial (Word, publicado em branco no site) preenchido aqui no navegador
+function gerarProtocolo(msg){
+  var pf = PAC.perfil, tel = function(t){ var m = String(t || '').match(/\(?(\d{2})\)?\s*([\d\s-]{8,})/); return m ? [m[1], m[2].trim()] : ['', '']; }, ce = tel(pf.celular), te = tel(pf.telefone);
+  var campus = {AR: 0, IT: 1, MA: 2, MG: 3, NF: 4, NI: 5, PE: 6, VA: 7}[pf.campus || 'VA'];
+  var carga = pf.regime === '20h' ? 2 : pf.regime === '40h' ? 3 : 4, caixas = [false, false, false, false, false, false, true, false, false, false, false, false];
+  caixas[(pf.carreira || 'EBTT') === 'MS' ? 1 : 0] = true; caixas[carga] = true;
+  var textos = [pf.nome, $('protCpf').value.trim(), pf.siape, pf.email, te[0], te[1], ce[0], ce[1], pf.colegiado, '', $('protData').value.trim(), $('protLocal').value.trim()];
+  msg('Preenchendo a folha de protocolo…');
+  var carregarZip = window.JSZip ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de Word.')); }; document.head.appendChild(s); });
+  return carregarZip.then(function(){ return fetch('modelo-protocolo-cppd.docx?v=1'); }).then(function(r){ if(!r.ok) throw new Error('Modelo do protocolo não encontrado.'); return r.arrayBuffer(); })
+    .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){ return z.file('word/document.xml').async('string').then(function(x){ z.file('word/document.xml', preencherProtocoloXml(x, textos, caixas, campus)); return z.generateAsync({type: 'base64'}); }); })
+    .then(function(b64){ return api('progSalvarGerado', {nome: '1 - Folha de protocolo.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
 }
 function carregarPdfLib(){
   if(window.PDFLib) return Promise.resolve();
