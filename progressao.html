@@ -109,10 +109,12 @@ function desenhar(){
     h += '<div class="caixa"><h2>🧾 O que já está na sua RAD</h2>' + listaItens() + '<div class="botoes"><button type="button" class="sec" id="btManual">+ Lançar item à mão</button></div><div id="manualBox"></div></div>';
     // ---------- CCO ----------
     h += desenharCCO();
+    h += '<div class="caixa" id="pacoteBox"><h2>📦 Pacote para a CCO</h2><p class="carregando">Carregando…</p></div>';
   }
   if(R.admin && R.adminDados) h += desenharAdmin();
   $('corpo').innerHTML = h;
   ligar();
+  if(per) carregarPacote();
 }
 function campo(k, rot, v){ return '<div><label>' + rot + '</label><input data-pf="' + k + '" value="' + esc(v || '') + '"></div>'; }
 function sel(k, rot, v, ops){ return '<div><label>' + rot + '</label><select data-pf="' + k + '">' + ops.map(function(o){ return '<option' + (o === v ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select></div>'; }
@@ -285,6 +287,96 @@ function desenharCal(){
   $('btCalOk').addEventListener('click', function(){ var b = this;
     var sem = lin.map(function(l, i){ var o = {nivel: l.nivel, semestre: l.semestre}; box.querySelectorAll('[data-cal="' + i + '"]').forEach(function(x){ o[x.dataset.c] = x.value.trim(); }); return o; });
     b.disabled = true; api('progCalendario', {salvar: {ano: $('calAno').value, campus: $('calCampus').value, arquivoId: c.arquivoId, semestres: sem}}).then(function(r){ R = r; CAL = null; desenhar(); }).catch(function(e){ b.disabled = false; alert(e.message); }); });
+}
+// ===================== etapa 2: o pacote para a CCO =====================
+var PAC = null;
+function carregarPacote(){
+  api('progPacote').then(function(p){ PAC = p; desenharPacote(); }).catch(function(e){ var b = $('pacoteBox'); if(b) b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso">' + esc(e.message) + '</p>'; });
+}
+function arqDo(n){ return (PAC.arquivos || []).filter(function(a){ return a.nome.indexOf(n + ' - ') === 0; }); }
+function linkArq(n){ var l = arqDo(n); return l.length ? l.map(function(a){ return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener">✓ ' + esc(a.nome) + '</a> <span class="aviso">' + esc(a.em) + '</span>'; }).join('<br>') : '<span class="aviso">ainda não gerado</span>'; }
+function desenharPacote(){
+  var b = $('pacoteBox'); if(!b) return; var p = PAC, cco = p.cco || [];
+  var nomesArea = {doc: 'Docência', ori: 'Orientações', out: 'Outras acadêmicas', art: 'Artísticas', comp: 'Complementares', ext: 'Extensão', pes: 'Pesquisa'};
+  var passo = function(n, tit, conteudo, botoes){ return '<div class="item"><div><b>' + n + ' · ' + tit + '</b><div style="margin-top:3px">' + conteudo + '</div></div><div class="botoes" style="margin:0">' + (botoes || '') + '</div></div>'; };
+  b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso" style="margin-top:0">Tudo vai para <a href="' + esc(p.pasta) + '" target="_blank" rel="noopener">a pasta do ciclo no seu Drive</a>, numerado como o SUAP pede. Depois é só assinar pelo gov.br e mandar para a CCO.</p>' +
+    passo(1, 'Folha de protocolo', '<a href="' + esc(p.modelos.protocolo) + '" target="_blank" rel="noopener">modelo oficial em branco</a> <span class="aviso">— preencha, date e assine; salve na pasta como "1 - Folha de protocolo.pdf"</span><br>' + linkArq(1)) +
+    passo(2, 'Portaria da última progressão', linkArq(2) + ' <span class="aviso">(na 1ª progressão, o termo de posse)</span>', '<label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar<input type="file" id="arqPortaria" accept="application/pdf,image/*" class="oculto"></label>') +
+    passo(3, 'Planilha RAD preenchida', linkArq(3) + '<div class="aviso">Total ' + num(p.resumo.total) + ' · nota ' + p.resumo.nota + '. Abra no Excel, confira, salve em PDF (aba TOTAL primeiro) e assine.</div>', '<button type="button" id="btRad">Gerar planilha</button>') +
+    passo(4, 'Comprovantes da RAD (um PDF, na ordem da planilha)', linkArq(4) + '<div class="aviso">' + (p.comprovantes.length ? p.comprovantes.length + ' arquivo(s): ' + p.comprovantes.map(function(c){ return nomesArea[c.area] + ': ' + esc(c.nome); }).join(' · ') : 'nenhum comprovante ainda') + '</div>', p.comprovantes.length ? '<button type="button" id="btComp">Montar PDF</button>' : '') +
+    passo(5, 'Avaliação de desempenho e parecer (formulário da CCO)', linkArq(5) + '<div class="aviso">Formulário oficial com a sua identificação, a comissão e a chefia já escritos. As notas e o parecer ficam para a CCO.</div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btCco">Preencher formulário</button>' : '<span class="aviso">escolha os 3 membros da CCO acima</span>') +
+    passo(6, 'Ata da reunião da CCO (modelo pré-preenchido)', linkArq(6) + '<div style="margin-top:4px;max-width:200px"><label>Data da reunião</label><input id="dataAta" placeholder="dd/mm/aaaa"></div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btAta">Gerar ata</button>' : '') +
+    '<div id="msgPac" class="aviso" style="margin-top:8px"></div>' + emailCCO();
+  var msg = function(t){ $('msgPac').innerHTML = t; };
+  var ok = function(){ carregarPacote(); };
+  if($('arqPortaria')) $('arqPortaria').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; msg('Enviando…');
+    (/^image\//.test(f.type) ? imagemParaPdf(f) : lerArquivo(f)).then(function(b64){ return api('progSalvarGerado', {nome: '2 - Portaria da última progressão.pdf', dados: b64, mime: 'application/pdf'}); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btComp')) $('btComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btCco')) $('btCco').addEventListener('click', function(){ this.disabled = true; preencherCCO(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btAta')) $('btAta').addEventListener('click', function(){ this.disabled = true; msg('Escrevendo a ata…'); api('progGerarAta', {data: $('dataAta').value.trim()}).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+}
+function emailCCO(){
+  var p = PAC, cco = (p.cco || []).filter(function(c){ return c.nome; });
+  if(cco.length < 3) return '';
+  var nomes = cco.map(function(c){ return c.nome.split(' ')[0]; }), mails = cco.map(function(c){ return c.email; }).filter(Boolean);
+  var corpo = 'Boa tarde a todos,\n\nMuito obrigado por aceitarem compor a minha CCO. Em anexo estou enviando os documentos para avaliação.\nQualquer dúvida podem entrar em contato (pode ser por WhatsApp, para facilitar).\n\nOBS: para facilitar eu enviei o modelo de Ata pré-preenchida. Tenham a liberdade para alterar o que julgarem necessário.\n\nUm excelente fim de semana para todos!!';
+  var assunto = 'Documentação para progressão ' + (p.perfil.nome || '').split(' ')[0];
+  return '<details style="margin-top:10px"><summary style="cursor:pointer"><b>✉ E-mail para a CCO</b> <span class="aviso">(você envia do seu e-mail; a plataforma não envia)</span></summary>' +
+    '<p class="aviso" style="margin:6px 0 2px">Para: ' + esc(cco.map(function(c){ return c.nome + (c.email ? ' <' + c.email + '>' : ' (sem e-mail na lista)'); }).join(', ')) + '<br>Assunto: <b>' + esc(assunto) + '</b></p>' +
+    '<textarea rows="8" id="txtEmailCCO">' + esc(corpo) + '</textarea><div class="botoes"><a class="btn sec" id="lnkMail" href="mailto:' + encodeURIComponent(mails.join(',')) + '?subject=' + encodeURIComponent(assunto) + '&body=' + encodeURIComponent(corpo) + '">Abrir no meu e-mail</a></div>' +
+    '<p class="aviso">Anexe os arquivos 1 a 6 da pasta do ciclo.</p></details>';
+}
+function carregarPdfLib(){
+  if(window.PDFLib) return Promise.resolve();
+  return new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de PDF. Verifique a internet.')); }; document.head.appendChild(s); });
+}
+function b64ParaBytes(b){ var s = atob(b), u = new Uint8Array(s.length); for(var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
+function bytesParaB64(u){ var s = '', t = 0x8000; for(var i = 0; i < u.length; i += t) s += String.fromCharCode.apply(null, u.subarray(i, i + t)); return btoa(s); }
+function imagemParaPdf(f){
+  return carregarPdfLib().then(function(){ return lerArquivo(f); }).then(function(u){
+    var L = PDFLib; return L.PDFDocument.create().then(function(doc){
+      var bytes = b64ParaBytes(u.split(',')[1]); return (/png/.test(f.type) ? doc.embedPng(bytes) : doc.embedJpg(bytes)).then(function(img){
+        var pg = doc.addPage([595, 842]), e = Math.min(555 / img.width, 802 / img.height); pg.drawImage(img, {x: (595 - img.width * e) / 2, y: (842 - img.height * e) / 2, width: img.width * e, height: img.height * e});
+        return doc.save(); }); }).then(function(b){ return bytesParaB64(b); }); });
+}
+// 4 · todos os comprovantes num PDF só, na ordem da planilha RAD
+function montarComprovantes(msg){
+  return carregarPdfLib().then(function(){ return PDFLib.PDFDocument.create(); }).then(function(saida){
+    var lista = PAC.comprovantes.slice(), i = 0, falhas = [];
+    var proximo = function(){
+      var c = lista[i++]; if(!c) return Promise.resolve();
+      msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
+      return api('progArquivo', {id: c.id}).then(function(a){
+        var bytes = b64ParaBytes(a.dados);
+        if(/pdf/.test(a.mime)) return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ return saida.copyPages(d, d.getPageIndices()); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); });
+        if(/image\/(png|jpe?g)/.test(a.mime)) return (/png/.test(a.mime) ? saida.embedPng(bytes) : saida.embedJpg(bytes)).then(function(img){ var pg = saida.addPage([595, 842]), e = Math.min(555 / img.width, 802 / img.height); pg.drawImage(img, {x: (595 - img.width * e) / 2, y: (842 - img.height * e) / 2, width: img.width * e, height: img.height * e}); });
+        falhas.push(c.nome);
+      }).catch(function(){ falhas.push(c.nome); }).then(proximo);
+    };
+    return proximo().then(function(){ msg('Salvando o PDF no Drive…'); return saida.save(); }).then(function(b){
+      return api('progSalvarGerado', {nome: '4 - Comprovantes da RAD.pdf', dados: bytesParaB64(b), mime: 'application/pdf'}); })
+      .then(function(){ if(falhas.length) alert('Não deu para incluir: ' + falhas.join(', ') + '. Confira esses arquivos.'); });
+  });
+}
+// 5 · formulário oficial da CCO com a identificação escrita nas posições do modelo
+function preencherCCO(msg){
+  var p = PAC, pf = p.perfil, cco = p.cco, ch = p.chefia || {};
+  msg('Baixando o formulário oficial…');
+  return carregarPdfLib().then(function(){ return api('progArquivo', {id: p.modelos.cco}); }).then(function(a){ return PDFLib.PDFDocument.load(b64ParaBytes(a.dados), {ignoreEncryption: true}); }).then(function(doc){
+    return doc.embedFont(PDFLib.StandardFonts.Helvetica).then(function(f){
+      var pgs = doc.getPages(), t = function(pg, x, y, s, tam){ if(s) pgs[pg].drawText(String(s), {x: x, y: y, size: tam || 10, font: f}); };
+      var adm = String(pf.admissao || '').split('/'), cidade = {VA: 'Valença-RJ', MA: 'Rio de Janeiro-RJ', MG: 'Rio de Janeiro-RJ', NI: 'Nova Iguaçu-RJ', NF: 'Nova Friburgo-RJ', PE: 'Petrópolis-RJ', IT: 'Itaguaí-RJ', AR: 'Angra dos Reis-RJ'}[pf.campus] || pf.campus;
+      t(0, 166, 642, pf.nome); t(0, 462, 642, pf.siape);
+      if(pf.regime !== '20h') t(0, 295, 617, 'x'); if((pf.carreira || 'EBTT') === 'EBTT') t(0, 82, 595, 'x');
+      t(0, 456, 620, adm[0], 11); t(0, 479, 620, adm[1], 11); t(0, 502, 620, adm[2], 11); t(0, 180, 577, cidade); t(0, 401, 577, pf.colegiado);
+      t(2, 67, 590, 'x', 11);
+      [515, 495, 475].forEach(function(y, i){ var m = cco[i] || {}; t(2, 44, y, m.nome, 8.5); t(2, 295, y, m.lotacao, 9); t(2, 365, y, m.titulacao, 9); t(2, 431, y, m.admissao, 9); });
+      [[360, 359], [322, 322], [288, 289]].forEach(function(y, i){ var m = cco[i] || {}; t(2, 100, y[0], m.nome); t(2, 483, y[1], m.siape); });
+      t(2, 160, 256, ch.nome); t(2, 488, 130, ch.siape); t(2, 490, 57, pf.siape);
+      msg('Salvando no Drive…'); return doc.save();
+    });
+  }).then(function(b){ return api('progSalvarGerado', {nome: '5 - CCO-AVALIACAO-PARECER (preenchido).pdf', dados: bytesParaB64(b), mime: 'application/pdf'}); });
 }
 abrir();
 </script>
