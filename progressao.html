@@ -106,6 +106,10 @@ function desenhar(){
       (R.estrelas.length ? '<div class="aviso" style="margin-bottom:6px">Você costuma enviar: ' + R.estrelas.map(function(k){ return '<span class="chip">★ ' + esc(rotuloChave(k)) + '</span>'; }).join('') + '</div>' : '') +
       '<input type="file" id="arqComp" accept="application/pdf,image/*" multiple><div id="lidoBox"></div></div>';
     // ---------- itens lançados ----------
+    var docs = R.documentos || [], soltos = docs.filter(function(d){ return !d.itens; });
+    if(docs.length) h += '<details class="caixa"' + (soltos.length ? ' open' : '') + '><summary style="cursor:pointer"><b>📂 Documentos enviados</b> <span class="aviso">(' + docs.length + (soltos.length ? ' · <span class="warn">' + soltos.length + ' sem itens</span>' : '') + ')</span></summary>' +
+      docs.map(function(d){ return '<div class="item"><div><a href="' + esc(d.url) + '" target="_blank" rel="noopener">📄 ' + esc(d.nome) + '</a> <span class="aviso">' + esc(d.em) + ' · ' + (d.itens ? d.itens + ' item(ns) na RAD' : '<span class="warn">sem itens — foi lido e não confirmado</span>') + '</span></div><button type="button" class="link" data-apagarq="' + esc(d.id) + '" data-n="' + d.itens + '">apagar</button></div>'; }).join('') +
+      '<p class="aviso" style="margin:6px 0 0">Documento sem itens não entra no PDF dos comprovantes. Se for um comprovante que vale, envie de novo e confirme; se for cópia, apague.</p></details>';
     h += '<div class="caixa"><h2>🧾 O que já está na sua RAD</h2>' + listaItens() + '<div class="botoes"><button type="button" class="sec" id="btManual">+ Lançar item à mão</button></div><div id="manualBox"></div></div>';
     // ---------- CCO ----------
     h += desenharCCO();
@@ -143,8 +147,19 @@ function enviarComprovantes(files){
     var f = fila.shift(); if(!f){ return; }
     if(f.size > 10 * 1024 * 1024){ box.insertAdjacentHTML('beforeend', '<div class="erro">' + esc(f.name) + ': grande demais (máx. 10 MB).</div>'); proximo(); return; }
     box.innerHTML = '<p class="carregando">Lendo "' + esc(f.name) + '" com a IA… (uns 20 a 40 s)' + (fila.length ? ' · faltam ' + fila.length : '') + '</p>';
-    lerArquivo(f).then(function(b64){ return api('progAnalisar', {nome: f.name, dados: b64, mime: f.type || 'application/pdf'}); })
-      .then(function(l){ LIDO = l; LIDO.fila = fila; desenharLido(proximo); })
+    var b64guardado = '';
+    lerArquivo(f).then(function(b64){ b64guardado = b64; return api('progAnalisar', {nome: f.name, dados: b64, mime: f.type || 'application/pdf'}); })
+      .then(function(l){
+        if(l.duplicado){
+          var d = l.duplicado;
+          box.innerHTML = '<div class="erro" style="background:#fff7d6;color:var(--navy)"><b>⚠ Este documento já foi enviado</b> em ' + esc(d.em) + ' (<a href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.nome) + '</a>) e gerou ' + d.itens + ' item(ns) na sua RAD. Se continuar, a leitura nova <b>substitui</b> a anterior: os itens antigos dele saem e o arquivo antigo vai para a lixeira do Drive.' +
+            '<div class="botoes"><button type="button" id="btSubst">Substituir</button><button type="button" class="sec" id="btManter">Cancelar (manter o que já está)</button></div></div>';
+          $('btManter').addEventListener('click', function(){ box.innerHTML = ''; proximo(); });
+          $('btSubst').addEventListener('click', function(){ box.innerHTML = '<p class="carregando">Lendo de novo "' + esc(f.name) + '"…</p>';
+            api('progAnalisar', {nome: f.name, dados: b64guardado, mime: f.type || 'application/pdf', substituir: true}).then(function(l2){ LIDO = l2; LIDO.fila = fila; desenharLido(proximo); }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; proximo(); }); });
+          return;
+        }
+        LIDO = l; LIDO.fila = fila; desenharLido(proximo); })
       .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(f.name) + ': ' + esc(e.message) + '</div>'; proximo(); });
   };
   proximo();
@@ -256,6 +271,9 @@ function ligar(){
     lerArquivo(f).then(function(b){ return api('progCalendario', {nome: f.name, dados: b, mime: f.type || 'application/pdf'}); }).then(function(x){ CAL = x.lido; desenharCal(); })
       .catch(function(e){ $('calBox').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
+  document.querySelectorAll('[data-apagarq]').forEach(function(b){ b.addEventListener('click', function(){
+    var n = Number(b.dataset.n); if(!confirm(n ? 'Apagar este documento e os ' + n + ' item(ns) que ele gerou na sua RAD? (o arquivo vai para a lixeira do Drive)' : 'Apagar este documento? (vai para a lixeira do Drive)')) return;
+    b.disabled = true; api('progApagarArquivo', {id: b.dataset.apagarq}).then(function(r){ R = r; desenhar(); }).catch(function(e){ b.disabled = false; alert(e.message); }); }); });
   document.querySelectorAll('[data-apagar]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Apagar este item da sua RAD? (o arquivo continua no Drive)')) return;
     api('progApagarItem', {id: b.dataset.apagar}).then(function(r){ R = r; desenhar(); }).catch(function(e){ alert(e.message); }); }); });
   if($('btManual')) $('btManual').addEventListener('click', function(){ LIDO = {arquivoId: '', arquivoNome: 'lançamento manual', arquivoUrl: '#', documento: 'Lançamento manual', resumo: 'Escolha o item e preencha. Depois envie o comprovante quando tiver.', duvida: '', itens: [{aba: 'comp', chave: 'comp_nde', dados: {descricao: '', quantidade: 1}, pts: 0}]};
