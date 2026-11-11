@@ -45,7 +45,7 @@
 <body>
 <div class="wrap">
   <div class="cab"><h1>📈 Progressão docente</h1><p>Planilha RAD, comprovantes e CCO, montados aos poucos. · <a href="aulas.html">voltar ao Aula por IA</a></p></div>
-  <div class="abas"><button type="button" data-aba="prog" aria-pressed="true">Progressão</button><button type="button" class="sec" disabled title="Em breve">Plano de trabalho / relatório (em breve)</button><button type="button" class="sec" data-aba="cco" aria-pressed="false">🧑‍⚖️ Sou membro de CCO</button></div>
+  <div class="abas"><button type="button" data-aba="prog" aria-pressed="true">Progressão</button><button type="button" class="sec" data-aba="ppa" aria-pressed="false">📋 Plano de trabalho / relatório</button><button type="button" class="sec" data-aba="cco" aria-pressed="false">🧑‍⚖️ Sou membro de CCO</button></div>
   <div id="corpo"><p class="carregando">Carregando…</p></div>
 </div>
 <script>
@@ -485,6 +485,199 @@ function desenharEstagio(){
     this.disabled = true; msg('Enviando…'); api('progEstagioEmail', {dados: d, reenviar: re}).then(function(r2){ feito(r2); msg('<span class="ok">✓ E-mail enviado ao coordenador.</span>'); }).catch(erro); });
 }
 
+// preenche a folha de rosto da DIREN (plano ou relatório): identificação, caixas, ano, tabela de 21 linhas e observações
+function preencherFolhaXml(xml, o){
+  var escX = function(t){ return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  var run = function(t){ return '<w:r><w:rPr><w:rFonts w:ascii="Arial" w:hAnsi="Arial" w:cs="Arial"/><w:sz w:val="20"/></w:rPr><w:t xml:space="preserve">' + escX(t) + '</w:t></w:r>'; };
+  // o sdt pode ter outro sdt dentro: troca tudo entre o 1º <w:sdtContent> e o último </w:sdtContent>
+  var porSdt = function(sdt, texto){
+    var a = sdt.indexOf('<w:sdtContent>'), b = sdt.lastIndexOf('</w:sdtContent>'); if(a < 0 || b < 0) return sdt;
+    var pr = sdt.slice(0, a).replace('<w:showingPlcHdr/>', ''), cont = sdt.slice(a + 14, b), t = String(texto == null ? '' : texto), novo;
+    if(/<w:p[ >]/.test(cont)){
+      var ppr = (cont.match(/<w:pPr>(?:(?!<w:pPr>)[\s\S])*?<\/w:pPr>/) || [''])[0];
+      novo = t.split('\n').map(function(l){ return '<w:p>' + ppr + run(l) + '</w:p>'; }).join('');
+    } else novo = t.split('\n').map(run).join('<w:r><w:br/></w:r>');
+    return pr + '<w:sdtContent>' + novo + '</w:sdtContent>' + sdt.slice(b + 15);
+  };
+  // os sdt de mais alto nível de um trecho (conta a profundidade)
+  var trocarSdts = function(s, f){
+    var out = '', pos = 0, re = /<w:sdt>|<\/w:sdt>/g, m, prof = 0, ini = -1, k = 0;
+    while((m = re.exec(s))){
+      if(m[0] === '<w:sdt>'){ if(prof === 0) ini = m.index; prof++; }
+      else { prof--; if(prof === 0 && ini >= 0){ var fim = m.index + m[0].length; out += s.slice(pos, ini) + f(s.slice(ini, fim), k++); pos = fim; ini = -1; } }
+    }
+    return out + s.slice(pos);
+  };
+  var nLinha = -1;
+  xml = xml.replace(/<w:tr[ >][\s\S]*?<\/w:tr>/g, function(tr){
+    nLinha++; var i = nLinha;
+    var col = function(){ return trocarSdts(tr, function(sdt, k){ var v = valor(k); return v === undefined ? sdt : porSdt(sdt, v); }); };
+    var valor = function(){ return undefined; };
+    if(i === 0) valor = function(k){ return k === 0 ? o.nome : k === 1 ? o.siape : undefined; };
+    else if(i === 3) valor = function(k){ return k === 0 ? o.lotacao : undefined; };
+    else if(i >= 6 && i <= 26){ var r = i - 6; valor = function(k){ var cs = o.colunas || []; if(cs.length === 1) return k === 0 ? (cs[0][r] || '') : undefined; return cs[k] ? (cs[k][r] || '') : undefined; }; }
+    else if(i === 27) valor = function(k){ return k === 0 ? (o.obs || '') : undefined; };
+    else return tr;
+    return col();
+  });
+  // ano letivo (lista suspensa "anos")
+  xml = xml.replace(/<w:sdt>(?:(?!<w:sdt>)[\s\S])*?<w:alias w:val="anos"\/>[\s\S]*?<\/w:sdt>/, function(sdt){ return porSdt(sdt, String(o.ano)); });
+  // caixas de marcar: o rótulo é o texto logo depois da caixa
+  var marcar = (o.marcar || []).map(function(t){ return String(t).toLowerCase(); });
+  var saida = '', pos = 0, re = /<w:sdt>(?:(?!<w:sdt>)[\s\S])*?w14:checkbox[\s\S]*?<\/w:sdt>/g, m;
+  while((m = re.exec(xml))){
+    var depois = xml.slice(m.index + m[0].length, m.index + m[0].length + 1500).split(/<w:sdt>|<\/w:p>/)[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+    var on = marcar.some(function(t){ return depois === t || (t.length > 8 && depois.indexOf(t) === 0); });
+    var novo = m[0].replace(/<w14:checked w14:val="[01]"\/>/, '<w14:checked w14:val="' + (on ? 1 : 0) + '"/>').replace(/<w:t>[☐☒]<\/w:t>/, '<w:t>' + (on ? '☒' : '☐') + '</w:t>');
+    saida += xml.slice(pos, m.index) + novo; pos = m.index + m[0].length;
+  }
+  return saida + xml.slice(pos);
+}
+
+// ===================== PLANO DE TRABALHO e RELATÓRIO DE ATIVIDADES (anuais, DIREN) =====================
+var AN = null, ANO_SEL = null;
+var CAMPUS_NOME = {VA: 'valença', MA: 'maracanã', MG: 'maria da graça', NI: 'nova iguaçu', NF: 'nova friburgo', PE: 'petrópolis', IT: 'itaguaí', AR: 'angra dos reis'};
+function abrirAnual(ano){
+  if(ano) ANO_SEL = ano;
+  $('corpo').innerHTML = '<div class="caixa"><p class="carregando"><span class="giro"></span>Juntando o que você já tem do ano letivo…</p></div>';
+  api('progAnualAbrir', {ano: ANO_SEL}).then(function(r){ AN = r; ANO_SEL = r.ano; desenharAnual(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+function nomeChave(k){ var c = AN.catalogo; if(k === 'doc') return 'Docência'; if(/^ori_/.test(k)) return (c.orient[k.slice(4)] || ['Orientação'])[0]; return (c.itens[k] || c.cargos[k] || [k, k])[c.itens[k] ? 1 : 0]; }
+function descItem(it){ var d = it.dados || {};
+  if(it.aba === 'doc') return esc(d.disciplina || '') + ' <span class="aviso">(' + esc(d.semestre || '') + ', ' + esc(d.ch || '?') + ' h-a/sem, ' + esc(d.alunos || '?') + ' alunos)</span>';
+  if(it.aba === 'ori') return esc((AN.catalogo.orient[d.tipo] || ['Orientação'])[0]) + ': ' + esc(d.nome || '') + (d.inicio ? ' <span class="aviso">(' + esc(d.inicio) + ' a ' + esc(d.fim || '?') + ')</span>' : '');
+  return esc(nomeChave(it.chave)) + (d.descricao ? ': ' + esc(d.descricao) : '') + (d.quantidade > 1 ? ' × ' + esc(d.quantidade) : ''); }
+function placarAnual(rs, min){ var ok = rs.total >= min;
+  return '<div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap"><span style="font-size:24px;font-weight:bold" class="' + (ok ? 'ok' : 'warn') + '">' + num(rs.total) + ' pts</span><span class="aviso">mínimo ' + min + ' · ' + (ok ? 'suficiente' : 'abaixo do mínimo: justifique nas observações') + '</span></div>' +
+    '<div class="aviso">' + [['docencia', 'Docência'], ['orientacoes', 'Orientações'], ['outras', 'Outras'], ['artisticas', 'Artísticas'], ['complementares', 'Complementares'], ['extensao', 'Extensão'], ['pesquisa', 'Pesquisa']].filter(function(a){ return rs.areas[a[0]] > 0; }).map(function(a){ return a[1] + ' ' + num(rs.areas[a[0]]); }).join(' · ') + '</div>'; }
+function desenharAnual(){
+  var r = AN, h = '', anoAt = new Date().getFullYear();
+  h += '<div class="caixa"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><div style="font-size:19px;font-weight:bold">📋 Relatório ' + r.ano + ' e Plano de trabalho ' + r.anoPlano + '</div>' +
+    '<div class="aviso">Ano letivo ' + r.ano + ': ' + esc(r.periodo.inicio) + ' a ' + esc(r.periodo.fim) + ' · anual, pedido pela DIREN (envio pelo formulário dela, depois de assinado por você e pela chefia)</div></div>' +
+    '<div><label>Ano do relatório</label><select id="anSel">' + [anoAt - 2, anoAt - 1, anoAt].map(function(a){ return '<option' + (a === r.ano ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div></div>' +
+    '<p class="aviso" style="margin:8px 0 0">Os comprovantes são os mesmos da progressão: o que você envia lá aparece aqui quando é deste ano letivo, e o que lança aqui vale lá. Regras: <a href="' + esc(r.formulario) + '" target="_blank" rel="noopener">página da DIREN</a>.</p>' +
+    '<details style="margin-top:6px"><summary class="aviso" style="cursor:pointer">📁 Pasta dos documentos: <a href="' + esc(r.pasta) + '" target="_blank" rel="noopener">abrir</a> (trocar)</summary><div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap"><input id="anPasta" placeholder="link da sua pasta do Drive (ex.: Plano de trabalho)" style="flex:1;min-width:220px"><button type="button" class="sec" id="anPastaOk">Usar esta pasta</button></div><div class="aviso">Dentro dela fica uma pasta por ano (' + r.ano + ' = relatório ' + r.ano + ' e plano ' + r.anoPlano + ').</div></details></div>';
+  // ---- 1 · relatório ----
+  var porLinha = {}; r.ra.itens.forEach(function(it){ (porLinha[it.linha] = porLinha[it.linha] || []).push(it); });
+  h += '<div class="caixa"><h2>1 · Relatório de atividades ' + r.ano + '</h2>' + placarAnual(r.ra.resumo, r.minimo) +
+    '<p class="aviso">Marque o que entra no relatório. "Sem data" = a plataforma não sabe o ano: confira.</p>' +
+    (r.ra.itens.length ? Object.keys(porLinha).sort(function(a, b){ return a - b; }).map(function(l){ return '<div style="margin-top:6px"><b>' + esc(r.linhasFolha[l][1]) + '</b>' + porLinha[l].map(function(it){
+      return '<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-weight:normal"><input type="checkbox" data-aninc="' + esc(it.id) + '"' + (it.incluido ? ' checked' : '') + ' style="width:auto;margin-top:3px"><span>' + descItem(it) + ' <span class="aviso">· ' + num(it.pts) + ' pts' + (it.noAno === 'sem' ? ' · <span class="warn">sem data</span>' : '') + (it.origem === 'plataforma' ? ' · Projeto Final da plataforma' : it.arquivoNome ? ' · ' + esc(it.arquivoNome) : '') + '</span></span></label>'; }).join('') + '</div>'; }).join('')
+      : '<p class="warn">Nada deste ano letivo ainda.</p>') +
+    '<div class="botoes"><button type="button" class="sec" id="anIrEnviar">📎 Enviar comprovante (vale para a progressão também)</button></div></div>';
+  // ---- 2 · plano ----
+  var pi = r.ppa.itens, cat = r.catalogo;
+  h += '<div class="caixa"><h2>2 · Plano de trabalho ' + r.anoPlano + '</h2>' + (pi.length ? placarAnual(r.ppa.resumo, r.minimo) : '') +
+    (pi.length ? '' : '<p class="aviso">Começo pelas disciplinas que você cadastrou na plataforma para ' + r.anoPlano + ' (o semestre que ainda não estiver cadastrado sai igual ao de ' + r.ano + ') e pelo que continua: orientações, NDE, comissões, projetos. Depois você confere.</p>') +
+    pi.map(function(it){ var d = it.dados || {};
+      if(it.aba === 'doc') return '<div class="item" data-anpi="' + esc(it.id) + '" data-aba="doc"><div style="flex:1"><div class="grade" style="grid-template-columns:2fr .8fr .6fr .6fr .8fr;gap:6px">' +
+        '<div><label>Disciplina</label><input data-c="disciplina" value="' + esc(d.disciplina) + '"></div><div><label>Semestre</label><select data-c="semestre">' + [r.anoPlano + '.1', r.anoPlano + '.2'].map(function(s){ return '<option' + (String(d.semestre) === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div>' +
+        '<div><label>h-a/sem</label><input data-c="ch" value="' + esc(d.ch) + '"></div><div><label>Alunos</label><input data-c="alunos" value="' + esc(d.alunos) + '"></div><div><label>Aula</label><select data-c="duracao">' + ['50 min', '45 min', '60 min'].map(function(s){ return '<option' + (d.duracao === s ? ' selected' : '') + '>' + s + '</option>'; }).join('') + '</select></div></div>' +
+        (d.origemSug ? '<div class="aviso">' + (d.origemSug === 'plataforma' ? 'cadastrada na plataforma' : 'igual a ' + esc(String(d.origemSug).replace('ano ', ''))) + ' · ' + num(it.pts) + ' pts</div>' : '<div class="aviso">' + num(it.pts) + ' pts</div>') + '</div><div class="botoes" style="margin:0"><button type="button" class="sec" data-anpidel="' + esc(it.id) + '">✕</button></div></div>';
+      return '<div class="item" data-anpi="' + esc(it.id) + '" data-aba="' + esc(it.aba) + '" data-chave="' + esc(it.chave) + '"><div style="flex:1">' + descItem(it) + ' <span class="aviso">· ' + num(it.pts) + ' pts' + (d.origemSug ? ' · ' + esc(d.origemSug) : '') + '</span></div><div class="botoes" style="margin:0"><button type="button" class="sec" data-anpidel="' + esc(it.id) + '">✕</button></div></div>'; }).join('') +
+    '<div class="botoes"><button type="button" ' + (pi.length ? 'class="sec" ' : '') + 'id="anSugerir">✨ ' + (pi.length ? 'Refazer a sugestão' : 'Montar o plano') + '</button>' + (pi.some(function(it){ return it.aba === 'doc'; }) ? '<button type="button" class="sec" id="anSalvarDisc">Salvar as disciplinas</button>' : '') + '</div>' +
+    (pi.length ? '<div style="border:2px solid ' + (r.ppa.confirmado ? 'var(--verde)' : '#d97706') + ';border-radius:10px;padding:8px 10px;margin-top:8px">' + (r.ppa.confirmado ? '<b class="ok">✓ Você confirmou o plano.</b> Se mudar algo, confirme de novo.' :
+      '<b>Está certo? Falta alguma coisa?</b><div class="aviso">Confira as disciplinas dos dois semestres (h-a por semana e alunos previstos) e acrescente o que mais pretende fazer: orientações, projetos, publicações, bancas, eventos…</div>') +
+      '<div class="botoes">' + (r.ppa.confirmado ? '' : '<button type="button" id="anConfirmar">✓ Está certo</button>') + '<button type="button" class="sec" id="anMaisDisc">+ disciplina</button><button type="button" class="sec" id="anMaisOutro">+ outra atividade</button></div><div id="anNovo"></div></div>' : '') + '</div>';
+  // ---- 3 · folhas de rosto ----
+  var tx = r.textos, raT = tx.ra || tx.raAuto, ppaT = tx.ppa || tx.ppaAuto, ant = tx.planoAnterior || [];
+  h += '<details class="caixa" id="anFolhas"' + (tx.ra ? ' open' : '') + '><summary style="cursor:pointer"><b>3 · Textos das folhas de rosto</b> <span class="aviso">— ' + (tx.ra ? 'escritos pela IA: confira' : 'a IA compara o previsto com o realizado e escreve') + '</span></summary>' +
+    '<p class="aviso">A coluna "PT/PPA – ano anterior" do relatório é o que você previu no plano de ' + r.ano + '. ' + (ant.some(Boolean) ? '✓ Já tenho o seu plano de ' + r.ano + '.' : 'Envie a folha de rosto do plano de ' + r.ano + ' (o Word que você entregou) para eu copiar.') + '</p>' +
+    '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy)">📄 Folha do plano de ' + r.ano + ' (.docx)<input type="file" id="anPlanoAnt" accept=".docx" class="oculto"></label><button type="button" id="anIA">🤖 ' + (tx.ra ? 'Escrever de novo' : 'Escrever os textos') + '</button></div><div id="anIAmsg"></div>' +
+    '<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:13px"><tr><th style="text-align:left;width:16%">Atividade</th><th style="text-align:left">Previsto em ' + r.ano + '</th><th style="text-align:left">Realizada / justificativa</th><th style="text-align:left">Plano ' + r.anoPlano + '</th></tr>' +
+    r.linhasFolha.map(function(l, i){ var ta = function(id, v){ return '<textarea data-' + id + '="' + i + '" rows="' + Math.min(6, Math.max(2, String(v || '').split('\n').length)) + '" style="width:100%;font-size:12.5px">' + esc(v || '') + '</textarea>'; };
+      return '<tr style="border-top:1px solid var(--linha);vertical-align:top"><td><b>' + esc(l[1]) + '</b>' + (l[0] ? '<div class="aviso" style="font-size:11px">' + esc(l[0]) + '</div>' : '') + '</td><td>' + ta('anant', ant[i]) + '</td><td>' + ta('anra', raT[i]) + '</td><td>' + ta('anppa', ppaT[i]) + '</td></tr>'; }).join('') + '</table>' +
+    '<div class="grade" style="grid-template-columns:1fr 1fr;margin-top:6px"><div><label>Observações do relatório</label><textarea id="anObsRa" rows="3">' + esc(tx.obsRa) + '</textarea></div><div><label>Observações do plano</label><textarea id="anObsPpa" rows="3">' + esc(tx.obsPpa) + '</textarea></div></div>' +
+    '<div class="botoes"><button type="button" class="sec" id="anSalvarTx">Salvar os textos</button></div></details>';
+  // ---- 4 · documentos ----
+  var arq = function(re){ return r.arquivos.filter(function(a){ return re.test(a.nome); }).map(function(a){ return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener">✓ ' + esc(a.nome) + '</a> <span class="aviso">' + esc(a.em) + '</span>'; }).join('<br>') || '<span class="aviso">ainda não gerado</span>'; };
+  var passo = function(tit, conteudo, bt){ return '<div class="item"><div><b>' + tit + '</b><div style="margin-top:3px">' + conteudo + '</div></div><div class="botoes" style="margin:0">' + bt + '</div></div>'; };
+  h += '<div class="caixa"><h2>4 · Documentos</h2><p class="aviso" style="margin-top:0">Tudo vai para a <a href="' + esc(r.pasta) + '" target="_blank" rel="noopener">pasta ' + r.ano + '</a>. Depois: assinar pelo gov.br (você e a chefia) e enviar no formulário da DIREN.</p>' +
+    passo('Folha de rosto do relatório ' + r.ano, arq(/^Folha de Rosto-Relat/), '<button type="button" data-anfolha="ra">Gerar (Word)</button>') +
+    passo('RAD do relatório ' + r.ano, arq(/^RAD relat/), '<button type="button" data-anrad="ra">Gerar</button>') +
+    passo('Comprovantes do relatório (um PDF, na ordem da tabela)', arq(/^Comprovantes relat/), '<button type="button" id="anComp">Montar PDF</button>') +
+    passo('Folha de rosto do plano ' + r.anoPlano, arq(/^Folha de Rosto-PPA/), '<button type="button" data-anfolha="ppa">Gerar (Word)</button>') +
+    passo('RAD do plano ' + r.anoPlano, arq(/^RAD Plano/), '<button type="button" data-anrad="ppa">Gerar</button>') +
+    '<div id="anDocMsg" class="aviso" style="margin-top:6px"></div></div>';
+  // ---- 5 · e-mail ----
+  h += '<div class="caixa"><h2>5 · E-mail para a chefia (coordenação)</h2><div class="grade" style="grid-template-columns:1fr"><div><label>Para</label><input id="anPara" value="' + esc(r.email.para) + '" placeholder="e-mail da chefia imediata"></div>' +
+    '<div><label>Assunto</label><input id="anAssunto" value="' + esc(r.email.assunto) + '"></div><div><label>Texto</label><textarea id="anCorpo" rows="11">' + esc(r.email.corpo) + '</textarea></div></div>' +
+    '<p class="aviso">Anexos: ' + (r.arquivos.length ? r.arquivos.map(function(a){ return esc(a.nome); }).join(' · ') : 'nenhum ainda') + '. Você recebe uma cópia.</p>' + (r.envios.length ? '<p class="ok">✓ Enviado em ' + r.envios.map(esc).join(', ') + '</p>' : '') +
+    '<div class="botoes"><button type="button" class="sec" id="anSalvarEmail">Salvar</button><button type="button" id="anEnviar"' + (r.arquivos.length ? '' : ' disabled') + '>✉ ' + (r.envios.length ? 'Enviar de novo' : 'Enviar à chefia') + '</button></div><div id="anEmailMsg" class="aviso"></div></div>';
+  $('corpo').innerHTML = h;
+  ligarAnual();
+}
+function coletarTextosAnual(){ var g = function(k){ var o = []; document.querySelectorAll('[data-' + k + ']').forEach(function(t){ o[Number(t.getAttribute('data-' + k))] = t.value; }); return o; };
+  return {planoAnterior: g('anant'), textosRa: g('anra'), textosPpa: g('anppa'), obsRa: $('anObsRa').value, obsPpa: $('anObsPpa').value}; }
+function coletarEmailAnual(){ return {para: $('anPara').value.trim(), assunto: $('anAssunto').value, corpo: $('anCorpo').value}; }
+function ligarAnual(){
+  var r = AN, feito = function(x){ AN = x; desenharAnual(); }, erro = function(id){ return function(e){ var b = $(id); if(b) b.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; document.querySelectorAll('#corpo button').forEach(function(x){ x.disabled = false; }); }; };
+  var ocupado = function(id, t){ $(id).innerHTML = '<span class="giro"></span>' + t; };
+  $('anSel').addEventListener('change', function(){ abrirAnual(Number(this.value)); });
+  $('anPastaOk').addEventListener('click', function(){ var v = $('anPasta').value.trim(); if(!v) return; this.disabled = true; api('progAnualSalvar', {ano: r.ano, dados: {ptPasta: v}}).then(feito).catch(function(e){ alert(e.message); }); });
+  document.querySelectorAll('[data-aninc]').forEach(function(c){ c.addEventListener('change', function(){ api('progAnualIncluir', {ano: r.ano, id: c.dataset.aninc, incluir: c.checked}).then(feito).catch(function(e){ alert(e.message); c.checked = !c.checked; }); }); });
+  $('anIrEnviar').addEventListener('click', function(){ trocarAba('prog'); setTimeout(function(){ var h2 = Array.prototype.slice.call(document.querySelectorAll('#corpo h2')).filter(function(x){ return /Enviar comprovante/.test(x.textContent); })[0]; if(h2) h2.scrollIntoView({behavior: 'smooth'}); }, 1200); });
+  // plano
+  $('anSugerir').addEventListener('click', function(){ if(r.ppa.itens.length && !confirm('Refazer a sugestão? O que veio da sugestão anterior é trocado; o que você acrescentou à mão fica.')) return; this.disabled = true; this.innerHTML = '<span class="giro"></span>Montando…'; api('progAnualSugerirPlano', {ano: r.ano}).then(feito).catch(function(e){ alert(e.message); abrirAnual(); }); });
+  document.querySelectorAll('[data-anpidel]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; api('progAnualPlanoItem', {ano: r.ano, apagar: b.dataset.anpidel}).then(feito).catch(function(e){ alert(e.message); }); }); });
+  var salvarDisc = function(){ var lin = Array.prototype.slice.call(document.querySelectorAll('[data-anpi][data-aba="doc"]')), i = 0;
+    var prox = function(){ var l = lin[i++]; if(!l) return api('progAnualAbrir', {ano: r.ano}); var it = r.ppa.itens.filter(function(x){ return x.id === l.dataset.anpi; })[0], d = Object.assign({}, it.dados);
+      l.querySelectorAll('[data-c]').forEach(function(x){ var v = x.value.trim(); d[x.dataset.c] = /^\d+([.,]\d+)?$/.test(v) ? Number(v.replace(',', '.')) : v; });
+      if(JSON.stringify(d) === JSON.stringify(it.dados)) return prox(); return api('progAnualPlanoItem', {ano: r.ano, item: {id: it.id, aba: 'doc', chave: 'doc', dados: d}}).then(prox); };
+    return prox(); };
+  if($('anSalvarDisc')) $('anSalvarDisc').addEventListener('click', function(){ this.disabled = true; salvarDisc().then(feito).catch(function(e){ alert(e.message); }); });
+  if($('anConfirmar')) $('anConfirmar').addEventListener('click', function(){ this.disabled = true; salvarDisc().then(function(){ return api('progAnualSalvar', {ano: r.ano, dados: {planoConfirmado: true}}); }).then(feito).catch(function(e){ alert(e.message); }); });
+  var novo = function(tipo){ var c = r.catalogo, opts = '';
+    if(tipo === 'doc') $('anNovo').innerHTML = '<div class="grade" style="grid-template-columns:2fr .8fr .6fr .6fr;gap:6px;margin-top:8px"><div><label>Disciplina</label><input id="nvD"></div><div><label>Semestre</label><select id="nvS"><option>' + r.anoPlano + '.1</option><option>' + r.anoPlano + '.2</option></select></div><div><label>h-a/sem</label><input id="nvC" value="2"></div><div><label>Alunos</label><input id="nvA" value="10"></div></div><div class="botoes"><button type="button" id="nvOk">Acrescentar</button></div>';
+    else { Object.keys(c.orient).forEach(function(t){ opts += '<option value="ori_' + t + '">Orientação: ' + esc(c.orient[t][0]) + '</option>'; });
+      Object.keys(c.cargos).forEach(function(k){ opts += '<option value="' + k + '">Cargo: ' + esc(c.cargos[k][0]) + '</option>'; });
+      Object.keys(c.itens).forEach(function(k){ opts += '<option value="' + k + '">' + esc(c.itens[k][1]) + '</option>'; });
+      $('anNovo').innerHTML = '<div class="grade" style="grid-template-columns:1.6fr 2fr .5fr;gap:6px;margin-top:8px"><div><label>Tipo</label><select id="nvT">' + opts + '</select></div><div><label>Descrição (aluno, projeto, revista…)</label><input id="nvDesc"></div><div><label>Qtd.</label><input id="nvQ" value="1"></div></div><div class="botoes"><button type="button" id="nvOk">Acrescentar</button></div>'; }
+    $('nvOk').addEventListener('click', function(){ this.disabled = true; var it;
+      if(tipo === 'doc') it = {aba: 'doc', chave: 'doc', dados: {disciplina: $('nvD').value.trim(), semestre: $('nvS').value, ch: Number($('nvC').value) || 2, alunos: Number($('nvA').value) || 0, duracao: '50 min', nivel: 'G', docentes: 1}};
+      else { var k = $('nvT').value, desc = $('nvDesc').value.trim(), q = Number(String($('nvQ').value).replace(',', '.')) || 1;
+        it = /^ori_/.test(k) ? {aba: 'ori', chave: 'ori', dados: {tipo: Number(k.slice(4)), nome: desc, orientadores: 1, inicio: '01/02/' + r.anoPlano, fim: '31/12/' + r.anoPlano}} : {chave: k, dados: {descricao: desc, quantidade: q}}; }
+      api('progAnualPlanoItem', {ano: r.ano, item: it}).then(feito).catch(function(e){ alert(e.message); }); });
+  };
+  if($('anMaisDisc')) $('anMaisDisc').addEventListener('click', function(){ novo('doc'); });
+  if($('anMaisOutro')) $('anMaisOutro').addEventListener('click', function(){ novo('outro'); });
+  // textos
+  $('anPlanoAnt').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; ocupado('anIAmsg', 'Lendo a folha do plano anterior…');
+    carregarJSZip().then(function(){ return JSZip.loadAsync(f); }).then(function(z){ return z.file('word/document.xml').async('string'); }).then(function(x){
+      var rows = x.match(/<w:tr[ >][\s\S]*?<\/w:tr>/g) || [], ant = [];
+      for(var i = 6; i <= 26; i++){ var cs = (rows[i] || '').match(/<w:tc>[\s\S]*?<\/w:tc>/g) || []; var c = cs[2] || cs[cs.length - 1] || '';
+        ant.push(c.split('</w:p>').map(function(p){ return (p.match(/<w:t[^>]*>[^<]*<\/w:t>/g) || []).map(function(t){ return t.replace(/<[^>]+>/g, ''); }).join(''); }).filter(function(t){ return t.trim() && !/^insira o texto\.?$/i.test(t.trim()); }).join('\n')
+          .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')); }
+      document.querySelectorAll('[data-anant]').forEach(function(t){ t.value = ant[Number(t.dataset.anant)] || ''; });
+      return api('progAnualSalvar', {ano: r.ano, dados: {planoAnterior: ant}}); }).then(function(x){ AN = x; $('anIAmsg').innerHTML = '<span class="ok">✓ Plano de ' + r.ano + ' copiado para a coluna "Previsto".</span>'; }).catch(erro('anIAmsg')); });
+  $('anIA').addEventListener('click', function(){ this.disabled = true; var t0 = Date.now(), tic = setInterval(function(){ if(!$('anIAmsg')) return clearInterval(tic); ocupado('anIAmsg', 'A IA está comparando o previsto com o realizado e escrevendo… ' + Math.round((Date.now() - t0) / 1000) + ' s'); }, 1000);
+    api('progAnualTextos', {ano: r.ano, planoAnterior: coletarTextosAnual().planoAnterior}).then(function(x){ clearInterval(tic); feito(x); $('anFolhas').open = true; }).catch(function(e){ clearInterval(tic); erro('anIAmsg')(e); }); });
+  $('anSalvarTx').addEventListener('click', function(){ this.disabled = true; api('progAnualSalvar', {ano: r.ano, dados: coletarTextosAnual()}).then(function(x){ feito(x); $('anFolhas').open = true; }).catch(erro('anIAmsg')); });
+  // documentos
+  var msg = function(t){ $('anDocMsg').innerHTML = t; };
+  document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); api('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(feito).catch(erro('anDocMsg')); }); });
+  document.querySelectorAll('[data-anfolha]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; var t = coletarTextosAnual(); msg('<span class="giro"></span>Montando a folha de rosto em Word…');
+    api('progAnualSalvar', {ano: r.ano, dados: t}).then(function(){ return gerarFolhaAnual(b.dataset.anfolha, t); }).then(feito).catch(erro('anDocMsg')); }); });
+  $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {
+    carregar: function(){ return api('progAnualComprovantes', {ano: r.ano}).then(function(x){ return x.comprovantes; }); },
+    salvar: function(b64){ return api('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
+  // e-mail
+  $('anSalvarEmail').addEventListener('click', function(){ this.disabled = true; api('progAnualSalvar', {ano: r.ano, dados: coletarEmailAnual()}).then(function(x){ feito(x); $('anEmailMsg').textContent = 'Salvo.'; }).catch(erro('anEmailMsg')); });
+  $('anEnviar').addEventListener('click', function(){ var d = coletarEmailAnual(), re = r.envios.length > 0;
+    if(!confirm((re ? 'Já foi enviado. Enviar DE NOVO' : 'Enviar agora') + ' para ' + d.para + ' com ' + r.arquivos.length + ' anexo(s)?')) return;
+    this.disabled = true; ocupado('anEmailMsg', 'Enviando…'); api('progAnualEmail', {ano: r.ano, dados: d, reenviar: re}).then(function(x){ feito(x); $('anEmailMsg').innerHTML = '<span class="ok">✓ E-mail enviado à chefia.</span>'; }).catch(erro('anEmailMsg')); });
+}
+function carregarJSZip(){ return window.JSZip ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de Word.')); }; document.head.appendChild(s); }); }
+function gerarFolhaAnual(qual, t){
+  var r = AN, p = r.perfil, ra = qual === 'ra';
+  var o = {ano: ra ? r.ano : r.anoPlano, nome: p.nome, siape: p.siape, lotacao: p.colegiado,
+    colunas: ra ? [t.planoAnterior, t.textosRa] : [t.textosPpa], obs: ra ? t.obsRa : t.obsPpa,
+    marcar: [/20h/.test(p.regime) ? '20h' : /DE/i.test(p.regime || '40h / DE') ? '40h/de' : '40h', (p.carreira || 'EBTT').toLowerCase(), CAMPUS_NOME[p.campus] || 'valença', 'sem fg ou cd', 'li e estou de acordo com a declaração acima.']};
+  return carregarJSZip().then(function(){ return fetch('modelo-folha-' + (ra ? 'relatorio' : 'ppa') + '.docx?v=1'); }).then(function(x){ if(!x.ok) throw new Error('Modelo da folha de rosto não encontrado.'); return x.arrayBuffer(); })
+    .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){ return z.file('word/document.xml').async('string').then(function(x){ z.file('word/document.xml', preencherFolhaXml(x, o)); return z.generateAsync({type: 'base64'}); }); })
+    .then(function(b64){ return api('progAnualSalvarArq', {ano: r.ano, nome: ra ? 'Folha de Rosto-Relatório ' + r.ano + '.docx' : 'Folha de Rosto-PPA ' + r.anoPlano + '.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
+}
+
 // ===================== etapa 2: o pacote para a CCO =====================
 var PAC = null;
 function carregarPacote(){
@@ -611,11 +804,11 @@ function imagemParaPdf(f){
         return doc.save(); }); }).then(function(b){ return bytesParaB64(b); }); });
 }
 // 4 · todos os comprovantes num PDF só, na ordem da planilha RAD
-function montarComprovantes(msg){
-  var incluidos = [];
+function montarComprovantes(msg, opts){
+  var incluidos = [], listaOp = null;
   msg('Conferindo a lista de comprovantes…');
-  return api('progPacote').then(function(p){ PAC = p; return carregarPdfLib(); }).then(function(){ return PDFLib.PDFDocument.create(); }).then(function(saida){
-    var lista = PAC.comprovantes.slice(), i = 0, falhas = [];
+  return (opts ? opts.carregar().then(function(l){ listaOp = l; }) : api('progPacote').then(function(p){ PAC = p; })).then(function(){ return carregarPdfLib(); }).then(function(){ return PDFLib.PDFDocument.create(); }).then(function(saida){
+    var lista = (listaOp || PAC.comprovantes).slice(), i = 0, falhas = [];
     var proximo = function(){
       var c = lista[i++]; if(!c) return Promise.resolve();
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
@@ -628,7 +821,7 @@ function montarComprovantes(msg){
       }).catch(function(){ falhas.push(c.nome); }).then(proximo);
     };
     return proximo().then(function(){ msg('Salvando o PDF no Drive…'); return saida.save(); }).then(function(b){
-      return api('progSalvarGerado', {nome: '4 - Comprovantes da RAD.pdf', dados: bytesParaB64(b), mime: 'application/pdf', incluidos: incluidos}); })
+      return opts ? opts.salvar(bytesParaB64(b), incluidos) : api('progSalvarGerado', {nome: '4 - Comprovantes da RAD.pdf', dados: bytesParaB64(b), mime: 'application/pdf', incluidos: incluidos}); })
       .then(function(){ if(falhas.length) alert('Não deu para incluir: ' + falhas.join(', ') + '. Confira esses arquivos.'); });
   });
 }
@@ -655,7 +848,7 @@ function preencherCCO(msg){
 function hojeCCO(){ var d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
 function trocarAba(a){
   document.querySelectorAll('.abas button[data-aba]').forEach(function(b){ var on = b.dataset.aba === a; b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.classList.toggle('sec', !on); });
-  if(a === 'cco') abrirCCO(); else if(R) desenhar(); else abrir();
+  if(a === 'cco') abrirCCO(); else if(a === 'ppa') abrirAnual(); else if(R) desenhar(); else abrir();
 }
 function ligarV197(){
   if($('btVarredura')) $('btVarredura').addEventListener('click', varredura);
