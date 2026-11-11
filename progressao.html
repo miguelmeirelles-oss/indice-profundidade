@@ -571,12 +571,16 @@ function ligarV197(){
 function varredura(){
   var box = $('varBox'); box.innerHTML = '<p class="carregando">Procurando documentos de outros docentes em que você aparece…</p>';
   api('progVarredura').then(function(r){
-    if(!r.docs.length){ box.innerHTML = '<p class="aviso" style="margin:8px 0 0">Nenhum documento novo para você. (' + r.total + ' documento(s) guardado(s) na pasta compartilhada.)</p>'; return; }
+    var oc = r.ocultos || [], htmlOcultos = oc.length ? '<details style="margin-top:8px"><summary class="aviso" style="cursor:pointer">👁 ' + oc.length + ' documento(s) que você ocultou</summary>' + oc.map(function(d){
+      return '<div class="item"><div>' + esc(d.documento) + '<div class="aviso">' + esc(d.tipo) + ' · você aparece como "' + esc(d.comoAparece) + '"</div></div><button type="button" class="sec" data-mostrar="' + esc(d.id) + '">Mostrar de novo</button></div>'; }).join('') + '</details>' : '';
+    var ligarOcultos = function(){ box.querySelectorAll('[data-mostrar]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; api('progCompartilhadoMostrar', {id: b.dataset.mostrar}).then(varredura).catch(function(e){ alert(e.message); }); }); }); };
+    if(!r.docs.length){ box.innerHTML = '<p class="aviso" style="margin:8px 0 0">Nenhum documento novo para você. (' + r.total + ' documento(s) guardado(s) na pasta compartilhada.)</p>' + htmlOcultos; ligarOcultos(); return; }
     box.innerHTML = '<p style="margin:10px 0 4px"><b>' + r.docs.length + ' documento(s) em que você aparece</b></p>' + r.docs.map(function(d){
       return '<div class="item"><div><b>' + esc(d.documento) + '</b><div class="aviso">' + esc(d.tipo) + ' · você aparece como "' + esc(d.comoAparece) + '"' + (d.papel ? ' (' + esc(d.papel) + ')' : '') +
         (d.por ? ' · enviado por ' + esc(d.por) : '') + ' em ' + esc(d.em) + ' · guardado até ' + esc(d.expira) + '</div></div>' +
-        '<div class="botoes" style="margin:0"><button type="button" data-receber="' + esc(d.id) + '">Adicionar à minha progressão</button><button type="button" class="sec" data-dispensar="' + esc(d.id) + '">Não é meu</button></div></div>'; }).join('') +
-      (r.docs.length > 1 ? '<div class="botoes"><button type="button" id="btReceberTodos">Adicionar todos</button></div>' : '');
+        '<div class="botoes" style="margin:0"><button type="button" data-receber="' + esc(d.id) + '">Adicionar à minha progressão</button><button type="button" class="sec" data-dispensar="' + esc(d.id) + '">Ocultar</button></div></div>'; }).join('') +
+      (r.docs.length > 1 ? '<div class="botoes"><button type="button" id="btReceberTodos">Adicionar todos</button></div>' : '') + htmlOcultos;
+    ligarOcultos();
     var receber = function(ids){
       var arqs = [], seq = Promise.resolve();
       box.innerHTML = '<p class="carregando">Trazendo ' + ids.length + ' documento(s) para a sua pasta…</p>';
@@ -587,7 +591,6 @@ function varredura(){
     box.querySelectorAll('[data-receber]').forEach(function(b){ b.addEventListener('click', function(){ receber([b.dataset.receber]); }); });
     if($('btReceberTodos')) $('btReceberTodos').addEventListener('click', function(){ receber(r.docs.map(function(d){ return d.id; })); });
     box.querySelectorAll('[data-dispensar]').forEach(function(b){ b.addEventListener('click', function(){
-      if(!confirm('Este documento não é seu (ou você não vai usar)? Ele deixa de aparecer na sua varredura.')) return;
       b.disabled = true; api('progCompartilhadoReceber', {id: b.dataset.dispensar, dispensar: true}).then(varredura).catch(function(e){ alert(e.message); }); }); });
   }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
