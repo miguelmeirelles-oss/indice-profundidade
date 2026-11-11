@@ -235,13 +235,27 @@ function blocoIndexacao(it, i){
     '<div data-ixmsg="' + i + '" class="aviso"></div>' +
     '<label style="display:inline-block;margin-top:4px;width:260px">No PDF entram só as páginas 1 até<input data-li="' + i + '" data-c="paginas" value="' + esc(d.paginas || 1) + '" style="width:70px;display:inline-block;margin-left:6px"></label></div>';
 }
+function htmlParecidos(l){
+  var ps = l.parecidos || []; if(!ps.length) return '';
+  var porItem = {}; ps.forEach(function(p){ (porItem[p.i] = porItem[p.i] || []).push(p); });
+  return '<div style="border:2px solid #d97706;border-radius:10px;padding:8px 10px;margin:8px 0;background:rgba(217,119,6,.08)"><b>⚠ Você já colocou na RAD algo muito parecido</b>' +
+    '<div class="aviso">Abra os dois e compare. Se for o mesmo documento (outra cópia, outra assinatura, foto), clique em <b>"É o mesmo documento: descartar"</b>. Se for outro, marque de novo o item abaixo e salve. Os itens parecidos começam desmarcados.</div>' +
+    Object.keys(porItem).map(function(i){ var it = l.itens[i] || {}, d = it.dados || {};
+      return '<div style="margin-top:6px"><b>Item ' + (Number(i) + 1) + '</b> <span class="aviso">(' + esc(d.disciplina || d.nome || d.descricao || it.chave || '') + ')</span> parece com:' +
+        porItem[i].map(function(p){ return '<div>• ' + esc(p.desc) + ' <span class="aviso">— ' + esc(p.origem === 'plataforma' ? 'Projeto Final da plataforma' : (p.arquivoNome || p.documento || 'lançado à mão')) + ' · ' + String(p.pts).replace('.', ',') + ' pts</span>' +
+          (p.url ? ' <a href="' + esc(p.url) + '" target="_blank" rel="noopener">abrir o que já está</a>' : '') + '</div>'; }).join('') + '</div>'; }).join('') +
+    '<div style="margin-top:6px"><a href="' + esc(l.arquivoUrl) + '" target="_blank" rel="noopener">abrir o documento novo</a></div></div>';
+}
 function desenharLido(proximo){
   var l = LIDO, box = $('lidoBox');
   box.innerHTML = '<div style="background:var(--bloco);border-radius:10px;padding:10px 12px;margin-top:10px"><b>🤖 ' + esc(l.documento || l.arquivoNome) + '</b> <a class="aviso" href="' + esc(l.arquivoUrl) + '" target="_blank" rel="noopener">abrir</a>' +
     (l.resumo ? '<div class="aviso">' + esc(l.resumo) + '</div>' : '') + (l.duvida ? '<div class="warn" style="margin-top:4px">⚠ ' + esc(l.duvida) + '</div>' : '') +
     ((l.outrosDocentes || []).length ? '<div class="aviso" style="margin-top:4px">👥 Também aparecem neste documento: ' + l.outrosDocentes.map(esc).join(', ') + '. Ao salvar, ele fica guardado por 3 anos para eles pegarem na varredura.</div>' : '') +
+    htmlParecidos(l) +
     (l.itens.length ? l.itens.map(linhaEditavel).join('') : '<p class="warn">A IA não achou nenhum item da RAD neste documento. Lance à mão se precisar.</p>') +
-    '<div class="botoes"><button type="button" id="btSalvarLido"' + (l.itens.length ? '' : ' disabled') + '>✓ Confirmar e salvar</button><button type="button" class="sec" id="btDescLido">Descartar</button></div><div id="msgLido" class="aviso"></div></div>';
+    '<div class="botoes"><button type="button" id="btSalvarLido"' + (l.itens.length ? '' : ' disabled') + '>✓ Confirmar e salvar</button><button type="button" class="sec" id="btDescLido">' + ((l.parecidos || []).length ? 'É o mesmo documento: descartar' : 'Descartar') + '</button></div><div id="msgLido" class="aviso"></div></div>';
+  // itens parecidos com o que já está na RAD começam DESMARCADOS: o docente confere e marca de novo se for outro documento
+  (l.parecidos || []).forEach(function(p){ var u = box.querySelector('[data-usar="' + p.i + '"]'); if(u) u.checked = false; });
   var coletar = function(){
     return l.itens.map(function(it, i){
       if(!box.querySelector('[data-usar="' + i + '"]').checked) return null;
