@@ -107,11 +107,13 @@ function desenhar(){
     h += '<div class="caixa"><h2>🧾 O que já está na sua RAD</h2><div id="listaItensBox">' + listaItens() + '</div>' + '<div class="botoes"><button type="button" class="sec" id="btManual">+ Lançar item à mão</button></div><div id="manualBox"></div></div>';
     // ---------- CCO ----------
     h += desenharCCO();
+    h += '<details class="caixa" id="estagioBox"><summary style="cursor:pointer"><b>🎓 Declaração de estágio (coordenador)</b> <span class="aviso">— envie as fichas e relatórios de estágio: a declaração sai pronta em Word e vai por e-mail ao coordenador</span></summary><div id="estagioCorpo"><p class="carregando">Carregando…</p></div></details>';
     h += '<div class="caixa" id="pacoteBox"><h2>📦 Pacote para a CCO</h2><p class="carregando">Carregando…</p></div>';
   }
   if(R.admin && R.adminDados) h += desenharAdmin();
   $('corpo').innerHTML = h;
   ligar(); ligarV197();
+  if($('estagioBox')) $('estagioBox').addEventListener('toggle', function(){ if(this.open){ if(EST) desenharEstagio(); else abrirEstagio(); } });
   if(per) carregarPacote();
 }
 function htmlPlacar(){ var p = R.perfil, per = R.periodo, rs = R.resumo, h = '';
@@ -409,6 +411,54 @@ function proximoNivel(txt) {
   if (c.classe === 'A') return 'Classe B – Nível 1';
   if (c.nivel < 4) return 'Classe ' + c.classe + ' – Nível ' + (c.nivel + 1);
   return c.classe === 'B' ? 'Classe C – Nível 1' : 'Titular';
+}
+
+// ===================== declaração de estágio para o coordenador =====================
+var EST = null;
+function abrirEstagio(){ api('progEstagioAbrir').then(function(r){ EST = r; desenharEstagio(); }).catch(function(e){ $('estagioCorpo').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; }); }
+function coletarEstagio(){
+  var v = function(id){ var x = $(id); return x ? x.value : undefined; };
+  var alunos = []; document.querySelectorAll('[data-estal]').forEach(function(l){ var g = function(c){ return l.querySelector('[data-c="' + c + '"]').value.trim(); };
+    alunos.push({nome: g('nome'), matricula: g('matricula'), inicio: g('inicio'), fim: g('fim'), empresa: l.dataset.empresa || '', obs: l.dataset.obs || '', arquivos: l.dataset.arquivos || ''}); });
+  return {cabecalho: (v('estCab') || '').split('\n'), local: v('estLocal'), data: v('estData'), curso: v('estCurso'), coordenador: v('estCoord'), cargo: v('estCargo'), para: v('estPara'), assunto: v('estAssunto'), corpo: v('estCorpo'), alunos: alunos};
+}
+function desenharEstagio(){
+  var r = EST, e = r.estado, docs = r.arquivos.filter(function(a){ return !a.declaracao; }), decl = r.arquivos.filter(function(a){ return a.declaracao; })[0];
+  var h = '<p class="aviso" style="margin-top:6px">Tudo fica em <a href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">uma pasta dentro do ciclo</a>. O coordenador só confere, emite e assina no SUAP; a declaração assinada depois entra como comprovante (orientação de estágio).</p>';
+  h += '<h3 style="margin:10px 0 4px">1 · Documentos de estágio</h3>' + (docs.length ? docs.map(function(a){ return '<div class="item"><div><a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.nome) + '</a> <span class="aviso">' + a.kb + ' KB</span></div><div class="botoes" style="margin:0"><button type="button" class="sec" data-estdel="' + esc(a.id) + '">✕</button></div></div>'; }).join('') : '<p class="aviso">Nenhum ainda. Mande a ficha de frequência e o relatório de cada aluno.</p>') +
+    '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy)">📤 Enviar documentos<input type="file" id="estArq" accept="application/pdf,image/*" multiple class="oculto"></label>' + (docs.length ? '<button type="button" id="estLer">🤖 Ler os documentos</button>' : '') + '</div>';
+  h += '<h3 style="margin:14px 0 4px">2 · Alunos</h3><p class="aviso" style="margin-top:0">' + (e.lido ? 'Lido pela IA em ' + esc(e.lido) + '. Confira e corrija se precisar.' : 'Leia os documentos ou preencha à mão.') + ' Período = vigência da ficha de frequência.</p>' +
+    (e.alunos || []).map(function(a, i){ return '<div class="item" data-estal="' + i + '" data-empresa="' + esc(a.empresa) + '" data-obs="' + esc(a.obs) + '" data-arquivos="' + esc(a.arquivos) + '"><div style="flex:1"><div class="grade" style="grid-template-columns:2fr 1fr 1fr 1fr;gap:6px">' +
+      '<div><label>Nome</label><input data-c="nome" value="' + esc(a.nome) + '"></div><div><label>Matrícula</label><input data-c="matricula" value="' + esc(a.matricula) + '"></div><div><label>Início</label><input data-c="inicio" value="' + esc(a.inicio) + '" placeholder="dd/mm/aaaa"></div><div><label>Fim</label><input data-c="fim" value="' + esc(a.fim) + '" placeholder="dd/mm/aaaa"></div></div>' +
+      ((a.empresa || a.obs) ? '<div class="aviso">' + esc([a.empresa, a.obs].filter(Boolean).join(' · ')) + '</div>' : '') + '</div><div class="botoes" style="margin:0"><button type="button" class="sec" data-estrem="' + i + '">✕</button></div></div>'; }).join('') +
+    ((e.observacoes || []).length ? '<div class="aviso warn">⚠ ' + e.observacoes.map(esc).join('<br>⚠ ') + '</div>' : '') +
+    '<div class="botoes"><button type="button" class="sec" id="estMais">+ aluno</button></div>';
+  h += '<h3 style="margin:14px 0 4px">3 · Declaração (Word)</h3><div class="grade" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">' +
+    '<div style="grid-column:1/-1"><label>Cabeçalho (uma linha por linha)</label><textarea id="estCab" rows="4">' + esc((e.cabecalho || []).join('\n')) + '</textarea></div>' +
+    '<div><label>Local</label><input id="estLocal" value="' + esc(e.local) + '"></div><div><label>Data</label><input id="estData" value="' + esc(e.data) + '"></div><div><label>Curso</label><input id="estCurso" value="' + esc(e.curso) + '"></div>' +
+    '<div><label>Coordenador(a)</label><input id="estCoord" value="' + esc(e.coordenador) + '"></div><div><label>Cargo</label><input id="estCargo" value="' + esc(e.cargo) + '"></div></div>' +
+    '<div class="botoes"><button type="button" id="estGerar">📄 ' + (decl ? 'Gerar de novo' : 'Gerar declaração') + '</button>' + (decl ? ' <a href="' + esc(decl.url) + '" target="_blank" rel="noopener">✓ ' + esc(decl.nome) + '</a>' + (e.gerada ? ' <span class="aviso">' + esc(e.gerada) + '</span>' : '') : '') + '</div>';
+  h += '<h3 style="margin:14px 0 4px">4 · E-mail ao coordenador</h3><div class="grade" style="grid-template-columns:1fr"><div><label>Para (chefia imediata)</label><input id="estPara" value="' + esc(e.para) + '" placeholder="e-mail do coordenador"></div>' +
+    '<div><label>Assunto</label><input id="estAssunto" value="' + esc(e.assunto) + '"></div><div><label>Texto</label><textarea id="estCorpo" rows="12">' + esc(e.corpo) + '</textarea></div></div>' +
+    '<p class="aviso">Anexos: ' + (r.arquivos.length ? r.arquivos.map(function(a){ return esc(a.nome); }).join(' · ') : 'nenhum') + '. Você recebe uma cópia.</p>' +
+    (e.envios && e.envios.length ? '<p class="ok">✓ Enviado em ' + e.envios.map(esc).join(', ') + '</p>' : '') +
+    '<div class="botoes"><button type="button" class="sec" id="estSalvar">Salvar</button><button type="button" id="estEnviar"' + (decl ? '' : ' disabled title="gere a declaração primeiro"') + '>✉ ' + (e.envios && e.envios.length ? 'Enviar de novo' : 'Enviar ao coordenador') + '</button></div><div id="estMsg" class="aviso"></div>';
+  $('estagioCorpo').innerHTML = h;
+  var msg = function(t){ $('estMsg').innerHTML = t; }, erro = function(x){ msg('<span class="erro">' + esc(x.message) + '</span>'); document.querySelectorAll('#estagioCorpo button').forEach(function(b){ b.disabled = false; }); };
+  var feito = function(r2){ EST = r2; desenharEstagio(); };
+  $('estArq').addEventListener('change', function(){ var fs = Array.prototype.slice.call(this.files), i = 0; if(!fs.length) return;
+    var prox = function(){ if(i >= fs.length) return api('progEstagioAbrir'); var f = fs[i++]; msg('Enviando ' + i + ' de ' + fs.length + ': ' + esc(f.name) + '…');
+      return lerArquivo(f).then(function(b64){ return api('progEstagioEnviarArq', {nome: f.name, dados: b64, mime: f.type || 'application/pdf'}); }).then(prox); };
+    prox().then(feito).catch(erro); });
+  document.querySelectorAll('[data-estdel]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Tirar este arquivo? (vai para a lixeira do Drive)')) return; b.disabled = true; api('progEstagioApagarArq', {id: b.dataset.estdel}).then(feito).catch(erro); }); });
+  if($('estLer')) $('estLer').addEventListener('click', function(){ this.disabled = true; msg('A IA está lendo os documentos…'); api('progEstagioLer').then(feito).catch(erro); });
+  document.querySelectorAll('[data-estrem]').forEach(function(b){ b.addEventListener('click', function(){ var d = coletarEstagio(); d.alunos.splice(Number(b.dataset.estrem), 1); EST.estado.alunos = d.alunos; api('progEstagioSalvar', {dados: d}).then(feito).catch(erro); }); });
+  $('estMais').addEventListener('click', function(){ var d = coletarEstagio(); d.alunos.push({nome: '', matricula: '', inicio: '', fim: ''}); EST.estado = Object.assign(EST.estado, d); desenharEstagio(); });
+  $('estSalvar').addEventListener('click', function(){ this.disabled = true; api('progEstagioSalvar', {dados: coletarEstagio()}).then(function(r2){ feito(r2); msg('Salvo.'); }).catch(erro); });
+  $('estGerar').addEventListener('click', function(){ this.disabled = true; msg('Montando a declaração em Word…'); api('progEstagioGerar', {dados: coletarEstagio()}).then(function(r2){ feito(r2); msg('Declaração pronta. Abra e confira antes de enviar.'); }).catch(erro); });
+  $('estEnviar').addEventListener('click', function(){ var d = coletarEstagio(), re = !!(EST.estado.envios && EST.estado.envios.length);
+    if(!confirm((re ? 'Este e-mail JÁ foi enviado. Enviar de novo' : 'Enviar agora') + ' para ' + d.para + ' com ' + EST.arquivos.length + ' anexo(s)?')) return;
+    this.disabled = true; msg('Enviando…'); api('progEstagioEmail', {dados: d, reenviar: re}).then(function(r2){ feito(r2); msg('<span class="ok">✓ E-mail enviado ao coordenador.</span>'); }).catch(erro); });
 }
 
 // ===================== etapa 2: o pacote para a CCO =====================
