@@ -487,6 +487,24 @@ function carregarPdfLib(){
   if(window.PDFLib) return Promise.resolve();
   return new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de PDF. Verifique a internet.')); }; document.head.appendChild(s); });
 }
+// artigos: o comprovante vai da página 1 até a página das palavras-chave do resumo (autores + resumo inteiros).
+// Lê o texto do PDF no navegador (pdf.js); se não der, fica o número que a IA deu.
+function carregarPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve();
+  return new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = function(){ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(); }; s.onerror = falha; document.head.appendChild(s); });
+}
+function fimDoResumo(bytes, minimo){
+  return carregarPdfJs().then(function(){ return pdfjsLib.getDocument({data: bytes.slice(0)}).promise; }).then(function(doc){
+    var max = Math.min(doc.numPages, 6), achouResumo = 0, p = 0;
+    var ler = function(){ p++; if(p > max) return achouResumo || minimo;
+      return doc.getPage(p).then(function(pg){ return pg.getTextContent(); }).then(function(tc){
+        var t = tc.items.map(function(x){ return x.str; }).join(' ').replace(/\s+/g, ' ');
+        if(!achouResumo && /\b(resumo|abstract|resumen)\b/i.test(t)) achouResumo = p;
+        if(achouResumo && /(palavras\s*-?\s*chave|key\s*-?\s*words|palabras\s*clave|descritores)/i.test(t)) return p;
+        return ler(); }); };
+    return ler();
+  }).then(function(n){ return Math.max(minimo, n || 0); }).catch(function(){ return minimo; });
+}
 function b64ParaBytes(b){ var s = atob(b), u = new Uint8Array(s.length); for(var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 function bytesParaB64(u){ var s = '', t = 0x8000; for(var i = 0; i < u.length; i += t) s += String.fromCharCode.apply(null, u.subarray(i, i + t)); return btoa(s); }
 function imagemParaPdf(f){
@@ -505,7 +523,7 @@ function montarComprovantes(msg){
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
       return api('progArquivo', {id: c.id}).then(function(a){
         var bytes = b64ParaBytes(a.dados);
-        if(/pdf/.test(a.mime)) return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(c.paginas > 0) ix = ix.slice(0, c.paginas); return saida.copyPages(d, ix); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); });
+        if(/pdf/.test(a.mime)) return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) ix = ix.slice(0, np); return saida.copyPages(d, ix); }); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); });
         if(/image\/(png|jpe?g)/.test(a.mime)) return (/png/.test(a.mime) ? saida.embedPng(bytes) : saida.embedJpg(bytes)).then(function(img){ var pg = saida.addPage([595, 842]), e = Math.min(555 / img.width, 802 / img.height); pg.drawImage(img, {x: (595 - img.width * e) / 2, y: (842 - img.height * e) / 2, width: img.width * e, height: img.height * e}); });
         falhas.push(c.nome);
       }).catch(function(){ falhas.push(c.nome); }).then(proximo);
