@@ -36,6 +36,9 @@
   table{border-collapse:collapse;width:100%;font-size:13.5px} td,th{border-bottom:1px solid var(--linha);padding:5px 6px;text-align:left;vertical-align:top}
   .tbox{overflow-x:auto}
   .carregando{color:var(--cinza)}
+  .giro{display:inline-block;width:14px;height:14px;border:2px solid var(--linha);border-top-color:var(--navy);border-radius:50%;animation:giro .8s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes giro{to{transform:rotate(360deg)}}
+  .barraEst{height:8px;background:var(--bloco);border-radius:4px;overflow:hidden;margin-top:5px}.barraEst>div{height:100%;background:var(--navy);transition:width .3s}
   .mudou{background:#fff3b0;border-radius:6px;transition:background 1.2s} .barra i{transition:width .7s ease}
 </style>
 </head>
@@ -440,7 +443,7 @@ function desenharEstagio(){
   var r = EST, e = r.estado, docs = r.arquivos.filter(function(a){ return !a.declaracao; }), decl = r.arquivos.filter(function(a){ return a.declaracao; })[0];
   var h = '<p class="aviso" style="margin-top:6px">Tudo fica em <a href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">uma pasta dentro do ciclo</a>. O coordenador só confere, emite e assina no SUAP; a declaração assinada depois entra como comprovante (orientação de estágio).</p>';
   h += '<h3 style="margin:10px 0 4px">1 · Documentos de estágio</h3>' + (docs.length ? docs.map(function(a){ return '<div class="item"><div><a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.nome) + '</a> <span class="aviso">' + a.kb + ' KB</span></div><div class="botoes" style="margin:0"><button type="button" class="sec" data-estdel="' + esc(a.id) + '">✕</button></div></div>'; }).join('') : '<p class="aviso">Nenhum ainda. Mande a ficha de frequência e o relatório de cada aluno.</p>') +
-    '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy)">📤 Enviar documentos<input type="file" id="estArq" accept="application/pdf,image/*" multiple class="oculto"></label>' + (docs.length ? '<button type="button" id="estLer">🤖 Ler os documentos</button>' : '') + '</div>';
+    '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy)">📤 Enviar documentos<input type="file" id="estArq" accept="application/pdf,image/*" multiple class="oculto"></label>' + (docs.length ? '<button type="button" id="estLer">🤖 Ler os documentos</button>' : '') + '</div><div id="estProg" style="margin-top:6px"></div>';
   h += '<h3 style="margin:14px 0 4px">2 · Alunos</h3><p class="aviso" style="margin-top:0">' + (e.lido ? 'Lido pela IA em ' + esc(e.lido) + '. Confira e corrija se precisar.' : 'Leia os documentos ou preencha à mão.') + ' Período = vigência da ficha de frequência.</p>' +
     (e.alunos || []).map(function(a, i){ return '<div class="item" data-estal="' + i + '" data-empresa="' + esc(a.empresa) + '" data-obs="' + esc(a.obs) + '" data-arquivos="' + esc(a.arquivos) + '"><div style="flex:1"><div class="grade" style="grid-template-columns:2fr 1fr 1fr 1fr;gap:6px">' +
       '<div><label>Nome</label><input data-c="nome" value="' + esc(a.nome) + '"></div><div><label>Matrícula</label><input data-c="matricula" value="' + esc(a.matricula) + '"></div><div><label>Início</label><input data-c="inicio" value="' + esc(a.inicio) + '" placeholder="dd/mm/aaaa"></div><div><label>Fim</label><input data-c="fim" value="' + esc(a.fim) + '" placeholder="dd/mm/aaaa"></div></div>' +
@@ -460,12 +463,19 @@ function desenharEstagio(){
   $('estagioCorpo').innerHTML = h;
   var msg = function(t){ $('estMsg').innerHTML = t; }, erro = function(x){ msg('<span class="erro">' + esc(x.message) + '</span>'); document.querySelectorAll('#estagioCorpo button').forEach(function(b){ b.disabled = false; }); };
   var feito = function(r2){ EST = r2; desenharEstagio(); };
-  $('estArq').addEventListener('change', function(){ var fs = Array.prototype.slice.call(this.files), i = 0; if(!fs.length) return;
-    var prox = function(){ if(i >= fs.length) return api('progEstagioAbrir'); var f = fs[i++]; msg('Enviando ' + i + ' de ' + fs.length + ': ' + esc(f.name) + '…');
+  var travar = function(sim){ document.querySelectorAll('#estagioCorpo button, #estArq').forEach(function(b){ b.disabled = sim; }); var lb = $('estArq') && $('estArq').parentNode; if(lb) lb.style.opacity = sim ? .5 : 1; };
+  var prog = function(txt, frac){ $('estProg').innerHTML = '<div class="aviso" style="color:var(--navy)"><span class="giro"></span>' + txt + '</div>' + (frac === undefined ? '' : '<div class="barraEst"><div style="width:' + Math.round(frac * 100) + '%"></div></div>'); };
+  var erroP = function(x){ travar(false); $('estProg').innerHTML = '<span class="erro">' + esc(x.message) + '</span>'; };
+  $('estArq').addEventListener('change', function(){ var fs = Array.prototype.slice.call(this.files), i = 0; if(!fs.length) return; travar(true);
+    var prox = function(){ if(i >= fs.length){ prog('Atualizando a lista…', 1); return api('progEstagioAbrir'); } var f = fs[i++];
+      prog('Carregando ' + i + ' de ' + fs.length + ': <b>' + esc(f.name) + '</b> (' + Math.max(1, Math.round(f.size / 1024)) + ' KB)…', (i - 1) / fs.length);
       return lerArquivo(f).then(function(b64){ return api('progEstagioEnviarArq', {nome: f.name, dados: b64, mime: f.type || 'application/pdf'}); }).then(prox); };
-    prox().then(feito).catch(erro); });
+    prox().then(function(r2){ feito(r2); $('estProg').innerHTML = '<span class="ok">✓ ' + fs.length + ' documento(s) carregado(s). Agora clique em 🤖 Ler os documentos.</span>'; }).catch(erroP); });
   document.querySelectorAll('[data-estdel]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Tirar este arquivo? (vai para a lixeira do Drive)')) return; b.disabled = true; api('progEstagioApagarArq', {id: b.dataset.estdel}).then(feito).catch(erro); }); });
-  if($('estLer')) $('estLer').addEventListener('click', function(){ this.disabled = true; msg('A IA está lendo os documentos…'); api('progEstagioLer').then(feito).catch(erro); });
+  if($('estLer')) $('estLer').addEventListener('click', function(){ travar(true); var t0 = Date.now(), n = docs.length;
+    var tic = setInterval(function(){ if(!$('estProg')) return clearInterval(tic); prog('A IA está lendo ' + n + ' documento(s)… ' + Math.round((Date.now() - t0) / 1000) + ' s <span class="aviso">(costuma levar 20 a 60 s)</span>'); }, 1000);
+    prog('A IA está lendo ' + n + ' documento(s)…');
+    api('progEstagioLer').then(function(r2){ clearInterval(tic); feito(r2); $('estProg').innerHTML = '<span class="ok">✓ Lido. Confira os alunos abaixo.</span>'; }).catch(function(x){ clearInterval(tic); erroP(x); }); });
   document.querySelectorAll('[data-estrem]').forEach(function(b){ b.addEventListener('click', function(){ var d = coletarEstagio(); d.alunos.splice(Number(b.dataset.estrem), 1); EST.estado.alunos = d.alunos; api('progEstagioSalvar', {dados: d}).then(feito).catch(erro); }); });
   $('estMais').addEventListener('click', function(){ var d = coletarEstagio(); d.alunos.push({nome: '', matricula: '', inicio: '', fim: ''}); EST.estado = Object.assign(EST.estado, d); desenharEstagio(); });
   $('estSalvar').addEventListener('click', function(){ this.disabled = true; api('progEstagioSalvar', {dados: coletarEstagio()}).then(function(r2){ feito(r2); msg('Salvo.'); }).catch(erro); });
