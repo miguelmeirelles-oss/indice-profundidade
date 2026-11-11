@@ -42,7 +42,7 @@
 <body>
 <div class="wrap">
   <div class="cab"><h1>📈 Progressão docente</h1><p>Planilha RAD, comprovantes e CCO, montados aos poucos. · <a href="aulas.html">voltar ao Aula por IA</a></p></div>
-  <div class="abas"><button type="button" aria-pressed="true">Progressão</button><button type="button" class="sec" disabled title="Em breve">Plano de trabalho / relatório (em breve)</button></div>
+  <div class="abas"><button type="button" data-aba="prog" aria-pressed="true">Progressão</button><button type="button" class="sec" disabled title="Em breve">Plano de trabalho / relatório (em breve)</button><button type="button" class="sec" data-aba="cco" aria-pressed="false">🧑‍⚖️ Sou membro de CCO</button></div>
   <div id="corpo"><p class="carregando">Carregando…</p></div>
 </div>
 <script>
@@ -98,7 +98,10 @@ function desenhar(){
     // ---------- enviar comprovante ----------
     h += '<div class="caixa"><h2>📎 Enviar comprovante</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA lê, classifica no item certo da planilha RAD e calcula os pontos (com os tetos e a proporção do tempo dentro do período). Você confere antes de salvar. Comece pelo relatório <b>"Turmas Ministradas por Docente para CPPD"</b> do Portal do Professor: ele preenche toda a docência.</p>' +
       (R.estrelas.length ? '<div class="aviso" style="margin-bottom:6px">Você costuma enviar: ' + R.estrelas.map(function(k){ return '<span class="chip">★ ' + esc(rotuloChave(k)) + '</span>'; }).join('') + '</div>' : '') +
-      '<input type="file" id="arqComp" accept="application/pdf,image/*" multiple><div id="lidoBox"></div></div>';
+      '<input type="file" id="arqComp" accept="application/pdf,image/*" multiple>' +
+      '<div class="botoes"><button type="button" class="sec" id="btVarredura">🔎 Fazer varredura de documentos compartilhados</button></div>' +
+      '<p class="aviso" style="margin:4px 0 0">Atas de defesa, artigos, portarias de NDE/comissão, ofícios de CCO… que outro docente já enviou e em que você aparece (até 3 anos). O arquivo vem para a sua pasta e entra pela leitura normal. Nada é enviado por e-mail.</p>' +
+      '<div id="varBox"></div><div id="lidoBox"></div></div>';
     // ---------- itens lançados ----------
     h += htmlDocs();
     h += '<div class="caixa"><h2>🧾 O que já está na sua RAD</h2><div id="listaItensBox">' + listaItens() + '</div>' + '<div class="botoes"><button type="button" class="sec" id="btManual">+ Lançar item à mão</button></div><div id="manualBox"></div></div>';
@@ -108,7 +111,7 @@ function desenhar(){
   }
   if(R.admin && R.adminDados) h += desenharAdmin();
   $('corpo').innerHTML = h;
-  ligar();
+  ligar(); ligarV197();
   if(per) carregarPacote();
 }
 function htmlPlacar(){ var p = R.perfil, per = R.periodo, rs = R.resumo, h = '';
@@ -233,6 +236,7 @@ function desenharLido(proximo){
   var l = LIDO, box = $('lidoBox');
   box.innerHTML = '<div style="background:var(--bloco);border-radius:10px;padding:10px 12px;margin-top:10px"><b>🤖 ' + esc(l.documento || l.arquivoNome) + '</b> <a class="aviso" href="' + esc(l.arquivoUrl) + '" target="_blank" rel="noopener">abrir</a>' +
     (l.resumo ? '<div class="aviso">' + esc(l.resumo) + '</div>' : '') + (l.duvida ? '<div class="warn" style="margin-top:4px">⚠ ' + esc(l.duvida) + '</div>' : '') +
+    ((l.outrosDocentes || []).length ? '<div class="aviso" style="margin-top:4px">👥 Também aparecem neste documento: ' + l.outrosDocentes.map(esc).join(', ') + '. Ao salvar, ele fica guardado por 3 anos para eles pegarem na varredura.</div>' : '') +
     (l.itens.length ? l.itens.map(linhaEditavel).join('') : '<p class="warn">A IA não achou nenhum item da RAD neste documento. Lance à mão se precisar.</p>') +
     '<div class="botoes"><button type="button" id="btSalvarLido"' + (l.itens.length ? '' : ' disabled') + '>✓ Confirmar e salvar</button><button type="button" class="sec" id="btDescLido">Descartar</button></div><div id="msgLido" class="aviso"></div></div>';
   var coletar = function(){
@@ -424,6 +428,7 @@ function desenharPacote(){
     passo(4, 'Comprovantes da RAD (um PDF, na ordem da planilha)', linkArq(4) + '<div class="aviso">' + (p.comprovantes.length ? p.comprovantes.length + ' arquivo(s): ' + p.comprovantes.map(function(c){ return nomesArea[c.area] + ': ' + esc(c.nome); }).join(' · ') : 'nenhum comprovante ainda') + '</div>', p.comprovantes.length ? '<button type="button" id="btComp">Montar PDF</button>' : '') +
     passo(5, 'Avaliação de desempenho e parecer (formulário da CCO)', linkArq(5) + '<div class="aviso">Formulário oficial com a sua identificação, a comissão e a chefia já escritos. As notas e o parecer ficam para a CCO.</div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btCco">Preencher formulário</button>' : '<span class="aviso">escolha os 3 membros da CCO acima</span>') +
     passo(6, 'Ata da reunião da CCO (modelo pré-preenchido)', linkArq(6) + '<div style="margin-top:4px;max-width:200px"><label>Data da reunião</label><input id="dataAta" placeholder="dd/mm/aaaa"></div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btAta">Gerar ata</button>' : '') +
+    passo(7, 'Avaliar se está tudo certo', '<div class="aviso">Depois de montar tudo: a IA confere cada linha da RAD com o PDF dos comprovantes, faz uma segunda verificação dos problemas que achar e emite um relatório final (fica na pasta do ciclo).</div><div id="confBox"></div>', '<button type="button" id="btConferir">✅ Avaliar se está tudo certo</button>') +
     '<div id="msgPac" class="aviso" style="margin-top:8px"></div>' + emailCCO();
   var msg = function(t){ $('msgPac').innerHTML = t; };
   var ok = function(){ carregarPacote(); };
@@ -433,6 +438,7 @@ function desenharPacote(){
   if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btComp')) $('btComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btCco')) $('btCco').addEventListener('click', function(){ this.disabled = true; preencherCCO(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btConferir')) $('btConferir').addEventListener('click', conferir);
   if($('btAta')) $('btAta').addEventListener('click', function(){ this.disabled = true; msg('Escrevendo a ata…'); api('progGerarAta', {data: $('dataAta').value.trim()}).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
 }
 function emailCCO(){
@@ -552,6 +558,172 @@ function preencherCCO(msg){
     });
   }).then(function(b){ return api('progSalvarGerado', {nome: '5 - CCO-AVALIACAO-PARECER (preenchido).pdf', dados: bytesParaB64(b), mime: 'application/pdf'}); });
 }
+// ===================== v197 · varredura, conferência final e "Sou membro de CCO" =====================
+function hojeCCO(){ var d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
+function trocarAba(a){
+  document.querySelectorAll('.abas button[data-aba]').forEach(function(b){ var on = b.dataset.aba === a; b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.classList.toggle('sec', !on); });
+  if(a === 'cco') abrirCCO(); else if(R) desenhar(); else abrir();
+}
+function ligarV197(){
+  if($('btVarredura')) $('btVarredura').addEventListener('click', varredura);
+}
+// ---------- documentos compartilhados por outros docentes ----------
+function varredura(){
+  var box = $('varBox'); box.innerHTML = '<p class="carregando">Procurando documentos de outros docentes em que você aparece…</p>';
+  api('progVarredura').then(function(r){
+    if(!r.docs.length){ box.innerHTML = '<p class="aviso" style="margin:8px 0 0">Nenhum documento novo para você. (' + r.total + ' documento(s) guardado(s) na pasta compartilhada.)</p>'; return; }
+    box.innerHTML = '<p style="margin:10px 0 4px"><b>' + r.docs.length + ' documento(s) em que você aparece</b></p>' + r.docs.map(function(d){
+      return '<div class="item"><div><b>' + esc(d.documento) + '</b><div class="aviso">' + esc(d.tipo) + ' · você aparece como "' + esc(d.comoAparece) + '"' + (d.papel ? ' (' + esc(d.papel) + ')' : '') +
+        (d.por ? ' · enviado por ' + esc(d.por) : '') + ' em ' + esc(d.em) + ' · guardado até ' + esc(d.expira) + '</div></div>' +
+        '<div class="botoes" style="margin:0"><button type="button" data-receber="' + esc(d.id) + '">Adicionar à minha progressão</button><button type="button" class="sec" data-dispensar="' + esc(d.id) + '">Não é meu</button></div></div>'; }).join('') +
+      (r.docs.length > 1 ? '<div class="botoes"><button type="button" id="btReceberTodos">Adicionar todos</button></div>' : '');
+    var receber = function(ids){
+      var arqs = [], seq = Promise.resolve();
+      box.innerHTML = '<p class="carregando">Trazendo ' + ids.length + ' documento(s) para a sua pasta…</p>';
+      ids.forEach(function(id){ seq = seq.then(function(){ return api('progCompartilhadoReceber', {id: id}).then(function(a){ arqs.push(new File([b64ParaBytes(a.dados)], a.nome, {type: a.mime})); }); }); });
+      seq.then(function(){ box.innerHTML = '<p class="ok" style="margin:8px 0 0">✓ ' + arqs.length + ' documento(s) trazido(s). A IA lê cada um abaixo, como se você tivesse enviado: confira e salve.</p>'; enviarComprovantes(arqs); })
+        .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    };
+    box.querySelectorAll('[data-receber]').forEach(function(b){ b.addEventListener('click', function(){ receber([b.dataset.receber]); }); });
+    if($('btReceberTodos')) $('btReceberTodos').addEventListener('click', function(){ receber(r.docs.map(function(d){ return d.id; })); });
+    box.querySelectorAll('[data-dispensar]').forEach(function(b){ b.addEventListener('click', function(){
+      if(!confirm('Este documento não é seu (ou você não vai usar)? Ele deixa de aparecer na sua varredura.')) return;
+      b.disabled = true; api('progCompartilhadoReceber', {id: b.dataset.dispensar, dispensar: true}).then(varredura).catch(function(e){ alert(e.message); }); }); });
+  }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+}
+// ---------- conferência final do próprio processo ----------
+var SIT_ICO = {ok: '✓', atencao: '⚠', erro: '✗'}, SIT_COR = {ok: 'ok', atencao: 'warn', erro: 'warn'};
+function conferir(){
+  var box = $('confBox'), bt = $('btConferir'); bt.disabled = true;
+  box.innerHTML = '<p class="carregando">1/2 · A IA está conferindo cada linha da RAD com o PDF dos comprovantes… (1 a 3 min)</p>';
+  api('progConferir', {etapa: 1}).then(function(r1){
+    if(r1.semIA){ box.innerHTML = htmlConferencia(r1); bt.disabled = false; return; }
+    var n = (r1.r1.linhas || []).filter(function(l){ return l.situacao !== 'ok'; }).length;
+    box.innerHTML = '<p class="carregando">2/2 · Segunda verificação: conferindo de novo ' + (n ? 'os ' + n + ' ponto(s) levantados' : 'o resultado') + '…</p>';
+    return api('progConferir', {etapa: 2}).then(function(rel){ box.innerHTML = htmlConferencia(rel); bt.disabled = false; });
+  }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; });
+}
+function htmlConferencia(r){
+  var graves = r.checagens.filter(function(c){ return !c.ok && c.grave; }).length, h = '<div style="margin-top:8px;background:var(--bloco);border-radius:10px;padding:10px 12px">';
+  if(r.conclusao) h += '<p style="margin:0 0 6px"><b>Conclusão:</b> ' + esc(r.conclusao) + '</p>';
+  h += '<p style="margin:0"><b>Checagens do processo</b>' + (graves ? ' <span class="warn">(' + graves + ' a resolver)</span>' : ' <span class="ok">(tudo certo)</span>') + '</p><ul style="margin:4px 0 8px;padding-left:20px">' +
+    r.checagens.map(function(c){ return '<li class="' + (c.ok ? 'ok' : c.grave ? 'warn' : 'aviso') + '">' + (c.ok ? '✓ ' : '✗ ') + esc(c.txt) + '</li>'; }).join('') + '</ul>';
+  if(r.semIA) h += '<p class="warn">' + esc(r.semIA) + '</p>';
+  if(r.linhas && r.linhas.length && r.linhas[0].situacao){
+    var prob = r.linhas.filter(function(l){ return l.situacao !== 'ok'; }), desc = r.linhas.filter(function(l){ return l.situacao === 'ok' && l.revisao; });
+    h += '<p style="margin:0"><b>Linhas da RAD:</b> ' + (r.linhas.length - prob.length) + ' de ' + r.linhas.length + ' conferidas com o comprovante' + (prob.length ? '; ' + prob.length + ' com observação' : '') + '.</p>';
+    if(prob.length) h += '<div class="tbox"><table><tr><th>Nº</th><th>Item</th><th>Pts</th><th>Observação</th></tr>' + prob.map(function(l){
+      return '<tr><td>' + l.n + '</td><td>' + esc(l.area) + ': ' + esc(l.desc) + '</td><td>' + num(l.pts) + '</td><td class="' + SIT_COR[l.situacao] + '">' + SIT_ICO[l.situacao] + ' ' + esc(l.obs) +
+        (l.pagina ? ' <span class="aviso">(pág. ' + esc(l.pagina) + ')</span>' : '') + (l.revisao ? '<div class="aviso">' + esc(l.revisao) + '</div>' : '') + '</td></tr>'; }).join('') + '</table></div>';
+    if(desc.length) h += '<details style="margin-top:4px"><summary class="aviso" style="cursor:pointer">' + desc.length + ' apontamento(s) descartado(s) na 2ª verificação</summary>' +
+      desc.map(function(l){ return '<div class="aviso">' + l.n + '. ' + esc(l.desc) + ' — ' + esc(l.revisao) + '</div>'; }).join('') + '</details>';
+  }
+  if((r.faltando || []).length) h += '<p style="margin:8px 0 0"><b>Pode estar faltando</b></p><ul style="margin:4px 0;padding-left:20px">' + r.faltando.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+  if((r.observacoes || []).length) h += '<p style="margin:8px 0 0"><b>Outras observações</b></p><ul style="margin:4px 0;padding-left:20px">' + r.observacoes.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+  if(r.url) h += '<p style="margin:8px 0 0"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">📄 Relatório final no Drive</a></p>';
+  return h + '</div>';
+}
+// ---------- aba "Sou membro de CCO" ----------
+var CCO = null, ROT_CONC = {favoravel: 'Parecer FAVORÁVEL', favoravel_com_ressalvas: 'FAVORÁVEL COM RESSALVAS', desfavoravel: 'Parecer DESFAVORÁVEL'};
+function abrirCCO(){
+  $('corpo').innerHTML = '<p class="carregando">Carregando…</p>';
+  api('progCCOListar').then(function(r){ CCO = r; desenharCCOLista(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+}
+function desenharCCOLista(){
+  var r = CCO, est = {documentos: 'enviando documentos', etapa1: 'falta a 2ª verificação', avaliado: 'avaliado'};
+  var h = '<div class="caixa"><h2>🧑‍⚖️ Sou membro de CCO</h2><p class="aviso" style="margin-top:0">Para avaliar o processo de progressão de outro docente. Cada avaliação ganha uma pasta (nome e data) dentro da sua pasta de progressão, em "CCO — avaliações". ' +
+    'Você envia os documentos do processo; a IA confere cada linha da RAD com os comprovantes, faz uma segunda verificação e emite o relatório final.</p>' +
+    '<div class="grade" style="grid-template-columns:minmax(0,2fr) minmax(120px,1fr);align-items:end"><div><label>Docente avaliado (nome completo)</label><input id="ccoNome" list="ccoDocs" autocomplete="off"><datalist id="ccoDocs">' +
+    r.docentes.map(function(n){ return '<option value="' + esc(n) + '">'; }).join('') + '</datalist></div><div><label>Data da avaliação</label><input id="ccoData" value="' + hojeCCO() + '"></div></div>' +
+    '<div class="botoes"><button type="button" id="btCcoNova">+ Nova avaliação</button></div><div id="ccoListaMsg" class="aviso"></div></div>';
+  h += '<div class="caixa"><h2>Minhas avaliações</h2>' + (r.avaliacoes.length ? r.avaliacoes.map(function(a){
+    return '<div class="item"><div><b>' + esc(a.avaliado) + '</b><div class="aviso">' + esc(a.data) + ' · ' + esc(est[a.estado] || a.estado) + (a.conclusao ? ' · ' + esc(ROT_CONC[a.conclusao] || a.conclusao) : '') + '</div></div>' +
+      '<div class="botoes" style="margin:0"><button type="button" class="sec" data-abrircco="' + esc(a.id) + '">Abrir</button><button type="button" class="link" data-apagarcco="' + esc(a.id) + '">tirar da lista</button></div></div>'; }).join('') :
+    '<p class="aviso">Nenhuma ainda.</p>') + '</div>';
+  $('corpo').innerHTML = h;
+  $('btCcoNova').addEventListener('click', function(){
+    var b = this, nome = $('ccoNome').value.trim(); if(nome.split(/\s+/).length < 2){ $('ccoListaMsg').innerHTML = '<span class="warn">Escreva o nome completo do docente avaliado.</span>'; return; }
+    b.disabled = true; $('ccoListaMsg').textContent = 'Criando a pasta…';
+    api('progCCONova', {avaliado: nome, data: $('ccoData').value.trim()}).then(desenharCCOAval).catch(function(e){ b.disabled = false; $('ccoListaMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
+  });
+  document.querySelectorAll('[data-abrircco]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; api('progCCOAbrir', {id: b.dataset.abrircco}).then(desenharCCOAval).catch(function(e){ alert(e.message); b.disabled = false; }); }); });
+  document.querySelectorAll('[data-apagarcco]').forEach(function(b){ b.addEventListener('click', function(){
+    if(!confirm('Tirar esta avaliação da lista? A pasta e os arquivos continuam no seu Drive.')) return;
+    api('progCCOApagar', {id: b.dataset.apagarcco}).then(function(r){ CCO = r; desenharCCOLista(); }).catch(function(e){ alert(e.message); }); }); });
+}
+// .xlsx: a IA não lê planilha; o navegador tira o texto de todas as abas e manda junto
+function textoDaPlanilha(f){
+  var go = function(){ return lerArquivo(f).then(function(u){
+    var wb = XLSX.read(u.split(',')[1], {type: 'base64'});
+    return wb.SheetNames.map(function(n){ var csv = XLSX.utils.sheet_to_csv(wb.Sheets[n], {blankrows: false}).split('\n').filter(function(l){ return l.replace(/[,;\s"]/g, ''); }).join('\n'); return csv ? '### ABA: ' + n + '\n' + csv : ''; }).filter(Boolean).join('\n\n');
+  }); };
+  if(window.XLSX) return go();
+  return new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = falha; document.head.appendChild(s); }).then(go);
+}
+function desenharCCOAval(a){
+  var rel = a.relatorio && a.relatorio.verificado ? a.relatorio : null, docs = a.arquivos.filter(function(f){ return !f.gerado; }), h = '';
+  var esperados = [[/protocolo/i, 'Folha de protocolo'], [/portaria/i, 'Portaria da última progressão'], [/rad|planilha/i, 'Planilha RAD'], [/comprova|documentos/i, 'Comprovantes'], [/of[ií]cio/i, 'Ofício de formação da CCO']];
+  h += '<div class="caixa"><button type="button" class="link" id="ccoVoltar">← minhas avaliações</button><h2 style="margin:6px 0 2px">Avaliação de ' + esc(a.avaliado) + '</h2><div class="aviso">' + esc(a.data) +
+    ' · <a href="' + esc(a.pastaUrl) + '" target="_blank" rel="noopener">📁 pasta da avaliação</a></div></div>';
+  h += '<div class="caixa"><h2>1 · Documentos do processo</h2><p class="aviso" style="margin-top:0">Envie tudo o que o docente mandou para a CCO: PDF, fotos ou a planilha RAD (.xlsx). Mande também o ofício de formação da CCO: ele fica guardado como comprovante para os 3 membros usarem na próxima progressão (pela varredura).</p>' +
+    '<div>' + esperados.map(function(e){ var tem = docs.some(function(f){ return e[0].test(f.nome); }); return '<span class="chip"' + (tem ? '' : ' style="opacity:.7"') + '>' + (tem ? '✓ ' : '○ ') + esc(e[1]) + '</span>'; }).join('') + '</div>' +
+    (docs.length ? docs.map(function(f){ return '<div class="item"><div><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + esc(f.nome) + '</a> <span class="aviso">' + f.kb + ' KB</span></div><button type="button" class="link" data-apagararq="' + esc(f.id) + '">apagar</button></div>'; }).join('') : '<p class="aviso">Nenhum documento ainda.</p>') +
+    '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar documentos<input type="file" id="ccoArqs" multiple accept="application/pdf,image/*,.xlsx,.xls" class="oculto"></label></div><div id="ccoMsg" class="aviso"></div></div>';
+  h += '<div class="caixa"><h2>2 · Avaliação por IA</h2><p class="aviso" style="margin-top:0">Etapa 1: a IA lê a RAD e procura o comprovante de cada linha, recalculando os pontos pelas regras da CPPD. Etapa 2 (dupla verificação): outra leitura confere o relatório da etapa 1 contra os documentos. Leva alguns minutos.</p>' +
+    '<div class="botoes"><button type="button" id="btCcoAvaliar"' + (docs.length ? '' : ' disabled') + '>' + (rel ? '🔁 Avaliar de novo' : a.estado === 'etapa1' ? '▶ Continuar (2ª verificação)' : '🔎 Avaliar com IA') + '</button></div><div id="ccoAvMsg"></div>' + (rel ? htmlRelCCO(rel) : '') + '</div>';
+  if(rel) h += '<div class="caixa"><h2>3 · Parecer e ata</h2><label>Parecer da CCO (pode editar)</label><textarea id="ccoParecer" rows="4">' + esc(rel.parecer || '') + '</textarea>' +
+    '<div class="botoes"><button type="button" class="sec" id="btCcoParecer">Salvar parecer</button></div>' +
+    '<div class="grade" style="margin-top:10px;grid-template-columns:minmax(120px,200px) auto;align-items:end"><div><label>Data da reunião</label><input id="ccoDataAta" value="' + esc(a.data) + '"></div><div><button type="button" id="btCcoAta">Gerar ata da CCO</button></div></div>' +
+    a.arquivos.filter(function(f){ return f.gerado; }).map(function(f){ return '<div style="margin-top:6px"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + esc(f.nome) + '</a></div>'; }).join('') + '<div id="ccoAtaMsg" class="aviso"></div></div>';
+  $('corpo').innerHTML = h; window.scrollTo(0, 0);
+  $('ccoVoltar').addEventListener('click', abrirCCO);
+  $('ccoArqs').addEventListener('change', function(){
+    var fs = Array.prototype.slice.call(this.files), m = $('ccoMsg'), atual = a, seq = Promise.resolve();
+    fs.forEach(function(f, i){ seq = seq.then(function(){
+      m.textContent = 'Enviando ' + (i + 1) + ' de ' + fs.length + ': ' + f.name + '…';
+      if(f.size > 25 * 1024 * 1024) throw new Error(f.name + ': grande demais (máx. 25 MB).');
+      var envio = lerArquivo(f).then(function(b64){ return api('progCCOEnviar', {id: a.id, nome: f.name, dados: b64, mime: f.type || 'application/octet-stream'}); });
+      if(/\.xlsx?$/i.test(f.name)) envio = envio.then(function(){ return textoDaPlanilha(f); }).then(function(txt){
+        return api('progCCOEnviar', {id: a.id, nome: f.name.replace(/\.xlsx?$/i, '') + ' (texto da planilha).txt', dados: btoa(unescape(encodeURIComponent(txt))), mime: 'text/plain'}); });
+      return envio.then(function(x){ atual = x; }); }); });
+    seq.then(function(){ desenharCCOAval(atual); }).catch(function(e){ m.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
+  });
+  document.querySelectorAll('[data-apagararq]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Apagar este arquivo da avaliação? (vai para a lixeira do Drive)')) return;
+    api('progCCOApagarArquivo', {id: a.id, arquivoId: b.dataset.apagararq}).then(desenharCCOAval).catch(function(e){ alert(e.message); }); }); });
+  $('btCcoAvaliar').addEventListener('click', function(){
+    var m = $('ccoAvMsg'), bt = this; bt.disabled = true;
+    var etapa2 = function(){ m.innerHTML = '<p class="carregando">2/2 · Dupla verificação: conferindo o relatório contra os documentos… (1 a 3 min)</p>'; return api('progCCOAvaliar', {id: a.id, etapa: 2}).then(desenharCCOAval); };
+    var p = (a.estado === 'etapa1' && !rel) ? etapa2() : (function(){ m.innerHTML = '<p class="carregando">1/2 · Lendo a RAD e procurando o comprovante de cada linha… (2 a 4 min)</p>';
+      return api('progCCOAvaliar', {id: a.id, etapa: 1}).then(function(r){ m.innerHTML = '<p class="ok">Etapa 1: ' + r.linhas + ' linha(s) conferida(s), ' + r.problemas + ' com observação.</p>'; a.estado = 'etapa1'; return etapa2(); }); })();
+    p.catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; if(a.estado === 'etapa1') bt.textContent = '▶ Continuar (2ª verificação)'; });
+  });
+  if($('btCcoParecer')) $('btCcoParecer').addEventListener('click', function(){ var b = this; b.disabled = true; api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ b.disabled = false; $('ccoAtaMsg').innerHTML = '<span class="ok">Parecer salvo.</span>'; }).catch(function(e){ b.disabled = false; alert(e.message); }); });
+  if($('btCcoAta')) $('btCcoAta').addEventListener('click', function(){ var b = this; b.disabled = true; $('ccoAtaMsg').textContent = 'Escrevendo a ata…';
+    api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ return api('progCCOAta', {id: a.id, data: $('ccoDataAta').value.trim()}); }).then(desenharCCOAval)
+      .catch(function(e){ b.disabled = false; $('ccoAtaMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+}
+function htmlRelCCO(r){
+  var h = '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bloco)"><div style="font-size:18px;font-weight:bold">' + esc(ROT_CONC[r.conclusao] || '') + '</div><div>' + esc(r.resumo || '') + '</div>' +
+    '<div class="aviso" style="margin-top:4px">' + esc([r.docente, r.siape && 'SIAPE ' + r.siape, r.periodo, r.nivelAtual && (r.nivelAtual + ' → ' + (r.nivelPretendido || '?')), r.em && 'avaliado em ' + r.em].filter(Boolean).join(' · ')) + '</div></div>';
+  h += '<div class="tbox" style="margin-top:8px"><table><tr><th>Área</th><th>Declarado</th><th>Conferido</th></tr>' + (r.areas || []).map(function(x){ var dif = Math.abs((x.declarado || 0) - (x.conferido || 0)) > 0.05;
+    return '<tr><td>' + esc(NOMES_AREA[x.area] || x.area) + '</td><td>' + num(x.declarado) + '</td><td' + (dif ? ' class="warn" style="font-weight:bold"' : '') + '>' + num(x.conferido) + '</td></tr>'; }).join('') +
+    '<tr><th>Total</th><th>' + num(r.totalDeclarado) + '</th><th>' + num(r.totalConferido) + '</th></tr></table></div>' +
+    '<p style="margin:6px 0">Nota de produtividade conferida: <b>' + esc(r.notaConferida) + '</b>' + (r.foraDocencia !== undefined ? ' · fora da docência: ' + num(r.foraDocencia) : '') +
+    (r.oficioCompartilhado ? ' · <span class="ok">ofício da CCO guardado para os 3 membros</span>' : '') + '</p>';
+  h += '<p style="margin:8px 0 2px"><b>Documentos</b></p>' + (r.documentos || []).map(function(d){ return '<div style="font-size:14px" class="' + (d.presente ? '' : 'warn') + '">' + (d.presente ? '✓ ' : '✗ ') + esc(d.documento) + (d.obs ? ' <span class="aviso">— ' + esc(d.obs) + '</span>' : '') + '</div>'; }).join('');
+  var ls = r.linhas || [], prob = ls.filter(function(l){ return l.situacao !== 'ok'; });
+  h += '<p style="margin:8px 0 2px"><b>Linhas da RAD</b> <span class="aviso">' + (ls.length - prob.length) + ' de ' + ls.length + ' ok' + (prob.length ? ', ' + prob.length + ' com observação' : '') + '</span></p>' +
+    '<details' + (prob.length ? ' open' : '') + '><summary class="aviso" style="cursor:pointer">ver a tabela</summary><div class="tbox"><table><tr><th>Área</th><th>Item</th><th>Decl.</th><th>Conf.</th><th>Comprovante / observação</th></tr>' +
+    ls.slice().sort(function(a, b){ return (a.situacao === 'ok') - (b.situacao === 'ok'); }).map(function(l){
+      return '<tr><td>' + esc(NOMES_AREA[l.area] || l.area) + '</td><td>' + esc(l.item) + '</td><td>' + num(l.declarado) + '</td><td>' + num(l.conferido) + '</td><td class="' + SIT_COR[l.situacao] + '">' + SIT_ICO[l.situacao] + ' ' +
+        esc((l.comprovante ? l.comprovante + ' · ' : '') + l.obs) + (l.revisao ? '<div class="aviso">' + esc(l.revisao) + '</div>' : '') + '</td></tr>'; }).join('') + '</table></div></details>';
+  if((r.pendencias || []).length) h += '<p style="margin:8px 0 2px"><b>Pendências</b></p><ul style="margin:0;padding-left:20px">' + r.pendencias.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+  var ign = (r.ignorados || []).filter(function(n){ return !/\.xlsx?$/i.test(n); });
+  if(ign.length) h += '<p class="aviso">Não lidos pela IA (formato não suportado): ' + ign.map(esc).join(', ') + '.</p>';
+  if(r.url) h += '<p style="margin:8px 0 0"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">📄 Relatório final no Drive</a></p>';
+  return h;
+}
+document.querySelectorAll('.abas button[data-aba]').forEach(function(b){ b.addEventListener('click', function(){ trocarAba(b.dataset.aba); }); });
 abrir();
 </script>
 </body>
