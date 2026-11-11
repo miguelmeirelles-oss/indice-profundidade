@@ -155,10 +155,12 @@ function descricaoItem(it){
 function listaItens(){
   var grupos = {doc: 'Docência', ori: 'Orientações', out: 'Outras atividades acadêmicas', comp: 'Atividades complementares', pes: 'Pesquisa', ext: 'Extensão', art: 'Atividades artísticas'};
   if(!R.itens.length) return '<p class="aviso">Nada ainda. Envie o primeiro comprovante.</p>';
-  return Object.keys(grupos).map(function(g){
+  var sa = (R.semArquivo || []).length, topo = sa ? '<div class="erro" style="background:#fff7d6;color:var(--navy)">⚠ ' + sa + ' item(ns) vêm de arquivos que foram apagados (provavelmente leituras repetidas). Eles ainda contam na RAD. <button type="button" class="link" id="btApagarSemArq">Apagar esses itens</button></div>' : '';
+  return topo + Object.keys(grupos).map(function(g){
     var l = R.itens.filter(function(it){ return it.aba === g; }); if(!l.length) return '';
     return '<p style="margin:12px 0 2px"><b>' + grupos[g] + '</b> <span class="aviso">(' + l.length + ')</span></p>' + l.map(function(it){
-      return '<div class="item"><div>' + descricaoItem(it) + (it.arquivoNome ? '<div class="aviso">📄 ' + esc(it.arquivoNome) + '</div>' : '') + (it.origem === 'plataforma' ? '<div class="aviso">da plataforma (' + esc(it.documento) + ')</div>' : '') + '</div>' +
+      var semArq = (R.semArquivo || []).indexOf(it.id) !== -1;
+      return '<div class="item"' + (semArq ? ' style="background:#fff7d6"' : '') + '><div>' + descricaoItem(it) + (it.arquivoNome ? '<div class="aviso">📄 ' + esc(it.arquivoNome) + (semArq ? ' <span class="warn">— este arquivo foi apagado: o item ainda conta</span>' : '') + '</div>' : '') + (it.origem === 'plataforma' ? '<div class="aviso">da plataforma (' + esc(it.documento) + ')</div>' : '') + '</div>' +
         '<div style="display:flex;gap:10px;align-items:center"><b>' + num(it.pts, 3) + '</b>' + (it.origem !== 'plataforma' ? '<button type="button" class="link" data-apagar="' + esc(it.id) + '">apagar</button>' : '') + '</div></div>';
     }).join('');
   }).join('') + '<p class="aviso" style="margin:8px 0 0">Pontos por item antes dos tetos. Na docência, o total da área é a soma dividida pelos 4 semestres.</p>';
@@ -325,6 +327,8 @@ function importarRad(f){
 }
 // ---------- eventos ----------
 function ligarListas(){
+  if($('btApagarSemArq')) $('btApagarSemArq').addEventListener('click', function(){ var ids = (R.semArquivo || []).slice(); if(!confirm('Apagar os ' + ids.length + ' item(ns) cujo arquivo foi apagado?')) return; this.disabled = true;
+    var seq = Promise.resolve(); ids.forEach(function(id){ seq = seq.then(function(){ return api('progApagarItem', {id: id}).then(function(r){ R = r; }); }); }); seq.then(function(){ atualizarParcial(R); }).catch(function(e){ alert(e.message); }); });
   document.querySelectorAll('[data-apagarq]').forEach(function(b){ b.addEventListener('click', function(){
     var n = Number(b.dataset.n); if(!confirm(n ? 'Apagar este documento e os ' + n + ' item(ns) que ele gerou na sua RAD? (o arquivo vai para a lixeira do Drive)' : 'Apagar este documento? (vai para a lixeira do Drive)')) return;
     b.disabled = true; api('progApagarArquivo', {id: b.dataset.apagarq}).then(function(r){ atualizarParcial(r); }).catch(function(e){ b.disabled = false; alert(e.message); }); }); });
