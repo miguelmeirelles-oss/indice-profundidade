@@ -138,11 +138,12 @@ function atualizarParcial(r){
   var db = $('docsBox'); if(db) db.outerHTML = htmlDocs();
   var li = $('listaItensBox'); if(li) li.innerHTML = listaItens();
   ligarListas();
-  if(!antes) return;
+  if(!antes){ if($('pacoteBox')) carregarPacote(); return; }
   var animar = function(id, de, para){ var el = $(id); if(!el || Math.abs(de - para) < 0.005) return; var t0 = performance.now(), dur = 700;
     el.parentNode.classList.add('mudou');
     (function passo(t){ var f = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - f, 3); el.textContent = num(de + (para - de) * e); if(f < 1) requestAnimationFrame(passo); })(t0);
     setTimeout(function(){ if(el.parentNode) el.parentNode.classList.remove('mudou'); }, 1600); };
+  if($('pacoteBox')) carregarPacote();
   animar('plTotal', antes.total, R.resumo.total);
   Object.keys(R.resumo.areas).forEach(function(k){ animar('pl_' + k, antes.areas[k] || 0, R.resumo.areas[k]); });
 }
@@ -511,6 +512,21 @@ function fimDoResumo(bytes, minimo){
     return ler();
   }).then(function(n){ return Math.max(minimo, n || 0); }).catch(function(){ return minimo; });
 }
+// portaria/ato longo (ex.: NDE de todos os cursos, 12 páginas): fica a 1ª página, as que citam o docente e a última (assinatura)
+function semAcento(t){ return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z]+/g, ' '); }
+function paginasDoDocente(bytes, total){
+  var tk = semAcento(R && R.perfil ? R.perfil.nome : '').trim().split(' ').filter(function(w){ return w.length > 2; });
+  if(tk.length < 2) return Promise.resolve(null);
+  var prim = tk[0], ult = tk[tk.length - 1];
+  return carregarPdfJs().then(function(){ return pdfjsLib.getDocument({data: bytes.slice(0)}).promise; }).then(function(doc){
+    var achou = [], p = 0;
+    var ler = function(){ p++; if(p > doc.numPages) return achou;
+      return doc.getPage(p).then(function(pg){ return pg.getTextContent(); }).then(function(tc){ var t = ' ' + semAcento(tc.items.map(function(x){ return x.str; }).join(' ')).replace(/\s+/g, ' ') + ' ';
+        if(t.indexOf(' ' + prim + ' ') !== -1 && t.indexOf(' ' + ult + ' ') !== -1) achou.push(p - 1); return ler(); }); };
+    return ler();
+  }).then(function(achou){ if(!achou.length) return null; var sel = [0].concat(achou, [total - 1]); return sel.filter(function(x, i){ return sel.indexOf(x) === i; }).sort(function(a, b){ return a - b; }); })
+    .catch(function(){ return null; });
+}
 function b64ParaBytes(b){ var s = atob(b), u = new Uint8Array(s.length); for(var i = 0; i < s.length; i++) u[i] = s.charCodeAt(i); return u; }
 function bytesParaB64(u){ var s = '', t = 0x8000; for(var i = 0; i < u.length; i += t) s += String.fromCharCode.apply(null, u.subarray(i, i + t)); return btoa(s); }
 function imagemParaPdf(f){
@@ -522,20 +538,23 @@ function imagemParaPdf(f){
 }
 // 4 · todos os comprovantes num PDF só, na ordem da planilha RAD
 function montarComprovantes(msg){
-  return carregarPdfLib().then(function(){ return PDFLib.PDFDocument.create(); }).then(function(saida){
+  var incluidos = [];
+  msg('Conferindo a lista de comprovantes…');
+  return api('progPacote').then(function(p){ PAC = p; return carregarPdfLib(); }).then(function(){ return PDFLib.PDFDocument.create(); }).then(function(saida){
     var lista = PAC.comprovantes.slice(), i = 0, falhas = [];
     var proximo = function(){
       var c = lista[i++]; if(!c) return Promise.resolve();
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
       return api('progArquivo', {id: c.id}).then(function(a){
         var bytes = b64ParaBytes(a.dados);
-        if(/pdf/.test(a.mime)) return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) ix = ix.slice(0, np); return saida.copyPages(d, ix); }); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); });
-        if(/image\/(png|jpe?g)/.test(a.mime)) return (/png/.test(a.mime) ? saida.embedPng(bytes) : saida.embedJpg(bytes)).then(function(img){ var pg = saida.addPage([595, 842]), e = Math.min(555 / img.width, 802 / img.height); pg.drawImage(img, {x: (595 - img.width * e) / 2, y: (842 - img.height * e) / 2, width: img.width * e, height: img.height * e}); });
+        if(/pdf/.test(a.mime)) return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) return ix.slice(0, np);
+          return c.area === 'comp' && ix.length > 4 ? paginasDoDocente(bytes, ix.length).then(function(sel){ return sel || ix; }) : ix; }).then(function(ix){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ return saida.copyPages(d, ix); }); }); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); incluidos.push(c.id); });
+        if(/image\/(png|jpe?g)/.test(a.mime)) return (/png/.test(a.mime) ? saida.embedPng(bytes) : saida.embedJpg(bytes)).then(function(img){ var pg = saida.addPage([595, 842]), e = Math.min(555 / img.width, 802 / img.height); pg.drawImage(img, {x: (595 - img.width * e) / 2, y: (842 - img.height * e) / 2, width: img.width * e, height: img.height * e}); incluidos.push(c.id); });
         falhas.push(c.nome);
       }).catch(function(){ falhas.push(c.nome); }).then(proximo);
     };
     return proximo().then(function(){ msg('Salvando o PDF no Drive…'); return saida.save(); }).then(function(b){
-      return api('progSalvarGerado', {nome: '4 - Comprovantes da RAD.pdf', dados: bytesParaB64(b), mime: 'application/pdf'}); })
+      return api('progSalvarGerado', {nome: '4 - Comprovantes da RAD.pdf', dados: bytesParaB64(b), mime: 'application/pdf', incluidos: incluidos}); })
       .then(function(){ if(falhas.length) alert('Não deu para incluir: ' + falhas.join(', ') + '. Confira esses arquivos.'); });
   });
 }
