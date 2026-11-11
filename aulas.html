@@ -2853,6 +2853,25 @@ function lerCamposPF(box){
   var alunos = [0, 1, 2].map(function(i){ return {nome: v('nome' + i), matricula: v('mat' + i)}; }).filter(function(a){ return a.nome; });
   return {alunos: alunos, orientador: v('orientador'), coorientadores: lista(v('coor')), titulo: v('titulo'), banca: lista(v('banca')), nota: v('nota')};
 }
+// prazos do regulamento do TCC (art. 17): 3 vias à banca 25 dias antes da defesa; apresentação de 20 a 40 min + arguição
+function textoPrazosPF(r){ var p = r.prazos || {};
+  return '📅 Projeto Final II · ' + (p.semestre || r.semestre) + '\n\n' +
+    '• Versão escrita do TCC: entregar 3 vias à banca com no mínimo 25 dias de antecedência da defesa (art. 17, §1º).' + (p.entregaLimite ? ' Para defender até o fim do semestre (' + p.fim + '), a entrega precisa ser até ' + p.entregaLimite + '.' : '') + '\n' +
+    (p.grupos && p.grupos.length ? p.grupos.map(function(g){ return '   – ' + g.rotulo + ': defesa em ' + g.defesa + ' → entregar até ' + g.entrega; }).join('\n') + '\n' : '') +
+    '• Apresentação oral: mínimo de 20 e máximo de 40 minutos, seguida de arguição (art. 17, §2º).' + (p.provaFinal ? '\n• Semana de prova final: ' + p.provaFinal + '.' : ''); }
+function htmlPrazosPF(r){
+  var p = r.prazos; if(!p) return '';
+  var h = '<div class="caixa"><h2>📅 Prazos do regulamento</h2>';
+  if(!p.temCalendario) h += '<p class="aviso" style="margin-top:0">Ainda não tenho o calendário de ' + esc(p.semestre) + '. Ele é baixado sozinho do site do curso uma vez por semana, ou pode ser enviado na página da Progressão (📅 Calendário acadêmico).</p>';
+  else h += '<p style="margin:0 0 6px">Semestre ' + esc(p.semestre) + ': ' + esc(p.inicio) + ' a <b>' + esc(p.fim) + '</b>' + (p.semanas ? ' · ' + p.semanas + ' semanas' : '') + (p.provaFinal ? ' · prova final ' + esc(p.provaFinal) : '') + '</p>';
+  h += '<div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0">' +
+    '<div><div class="aviso">entrega das 3 vias à banca</div><div style="font-size:18px;font-weight:bold">' + (p.entregaLimite ? 'até ' + esc(p.entregaLimite) : '25 dias antes') + '</div><div class="aviso">para defender até ' + esc(p.fim || 'o fim do semestre') + '</div></div>' +
+    '<div><div class="aviso">apresentação oral</div><div style="font-size:18px;font-weight:bold">20 a 40 min</div><div class="aviso">+ arguição da banca</div></div></div>';
+  if(p.grupos && p.grupos.length) h += '<div class="tbox"><table><tr><th>Grupo</th><th>Defesa</th><th>Entregar à banca até</th></tr>' + p.grupos.map(function(g){ return '<tr><td>' + esc(g.rotulo) + '</td><td>' + esc(g.defesa) + '</td><td><b>' + esc(g.entrega) + '</b></td></tr>'; }).join('') + '</table></div>';
+  h += '<details style="margin-top:8px"><summary style="cursor:pointer"><b>📣 Avisar a turma</b> <span class="aviso">(recado na plataforma e no celular dos alunos)</span></summary><textarea id="pfPrazoTxt" rows="8" style="margin-top:6px">' + esc(textoPrazosPF(r)) + '</textarea>' +
+    '<div class="botoes"><button type="button" class="mini" id="pfPrazoEnviar">📣 Enviar recado à turma</button></div><div id="pfPrazoMsg" class="aviso"></div></details></div>';
+  return h;
+}
 function desenharPF(){
   var r = PFV.r, e2 = r.etapa === 2, el = $('aulaTopo');
   var conta = function(f){ return r.grupos.filter(f).length; };
@@ -2863,7 +2882,7 @@ function desenharPF(){
         : numPF('com nota', conta(function(g){ return g.nota !== null; })) + numPF('aprovados', conta(function(g){ return g.nota !== null && g.nota >= r.aprova; }))) + '</div>' +
     '<div class="botoes" style="margin:0">' + (r.pastaUrl ? '<a class="botaoLink" href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">📁 Documentos de ' + esc(r.semestre) + '</a>' : '') +
     '<button type="button" class="mini secundario" id="pfSync">↻ Atualizar planilha de controle' + (e2 ? ' e formulário' : '') + '</button>' +
-    (e2 && r.podeEnviar ? '<button type="button" class="mini" id="pfConvite">✉ Convite das defesas</button>' : '') + '</div><div id="pfMsg" class="aviso"></div><div id="pfConviteBox"></div></div>';
+    (e2 && r.podeEnviar ? '<button type="button" class="mini" id="pfConvite">✉ Convite das defesas</button>' : '') + '</div><div id="pfMsg" class="aviso"></div><div id="pfConviteBox"></div></div>' + (e2 ? htmlPrazosPF(r) : '');
   h += '<div class="caixa"><h2>📎 Enviar documento assinado</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA descobre qual apêndice é (A proposta, C, F, J banca, B ata) e lê alunos, orientador, coorientador, título' + (e2 ? ' e banca' : ' e nota') + '. Você confere antes de salvar; o arquivo vai para Defesas documentos / ' + esc(r.semestre) + ' / pasta do grupo.</p>' +
     '<input type="file" id="pfArq" accept="application/pdf,image/*"><div id="pfLido"></div></div>';
   h += '<div class="caixa"><h2>Grupos</h2><p class="aviso" style="margin:0 0 4px">Documentos: A proposta · C termo de responsabilidade · F termo de ciência · J banca · B ata assinada. Toque numa letra verde para abrir o PDF.</p>';
@@ -2891,6 +2910,10 @@ function desenharPF(){
   h += '</div>';
   el.innerHTML = h;
   // eventos
+  if($('pfPrazoEnviar')) $('pfPrazoEnviar').addEventListener('click', function(){ var b = this, t = $('pfPrazoTxt').value.trim(); if(!t) return;
+    if(!confirm('Enviar este recado a todos os alunos inscritos (na plataforma e no celular)?')) return;
+    b.disabled = true; $('pfPrazoMsg').textContent = 'Enviando…';
+    api('enviarRecado', {disciplinaId: PFV.d.id, texto: t, porEmail: false}).then(function(){ $('pfPrazoMsg').innerHTML = '<span class="ok">✓ Recado enviado à turma.</span>'; }).catch(function(e){ b.disabled = false; $('pfPrazoMsg').textContent = e.message; }); });
   $('pfSync').addEventListener('click', function(){ var b = this; b.disabled = true; $('pfMsg').textContent = 'Atualizando…';
     api('pfSincronizar', {disciplinaId: PFV.d.id}).then(function(x){ b.disabled = false; $('pfMsg').textContent = 'Planilha de controle: ' + x.controle + ' célula(s) atualizada(s)' + (e2 ? ' · formulário da ata: ' + x.form + ' projeto(s) com banca' : '') + (x.erros.length ? ' · ' + x.erros.join('; ') : '') + '.'; })
       .catch(function(e){ b.disabled = false; $('pfMsg').textContent = e.message; }); });
