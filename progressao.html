@@ -56,7 +56,7 @@ function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function num(n, c){ return (Math.round(Number(n || 0) * Math.pow(10, c === undefined ? 2 : c)) / Math.pow(10, c === undefined ? 2 : c)).toString().replace('.', ','); }
 function api(acao, dados){
-  dados = dados || {}; dados.token = token;
+  dados = dados || {}; dados.token = token; var sim = ''; try { sim = sessionStorage.getItem('progSim') || ''; } catch(e){} if(sim && /^prog/.test(acao)) dados.simular = sim;
   return fetch(BACKEND_AULAS, {method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({acao: acao, dados: dados})})
     .then(function(r){ return r.json(); }).then(function(j){ if(!j.ok){ if(j.erro === 'SESSAO') throw new Error('Sua sessão expirou. Entre de novo pelo Aula por IA.'); throw new Error(j.erro || 'Não deu para concluir.'); } return j.resultado; });
 }
@@ -85,6 +85,7 @@ function desenhar(){
   }
   // ---------- perfil ----------
   var incompleto = !per || !p.siape || (!p.pastaId && !R.admin && !R.proprio);
+  if(R.simulando) h = '<div class="caixa" style="border:3px solid #d97706;background:rgba(217,119,6,.08)"><b>🧪 SIMULAÇÃO: ' + esc(R.simulando) + '</b> <span class="aviso">— dados à parte dos seus, pasta "Simulações de progressão", nada vai para a pasta compartilhada.</span><div class="botoes"><button type="button" class="sec" id="btSimSair">Sair da simulação</button><button type="button" class="sec" id="btSimApagar">Apagar os dados desta simulação</button></div></div>' + h;
   h += htmlDrive();
   h += '<details class="caixa"' + (incompleto ? ' open' : '') + '><summary style="cursor:pointer"><b>👤 Seu perfil</b> <span class="aviso">' + (incompleto ? '— complete para começar' : '— dados que mudam pouco') + '</span></summary>' +
     '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('email', 'E-mail institucional', p.email) + campo('celular', 'Celular, ex.: (24) 98183-9748', p.celular) + campo('telefone', 'Telefone (opcional)', p.telefone) + campo('admissao', 'Data de admissão (dd/mm/aaaa)' + (p.admissao && !/\d{4}/.test(p.admissao) ? ' — falta o ano' : ''), p.admissao) +
@@ -100,7 +101,7 @@ function desenhar(){
       (R.faltaCal.length ? '<p class="warn" style="margin:8px 0 0">Falta: ' + R.faltaCal.map(esc).join(', ') + '. Sem ele, a docência desses semestres não é calculada.</p>' : '') +
       '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar calendário (PDF)<input type="file" id="arqCal" accept="application/pdf,image/*" class="oculto"></label></div><div id="calBox"></div></details>';
     // ---------- enviar comprovante ----------
-    h += '<div class="caixa"><h2>📎 Enviar comprovante</h2><p class="aviso" style="margin-top:0">PDF ou foto. A IA lê, classifica no item certo da planilha RAD e calcula os pontos (com os tetos e a proporção do tempo dentro do período). Você confere antes de salvar. Comece pelo relatório <b>"Turmas Ministradas por Docente para CPPD"</b> do Portal do Professor: ele preenche toda a docência.</p>' +
+    h += '<div class="caixa"><h2>📎 Enviar comprovante</h2><div style="display:flex;gap:6px;flex-wrap:wrap;margin:0 0 8px"><input id="impPasta" placeholder="ou cole o link de uma pasta do Drive com os comprovantes" style="flex:1;min-width:220px"><button type="button" class="sec" id="btImpPasta">📁 Importar da pasta</button></div><div id="impPastaMsg" class="aviso"></div><p class="aviso" style="margin-top:0">PDF ou foto. A IA lê, classifica no item certo da planilha RAD e calcula os pontos (com os tetos e a proporção do tempo dentro do período). Você confere antes de salvar. Comece pelo relatório <b>"Turmas Ministradas por Docente para CPPD"</b> do Portal do Professor: ele preenche toda a docência.</p>' +
       (R.estrelas.length ? '<div class="aviso" style="margin-bottom:6px">Você costuma enviar: ' + R.estrelas.map(function(k){ return '<span class="chip">★ ' + esc(rotuloChave(k)) + '</span>'; }).join('') + '</div>' : '') +
       '<input type="file" id="arqComp" accept="application/pdf,image/*" multiple>' +
       '<div class="botoes"><button type="button" class="sec" id="btVarredura">🔎 Fazer varredura de documentos compartilhados</button></div>' +
@@ -117,6 +118,13 @@ function desenhar(){
   if(R.admin && R.adminDados) h += desenharAdmin();
   $('corpo').innerHTML = h;
   ligar(); ligarV197(); ligarDrive();
+  if($('btSimSair')) $('btSimSair').addEventListener('click', function(){ try { sessionStorage.removeItem('progSim'); } catch(e){} R = null; abrir(); });
+  if($('btSimApagar')) $('btSimApagar').addEventListener('click', function(){ if(!confirm('Apagar todos os itens, perfil e a pasta desta simulação (' + R.simulando + ')? Os seus dados não são tocados.')) return; api('progSimLimpar').then(function(){ try { sessionStorage.removeItem('progSim'); } catch(e){} R = null; abrir(); }).catch(function(e){ alert(e.message); }); });
+  if($('btSimEntrar')) $('btSimEntrar').addEventListener('click', function(){ var n = $('simNome').value.trim(); if(n.length < 3) return; try { sessionStorage.setItem('progSim', n); } catch(e){} R = null; abrir(); });
+  if($('btImpPasta')) $('btImpPasta').addEventListener('click', function(){ var b = this, link = $('impPasta').value.trim(), m = $('impPastaMsg'); if(!link) return; b.disabled = true; m.innerHTML = '<span class="giro"></span>Buscando os arquivos da pasta…';
+    api('progImportarPasta', {link: link}).then(function(r){ b.disabled = false; var fs = r.arquivos.map(function(o){ return new File([b64ParaBytes(o.dados)], o.nome, {type: o.mime}); });
+      m.innerHTML = '✓ ' + fs.length + ' arquivo(s) de "' + esc(r.origem) + '" vão para a leitura.' + (r.ignorados.length ? '<div>Não importei: ' + r.ignorados.map(esc).join(' · ') + '</div>' : '');
+      if(fs.length) enviarComprovantes(fs); }).catch(function(e){ b.disabled = false; m.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   if($('btRadDiren')) $('btRadDiren').addEventListener('click', function(){ var b = this; b.disabled = true; $('msgRadModelo').innerHTML = '<span class="giro"></span>Baixando da página da DIREN…'; api('progModeloRad', {conferir: true}).then(function(x){ b.disabled = false; $('msgRadModelo').innerHTML = '<span class="ok">✓ ' + esc(x.msg) + '</span>'; }).catch(function(e){ b.disabled = false; $('msgRadModelo').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   if($('arqRadModelo')) $('arqRadModelo').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; $('msgRadModelo').innerHTML = '<span class="giro"></span>Enviando…'; lerArquivo(f).then(function(b64){ return api('progModeloRad', {nome: f.name, dados: b64}); }).then(function(x){ $('msgRadModelo').innerHTML = '<span class="ok">✓ ' + esc(x.msg) + '</span>'; }).catch(function(e){ $('msgRadModelo').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   document.querySelectorAll('[data-calcorr]').forEach(function(b){ b.addEventListener('click', function(e){ e.preventDefault(); var p = b.dataset.calcorr.split('|'); corrigirCal(p[0], p[1]); }); });
@@ -328,6 +336,7 @@ function desenharAdmin(){
     '<div><label>Nome da instituição nos documentos</label><input id="nomeInst" value="' + esc(a.instituicao) + '"></div></div>' +
     '<p class="aviso" style="margin:6px 0 0">A chave é gratuita: portaldatransparencia.gov.br/api-de-dados/cadastrar-email (com o seu gov.br). Fica guardada só no servidor. Quando o CEFET/RJ virar UFCI/RJ, troque o nome aqui.</p>' +
     '<div class="botoes"><button type="button" id="btAdmin">Salvar</button></div><div id="msgAdmin" class="aviso"></div>' +
+    '<p style="margin:14px 0 4px"><b>🧪 Simular a progressão de outro docente</b></p><p class="aviso" style="margin:0">Para testar com o processo de outra pessoa (ex.: documentos que ela mandou para a CCO). Os dados ficam à parte dos seus e podem ser apagados no fim.</p><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><input id="simNome" placeholder="nome do docente (ex.: Diana Lima — teste)" style="flex:1;min-width:200px"><button type="button" class="sec" id="btSimEntrar">Entrar na simulação</button></div>' +
     '<p style="margin:14px 0 4px"><b>Planilha RAD oficial</b></p><p class="aviso" style="margin:0">A plataforma usa a planilha da página da DIREN e confere uma vez por semana se ela mudou (avisa você quando muda). Se precisar, confira agora ou envie a planilha à mão.</p>' +
     '<div class="botoes"><button type="button" class="sec" id="btRadDiren">🔄 Conferir agora na DIREN</button><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar planilha RAD nova (.xlsx)<input type="file" id="arqRadModelo" accept=".xlsx" class="oculto"></label></div><div id="msgRadModelo" class="aviso"></div></details>';
 }
