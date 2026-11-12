@@ -551,7 +551,8 @@ function preencherFolhaXml(xml, o){
 }
 
 // ===================== PLANO DE TRABALHO e RELATÓRIO DE ATIVIDADES (anuais, DIREN) =====================
-var AN = null, ANO_SEL = null, DISC_ARQ = null;
+var AN = null, ANO_SEL = null;
+function discAnexado(r){ return ((r && r.arquivos) || []).filter(function(a){ return /^Comprovante de disciplinas \d{4}\.pdf$/.test(a.nome) && a.nome.indexOf(String(r.ano)) !== -1; })[0] || null; }
 var CAMPUS_NOME = {VA: 'valença', MA: 'maracanã', MG: 'maria da graça', NI: 'nova iguaçu', NF: 'nova friburgo', PE: 'petrópolis', IT: 'itaguaí', AR: 'angra dos reis'};
 function abrirAnual(ano){
   if(ano) ANO_SEL = ano;
@@ -581,6 +582,8 @@ function desenharAnual(){
       return '<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-weight:normal"><input type="checkbox" data-aninc="' + esc(it.id) + '"' + (it.incluido ? ' checked' : '') + ' style="width:auto;margin-top:3px"><span>' + descItem(it) + ' <span class="aviso">· ' + num(it.pts) + ' pts' + (it.noAno === 'sem' ? ' · <span class="warn">sem data</span>' + (it.arquivoId ? ' <input data-anano="' + esc(it.id) + '" placeholder="ano" style="width:62px;padding:2px 4px;font-size:12px" inputmode="numeric">' : '') : '') + (it.origem === 'plataforma' ? ' · Projeto Final da plataforma' : it.arquivoNome ? ' · ' + esc(it.arquivoNome) : '') + '</span></span></label>'; }).join('') + '</div>'; }).join('')
       : '<p class="warn">Nada deste ano letivo ainda.</p>') +
     (r.ra.itens.some(function(it){ return it.noAno === 'sem' && it.arquivoId; }) ? '<div class="botoes"><button type="button" id="anAnoIA">🔎 Descobrir com a IA o ano dos itens sem data (' + r.ra.itens.filter(function(it){ return it.noAno === 'sem' && it.arquivoId; }).length + ')</button></div><div id="anAnoMsg" class="aviso"></div>' : '') +
+    (function(){ var d = discAnexado(r); return '<div style="margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--bloco)">' + (d ? '✓ <b>Comprovante de disciplinas de ' + r.ano + ' anexado:</b> <a href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.nome) + '</a> <span class="aviso">(entra no PDF no lugar do relatório completo do portal)</span> <label class="link" style="cursor:pointer">trocar<input type="file" id="anDiscArq" accept="application/pdf" class="oculto"></label>'
+      : '<b>Comprovante de disciplinas</b> <span class="aviso">— gere no Portal do Professor o relatório de turmas só de ' + r.ano + ' e anexe aqui (sem ele, o relatório do portal entra cortado)</span><div class="botoes" style="margin:6px 0 0"><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📎 Disciplinas só de ' + r.ano + ' (PDF)<input type="file" id="anDiscArq" accept="application/pdf" class="oculto"></label></div>') + '<div id="anDiscInfo" class="aviso"></div></div>'; })() +
     '<div class="botoes"><button type="button" class="sec" id="anIrEnviar">📎 Enviar comprovante (vale para a progressão também)</button></div></div>';
   // ---- 2 · plano ----
   var pi = r.ppa.itens, cat = r.catalogo;
@@ -612,8 +615,8 @@ function desenharAnual(){
   h += '<div class="caixa"><h2>4 · Documentos</h2><p class="aviso" style="margin-top:0">Tudo vai para a <a href="' + esc(r.pasta) + '" target="_blank" rel="noopener">pasta ' + r.ano + '</a>. Depois: assinar pelo gov.br (você e a chefia) e enviar no formulário da DIREN.</p>' +
     passo('Folha de rosto do relatório ' + r.ano, arq(/^Folha de Rosto-Relat/), '<button type="button" data-anfolha="ra">Gerar (Word)</button>') +
     passo('RAD do relatório ' + r.ano, arq(/^RAD relat/), '<button type="button" data-anrad="ra">Gerar</button>') +
-    passo('Comprovantes do relatório (um PDF, na ordem da tabela)', arq(/^Comprovantes relat/) + '<div class="aviso" id="anDiscInfo">Disciplinas: ' + (DISC_ARQ ? '✓ vai entrar o seu arquivo "' + esc(DISC_ARQ.name) + '"' : 'o relatório de turmas do portal entra cortado (só ' + r.ano + '). Se preferir, gere no portal um relatório só de ' + r.ano + ' e anexe aqui.') + '</div>',
-      '<label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📎 Disciplinas só de ' + r.ano + ' (PDF)<input type="file" id="anDiscArq" accept="application/pdf" class="oculto"></label><button type="button" id="anComp">Montar PDF</button>') +
+    passo('Comprovantes do relatório (um PDF, na ordem da tabela)', arq(/^Comprovantes relat/) + '<div class="aviso">Disciplinas: ' + (discAnexado(r) ? '✓ entra o comprovante anexado (só ' + r.ano + ')' : 'o relatório do portal entra cortado (só ' + r.ano + ') — ou anexe o de ' + r.ano + ' lá em cima, no relatório') + '</div>',
+      '<button type="button" id="anComp">Montar PDF</button>') +
     passo('Folha de rosto do plano ' + r.anoPlano, arq(/^Folha de Rosto-PPA/), '<button type="button" data-anfolha="ppa">Gerar (Word)</button>') +
     passo('RAD do plano ' + r.anoPlano, arq(/^RAD Plano/), '<button type="button" data-anrad="ppa">Gerar</button>') +
     '<div id="anDocMsg" class="aviso" style="margin-top:6px"></div></div>';
@@ -683,8 +686,10 @@ function ligarAnual(){
   document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); apiAn('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(feito).catch(erro('anDocMsg')); }); });
   document.querySelectorAll('[data-anfolha]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; var t = coletarTextosAnual(); msg('<span class="giro"></span>Montando a folha de rosto em Word…');
     apiAn('progAnualSalvar', {ano: r.ano, dados: t}).then(function(){ return gerarFolhaAnual(b.dataset.anfolha, t); }).then(feito).catch(erro('anDocMsg')); }); });
-  $('anDiscArq').addEventListener('change', function(){ DISC_ARQ = this.files[0] || null; $('anDiscInfo').innerHTML = DISC_ARQ ? '✓ Disciplinas: vai entrar o seu arquivo "' + esc(DISC_ARQ.name) + '" no lugar do relatório do portal.' : ''; });
-  $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {ano: r.ano, discArq: DISC_ARQ,
+  $('anDiscArq').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; if(!/pdf/i.test(f.type || f.name)){ $('anDiscInfo').innerHTML = '<span class="erro">Envie um PDF.</span>'; return; }
+    $('anDiscInfo').innerHTML = '<span class="giro"></span>Guardando na pasta de ' + r.ano + '…';
+    lerArquivo(f).then(function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovante de disciplinas ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); }).then(feito).catch(function(e){ $('anDiscInfo').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+  $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {ano: r.ano, discId: (discAnexado(r) || {}).id,
     carregar: function(){ return apiAn('progAnualComprovantes', {ano: r.ano}).then(function(x){ return x.comprovantes; }); },
     salvar: function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
   // e-mail
@@ -789,7 +794,7 @@ function apiAn(acao, d){
   if(!pr) return api(acao, d).then(completar);
   if(acao === 'progAnualSalvarArq') return pastaAnualDrv(AN).then(function(p){ return drvSalvar(p.id, d.nome, d.dados, d.mime); }).then(function(){ return apiAn('progAnualAbrir', {ano: AN.ano}); });
   var pre = Promise.resolve();
-  if(acao === 'progAnualEmail') pre = bytesDosArquivos(AN.arquivos).then(function(l){ d.anexos = l; });
+  if(acao === 'progAnualEmail') pre = bytesDosArquivos(AN.arquivos.filter(function(a){ return !/^Comprovante de disciplinas/.test(a.nome); })).then(function(l){ d.anexos = l; });
   return pre.then(function(){ return api(acao, d); }).then(function(r){
     return (r && r.arquivoNovo ? pastaAnualDrv(r).then(function(p){ return drvSalvar(p.id, r.arquivoNovo.nome, r.arquivoNovo.dados, r.arquivoNovo.mime); }) : Promise.resolve()).then(function(){ return completar(r); }); });
 }
@@ -999,9 +1004,9 @@ function montarComprovantes(msg, opts){
     var proximo = function(){
       var c = lista[i++]; if(!c) return Promise.resolve();
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
-      if(opts && opts.discArq && c.area === 'doc'){ if(opts._discUsado){ incluidos.push(c.id); return proximo(); } opts._discUsado = true;
-        return opts.discArq.arrayBuffer().then(function(buf){ return PDFLib.PDFDocument.load(new Uint8Array(buf), {ignoreEncryption: true}); }).then(function(d){ return saida.copyPages(d, d.getPageIndices()); })
-          .then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); incluidos.push(c.id); }).catch(function(){ falhas.push(opts.discArq.name); }).then(proximo); }
+      if(opts && opts.discId && c.area === 'doc'){ if(opts._discUsado){ incluidos.push(c.id); return proximo(); } opts._discUsado = true;
+        return baixarArquivo(opts.discId).then(function(a){ return PDFLib.PDFDocument.load(b64ParaBytes(a.dados), {ignoreEncryption: true}); }).then(function(d){ return saida.copyPages(d, d.getPageIndices()); })
+          .then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); incluidos.push(c.id); }).catch(function(){ falhas.push('comprovante de disciplinas anexado'); }).then(proximo); }
       return baixarArquivo(c.id).then(function(a){
         var bytes = b64ParaBytes(a.dados);
         if(/pdf/.test(a.mime)) return (opts && opts.ano && c.area === 'doc' ? recortarAno(bytes, opts.ano) : Promise.resolve(bytes)).then(function(b2){ bytes = b2; return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) return ix.slice(0, np);
