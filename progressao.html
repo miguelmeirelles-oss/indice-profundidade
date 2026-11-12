@@ -444,7 +444,7 @@ function proximoNivel(txt) {
 
 // ===================== declaração de estágio para o coordenador =====================
 var EST = null;
-function abrirEstagio(){ api('progEstagioAbrir').then(function(r){ EST = r; desenharEstagio(); }).catch(function(e){ $('estagioCorpo').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; }); }
+function abrirEstagio(){ apiEst('progEstagioAbrir').then(function(r){ EST = r; desenharEstagio(); }).catch(function(e){ $('estagioCorpo').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; }); }
 function coletarEstagio(){
   var v = function(id){ var x = $(id); return x ? x.value : undefined; };
   var alunos = []; document.querySelectorAll('[data-estal]').forEach(function(l){ var g = function(c){ return l.querySelector('[data-c="' + c + '"]').value.trim(); };
@@ -479,22 +479,22 @@ function desenharEstagio(){
   var prog = function(txt, frac){ $('estProg').innerHTML = '<div class="aviso" style="color:var(--navy)"><span class="giro"></span>' + txt + '</div>' + (frac === undefined ? '' : '<div class="barraEst"><div style="width:' + Math.round(frac * 100) + '%"></div></div>'); };
   var erroP = function(x){ travar(false); $('estProg').innerHTML = '<span class="erro">' + esc(x.message) + '</span>'; };
   $('estArq').addEventListener('change', function(){ var fs = Array.prototype.slice.call(this.files), i = 0; if(!fs.length) return; travar(true);
-    var prox = function(){ if(i >= fs.length){ prog('Atualizando a lista…', 1); return api('progEstagioAbrir'); } var f = fs[i++];
+    var prox = function(){ if(i >= fs.length){ prog('Atualizando a lista…', 1); return apiEst('progEstagioAbrir'); } var f = fs[i++];
       prog('Carregando ' + i + ' de ' + fs.length + ': <b>' + esc(f.name) + '</b> (' + Math.max(1, Math.round(f.size / 1024)) + ' KB)…', (i - 1) / fs.length);
-      return lerArquivo(f).then(function(b64){ return api('progEstagioEnviarArq', {nome: f.name, dados: b64, mime: f.type || 'application/pdf'}); }).then(prox); };
+      return lerArquivo(f).then(function(b64){ return apiEst('progEstagioEnviarArq', {nome: f.name, dados: b64, mime: f.type || 'application/pdf'}); }).then(prox); };
     prox().then(function(r2){ feito(r2); $('estProg').innerHTML = '<span class="ok">✓ ' + fs.length + ' documento(s) carregado(s). Agora clique em 🤖 Ler os documentos.</span>'; }).catch(erroP); });
-  document.querySelectorAll('[data-estdel]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Tirar este arquivo? (vai para a lixeira do Drive)')) return; b.disabled = true; api('progEstagioApagarArq', {id: b.dataset.estdel}).then(feito).catch(erro); }); });
+  document.querySelectorAll('[data-estdel]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Tirar este arquivo? (vai para a lixeira do Drive)')) return; b.disabled = true; apiEst('progEstagioApagarArq', {id: b.dataset.estdel}).then(feito).catch(erro); }); });
   if($('estLer')) $('estLer').addEventListener('click', function(){ travar(true); var t0 = Date.now(), n = docs.length;
     var tic = setInterval(function(){ if(!$('estProg')) return clearInterval(tic); prog('A IA está lendo ' + n + ' documento(s)… ' + Math.round((Date.now() - t0) / 1000) + ' s <span class="aviso">(costuma levar 20 a 60 s)</span>'); }, 1000);
     prog('A IA está lendo ' + n + ' documento(s)…');
-    api('progEstagioLer').then(function(r2){ clearInterval(tic); feito(r2); $('estProg').innerHTML = '<span class="ok">✓ Lido. Confira os alunos abaixo.</span>'; }).catch(function(x){ clearInterval(tic); erroP(x); }); });
-  document.querySelectorAll('[data-estrem]').forEach(function(b){ b.addEventListener('click', function(){ var d = coletarEstagio(); d.alunos.splice(Number(b.dataset.estrem), 1); EST.estado.alunos = d.alunos; api('progEstagioSalvar', {dados: d}).then(feito).catch(erro); }); });
+    apiEst('progEstagioLer').then(function(r2){ clearInterval(tic); feito(r2); $('estProg').innerHTML = '<span class="ok">✓ Lido. Confira os alunos abaixo.</span>'; }).catch(function(x){ clearInterval(tic); erroP(x); }); });
+  document.querySelectorAll('[data-estrem]').forEach(function(b){ b.addEventListener('click', function(){ var d = coletarEstagio(); d.alunos.splice(Number(b.dataset.estrem), 1); EST.estado.alunos = d.alunos; apiEst('progEstagioSalvar', {dados: d}).then(feito).catch(erro); }); });
   $('estMais').addEventListener('click', function(){ var d = coletarEstagio(); d.alunos.push({nome: '', matricula: '', inicio: '', fim: ''}); EST.estado = Object.assign(EST.estado, d); desenharEstagio(); });
-  $('estSalvar').addEventListener('click', function(){ this.disabled = true; api('progEstagioSalvar', {dados: coletarEstagio()}).then(function(r2){ feito(r2); msg('Salvo.'); }).catch(erro); });
-  $('estGerar').addEventListener('click', function(){ this.disabled = true; msg('Montando a declaração em Word…'); api('progEstagioGerar', {dados: coletarEstagio()}).then(function(r2){ feito(r2); msg('Declaração pronta. Abra e confira antes de enviar.'); }).catch(erro); });
+  $('estSalvar').addEventListener('click', function(){ this.disabled = true; apiEst('progEstagioSalvar', {dados: coletarEstagio()}).then(function(r2){ feito(r2); msg('Salvo.'); }).catch(erro); });
+  $('estGerar').addEventListener('click', function(){ this.disabled = true; msg('Montando a declaração em Word…'); apiEst('progEstagioGerar', {dados: coletarEstagio()}).then(function(r2){ feito(r2); msg('Declaração pronta. Abra e confira antes de enviar.'); }).catch(erro); });
   $('estEnviar').addEventListener('click', function(){ var d = coletarEstagio(), re = !!(EST.estado.envios && EST.estado.envios.length);
     if(!confirm((re ? 'Este e-mail JÁ foi enviado. Enviar de novo' : 'Enviar agora') + ' para ' + d.para + ' com ' + EST.arquivos.length + ' anexo(s)?')) return;
-    this.disabled = true; msg('Enviando…'); api('progEstagioEmail', {dados: d, reenviar: re}).then(function(r2){ feito(r2); msg('<span class="ok">✓ E-mail enviado ao coordenador.</span>'); }).catch(erro); });
+    this.disabled = true; msg('Enviando…'); apiEst('progEstagioEmail', {dados: d, reenviar: re}).then(function(r2){ feito(r2); msg('<span class="ok">✓ E-mail enviado ao coordenador.</span>'); }).catch(erro); });
 }
 
 // preenche a folha de rosto da DIREN (plano ou relatório): identificação, caixas, ano, tabela de 21 linhas e observações
@@ -552,7 +552,7 @@ var CAMPUS_NOME = {VA: 'valença', MA: 'maracanã', MG: 'maria da graça', NI: '
 function abrirAnual(ano){
   if(ano) ANO_SEL = ano;
   $('corpo').innerHTML = '<div class="caixa"><p class="carregando"><span class="giro"></span>Juntando o que você já tem do ano letivo…</p></div>';
-  api('progAnualAbrir', {ano: ANO_SEL}).then(function(r){ AN = r; ANO_SEL = r.ano; desenharAnual(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+  apiAn('progAnualAbrir', {ano: ANO_SEL}).then(function(r){ AN = r; ANO_SEL = r.ano; desenharAnual(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 function nomeChave(k){ var c = AN.catalogo; if(k === 'doc') return 'Docência'; if(/^ori_/.test(k)) return (c.orient[k.slice(4)] || ['Orientação'])[0]; return (c.itens[k] || c.cargos[k] || [k, k])[c.itens[k] ? 1 : 0]; }
 function descItem(it){ var d = it.dados || {};
@@ -568,7 +568,7 @@ function desenharAnual(){
     '<div class="aviso">Ano letivo ' + r.ano + ': ' + esc(r.periodo.inicio) + ' a ' + esc(r.periodo.fim) + ' · anual, pedido pela DIREN (envio pelo formulário dela, depois de assinado por você e pela chefia)</div></div>' +
     '<div><label>Ano do relatório</label><select id="anSel">' + [anoAt - 2, anoAt - 1, anoAt].map(function(a){ return '<option' + (a === r.ano ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div></div>' +
     '<p class="aviso" style="margin:8px 0 0">Os comprovantes são os mesmos da progressão: o que você envia lá aparece aqui quando é deste ano letivo, e o que lança aqui vale lá. Regras: <a href="' + esc(r.formulario) + '" target="_blank" rel="noopener">página da DIREN</a>.</p>' +
-    '<details style="margin-top:6px"><summary class="aviso" style="cursor:pointer">📁 Pasta dos documentos: <a href="' + esc(r.pasta) + '" target="_blank" rel="noopener">abrir</a> (trocar)</summary><div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap"><input id="anPasta" placeholder="link da sua pasta do Drive (ex.: Plano de trabalho)" style="flex:1;min-width:220px"><button type="button" class="sec" id="anPastaOk">Usar esta pasta</button></div><div class="aviso">Dentro dela fica uma pasta por ano (' + r.ano + ' = relatório ' + r.ano + ' e plano ' + r.anoPlano + ').</div></details></div>';
+    (r.proprio ? '<p class="aviso" style="margin:6px 0 0">📁 Pasta no seu Google Drive: <a href="' + esc(r.pasta) + '" target="_blank" rel="noopener">abrir</a> (dentro de "Progressão (Aula por IA)")</p>' : '<details style="margin-top:6px"><summary class="aviso" style="cursor:pointer">📁 Pasta dos documentos: <a href="' + esc(r.pasta) + '" target="_blank" rel="noopener">abrir</a> (trocar)</summary><div style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap"><input id="anPasta" placeholder="link da sua pasta do Drive (ex.: Plano de trabalho)" style="flex:1;min-width:220px"><button type="button" class="sec" id="anPastaOk">Usar esta pasta</button></div><div class="aviso">Dentro dela fica uma pasta por ano (' + r.ano + ' = relatório ' + r.ano + ' e plano ' + r.anoPlano + ').</div></details>') + '</div>';
   // ---- 1 · relatório ----
   var porLinha = {}; r.ra.itens.forEach(function(it){ (porLinha[it.linha] = porLinha[it.linha] || []).push(it); });
   h += '<div class="caixa"><h2>1 · Relatório de atividades ' + r.ano + '</h2>' + placarAnual(r.ra.resumo, r.minimo) +
@@ -626,20 +626,20 @@ function ligarAnual(){
   var r = AN, feito = function(x){ AN = x; desenharAnual(); }, erro = function(id){ return function(e){ var b = $(id); if(b) b.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; document.querySelectorAll('#corpo button').forEach(function(x){ x.disabled = false; }); }; };
   var ocupado = function(id, t){ $(id).innerHTML = '<span class="giro"></span>' + t; };
   $('anSel').addEventListener('change', function(){ abrirAnual(Number(this.value)); });
-  $('anPastaOk').addEventListener('click', function(){ var v = $('anPasta').value.trim(); if(!v) return; this.disabled = true; api('progAnualSalvar', {ano: r.ano, dados: {ptPasta: v}}).then(feito).catch(function(e){ alert(e.message); }); });
-  document.querySelectorAll('[data-aninc]').forEach(function(c){ c.addEventListener('change', function(){ api('progAnualIncluir', {ano: r.ano, id: c.dataset.aninc, incluir: c.checked}).then(feito).catch(function(e){ alert(e.message); c.checked = !c.checked; }); }); });
-  document.querySelectorAll('[data-anano]').forEach(function(x){ x.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); }); x.addEventListener('change', function(){ var v = x.value.trim(); if(!/^\d{4}$/.test(v)) return; x.disabled = true; api('progAnualDataItem', {ano: r.ano, id: x.dataset.anano, anoItem: v}).then(feito).catch(function(e){ alert(e.message); x.disabled = false; }); }); });
+  if($('anPastaOk')) $('anPastaOk').addEventListener('click', function(){ var v = $('anPasta').value.trim(); if(!v) return; this.disabled = true; apiAn('progAnualSalvar', {ano: r.ano, dados: {ptPasta: v}}).then(feito).catch(function(e){ alert(e.message); }); });
+  document.querySelectorAll('[data-aninc]').forEach(function(c){ c.addEventListener('change', function(){ apiAn('progAnualIncluir', {ano: r.ano, id: c.dataset.aninc, incluir: c.checked}).then(feito).catch(function(e){ alert(e.message); c.checked = !c.checked; }); }); });
+  document.querySelectorAll('[data-anano]').forEach(function(x){ x.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); }); x.addEventListener('change', function(){ var v = x.value.trim(); if(!/^\d{4}$/.test(v)) return; x.disabled = true; apiAn('progAnualDataItem', {ano: r.ano, id: x.dataset.anano, anoItem: v}).then(feito).catch(function(e){ alert(e.message); x.disabled = false; }); }); });
   $('anIrEnviar').addEventListener('click', function(){ trocarAba('prog'); setTimeout(function(){ var h2 = Array.prototype.slice.call(document.querySelectorAll('#corpo h2')).filter(function(x){ return /Enviar comprovante/.test(x.textContent); })[0]; if(h2) h2.scrollIntoView({behavior: 'smooth'}); }, 1200); });
   // plano
-  $('anSugerir').addEventListener('click', function(){ if(r.ppa.itens.length && !confirm('Refazer a sugestão? O que veio da sugestão anterior é trocado; o que você acrescentou à mão fica.')) return; this.disabled = true; this.innerHTML = '<span class="giro"></span>Montando…'; api('progAnualSugerirPlano', {ano: r.ano}).then(feito).catch(function(e){ alert(e.message); abrirAnual(); }); });
-  document.querySelectorAll('[data-anpidel]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; api('progAnualPlanoItem', {ano: r.ano, apagar: b.dataset.anpidel}).then(feito).catch(function(e){ alert(e.message); }); }); });
+  $('anSugerir').addEventListener('click', function(){ if(r.ppa.itens.length && !confirm('Refazer a sugestão? O que veio da sugestão anterior é trocado; o que você acrescentou à mão fica.')) return; this.disabled = true; this.innerHTML = '<span class="giro"></span>Montando…'; apiAn('progAnualSugerirPlano', {ano: r.ano}).then(feito).catch(function(e){ alert(e.message); abrirAnual(); }); });
+  document.querySelectorAll('[data-anpidel]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; apiAn('progAnualPlanoItem', {ano: r.ano, apagar: b.dataset.anpidel}).then(feito).catch(function(e){ alert(e.message); }); }); });
   var salvarDisc = function(){ var lin = Array.prototype.slice.call(document.querySelectorAll('[data-anpi][data-aba="doc"]')), i = 0;
-    var prox = function(){ var l = lin[i++]; if(!l) return api('progAnualAbrir', {ano: r.ano}); var it = r.ppa.itens.filter(function(x){ return x.id === l.dataset.anpi; })[0], d = Object.assign({}, it.dados);
+    var prox = function(){ var l = lin[i++]; if(!l) return apiAn('progAnualAbrir', {ano: r.ano}); var it = r.ppa.itens.filter(function(x){ return x.id === l.dataset.anpi; })[0], d = Object.assign({}, it.dados);
       l.querySelectorAll('[data-c]').forEach(function(x){ var v = x.value.trim(); d[x.dataset.c] = /^\d+([.,]\d+)?$/.test(v) ? Number(v.replace(',', '.')) : v; });
-      if(JSON.stringify(d) === JSON.stringify(it.dados)) return prox(); return api('progAnualPlanoItem', {ano: r.ano, item: {id: it.id, aba: 'doc', chave: 'doc', dados: d}}).then(prox); };
+      if(JSON.stringify(d) === JSON.stringify(it.dados)) return prox(); return apiAn('progAnualPlanoItem', {ano: r.ano, item: {id: it.id, aba: 'doc', chave: 'doc', dados: d}}).then(prox); };
     return prox(); };
   if($('anSalvarDisc')) $('anSalvarDisc').addEventListener('click', function(){ this.disabled = true; salvarDisc().then(feito).catch(function(e){ alert(e.message); }); });
-  if($('anConfirmar')) $('anConfirmar').addEventListener('click', function(){ this.disabled = true; salvarDisc().then(function(){ return api('progAnualSalvar', {ano: r.ano, dados: {planoConfirmado: true}}); }).then(feito).catch(function(e){ alert(e.message); }); });
+  if($('anConfirmar')) $('anConfirmar').addEventListener('click', function(){ this.disabled = true; salvarDisc().then(function(){ return apiAn('progAnualSalvar', {ano: r.ano, dados: {planoConfirmado: true}}); }).then(feito).catch(function(e){ alert(e.message); }); });
   var novo = function(tipo){ var c = r.catalogo, opts = '';
     if(tipo === 'doc') $('anNovo').innerHTML = '<div class="grade" style="grid-template-columns:2fr .8fr .6fr .6fr;gap:6px;margin-top:8px"><div><label>Disciplina</label><input id="nvD"></div><div><label>Semestre</label><select id="nvS"><option>' + r.anoPlano + '.1</option><option>' + r.anoPlano + '.2</option></select></div><div><label>h-a/sem</label><input id="nvC" value="2"></div><div><label>Alunos</label><input id="nvA" value="10"></div></div><div class="botoes"><button type="button" id="nvOk">Acrescentar</button></div>';
     else { Object.keys(c.orient).forEach(function(t){ opts += '<option value="ori_' + t + '">Orientação: ' + esc(c.orient[t][0]) + '</option>'; });
@@ -650,7 +650,7 @@ function ligarAnual(){
       if(tipo === 'doc') it = {aba: 'doc', chave: 'doc', dados: {disciplina: $('nvD').value.trim(), semestre: $('nvS').value, ch: Number($('nvC').value) || 2, alunos: Number($('nvA').value) || 0, duracao: '50 min', nivel: 'G', docentes: 1}};
       else { var k = $('nvT').value, desc = $('nvDesc').value.trim(), q = Number(String($('nvQ').value).replace(',', '.')) || 1;
         it = /^ori_/.test(k) ? {aba: 'ori', chave: 'ori', dados: {tipo: Number(k.slice(4)), nome: desc, orientadores: 1, inicio: '01/02/' + r.anoPlano, fim: '31/12/' + r.anoPlano}} : {chave: k, dados: {descricao: desc, quantidade: q}}; }
-      api('progAnualPlanoItem', {ano: r.ano, item: it}).then(feito).catch(function(e){ alert(e.message); }); });
+      apiAn('progAnualPlanoItem', {ano: r.ano, item: it}).then(feito).catch(function(e){ alert(e.message); }); });
   };
   if($('anMaisDisc')) $('anMaisDisc').addEventListener('click', function(){ novo('doc'); });
   if($('anMaisOutro')) $('anMaisOutro').addEventListener('click', function(){ novo('outro'); });
@@ -662,23 +662,23 @@ function ligarAnual(){
         ant.push(c.split('</w:p>').map(function(p){ return (p.match(/<w:t[^>]*>[^<]*<\/w:t>/g) || []).map(function(t){ return t.replace(/<[^>]+>/g, ''); }).join(''); }).filter(function(t){ return t.trim() && !/^insira o texto\.?$/i.test(t.trim()); }).join('\n')
           .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')); }
       document.querySelectorAll('[data-anant]').forEach(function(t){ t.value = ant[Number(t.dataset.anant)] || ''; });
-      return api('progAnualSalvar', {ano: r.ano, dados: {planoAnterior: ant}}); }).then(function(x){ AN = x; $('anIAmsg').innerHTML = '<span class="ok">✓ Plano de ' + r.ano + ' copiado para a coluna "Previsto".</span>'; }).catch(erro('anIAmsg')); });
+      return apiAn('progAnualSalvar', {ano: r.ano, dados: {planoAnterior: ant}}); }).then(function(x){ AN = x; $('anIAmsg').innerHTML = '<span class="ok">✓ Plano de ' + r.ano + ' copiado para a coluna "Previsto".</span>'; }).catch(erro('anIAmsg')); });
   $('anIA').addEventListener('click', function(){ this.disabled = true; var t0 = Date.now(), tic = setInterval(function(){ if(!$('anIAmsg')) return clearInterval(tic); ocupado('anIAmsg', 'A IA está comparando o previsto com o realizado e escrevendo… ' + Math.round((Date.now() - t0) / 1000) + ' s'); }, 1000);
-    api('progAnualTextos', {ano: r.ano, planoAnterior: coletarTextosAnual().planoAnterior}).then(function(x){ clearInterval(tic); feito(x); $('anFolhas').open = true; }).catch(function(e){ clearInterval(tic); erro('anIAmsg')(e); }); });
-  $('anSalvarTx').addEventListener('click', function(){ this.disabled = true; api('progAnualSalvar', {ano: r.ano, dados: coletarTextosAnual()}).then(function(x){ feito(x); $('anFolhas').open = true; }).catch(erro('anIAmsg')); });
+    apiAn('progAnualTextos', {ano: r.ano, planoAnterior: coletarTextosAnual().planoAnterior}).then(function(x){ clearInterval(tic); feito(x); $('anFolhas').open = true; }).catch(function(e){ clearInterval(tic); erro('anIAmsg')(e); }); });
+  $('anSalvarTx').addEventListener('click', function(){ this.disabled = true; apiAn('progAnualSalvar', {ano: r.ano, dados: coletarTextosAnual()}).then(function(x){ feito(x); $('anFolhas').open = true; }).catch(erro('anIAmsg')); });
   // documentos
   var msg = function(t){ $('anDocMsg').innerHTML = t; };
-  document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); api('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(feito).catch(erro('anDocMsg')); }); });
+  document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); apiAn('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(feito).catch(erro('anDocMsg')); }); });
   document.querySelectorAll('[data-anfolha]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; var t = coletarTextosAnual(); msg('<span class="giro"></span>Montando a folha de rosto em Word…');
-    api('progAnualSalvar', {ano: r.ano, dados: t}).then(function(){ return gerarFolhaAnual(b.dataset.anfolha, t); }).then(feito).catch(erro('anDocMsg')); }); });
+    apiAn('progAnualSalvar', {ano: r.ano, dados: t}).then(function(){ return gerarFolhaAnual(b.dataset.anfolha, t); }).then(feito).catch(erro('anDocMsg')); }); });
   $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {
-    carregar: function(){ return api('progAnualComprovantes', {ano: r.ano}).then(function(x){ return x.comprovantes; }); },
-    salvar: function(b64){ return api('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
+    carregar: function(){ return apiAn('progAnualComprovantes', {ano: r.ano}).then(function(x){ return x.comprovantes; }); },
+    salvar: function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
   // e-mail
-  $('anSalvarEmail').addEventListener('click', function(){ this.disabled = true; api('progAnualSalvar', {ano: r.ano, dados: coletarEmailAnual()}).then(function(x){ feito(x); $('anEmailMsg').textContent = 'Salvo.'; }).catch(erro('anEmailMsg')); });
+  $('anSalvarEmail').addEventListener('click', function(){ this.disabled = true; apiAn('progAnualSalvar', {ano: r.ano, dados: coletarEmailAnual()}).then(function(x){ feito(x); $('anEmailMsg').textContent = 'Salvo.'; }).catch(erro('anEmailMsg')); });
   $('anEnviar').addEventListener('click', function(){ var d = coletarEmailAnual(), re = r.envios.length > 0;
     if(!confirm((re ? 'Já foi enviado. Enviar DE NOVO' : 'Enviar agora') + ' para ' + d.para + ' com ' + r.arquivos.length + ' anexo(s)?')) return;
-    this.disabled = true; ocupado('anEmailMsg', 'Enviando…'); api('progAnualEmail', {ano: r.ano, dados: d, reenviar: re}).then(function(x){ feito(x); $('anEmailMsg').innerHTML = '<span class="ok">✓ E-mail enviado à chefia.</span>'; }).catch(erro('anEmailMsg')); });
+    this.disabled = true; ocupado('anEmailMsg', 'Enviando…'); apiAn('progAnualEmail', {ano: r.ano, dados: d, reenviar: re}).then(function(x){ feito(x); $('anEmailMsg').innerHTML = '<span class="ok">✓ E-mail enviado à chefia.</span>'; }).catch(erro('anEmailMsg')); });
 }
 function carregarJSZip(){ return window.JSZip ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de Word.')); }; document.head.appendChild(s); }); }
 function gerarFolhaAnual(qual, t){
@@ -688,7 +688,7 @@ function gerarFolhaAnual(qual, t){
     marcar: [/20h/.test(p.regime) ? '20h' : /DE/i.test(p.regime || '40h / DE') ? '40h/de' : '40h', (p.carreira || 'EBTT').toLowerCase(), CAMPUS_NOME[p.campus] || 'valença', 'sem fg ou cd', 'li e estou de acordo com a declaração acima.']};
   return carregarJSZip().then(function(){ return fetch('modelo-folha-' + (ra ? 'relatorio' : 'ppa') + '.docx?v=1'); }).then(function(x){ if(!x.ok) throw new Error('Modelo da folha de rosto não encontrado.'); return x.arrayBuffer(); })
     .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){ return z.file('word/document.xml').async('string').then(function(x){ z.file('word/document.xml', preencherFolhaXml(x, o)); return z.generateAsync({type: 'base64'}); }); })
-    .then(function(b64){ return api('progAnualSalvarArq', {ano: r.ano, nome: ra ? 'Folha de Rosto-Relatório ' + r.ano + '.docx' : 'Folha de Rosto-PPA ' + r.anoPlano + '.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
+    .then(function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: ra ? 'Folha de Rosto-Relatório ' + r.ano + '.docx' : 'Folha de Rosto-PPA ' + r.anoPlano + '.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
 }
 
 // ===================== Drive próprio do docente (v211) =====================
@@ -718,16 +718,67 @@ function drvPasta(nome, pai){
     return drv('drive/v3/files?fields=id,webViewLink', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: nome, mimeType: 'application/vnd.google-apps.folder', parents: [pai]})}).then(function(r){ return r.json(); });
   }).then(function(p){ GDRV.pastas[k] = p; return p; }); }
 function drvListar(pai){ var q = "'" + pai + "' in parents and trashed=false";
-  return drv('drive/v3/files?pageSize=200&fields=files(id,name,webViewLink,modifiedTime,description,mimeType)&q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(j){ return j.files || []; }); }
+  return drv('drive/v3/files?pageSize=200&fields=files(id,name,webViewLink,modifiedTime,description,mimeType,size)&q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(j){ return j.files || []; }); }
 // grava (substitui o de mesmo nome, que vai para a lixeira dela)
 function drvSalvar(pai, nome, dados, mime, descricao){
-  var blob = dados instanceof Blob ? dados : new Blob([dados instanceof Uint8Array ? dados : b64ParaBytes(dados)], {type: mime});
+  var blob = dados instanceof Blob ? dados : new Blob([dados instanceof Uint8Array ? dados : b64ParaBytes(String(dados).replace(/^data:[^,]*,/, ''))], {type: mime});
   return drvListar(pai).then(function(fs){ return Promise.all(fs.filter(function(f){ return f.name === nome; }).map(function(f){ return drv('drive/v3/files/' + f.id, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({trashed: true})}); })); })
     .then(function(){ var meta = {name: nome, parents: [pai], mimeType: mime}; if(descricao) meta.description = String(descricao).slice(0, 30000);
       var fd = new FormData(); fd.append('metadata', new Blob([JSON.stringify(meta)], {type: 'application/json'})); fd.append('file', blob);
       return drv('upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,modifiedTime', {method: 'POST', body: fd}); }).then(function(r){ return r.json(); }); }
 function drvBaixar(id){ return Promise.all([drv('drive/v3/files/' + id + '?fields=mimeType,name').then(function(r){ return r.json(); }), drv('drive/v3/files/' + id + '?alt=media').then(function(r){ return r.arrayBuffer(); })])
   .then(function(x){ return {mime: x[0].mimeType, nome: x[0].name, bytes: new Uint8Array(x[1])}; }); }
+function drvLixeira(id){ return drv('drive/v3/files/' + id, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({trashed: true})}); }
+function drvLink(id){ return drv('drive/v3/files/' + id + '?fields=webViewLink').then(function(r){ return r.json(); }).then(function(j){ return j.webViewLink || ''; }).catch(function(){ return ''; }); }
+function bytesDosArquivos(lista){ return Promise.all((lista || []).map(function(a){ return drvBaixar(a.id).then(function(b){ return {nome: a.nome, dados: bytesParaB64(b.bytes), mime: b.mime}; }); })); }
+function arqsDrv(pai, gerado){ return drvListar(pai).then(function(fs){ return fs.map(function(f){ return {id: f.id, nome: f.name, url: f.webViewLink, kb: Math.round((Number(f.size) || 0) / 1024), em: new Date(f.modifiedTime).toLocaleDateString('pt-BR'), gerado: gerado ? gerado.test(f.name) : false, declaracao: /^Declaração de estágio/.test(f.name)}; }).sort(function(a, b){ return a.nome.localeCompare(b.nome); }); }); }
+// ---- estágio no Drive próprio ----
+function pastaEstagioDrv(){ return pastaCicloDrv().then(function(p){ return drvPasta('Estágio — declaração do coordenador', p.id); }); }
+function apiEst(acao, d){
+  d = d || {};
+  if(!proprio()) return api(acao, d);
+  var completar = function(r){ if(!r || !r.proprio || !r.estado) return r; return pastaEstagioDrv().then(function(p){ r.pastaUrl = p.webViewLink; return arqsDrv(p.id); }).then(function(l){ r.arquivos = l; return r; }); };
+  if(acao === 'progEstagioEnviarArq') return pastaEstagioDrv().then(function(p){ return drvSalvar(p.id, d.nome, d.dados, d.mime); }).then(function(){ return apiEst('progEstagioAbrir'); });
+  if(acao === 'progEstagioApagarArq') return drvLixeira(d.id).then(function(){ return apiEst('progEstagioAbrir'); });
+  var pre = Promise.resolve();
+  if(acao === 'progEstagioLer') pre = bytesDosArquivos((EST && EST.arquivos || []).filter(function(a){ return !a.declaracao; })).then(function(l){ d.arquivos = l; });
+  if(acao === 'progEstagioEmail') pre = bytesDosArquivos(EST && EST.arquivos).then(function(l){ d.anexos = l; });
+  return pre.then(function(){ return api(acao, d); }).then(function(r){
+    return (r && r.arquivoNovo ? pastaEstagioDrv().then(function(p){ return drvSalvar(p.id, r.arquivoNovo.nome, r.arquivoNovo.dados, r.arquivoNovo.mime); }) : Promise.resolve()).then(function(){ return completar(r); }); });
+}
+// ---- CCO (sou membro) no Drive próprio ----
+var CCOA = null;
+function apiCCO(acao, d){
+  d = d || {};
+  var pr = (CCO && CCO.proprio) || (CCOA && CCOA.proprio);
+  if(!pr) return api(acao, d);
+  var completar = function(r){ if(!r || !r.proprio || !r.pastaId || r.avaliacoes) return r; return arqsDrv(r.pastaId, /^(Relatório da CCO|ATA DA REUNIÃO)/).then(function(l){ r.arquivos = l; return drvLink(r.pastaId); }).then(function(u){ r.pastaUrl = u; CCOA = r; return r; }); };
+  if(acao === 'progCCONova'){
+    var m = String(d.data || '').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/), dt = m ? m[3] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[1]).slice(-2) : new Date().toISOString().slice(0, 10);
+    return drvPasta('CCO — avaliações', CCO.raiz).then(function(p){ return drvPasta(String(d.avaliado).replace(/[\/\\]/g, ' ').trim() + ' — ' + dt, p.id); }).then(function(p){ d.pastaId = p.id; return api(acao, d); }).then(completar);
+  }
+  if(acao === 'progCCOEnviar') return drvSalvar(CCOA.pastaId, String(d.nome).replace(/[\/\\]/g, '-'), d.dados, d.mime).then(function(){ return apiCCO('progCCOAbrir', {id: d.id}); });
+  if(acao === 'progCCOApagarArquivo') return drvLixeira(d.arquivoId).then(function(){ return apiCCO('progCCOAbrir', {id: d.id}); });
+  var pre = Promise.resolve();
+  if(acao === 'progCCOAvaliar') pre = bytesDosArquivos((CCOA && CCOA.arquivos || []).filter(function(a){ return !a.gerado; })).then(function(l){ d.arquivos = l;
+    if(Number(d.etapa) === 2) d.compartilharOficio = confirm('Se houver o ofício de formação da CCO, guardar uma cópia na pasta compartilhada da plataforma (por 3 anos) para os 3 membros usarem na progressão deles?'); });
+  return pre.then(function(){ return api(acao, d); }).then(function(r){
+    var pasta = (r && r.pastaId) || (CCOA && CCOA.pastaId);
+    return (r && r.arquivoNovo ? drvSalvar(pasta, r.arquivoNovo.nome, r.arquivoNovo.dados, r.arquivoNovo.mime) : Promise.resolve()).then(function(){ return completar(r); }); });
+}
+// ---- plano de trabalho / relatório no Drive próprio ----
+function pastaAnualDrv(r){ return drvPasta('Plano de trabalho e relatório', r.raiz).then(function(p){ return drvPasta(String(r.ano), p.id); }); }
+function apiAn(acao, d){
+  d = d || {};
+  var pr = AN && AN.proprio;
+  var completar = function(r){ if(!r || !r.proprio || !r.anoPlano) return r; return pastaAnualDrv(r).then(function(p){ r.pasta = p.webViewLink; return arqsDrv(p.id); }).then(function(l){ r.arquivos = l; return r; }); };
+  if(!pr) return api(acao, d).then(completar);
+  if(acao === 'progAnualSalvarArq') return pastaAnualDrv(AN).then(function(p){ return drvSalvar(p.id, d.nome, d.dados, d.mime); }).then(function(){ return apiAn('progAnualAbrir', {ano: AN.ano}); });
+  var pre = Promise.resolve();
+  if(acao === 'progAnualEmail') pre = bytesDosArquivos(AN.arquivos).then(function(l){ d.anexos = l; });
+  return pre.then(function(){ return api(acao, d); }).then(function(r){
+    return (r && r.arquivoNovo ? pastaAnualDrv(r).then(function(p){ return drvSalvar(p.id, r.arquivoNovo.nome, r.arquivoNovo.dados, r.arquivoNovo.mime); }) : Promise.resolve()).then(function(){ return completar(r); }); });
+}
 function pastaCicloDrv(){ var raiz = R && R.perfil && R.perfil.pastaId; if(!raiz) return Promise.reject(new Error('Conecte o seu Google Drive no perfil primeiro.')); return drvPasta((R && R.cicloNome) || (PAC && PAC.cicloNome) || 'Progressão', raiz); }
 function pastaCompDrv(){ return pastaCicloDrv().then(function(p){ return drvPasta('Comprovantes (Aula por IA)', p.id); }); }
 // arquivo de um comprovante: do Drive do docente (Drive próprio) ou do servidor (modelos, indexações e quem não conectou)
@@ -749,7 +800,7 @@ function htmlDrive(){
   if(!R || R.admin) return '';
   if(R.proprio) return '<div class="caixa" style="border-color:var(--verde)"><b class="ok">☁ Seu Google Drive está conectado.</b> <span class="aviso">Comprovantes, planilha RAD, PDF e documentos do processo ficam na pasta "Progressão (Aula por IA)" do seu Drive (pode mover ou renomear). A plataforma só vê os arquivos que ela mesma criou.</span>' +
     '<div class="botoes"><button type="button" class="sec" id="btDriveAbrir">📁 Abrir a pasta</button><button type="button" class="sec" id="btDriveSair">Desconectar</button></div><div id="msgDrive" class="aviso"></div>' +
-    '<p class="aviso" style="margin:4px 0 0">Ainda gravam pela plataforma (próxima versão): declaração de estágio, avaliações como membro de CCO e plano de trabalho/relatório.</p></div>';
+    '</div>';
   return '<div class="caixa"><b>☁ Guardar tudo no seu próprio Google Drive</b><p class="aviso" style="margin:4px 0 0">Clique, escolha a sua conta Google e autorize. A plataforma cria a pasta "Progressão (Aula por IA)" no seu Drive e grava tudo lá. Ela só enxerga os arquivos que ela mesma criou: o resto do seu Drive continua invisível.</p>' +
     '<div class="botoes"><button type="button" id="btDrive">☁ Conectar meu Google Drive</button></div><div id="msgDrive" class="aviso"></div></div>';
 }
@@ -1022,9 +1073,9 @@ function desenharCCOLista(){
   $('btCcoNova').addEventListener('click', function(){
     var b = this, nome = $('ccoNome').value.trim(); if(nome.split(/\s+/).length < 2){ $('ccoListaMsg').innerHTML = '<span class="warn">Escreva o nome completo do docente avaliado.</span>'; return; }
     b.disabled = true; $('ccoListaMsg').textContent = 'Criando a pasta…';
-    api('progCCONova', {avaliado: nome, data: $('ccoData').value.trim()}).then(desenharCCOAval).catch(function(e){ b.disabled = false; $('ccoListaMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
+    apiCCO('progCCONova', {avaliado: nome, data: $('ccoData').value.trim()}).then(desenharCCOAval).catch(function(e){ b.disabled = false; $('ccoListaMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
   });
-  document.querySelectorAll('[data-abrircco]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; api('progCCOAbrir', {id: b.dataset.abrircco}).then(desenharCCOAval).catch(function(e){ alert(e.message); b.disabled = false; }); }); });
+  document.querySelectorAll('[data-abrircco]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; apiCCO('progCCOAbrir', {id: b.dataset.abrircco}).then(desenharCCOAval).catch(function(e){ alert(e.message); b.disabled = false; }); }); });
   document.querySelectorAll('[data-apagarcco]').forEach(function(b){ b.addEventListener('click', function(){
     if(!confirm('Tirar esta avaliação da lista? A pasta e os arquivos continuam no seu Drive.')) return;
     api('progCCOApagar', {id: b.dataset.apagarcco}).then(function(r){ CCO = r; desenharCCOLista(); }).catch(function(e){ alert(e.message); }); }); });
@@ -1039,6 +1090,7 @@ function textoDaPlanilha(f){
   return new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'; s.onload = ok; s.onerror = falha; document.head.appendChild(s); }).then(go);
 }
 function desenharCCOAval(a){
+  CCOA = a;
   var rel = a.relatorio && a.relatorio.verificado ? a.relatorio : null, docs = a.arquivos.filter(function(f){ return !f.gerado; }), h = '';
   var esperados = [[/protocolo/i, 'Folha de protocolo'], [/portaria/i, 'Portaria da última progressão'], [/rad|planilha/i, 'Planilha RAD'], [/comprova|documentos/i, 'Comprovantes'], [/of[ií]cio/i, 'Ofício de formação da CCO']];
   h += '<div class="caixa"><button type="button" class="link" id="ccoVoltar">← minhas avaliações</button><h2 style="margin:6px 0 2px">Avaliação de ' + esc(a.avaliado) + '</h2><div class="aviso">' + esc(a.data) +
@@ -1060,24 +1112,24 @@ function desenharCCOAval(a){
     fs.forEach(function(f, i){ seq = seq.then(function(){
       m.textContent = 'Enviando ' + (i + 1) + ' de ' + fs.length + ': ' + f.name + '…';
       if(f.size > 25 * 1024 * 1024) throw new Error(f.name + ': grande demais (máx. 25 MB).');
-      var envio = lerArquivo(f).then(function(b64){ return api('progCCOEnviar', {id: a.id, nome: f.name, dados: b64, mime: f.type || 'application/octet-stream'}); });
+      var envio = lerArquivo(f).then(function(b64){ return apiCCO('progCCOEnviar', {id: a.id, nome: f.name, dados: b64, mime: f.type || 'application/octet-stream'}); });
       if(/\.xlsx?$/i.test(f.name)) envio = envio.then(function(){ return textoDaPlanilha(f); }).then(function(txt){
-        return api('progCCOEnviar', {id: a.id, nome: f.name.replace(/\.xlsx?$/i, '') + ' (texto da planilha).txt', dados: btoa(unescape(encodeURIComponent(txt))), mime: 'text/plain'}); });
+        return apiCCO('progCCOEnviar', {id: a.id, nome: f.name.replace(/\.xlsx?$/i, '') + ' (texto da planilha).txt', dados: btoa(unescape(encodeURIComponent(txt))), mime: 'text/plain'}); });
       return envio.then(function(x){ atual = x; }); }); });
     seq.then(function(){ desenharCCOAval(atual); }).catch(function(e){ m.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
   });
   document.querySelectorAll('[data-apagararq]').forEach(function(b){ b.addEventListener('click', function(){ if(!confirm('Apagar este arquivo da avaliação? (vai para a lixeira do Drive)')) return;
-    api('progCCOApagarArquivo', {id: a.id, arquivoId: b.dataset.apagararq}).then(desenharCCOAval).catch(function(e){ alert(e.message); }); }); });
+    apiCCO('progCCOApagarArquivo', {id: a.id, arquivoId: b.dataset.apagararq}).then(desenharCCOAval).catch(function(e){ alert(e.message); }); }); });
   $('btCcoAvaliar').addEventListener('click', function(){
     var m = $('ccoAvMsg'), bt = this; bt.disabled = true;
-    var etapa2 = function(){ m.innerHTML = '<p class="carregando">2/2 · Dupla verificação: conferindo o relatório contra os documentos… (1 a 3 min)</p>'; return api('progCCOAvaliar', {id: a.id, etapa: 2}).then(desenharCCOAval); };
+    var etapa2 = function(){ m.innerHTML = '<p class="carregando">2/2 · Dupla verificação: conferindo o relatório contra os documentos… (1 a 3 min)</p>'; return apiCCO('progCCOAvaliar', {id: a.id, etapa: 2}).then(desenharCCOAval); };
     var p = (a.estado === 'etapa1' && !rel) ? etapa2() : (function(){ m.innerHTML = '<p class="carregando">1/2 · Lendo a RAD e procurando o comprovante de cada linha… (2 a 4 min)</p>';
-      return api('progCCOAvaliar', {id: a.id, etapa: 1}).then(function(r){ m.innerHTML = '<p class="ok">Etapa 1: ' + r.linhas + ' linha(s) conferida(s), ' + r.problemas + ' com observação.</p>'; a.estado = 'etapa1'; return etapa2(); }); })();
+      return apiCCO('progCCOAvaliar', {id: a.id, etapa: 1}).then(function(r){ m.innerHTML = '<p class="ok">Etapa 1: ' + r.linhas + ' linha(s) conferida(s), ' + r.problemas + ' com observação.</p>'; a.estado = 'etapa1'; return etapa2(); }); })();
     p.catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; if(a.estado === 'etapa1') bt.textContent = '▶ Continuar (2ª verificação)'; });
   });
   if($('btCcoParecer')) $('btCcoParecer').addEventListener('click', function(){ var b = this; b.disabled = true; api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ b.disabled = false; $('ccoAtaMsg').innerHTML = '<span class="ok">Parecer salvo.</span>'; }).catch(function(e){ b.disabled = false; alert(e.message); }); });
   if($('btCcoAta')) $('btCcoAta').addEventListener('click', function(){ var b = this; b.disabled = true; $('ccoAtaMsg').textContent = 'Escrevendo a ata…';
-    api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ return api('progCCOAta', {id: a.id, data: $('ccoDataAta').value.trim()}); }).then(desenharCCOAval)
+    api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ return apiCCO('progCCOAta', {id: a.id, data: $('ccoDataAta').value.trim()}); }).then(desenharCCOAval)
       .catch(function(e){ b.disabled = false; $('ccoAtaMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
 }
 function htmlRelCCO(r){
