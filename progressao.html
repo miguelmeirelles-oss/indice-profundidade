@@ -692,7 +692,7 @@ function ligarAnual(){
   $('anSalvarTx').addEventListener('click', function(){ this.disabled = true; apiAn('progAnualSalvar', {ano: r.ano, dados: coletarTextosAnual()}).then(function(x){ feito(x); $('anFolhas').open = true; }).catch(erro('anIAmsg')); });
   // documentos
   var msg = function(t){ $('anDocMsg').innerHTML = t; };
-  document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); apiAn('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(feito).catch(erro('anDocMsg')); }); });
+  document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); apiAn('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(function(x){ if(x && x.avisoRad) alert(x.avisoRad); feito(x); }).catch(erro('anDocMsg')); }); });
   document.querySelectorAll('[data-anfolha]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; var t = coletarTextosAnual(); msg('<span class="giro"></span>Montando a folha de rosto em Word…');
     apiAn('progAnualSalvar', {ano: r.ano, dados: t}).then(function(){ return gerarFolhaAnual(b.dataset.anfolha, t); }).then(feito).catch(erro('anDocMsg')); }); });
   $('anDiscArq').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; if(!/pdf/i.test(f.type || f.name)){ $('anDiscInfo').innerHTML = '<span class="erro">Envie um PDF.</span>'; return; }
@@ -865,7 +865,7 @@ function desenharPacote(){
   if($('arqPortaria')) $('arqPortaria').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; msg('Enviando…');
     (/^image\//.test(f.type) ? imagemParaPdf(f) : lerArquivo(f)).then(function(b64){ return salvarGerado({nome: '2 - Portaria da última progressão.pdf', dados: b64, mime: 'application/pdf'}); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btProt')) $('btProt').addEventListener('click', function(){ this.disabled = true; gerarProtocolo(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
-  if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(salvarRetornado).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(function(r){ if(r && r.aviso) alert(r.aviso); return salvarRetornado(r); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btComp')) $('btComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btCco')) $('btCco').addEventListener('click', function(){ this.disabled = true; preencherCCO(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btConferir')) $('btConferir').addEventListener('click', conferir);
