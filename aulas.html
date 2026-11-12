@@ -3038,14 +3038,18 @@ function desenharLidoPF(){
     '<div><label>Grupo</label><select data-pfg><option value="novo"' + (l.grupoId ? '' : ' selected') + '>novo grupo</option>' + grupos.map(function(g){ return '<option value="' + esc(g.id) + '"' + (g.id === l.grupoId ? ' selected' : '') + '>' + esc(g.rotulo) + '</option>'; }).join('') + '</select></div></div>' +
     camposPF(l.campos, l.tipo) +
     (l.campos.parecer ? '<p class="aviso" style="margin:0 0 6px">Parecer marcado no documento: <b>' + esc(l.campos.parecer) + '</b></p>' : '') +
+    (PFV.r && PFV.r.etapa === 2 && PFV.r.podeEnviar ? '<label id="pfAvisarLbl" style="display:' + (l.tipo === 'J' ? 'flex' : 'none') + ';gap:6px;align-items:center;margin:4px 0 8px;font-weight:normal"><input type="checkbox" id="pfAvisarBanca" checked style="width:auto"> ✉ Ao salvar, enviar e-mail formal aos membros da banca (as respostas chegam no seu e-mail e aparecem como aviso aqui)</label>' : '') +
     '<div class="botoes" style="margin:0"><button type="button" class="mini" id="pfSalvar">✓ Confirmar e salvar</button><button type="button" class="mini secundario" id="pfDescartar">Descartar</button></div><div id="pfMsgLido" class="aviso"></div></div>';
   $('pfDescartar').addEventListener('click', function(){ api('pfDescartar', {disciplinaId: PFV.d.id, arquivoId: l.arquivoId}).catch(function(){}); PFV.lido = null; box.innerHTML = ''; });
+  var selT = box.querySelector('[data-pft]'); if(selT && $('pfAvisarLbl')) selT.addEventListener('change', function(){ $('pfAvisarLbl').style.display = selT.value === 'J' ? 'flex' : 'none'; });
   $('pfSalvar').addEventListener('click', function(){
     var b = this, c = lerCamposPF(box);
+    if($('pfAvisarBanca')) c.avisarBanca = box.querySelector('[data-pft]').value === 'J' && $('pfAvisarBanca').checked;
     if(!c.alunos.length){ $('pfMsgLido').innerHTML = '<span class="t-err">Informe pelo menos um aluno.</span>'; return; }
     b.disabled = true; $('pfMsgLido').textContent = 'Salvando e arquivando no Drive…';
     api('pfSalvar', {disciplinaId: PFV.d.id, arquivoId: l.arquivoId, tipo: box.querySelector('[data-pft]').value, campos: c, grupoId: box.querySelector('[data-pfg]').value})
-      .then(function(x){ PFV.lido = null; PFV.r = x; desenharPF(); $('pfMsg').textContent = 'Documento salvo na pasta do grupo e planilhas atualizadas.'; })
+      .then(function(x){ PFV.lido = null; PFV.r = x; desenharPF(); var a = x.avisoBanca;
+        $('pfMsg').innerHTML = 'Documento salvo na pasta do grupo e planilhas atualizadas.' + (a ? (a.erro ? '<br><span class="t-err">E-mail à banca não enviado: ' + esc(a.erro) + '</span>' : (a.enviado.length ? '<br>✉ E-mail formal enviado a: <b>' + a.enviado.map(esc).join(', ') + '</b>.' : '') + (a.ja ? '<br>✉ Esta banca já tinha recebido o e-mail em ' + esc(a.ja) + ' (não enviei de novo).' : '') + (a.semEmail.length ? '<br><span class="t-err">Sem e-mail cadastrado (não recebeu): ' + a.semEmail.map(esc).join(', ') + '. Cadastre na lista de docentes da Progressão ou na aba "Dados da banca".</span>' : '')) : ''); })
       .catch(function(e){ b.disabled = false; $('pfMsgLido').innerHTML = '<span class="t-err">' + esc(e.message) + '</span>'; });
   });
 }
