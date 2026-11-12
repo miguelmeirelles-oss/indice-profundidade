@@ -576,6 +576,7 @@ function desenharAnual(){
     (r.ra.itens.length ? Object.keys(porLinha).sort(function(a, b){ return a - b; }).map(function(l){ return '<div style="margin-top:6px"><b>' + esc(r.linhasFolha[l][1]) + '</b>' + porLinha[l].map(function(it){
       return '<label style="display:flex;gap:8px;align-items:flex-start;padding:3px 0;font-weight:normal"><input type="checkbox" data-aninc="' + esc(it.id) + '"' + (it.incluido ? ' checked' : '') + ' style="width:auto;margin-top:3px"><span>' + descItem(it) + ' <span class="aviso">· ' + num(it.pts) + ' pts' + (it.noAno === 'sem' ? ' · <span class="warn">sem data</span>' + (it.arquivoId ? ' <input data-anano="' + esc(it.id) + '" placeholder="ano" style="width:62px;padding:2px 4px;font-size:12px" inputmode="numeric">' : '') : '') + (it.origem === 'plataforma' ? ' · Projeto Final da plataforma' : it.arquivoNome ? ' · ' + esc(it.arquivoNome) : '') + '</span></span></label>'; }).join('') + '</div>'; }).join('')
       : '<p class="warn">Nada deste ano letivo ainda.</p>') +
+    (r.ra.itens.some(function(it){ return it.noAno === 'sem' && it.arquivoId; }) ? '<div class="botoes"><button type="button" id="anAnoIA">🔎 Descobrir com a IA o ano dos itens sem data (' + r.ra.itens.filter(function(it){ return it.noAno === 'sem' && it.arquivoId; }).length + ')</button></div><div id="anAnoMsg" class="aviso"></div>' : '') +
     '<div class="botoes"><button type="button" class="sec" id="anIrEnviar">📎 Enviar comprovante (vale para a progressão também)</button></div></div>';
   // ---- 2 · plano ----
   var pi = r.ppa.itens, cat = r.catalogo;
@@ -629,6 +630,12 @@ function ligarAnual(){
   if($('anPastaOk')) $('anPastaOk').addEventListener('click', function(){ var v = $('anPasta').value.trim(); if(!v) return; this.disabled = true; apiAn('progAnualSalvar', {ano: r.ano, dados: {ptPasta: v}}).then(feito).catch(function(e){ alert(e.message); }); });
   document.querySelectorAll('[data-aninc]').forEach(function(c){ c.addEventListener('change', function(){ apiAn('progAnualIncluir', {ano: r.ano, id: c.dataset.aninc, incluir: c.checked}).then(feito).catch(function(e){ alert(e.message); c.checked = !c.checked; }); }); });
   document.querySelectorAll('[data-anano]').forEach(function(x){ x.addEventListener('click', function(e){ e.preventDefault(); e.stopPropagation(); }); x.addEventListener('change', function(){ var v = x.value.trim(); if(!/^\d{4}$/.test(v)) return; x.disabled = true; apiAn('progAnualDataItem', {ano: r.ano, id: x.dataset.anano, anoItem: v}).then(feito).catch(function(e){ alert(e.message); x.disabled = false; }); }); });
+  if($('anAnoIA')) $('anAnoIA').addEventListener('click', function(){ var b = this; b.disabled = true; var sem = r.ra.itens.filter(function(it){ return it.noAno === 'sem' && it.arquivoId; }).slice(0, 12);
+    $('anAnoMsg').innerHTML = '<span class="giro"></span>A IA está lendo ' + sem.length + ' documento(s) para achar o ano de publicação… (uns 10 s cada)';
+    var arqs = {}; sem.forEach(function(it){ arqs[it.arquivoId] = it.arquivoNome || it.documento || 'documento'; });
+    (r.proprio ? Promise.all(Object.keys(arqs).map(function(id){ return drvBaixar(id).then(function(a){ return {id: id, nome: arqs[id], dados: bytesParaB64(a.bytes), mime: a.mime}; }).catch(function(){ return null; }); })).then(function(l){ return l.filter(Boolean); }) : Promise.resolve([]))
+      .then(function(lista){ return apiAn('progAnualAnoIA', {ano: r.ano, ids: sem.map(function(it){ return it.id; }), arquivos: lista}); })
+      .then(function(x){ feito(x); $('anAnoMsg').innerHTML = '<span class="ok">✓ Ano encontrado em ' + x.anosLidos + ' de ' + x.anosPedidos + ' item(ns).</span> Os que não são de ' + x.ano + ' saíram da lista.'; }).catch(function(e){ b.disabled = false; $('anAnoMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   $('anIrEnviar').addEventListener('click', function(){ trocarAba('prog'); setTimeout(function(){ var h2 = Array.prototype.slice.call(document.querySelectorAll('#corpo h2')).filter(function(x){ return /Enviar comprovante/.test(x.textContent); })[0]; if(h2) h2.scrollIntoView({behavior: 'smooth'}); }, 1200); });
   // plano
   $('anSugerir').addEventListener('click', function(){ if(r.ppa.itens.length && !confirm('Refazer a sugestão? O que veio da sugestão anterior é trocado; o que você acrescentou à mão fica.')) return; this.disabled = true; this.innerHTML = '<span class="giro"></span>Montando…'; apiAn('progAnualSugerirPlano', {ano: r.ano}).then(feito).catch(function(e){ alert(e.message); abrirAnual(); }); });
@@ -671,7 +678,7 @@ function ligarAnual(){
   document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); apiAn('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(feito).catch(erro('anDocMsg')); }); });
   document.querySelectorAll('[data-anfolha]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; var t = coletarTextosAnual(); msg('<span class="giro"></span>Montando a folha de rosto em Word…');
     apiAn('progAnualSalvar', {ano: r.ano, dados: t}).then(function(){ return gerarFolhaAnual(b.dataset.anfolha, t); }).then(feito).catch(erro('anDocMsg')); }); });
-  $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {
+  $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {ano: r.ano,
     carregar: function(){ return apiAn('progAnualComprovantes', {ano: r.ano}).then(function(x){ return x.comprovantes; }); },
     salvar: function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
   // e-mail
@@ -898,6 +905,45 @@ function carregarPdfLib(){
 }
 // artigos: o comprovante vai da página 1 até a página das palavras-chave do resumo (autores + resumo inteiros).
 // Lê o texto do PDF no navegador (pdf.js); se não der, fica o número que a IA deu.
+// relatório de turmas do portal (blocos "Ano: 2025 - 1º Semestre"): no relatório anual só pode aparecer o ano do relatório.
+// Cobre de branco os blocos dos outros anos e o total geral (que soma todos os anos), tira as páginas que ficam vazias
+// e mantém cabeçalho, legendas, data e assinatura. Se o PDF não tiver esses blocos (ou for imagem), volta como veio.
+function recortarAno(bytes, ano){
+  ano = Number(ano);
+  return carregarPdfJs().then(function(){ return pdfjsLib.getDocument({data: bytes.slice(0)}).promise; }).then(function(doc){
+    var paginas = [], anoAtual = null, modo = 'normal', achouAno = false, algumOutro = false, p = 0;
+    var ler = function(){ p++; if(p > doc.numPages) return Promise.resolve();
+      return doc.getPage(p).then(function(pg){ return pg.getTextContent(); }).then(function(tc){
+        var ls = [];
+        tc.items.forEach(function(it){ if(!it.str || !it.str.trim()) return; var y = it.transform[5], h = Math.abs(it.transform[3]) || it.height || 10;
+          var l = ls.filter(function(q){ return Math.abs(q.y - y) <= 2.5; })[0]; if(!l){ l = {y: y, h: 0, t: []}; ls.push(l); } l.t.push({x: it.transform[4], s: it.str}); l.h = Math.max(l.h, h); });
+        ls.forEach(function(l){ l.txt = l.t.sort(function(a, b){ return a.x - b.x; }).map(function(t){ return t.s; }).join(' '); });
+        ls.sort(function(a, b){ return b.y - a.y; });
+        ls.forEach(function(l){
+          var m = l.txt.match(/Ano:\s*(\d{4})/);
+          if(m){ anoAtual = Number(m[1]); modo = 'normal'; if(anoAtual === ano) achouAno = true; else algumOutro = true; }
+          if(/^\s*TOTAIS\b/.test(l.txt)) modo = 'totais';
+          if(/LEGENDAS/.test(l.txt)) modo = 'fim';
+          l.cobrir = modo === 'totais' || (modo === 'normal' && anoAtual !== null && anoAtual !== ano);
+        });
+        var masks = [], i = 0;
+        while(i < ls.length){ if(!ls[i].cobrir){ i++; continue; } var j = i; while(j + 1 < ls.length && ls[j + 1].cobrir) j++;
+          var topo = i > 0 ? ls[i - 1].y - 3 : ls[i].y + ls[i].h + 4, base = j + 1 < ls.length ? ls[j + 1].y + ls[j + 1].h + 1 : ls[j].y - 6;
+          masks.push({topo: topo, base: base}); i = j + 1; }
+        paginas.push({masks: masks, tudoCoberto: ls.length > 0 && !ls.some(function(l){ return !l.cobrir; })});
+        return ler(); }); };
+    return ler().then(function(){ return {paginas: paginas, achouAno: achouAno, algumOutro: algumOutro}; });
+  }).then(function(r){
+    if(!r.algumOutro || !r.achouAno) return bytes;
+    return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){
+      var tirar = [];
+      r.paginas.forEach(function(pg, k){ var page = d.getPage(k); if(pg.tudoCoberto && k > 0){ tirar.push(k); return; }
+        pg.masks.forEach(function(m){ if(m.topo > m.base) page.drawRectangle({x: 0, y: m.base, width: page.getWidth(), height: m.topo - m.base, color: PDFLib.rgb(1, 1, 1)}); }); });
+      tirar.reverse().forEach(function(k){ d.removePage(k); });
+      return d.save(); });
+  }).catch(function(){ return bytes; });
+}
+
 function carregarPdfJs(){
   if(window.pdfjsLib) return Promise.resolve();
   return new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'; s.onload = function(){ pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; ok(); }; s.onerror = falha; document.head.appendChild(s); });
@@ -949,8 +995,8 @@ function montarComprovantes(msg, opts){
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
       return baixarArquivo(c.id).then(function(a){
         var bytes = b64ParaBytes(a.dados);
-        if(/pdf/.test(a.mime)) return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) return ix.slice(0, np);
-          return c.area === 'comp' && ix.length > 4 ? paginasDoDocente(bytes, ix.length).then(function(sel){ return sel || ix; }) : ix; }).then(function(ix){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ return saida.copyPages(d, ix); }); }); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); incluidos.push(c.id); });
+        if(/pdf/.test(a.mime)) return (opts && opts.ano && c.area === 'doc' ? recortarAno(bytes, opts.ano) : Promise.resolve(bytes)).then(function(b2){ bytes = b2; return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) return ix.slice(0, np);
+          return c.area === 'comp' && ix.length > 4 ? paginasDoDocente(bytes, ix.length).then(function(sel){ return sel || ix; }) : ix; }).then(function(ix){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ return saida.copyPages(d, ix); }); }); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); incluidos.push(c.id); }); });
         if(/image\/(png|jpe?g)/.test(a.mime)) return (/png/.test(a.mime) ? saida.embedPng(bytes) : saida.embedJpg(bytes)).then(function(img){ var pg = saida.addPage([595, 842]), e = Math.min(555 / img.width, 802 / img.height); pg.drawImage(img, {x: (595 - img.width * e) / 2, y: (842 - img.height * e) / 2, width: img.width * e, height: img.height * e}); incluidos.push(c.id); });
         falhas.push(c.nome);
       }).catch(function(){ falhas.push(c.nome); }).then(proximo);
