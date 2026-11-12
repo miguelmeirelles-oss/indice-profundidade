@@ -1106,7 +1106,7 @@ function arquivosConferencia(){
   if(!proprio()) return Promise.resolve(null);
   return pastaCicloDrv().then(function(c){ return drvListar(c.id).then(function(fs){ var l = fs.filter(function(f){ return /^[1-6] - /.test(f.name); });
     return Promise.all(l.map(function(f){ var o = {id: f.id, nome: f.name, em: new Date(f.modifiedTime).getTime(), desc: f.description || '', mime: f.mimeType, url: f.webViewLink};
-      return /^[24] - /.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }); }); }
+      return /^[234] - /.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }); }); }
 function conferir(){
   var box = $('confBox'), bt = $('btConferir'); bt.disabled = true, ARQC = null;
   box.innerHTML = '<p class="carregando">1/2 · A IA está conferindo cada linha da RAD com o PDF dos comprovantes… (1 a 3 min)</p>';
@@ -1121,8 +1121,11 @@ function conferir(){
 function htmlConferencia(r){
   var graves = r.checagens.filter(function(c){ return !c.ok && c.grave; }).length, h = '<div style="margin-top:8px;background:var(--bloco);border-radius:10px;padding:10px 12px">';
   if(r.conclusao) h += '<p style="margin:0 0 6px"><b>Conclusão:</b> ' + esc(r.conclusao) + '</p>';
-  h += '<p style="margin:0"><b>Checagens do processo</b>' + (graves ? ' <span class="warn">(' + graves + ' a resolver)</span>' : ' <span class="ok">(tudo certo)</span>') + '</p><ul style="margin:4px 0 8px;padding-left:20px">' +
-    r.checagens.map(function(c){ return '<li class="' + (c.ok ? 'ok' : c.grave ? 'warn' : 'aviso') + '">' + (c.ok ? '✓ ' : '✗ ') + esc(c.txt) + '</li>'; }).join('') + '</ul>';
+  var grupos = []; r.checagens.forEach(function(c){ var g = c.g || '1 · Peças do processo'; if(grupos.indexOf(g) === -1) grupos.push(g); }); grupos.sort();
+  h += '<p style="margin:0"><b>Checklist</b>' + (graves ? ' <span class="warn">(' + graves + ' a resolver)</span>' : ' <span class="ok">(nada grave)</span>') + (r.inventario ? ' <span class="aviso">· a IA inventariou ' + r.inventario + ' documento(s) no PDF</span>' : '') + '</p>' +
+    grupos.map(function(g){ var l = r.checagens.filter(function(c){ return (c.g || '1 · Peças do processo') === g; }), ruins = l.filter(function(c){ return !c.ok; }).length;
+      return '<details' + (ruins ? ' open' : '') + ' style="margin:4px 0"><summary style="cursor:pointer"><b>' + esc(g) + '</b> ' + (ruins ? '<span class="warn">' + ruins + ' ponto(s)</span>' : '<span class="ok">✓</span>') + '</summary><ul style="margin:2px 0 6px;padding-left:20px">' +
+        l.map(function(c){ return '<li class="' + (c.ok ? 'ok' : c.grave ? 'warn' : 'aviso') + '">' + (c.ok ? '✓ ' : c.grave ? '✗ ' : '⚠ ') + esc(c.txt) + '</li>'; }).join('') + '</ul></details>'; }).join('');
   if(r.semIA) h += '<p class="warn">' + esc(r.semIA) + '</p>';
   if(r.linhas && r.linhas.length && r.linhas[0].situacao){
     var prob = r.linhas.filter(function(l){ return l.situacao !== 'ok'; }), desc = r.linhas.filter(function(l){ return l.situacao === 'ok' && l.revisao; });
@@ -1230,7 +1233,8 @@ function desenharCCOAval(a){
     api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ return apiCCO('progCCOAta', {id: a.id, data: $('ccoDataAta').value.trim()}); }).then(desenharCCOAval)
       .catch(function(e){ b.disabled = false; $('ccoAtaMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
 }
-function htmlRelCCO(r){
+function htmlRelCCO(r){ return ((r.checagensFixas || []).length ? '<div style="background:var(--bloco);border-radius:10px;padding:8px 10px;margin:6px 0"><b>Conferência fixa da planilha</b> <span class="aviso">(fórmulas oficiais, feita pelo sistema)</span><ul style="margin:4px 0;padding-left:20px">' + r.checagensFixas.map(function(q){ return '<li class="' + (q.ok ? 'ok' : 'warn') + '">' + (q.ok ? '✓ ' : '✗ ') + esc(q.txt) + '</li>'; }).join('') + '</ul>' + ((r.inventario || []).length ? '<div class="aviso">A IA inventariou ' + r.inventario.length + ' documento(s) nos arquivos.</div>' : '') + '</div>' : '') + htmlRelCCO0(r); }
+function htmlRelCCO0(r){
   var h = '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bloco)"><div style="font-size:18px;font-weight:bold">' + esc(ROT_CONC[r.conclusao] || '') + '</div><div>' + esc(r.resumo || '') + '</div>' +
     '<div class="aviso" style="margin-top:4px">' + esc([r.docente, r.siape && 'SIAPE ' + r.siape, r.periodo, r.nivelAtual && (r.nivelAtual + ' → ' + (r.nivelPretendido || '?')), r.em && 'avaliado em ' + r.em].filter(Boolean).join(' · ')) + '</div></div>';
   h += '<div class="tbox" style="margin-top:8px"><table><tr><th>Área</th><th>Declarado</th><th>Conferido</th></tr>' + (r.areas || []).map(function(x){ var dif = Math.abs((x.declarado || 0) - (x.conferido || 0)) > 0.05;
