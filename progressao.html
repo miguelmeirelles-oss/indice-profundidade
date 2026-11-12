@@ -117,6 +117,8 @@ function desenhar(){
   if(R.admin && R.adminDados) h += desenharAdmin();
   $('corpo').innerHTML = h;
   ligar(); ligarV197(); ligarDrive();
+  if($('btRadDiren')) $('btRadDiren').addEventListener('click', function(){ var b = this; b.disabled = true; $('msgRadModelo').innerHTML = '<span class="giro"></span>Baixando da página da DIREN…'; api('progModeloRad', {conferir: true}).then(function(x){ b.disabled = false; $('msgRadModelo').innerHTML = '<span class="ok">✓ ' + esc(x.msg) + '</span>'; }).catch(function(e){ b.disabled = false; $('msgRadModelo').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+  if($('arqRadModelo')) $('arqRadModelo').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; $('msgRadModelo').innerHTML = '<span class="giro"></span>Enviando…'; lerArquivo(f).then(function(b64){ return api('progModeloRad', {nome: f.name, dados: b64}); }).then(function(x){ $('msgRadModelo').innerHTML = '<span class="ok">✓ ' + esc(x.msg) + '</span>'; }).catch(function(e){ $('msgRadModelo').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   document.querySelectorAll('[data-calcorr]').forEach(function(b){ b.addEventListener('click', function(e){ e.preventDefault(); var p = b.dataset.calcorr.split('|'); corrigirCal(p[0], p[1]); }); });
   if($('estagioBox')) $('estagioBox').addEventListener('toggle', function(){ if(this.open){ if(EST) desenharEstagio(); else abrirEstagio(); } });
   if(per) carregarPacote();
@@ -325,7 +327,9 @@ function desenharAdmin(){
     '<div class="grade" style="margin-top:10px"><div><label>Chave da API do Portal da Transparência ' + (a.temChavePortal ? '(cadastrada)' : '(não cadastrada)') + '</label><input type="password" id="chavePT" placeholder="' + (a.temChavePortal ? 'deixe vazio para manter' : 'cole a chave recebida por e-mail') + '" autocomplete="off"></div>' +
     '<div><label>Nome da instituição nos documentos</label><input id="nomeInst" value="' + esc(a.instituicao) + '"></div></div>' +
     '<p class="aviso" style="margin:6px 0 0">A chave é gratuita: portaldatransparencia.gov.br/api-de-dados/cadastrar-email (com o seu gov.br). Fica guardada só no servidor. Quando o CEFET/RJ virar UFCI/RJ, troque o nome aqui.</p>' +
-    '<div class="botoes"><button type="button" id="btAdmin">Salvar</button></div><div id="msgAdmin" class="aviso"></div></details>';
+    '<div class="botoes"><button type="button" id="btAdmin">Salvar</button></div><div id="msgAdmin" class="aviso"></div>' +
+    '<p style="margin:14px 0 4px"><b>Planilha RAD oficial</b></p><p class="aviso" style="margin:0">A plataforma usa a planilha da página da DIREN e confere uma vez por semana se ela mudou (avisa você quando muda). Se precisar, confira agora ou envie a planilha à mão.</p>' +
+    '<div class="botoes"><button type="button" class="sec" id="btRadDiren">🔄 Conferir agora na DIREN</button><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar planilha RAD nova (.xlsx)<input type="file" id="arqRadModelo" accept=".xlsx" class="oculto"></label></div><div id="msgRadModelo" class="aviso"></div></details>';
 }
 // ---------- importar a RAD anterior (para as estrelas) ----------
 var LINHAS_RAD = {
@@ -547,7 +551,7 @@ function preencherFolhaXml(xml, o){
 }
 
 // ===================== PLANO DE TRABALHO e RELATÓRIO DE ATIVIDADES (anuais, DIREN) =====================
-var AN = null, ANO_SEL = null;
+var AN = null, ANO_SEL = null, DISC_ARQ = null;
 var CAMPUS_NOME = {VA: 'valença', MA: 'maracanã', MG: 'maria da graça', NI: 'nova iguaçu', NF: 'nova friburgo', PE: 'petrópolis', IT: 'itaguaí', AR: 'angra dos reis'};
 function abrirAnual(ano){
   if(ano) ANO_SEL = ano;
@@ -608,7 +612,8 @@ function desenharAnual(){
   h += '<div class="caixa"><h2>4 · Documentos</h2><p class="aviso" style="margin-top:0">Tudo vai para a <a href="' + esc(r.pasta) + '" target="_blank" rel="noopener">pasta ' + r.ano + '</a>. Depois: assinar pelo gov.br (você e a chefia) e enviar no formulário da DIREN.</p>' +
     passo('Folha de rosto do relatório ' + r.ano, arq(/^Folha de Rosto-Relat/), '<button type="button" data-anfolha="ra">Gerar (Word)</button>') +
     passo('RAD do relatório ' + r.ano, arq(/^RAD relat/), '<button type="button" data-anrad="ra">Gerar</button>') +
-    passo('Comprovantes do relatório (um PDF, na ordem da tabela)', arq(/^Comprovantes relat/), '<button type="button" id="anComp">Montar PDF</button>') +
+    passo('Comprovantes do relatório (um PDF, na ordem da tabela)', arq(/^Comprovantes relat/) + '<div class="aviso" id="anDiscInfo">Disciplinas: ' + (DISC_ARQ ? '✓ vai entrar o seu arquivo "' + esc(DISC_ARQ.name) + '"' : 'o relatório de turmas do portal entra cortado (só ' + r.ano + '). Se preferir, gere no portal um relatório só de ' + r.ano + ' e anexe aqui.') + '</div>',
+      '<label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📎 Disciplinas só de ' + r.ano + ' (PDF)<input type="file" id="anDiscArq" accept="application/pdf" class="oculto"></label><button type="button" id="anComp">Montar PDF</button>') +
     passo('Folha de rosto do plano ' + r.anoPlano, arq(/^Folha de Rosto-PPA/), '<button type="button" data-anfolha="ppa">Gerar (Word)</button>') +
     passo('RAD do plano ' + r.anoPlano, arq(/^RAD Plano/), '<button type="button" data-anrad="ppa">Gerar</button>') +
     '<div id="anDocMsg" class="aviso" style="margin-top:6px"></div></div>';
@@ -678,7 +683,8 @@ function ligarAnual(){
   document.querySelectorAll('[data-anrad]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; msg('<span class="giro"></span>Preenchendo a planilha RAD (modo plano de trabalho)…'); apiAn('progAnualRad', {ano: r.ano, qual: b.dataset.anrad}).then(feito).catch(erro('anDocMsg')); }); });
   document.querySelectorAll('[data-anfolha]').forEach(function(b){ b.addEventListener('click', function(){ b.disabled = true; var t = coletarTextosAnual(); msg('<span class="giro"></span>Montando a folha de rosto em Word…');
     apiAn('progAnualSalvar', {ano: r.ano, dados: t}).then(function(){ return gerarFolhaAnual(b.dataset.anfolha, t); }).then(feito).catch(erro('anDocMsg')); }); });
-  $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {ano: r.ano,
+  $('anDiscArq').addEventListener('change', function(){ DISC_ARQ = this.files[0] || null; $('anDiscInfo').innerHTML = DISC_ARQ ? '✓ Disciplinas: vai entrar o seu arquivo "' + esc(DISC_ARQ.name) + '" no lugar do relatório do portal.' : ''; });
+  $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {ano: r.ano, discArq: DISC_ARQ,
     carregar: function(){ return apiAn('progAnualComprovantes', {ano: r.ano}).then(function(x){ return x.comprovantes; }); },
     salvar: function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
   // e-mail
@@ -993,6 +999,9 @@ function montarComprovantes(msg, opts){
     var proximo = function(){
       var c = lista[i++]; if(!c) return Promise.resolve();
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
+      if(opts && opts.discArq && c.area === 'doc'){ if(opts._discUsado){ incluidos.push(c.id); return proximo(); } opts._discUsado = true;
+        return opts.discArq.arrayBuffer().then(function(buf){ return PDFLib.PDFDocument.load(new Uint8Array(buf), {ignoreEncryption: true}); }).then(function(d){ return saida.copyPages(d, d.getPageIndices()); })
+          .then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); incluidos.push(c.id); }).catch(function(){ falhas.push(opts.discArq.name); }).then(proximo); }
       return baixarArquivo(c.id).then(function(a){
         var bytes = b64ParaBytes(a.dados);
         if(/pdf/.test(a.mime)) return (opts && opts.ano && c.area === 'doc' ? recortarAno(bytes, opts.ano) : Promise.resolve(bytes)).then(function(b2){ bytes = b2; return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) return ix.slice(0, np);
