@@ -84,14 +84,14 @@ function desenhar(){
     h += htmlPlacar();
   }
   // ---------- perfil ----------
-  var incompleto = !per || !p.siape || (!p.pastaId && !R.admin);
+  var incompleto = !per || !p.siape || (!p.pastaId && !R.admin && !R.proprio);
   h += htmlDrive();
   h += '<details class="caixa"' + (incompleto ? ' open' : '') + '><summary style="cursor:pointer"><b>👤 Seu perfil</b> <span class="aviso">' + (incompleto ? '— complete para começar' : '— dados que mudam pouco') + '</span></summary>' +
     '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('email', 'E-mail institucional', p.email) + campo('celular', 'Celular, ex.: (24) 98183-9748', p.celular) + campo('telefone', 'Telefone (opcional)', p.telefone) + campo('admissao', 'Data de admissão (dd/mm/aaaa)' + (p.admissao && !/\d{4}/.test(p.admissao) ? ' — falta o ano' : ''), p.admissao) +
     sel('regime', 'Regime', p.regime || '40h / DE', ['40h / DE', '40h', '20h']) + sel('carreira', 'Carreira', p.carreira || 'EBTT', ['EBTT', 'MS']) + sel('campus', 'Unidade', p.campus || 'VA', ['MA', 'MG', 'NI', 'NF', 'PE', 'IT', 'AR', 'VA']) +
     campo('colegiado', 'Colegiado / lotação (ex.: CCEAL-VA)', p.colegiado) + campo('titulacao', 'Titulação', p.titulacao) + campoNivel('nivelAtual', 'Nível atual (antigo D 401 / D4.1 ou novo C1)', p.nivelAtual) +
     campoNivel('nivelPretendido', 'Nível pretendido (vazio = o próximo)', p.nivelPretendido || proximoNivel(p.nivelAtual)) + campo('anoProgressao', 'Ano da progressão (vazio = o próximo)', p.anoProgressao) + '</div>' +
-    '<div style="margin-top:8px">' + campo('pastaLink', 'Link da sua pasta de progressão no Google Drive' + (R.admin ? ' (opcional)' : ''), p.pastaLink) + '<p class="aviso" style="margin:4px 0 0">' + (R.admin ? 'Opcional: se ficar em branco, a plataforma cria a pasta "Progressão docente (Aula por IA)" no seu Drive. Se colar a sua pasta de progressões, ela usa a do ciclo que já existe lá (ex.: "D4.1 para D4.2") — escreva os níveis do mesmo jeito do nome da pasta.' : 'A pasta é sua, no seu Drive: compartilhe-a com <b>miguelmeirelles@gmail.com</b> como <b>editor</b> antes de colar o link. A plataforma cria dentro dela a pasta do ciclo (ex.: "D4.1 para D4.2") e guarda os comprovantes.') + '</p></div>' +
+    (R.proprio ? '' : '<div style="margin-top:8px">' + campo('pastaLink', 'Link da sua pasta de progressão no Google Drive' + (R.admin ? ' (opcional)' : ''), p.pastaLink) + '<p class="aviso" style="margin:4px 0 0">' + (R.admin ? 'Opcional: se ficar em branco, a plataforma cria a pasta "Progressão docente (Aula por IA)" no seu Drive. Se colar a sua pasta de progressões, ela usa a do ciclo que já existe lá (ex.: "D4.1 para D4.2") — escreva os níveis do mesmo jeito do nome da pasta.' : 'A pasta é sua, no seu Drive: compartilhe-a com <b>miguelmeirelles@gmail.com</b> como <b>editor</b> antes de colar o link. A plataforma cria dentro dela a pasta do ciclo (ex.: "D4.1 para D4.2") e guarda os comprovantes. Ou, sem compartilhar nada, use ☁ Conectar meu Google Drive (acima).') + '</p></div>') +
     '<div class="botoes"><button type="button" id="btPerfil">Salvar perfil</button><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📥 Importar minha RAD anterior (.xlsx)<input type="file" id="impRad" accept=".xlsx" class="oculto"></label></div><div id="msgPerfil" class="aviso"></div></details>';
   if(per){
     // ---------- calendário ----------
@@ -191,7 +191,7 @@ function enviarComprovantes(files){
           box.innerHTML = '<div class="erro" style="background:#fff7d6;color:var(--navy)"><b>⚠ Este documento já foi enviado</b> em ' + esc(d.em) + ' (<a href="' + esc(d.url) + '" target="_blank" rel="noopener">' + esc(d.nome) + '</a>) e gerou ' + d.itens + ' item(ns) na sua RAD. Se continuar, a leitura nova <b>substitui</b> a anterior: os itens antigos dele saem e o arquivo antigo vai para a lixeira do Drive.' +
             '<div class="botoes"><button type="button" id="btSubst">Substituir</button><button type="button" class="sec" id="btManter">Cancelar (manter o que já está)</button></div></div>';
           $('btManter').addEventListener('click', function(){ box.innerHTML = ''; proximo(); });
-          $('btSubst').addEventListener('click', function(){ box.innerHTML = '<p class="carregando">Lendo de novo "' + esc(f.name) + '"…</p>';
+          $('btSubst').addEventListener('click', function(){ if(proprio() && d.arquivoId) drvLixeira(d.arquivoId).catch(function(){}); box.innerHTML = '<p class="carregando">Lendo de novo "' + esc(f.name) + '"…</p>';
             api('progAnalisar', {nome: f.name, dados: b64guardado, mime: f.type || 'application/pdf', substituir: true}).then(function(l2){ LIDO = l2; LIDO.fila = fila; LIDO.arq = f; if(proprio()) LIDO.arquivoUrl = URL.createObjectURL(f); desenharLido(proximo); }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; proximo(); }); });
           return;
         }
@@ -292,7 +292,7 @@ function desenharLido(proximo){
   $('btSalvarLido').addEventListener('click', function(){
     var b = this, itens = coletar(); if(!itens.length){ $('msgLido').innerHTML = '<span class="warn">Marque pelo menos um item.</span>'; return; }
     b.disabled = true; $('msgLido').textContent = 'Salvando…';
-    (proprio() && l.arq ? pastaCompDrv().then(function(p){ $('msgLido').innerHTML = '<span class="giro"></span>Gravando no seu Google Drive…'; return drvSalvar(p.id, l.arq.name, l.arq, l.arq.type || 'application/pdf'); })
+    (proprio() && l.arq ? pastaCompDrv().then(function(p){ $('msgLido').innerHTML = '<span class="giro"></span>Gravando no seu Google Drive…'; return drvSalvar(p.id, l.arq.name, l.arq, l.arq.type || 'application/pdf', '', true); })
       .then(function(g){ var tmp = l.arquivoId; return api('progSalvarItens', {arquivoId: g.id, documento: l.documento, itens: itens, nomeArquivo: g.name}).then(function(r){
         if((l.outrosDocentes || []).length && confirm('Este documento cita também: ' + l.outrosDocentes.join(', ') + '.\n\nGuardar uma cópia na pasta compartilhada da plataforma (por 3 anos) para eles usarem na progressão deles?'))
           lerArquivo(l.arq).then(function(b64){ return api('progCompartilharBytes', {tmpId: tmp, nome: l.arq.name, dados: b64, mime: l.arq.type || 'application/pdf', documento: l.documento, itens: itens}); }).catch(function(){});
@@ -695,6 +695,7 @@ function gerarFolhaAnual(qual, t){
 // O navegador pede ao Google um token só para os arquivos criados por esta página (drive.file) e grava/lê direto no Drive
 // do docente. A plataforma (servidor) nunca abre esses arquivos: só processa os bytes que o navegador manda.
 var GDRV = {cliente: '1032500948433-kavbmg0kj85ht9d911nr0iloliru3qk6.apps.googleusercontent.com', token: null, expira: 0, tc: null, pastas: {}};
+document.addEventListener('click', function(e){ var t = e.target && e.target.closest ? e.target.closest('#corpo button, #corpo label') : null; if(t && proprio() && (!GDRV.token || Date.now() > GDRV.expira - 5 * 60000)) tokenDrive().catch(function(){}); }, true);
 function proprio(){ return !!(R && R.proprio) || !!(PAC && PAC.proprio); }
 function carregarGis(){ return window.google && google.accounts && google.accounts.oauth2 ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o login do Google.')); }; document.head.appendChild(s); }); }
 function tokenDrive(){
@@ -720,9 +721,9 @@ function drvPasta(nome, pai){
 function drvListar(pai){ var q = "'" + pai + "' in parents and trashed=false";
   return drv('drive/v3/files?pageSize=200&fields=files(id,name,webViewLink,modifiedTime,description,mimeType,size)&q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(j){ return j.files || []; }); }
 // grava (substitui o de mesmo nome, que vai para a lixeira dela)
-function drvSalvar(pai, nome, dados, mime, descricao){
+function drvSalvar(pai, nome, dados, mime, descricao, manter){
   var blob = dados instanceof Blob ? dados : new Blob([dados instanceof Uint8Array ? dados : b64ParaBytes(String(dados).replace(/^data:[^,]*,/, ''))], {type: mime});
-  return drvListar(pai).then(function(fs){ return Promise.all(fs.filter(function(f){ return f.name === nome; }).map(function(f){ return drv('drive/v3/files/' + f.id, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({trashed: true})}); })); })
+  return (manter ? Promise.resolve([]) : drvListar(pai)).then(function(fs){ return Promise.all(fs.filter(function(f){ return f.name === nome; }).map(function(f){ return drv('drive/v3/files/' + f.id, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({trashed: true})}); })); })
     .then(function(){ var meta = {name: nome, parents: [pai], mimeType: mime}; if(descricao) meta.description = String(descricao).slice(0, 30000);
       var fd = new FormData(); fd.append('metadata', new Blob([JSON.stringify(meta)], {type: 'application/json'})); fd.append('file', blob);
       return drv('upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,modifiedTime', {method: 'POST', body: fd}); }).then(function(r){ return r.json(); }); }
@@ -806,7 +807,7 @@ function htmlDrive(){
 }
 function ligarDrive(){
   if($('btDrive')) $('btDrive').addEventListener('click', conectarDrive);
-  if($('btDriveAbrir')) $('btDriveAbrir').addEventListener('click', function(){ var w = window.open('about:blank', '_blank'); drvPasta('Progressão (Aula por IA)', 'root').then(function(){ return drv('drive/v3/files/' + R.perfil.pastaId + '?fields=webViewLink'); }).then(function(r){ return r.json(); }).then(function(j){ w.location = j.webViewLink; }).catch(function(e){ w.close(); $('msgDrive').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+  if($('btDriveAbrir')) $('btDriveAbrir').addEventListener('click', function(){ var w = window.open('about:blank', '_blank'); drv('drive/v3/files/' + R.perfil.pastaId + '?fields=webViewLink').then(function(r){ return r.json(); }).then(function(j){ w.location = j.webViewLink; }).catch(function(e){ w.close(); $('msgDrive').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   if($('btDriveSair')) $('btDriveSair').addEventListener('click', function(){ if(!confirm('Desconectar o seu Google Drive? Os arquivos continuam no seu Drive; a plataforma deixa de gravar lá.')) return;
     try { if(GDRV.token) google.accounts.oauth2.revoke(GDRV.token, function(){}); } catch(e){}
     GDRV.token = null; api('progDriveProprio', {desligar: true}).then(function(r){ R = r; desenhar(); }).catch(function(e){ alert(e.message); }); });
