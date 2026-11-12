@@ -116,6 +116,7 @@ function desenhar(){
   if(R.admin && R.adminDados) h += desenharAdmin();
   $('corpo').innerHTML = h;
   ligar(); ligarV197();
+  document.querySelectorAll('[data-calcorr]').forEach(function(b){ b.addEventListener('click', function(e){ e.preventDefault(); var p = b.dataset.calcorr.split('|'); corrigirCal(p[0], p[1]); }); });
   if($('estagioBox')) $('estagioBox').addEventListener('toggle', function(){ if(this.open){ if(EST) desenharEstagio(); else abrirEstagio(); } });
   if(per) carregarPacote();
 }
