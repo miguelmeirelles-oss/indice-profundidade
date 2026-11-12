@@ -181,8 +181,8 @@ function listaItens(){
     var l = R.itens.filter(function(it){ return it.aba === g; }); if(!l.length) return '';
     return '<p style="margin:12px 0 2px"><b>' + grupos[g] + '</b> <span class="aviso">(' + l.length + ')</span></p>' + l.map(function(it){
       var semArq = (R.semArquivo || []).indexOf(it.id) !== -1;
-      return '<div class="item"' + (semArq ? ' style="background:#fff7d6"' : '') + '><div>' + descricaoItem(it) + (it.arquivoNome ? '<div class="aviso">📄 ' + esc(it.arquivoNome) + (semArq ? ' <span class="warn">— este arquivo foi apagado: o item ainda conta</span>' : '') + '</div>' : '') + (it.origem === 'plataforma' ? '<div class="aviso">da plataforma (' + esc(it.documento) + ')</div>' : '') + '</div>' +
-        '<div style="display:flex;gap:10px;align-items:center"><b>' + num(it.pts, 3) + '</b>' + (it.origem !== 'plataforma' ? '<button type="button" class="link" data-apagar="' + esc(it.id) + '">apagar</button>' : '') + '</div></div>';
+      return '<div class="item" data-itemrow="' + esc(it.id) + '"' + (semArq ? ' style="background:#fff7d6"' : '') + '><div>' + descricaoItem(it) + (it.arquivoNome ? '<div class="aviso">📄 ' + esc(it.arquivoNome) + (semArq ? ' <span class="warn">— este arquivo foi apagado: o item ainda conta</span>' : '') + '</div>' : '') + (it.origem === 'plataforma' ? '<div class="aviso">da plataforma (' + esc(it.documento) + ')</div>' : '') + '</div>' +
+        '<div style="display:flex;gap:10px;align-items:center"><b>' + num(it.pts, 3) + '</b>' + (it.origem !== 'plataforma' ? '<button type="button" class="link" data-editar="' + esc(it.id) + '">✏️ editar</button><button type="button" class="link" data-apagar="' + esc(it.id) + '">apagar</button>' : '') + '</div></div>';
     }).join('');
   }).join('') + '<p class="aviso" style="margin:8px 0 0">Pontos por item antes dos tetos. Na docência, o total da área é a soma dividida pelos 4 semestres.</p>';
 }
@@ -234,6 +234,22 @@ function ptsLinha(k, d, info){
   if(c.cargos[k]) return (n(d.semanas) || 104) * ((n(d.carga) || c.cargos[k][1]) / 104);
   if(c.itens[k]) return n(d.quantidade) * (k === 'comp_formacao' && R.perfil.regime === '20h' ? 0.05 : c.itens[k][2]);
   return 0;
+}
+// editar um item já salvo (tipo e campos), com os pontos recalculados na hora
+document.addEventListener('click', function(e){ var b = e.target && e.target.closest ? e.target.closest('[data-editar]') : null; if(b) editarItem(b.dataset.editar); });
+function editarItem(id){
+  var it = R.itens.filter(function(x){ return x.id === id; })[0], el = document.querySelector('[data-itemrow="' + id + '"]'); if(!it || !el) return;
+  var tmp = JSON.parse(JSON.stringify(it));
+  el.innerHTML = '<div style="flex:1;background:var(--bloco);border-radius:10px;padding:6px 10px">' + linhaEditavel(tmp, 'E') + '<div class="botoes" style="margin:4px 0 0"><button type="button" data-salvaredit>Salvar</button><button type="button" class="sec" data-canceledit>Cancelar</button></div><div class="aviso" data-msgedit></div></div>';
+  var chk = el.querySelector('[data-usar="E"]'); if(chk) chk.style.display = 'none';
+  var sel = el.querySelector('[data-chave="E"]');
+  if(sel) sel.addEventListener('change', function(){ tmp.chave = sel.value; recalcularLinha(el, 'E', tmp); });
+  el.querySelectorAll('[data-li="E"]').forEach(function(x){ x.addEventListener('input', function(){ recalcularLinha(el, 'E', tmp); }); });
+  el.querySelector('[data-canceledit]').addEventListener('click', function(){ $('listaItensBox').innerHTML = listaItens(); ligarListas(); });
+  el.querySelector('[data-salvaredit]').addEventListener('click', function(){ var b = this, d = {}; b.disabled = true;
+    el.querySelectorAll('[data-li="E"]').forEach(function(x){ var v = x.value.trim(); d[x.dataset.c] = /^-?\d+([.,]\d+)?$/.test(v) ? Number(v.replace(',', '.')) : v; });
+    el.querySelector('[data-msgedit]').innerHTML = '<span class="giro"></span>Salvando…';
+    api('progEditarItem', {id: id, campos: d, chave: sel ? sel.value : ''}).then(function(r){ atualizarParcial(r); }).catch(function(e){ b.disabled = false; el.querySelector('[data-msgedit]').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
 }
 function recalcularLinha(box, i, it){
   var k = box.querySelector('[data-chave="' + i + '"]').value, d = JSON.parse(JSON.stringify(it.dados || {}));
