@@ -1159,7 +1159,8 @@ function desenharCCOAval(a){
   h += '<div class="caixa"><h2>1 · Documentos do processo</h2><p class="aviso" style="margin-top:0">Envie tudo o que o docente mandou para a CCO: PDF, fotos ou a planilha RAD (.xlsx). Mande também o ofício de formação da CCO: ele fica guardado como comprovante para os 3 membros usarem na próxima progressão (pela varredura).</p>' +
     '<div>' + esperados.map(function(e){ var tem = docs.some(function(f){ return e[0].test(f.nome); }); return '<span class="chip"' + (tem ? '' : ' style="opacity:.7"') + '>' + (tem ? '✓ ' : '○ ') + esc(e[1]) + '</span>'; }).join('') + '</div>' +
     (docs.length ? docs.map(function(f){ return '<div class="item"><div><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + esc(f.nome) + '</a> <span class="aviso">' + f.kb + ' KB</span></div><button type="button" class="link" data-apagararq="' + esc(f.id) + '">apagar</button></div>'; }).join('') : '<p class="aviso">Nenhum documento ainda.</p>') +
-    '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar documentos<input type="file" id="ccoArqs" multiple accept="application/pdf,image/*,.xlsx,.xls" class="oculto"></label></div><div id="ccoMsg" class="aviso"></div></div>';
+    '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar documentos<input type="file" id="ccoArqs" multiple accept="application/pdf,image/*,.xlsx,.xls" class="oculto"></label></div>' +
+    '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><input id="ccoLink" placeholder="ou cole o link da pasta do Drive com o processo" style="flex:1;min-width:220px"><button type="button" class="sec" id="btCcoLink">📁 Importar da pasta</button></div><div id="ccoMsg" class="aviso"></div></div>';
   h += '<div class="caixa"><h2>2 · Avaliação por IA</h2><p class="aviso" style="margin-top:0">Etapa 1: a IA lê a RAD e procura o comprovante de cada linha, recalculando os pontos pelas regras da CPPD. Etapa 2 (dupla verificação): outra leitura confere o relatório da etapa 1 contra os documentos. Leva alguns minutos.</p>' +
     '<div class="botoes"><button type="button" id="btCcoAvaliar"' + (docs.length ? '' : ' disabled') + '>' + (rel ? '🔁 Avaliar de novo' : a.estado === 'etapa1' ? '▶ Continuar (2ª verificação)' : '🔎 Avaliar com IA') + '</button></div><div id="ccoAvMsg"></div>' + (rel ? htmlRelCCO(rel) : '') + '</div>';
   if(rel) h += '<div class="caixa"><h2>3 · Parecer e ata</h2><label>Parecer da CCO (pode editar)</label><textarea id="ccoParecer" rows="4">' + esc(rel.parecer || '') + '</textarea>' +
@@ -1168,6 +1169,17 @@ function desenharCCOAval(a){
     a.arquivos.filter(function(f){ return f.gerado; }).map(function(f){ return '<div style="margin-top:6px"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + esc(f.nome) + '</a></div>'; }).join('') + '<div id="ccoAtaMsg" class="aviso"></div></div>';
   $('corpo').innerHTML = h; window.scrollTo(0, 0);
   $('ccoVoltar').addEventListener('click', abrirCCO);
+  $('btCcoLink').addEventListener('click', function(){ var b = this, link = $('ccoLink').value.trim(), m = $('ccoMsg'); if(!link) return; b.disabled = true; m.innerHTML = '<span class="giro"></span>Copiando os arquivos da pasta…';
+    var imp = null;
+    api('progCCOImportar', {id: a.id, link: link}).then(function(r){ imp = r.importacao;
+      var salvar = (imp.navegador || []).reduce(function(p, o){ return p.then(function(){ m.innerHTML = '<span class="giro"></span>Gravando no seu Drive: ' + esc(o.nome) + '…'; return drvSalvar(r.pastaId, o.nome, o.dados, o.mime); }); }, Promise.resolve());
+      var planilhas = (imp.planilhas || []).concat((imp.navegador || []).filter(function(o){ return /\.xlsx?$/i.test(o.nome); }).map(function(o){ return {nome: o.nome, dados: o.dados, mime: o.mime}; }));
+      return salvar.then(function(){ return planilhas.reduce(function(p, pl){ return p.then(function(){ m.innerHTML = '<span class="giro"></span>Lendo a planilha ' + esc(pl.nome) + '…';
+        return (pl.dados ? Promise.resolve(pl) : api('progCCOArquivo', {id: a.id, arquivoId: pl.id})).then(function(x){ var f = new File([b64ParaBytes(x.dados)], x.nome || pl.nome, {type: x.mime || ''}); return textoDaPlanilha(f); })
+          .then(function(txt){ return apiCCO('progCCOEnviar', {id: a.id, nome: pl.nome.replace(/\.xlsx?$/i, '') + ' (texto da planilha).txt', dados: btoa(unescape(encodeURIComponent(txt))), mime: 'text/plain'}); }); }); }, Promise.resolve()); });
+    }).then(function(){ return apiCCO('progCCOAbrir', {id: a.id}); }).then(function(x){ desenharCCOAval(x); var mm = $('ccoMsg');
+      mm.innerHTML = '<span class="ok">✓ Importado de "' + esc(imp.origem) + '": ' + (imp.copiados.length + (imp.navegador || []).length) + ' arquivo(s).</span>' + (imp.ignorados.length ? '<div>Não importei: ' + imp.ignorados.map(esc).join(' · ') + '</div>' : ''); })
+      .catch(function(e){ b.disabled = false; m.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   $('ccoArqs').addEventListener('change', function(){
     var fs = Array.prototype.slice.call(this.files), m = $('ccoMsg'), atual = a, seq = Promise.resolve();
     fs.forEach(function(f, i){ seq = seq.then(function(){
