@@ -51,7 +51,7 @@
 <script>
 var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
 function tokenSalvo(){ try{ return localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){ return ''; } }
-var token = tokenSalvo(), R = null, LIDO = null, CAL = null;
+var token = tokenSalvo(), R = null, LIDO = null, CAL = null, ARQC = null;
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function num(n, c){ return (Math.round(Number(n || 0) * Math.pow(10, c === undefined ? 2 : c)) / Math.pow(10, c === undefined ? 2 : c)).toString().replace('.', ','); }
@@ -85,6 +85,7 @@ function desenhar(){
   }
   // ---------- perfil ----------
   var incompleto = !per || !p.siape || (!p.pastaId && !R.admin);
+  h += htmlDrive();
   h += '<details class="caixa"' + (incompleto ? ' open' : '') + '><summary style="cursor:pointer"><b>👤 Seu perfil</b> <span class="aviso">' + (incompleto ? '— complete para começar' : '— dados que mudam pouco') + '</span></summary>' +
     '<div class="grade" style="margin-top:10px">' + campo('nome', 'Nome completo', p.nome) + campo('siape', 'SIAPE (matrícula)', p.siape) + campo('email', 'E-mail institucional', p.email) + campo('celular', 'Celular, ex.: (24) 98183-9748', p.celular) + campo('telefone', 'Telefone (opcional)', p.telefone) + campo('admissao', 'Data de admissão (dd/mm/aaaa)' + (p.admissao && !/\d{4}/.test(p.admissao) ? ' — falta o ano' : ''), p.admissao) +
     sel('regime', 'Regime', p.regime || '40h / DE', ['40h / DE', '40h', '20h']) + sel('carreira', 'Carreira', p.carreira || 'EBTT', ['EBTT', 'MS']) + sel('campus', 'Unidade', p.campus || 'VA', ['MA', 'MG', 'NI', 'NF', 'PE', 'IT', 'AR', 'VA']) +
@@ -115,7 +116,7 @@ function desenhar(){
   }
   if(R.admin && R.adminDados) h += desenharAdmin();
   $('corpo').innerHTML = h;
-  ligar(); ligarV197();
+  ligar(); ligarV197(); ligarDrive();
   document.querySelectorAll('[data-calcorr]').forEach(function(b){ b.addEventListener('click', function(e){ e.preventDefault(); var p = b.dataset.calcorr.split('|'); corrigirCal(p[0], p[1]); }); });
   if($('estagioBox')) $('estagioBox').addEventListener('toggle', function(){ if(this.open){ if(EST) desenharEstagio(); else abrirEstagio(); } });
   if(per) carregarPacote();
@@ -191,10 +192,10 @@ function enviarComprovantes(files){
             '<div class="botoes"><button type="button" id="btSubst">Substituir</button><button type="button" class="sec" id="btManter">Cancelar (manter o que já está)</button></div></div>';
           $('btManter').addEventListener('click', function(){ box.innerHTML = ''; proximo(); });
           $('btSubst').addEventListener('click', function(){ box.innerHTML = '<p class="carregando">Lendo de novo "' + esc(f.name) + '"…</p>';
-            api('progAnalisar', {nome: f.name, dados: b64guardado, mime: f.type || 'application/pdf', substituir: true}).then(function(l2){ LIDO = l2; LIDO.fila = fila; desenharLido(proximo); }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; proximo(); }); });
+            api('progAnalisar', {nome: f.name, dados: b64guardado, mime: f.type || 'application/pdf', substituir: true}).then(function(l2){ LIDO = l2; LIDO.fila = fila; LIDO.arq = f; if(proprio()) LIDO.arquivoUrl = URL.createObjectURL(f); desenharLido(proximo); }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; proximo(); }); });
           return;
         }
-        LIDO = l; LIDO.fila = fila; desenharLido(proximo); })
+        LIDO = l; LIDO.fila = fila; LIDO.arq = f; if(proprio()) LIDO.arquivoUrl = URL.createObjectURL(f); desenharLido(proximo); })
       .catch(function(e){ box.innerHTML = '<div class="erro">' + esc(f.name) + ': ' + esc(e.message) + '</div>'; proximo(); });
   };
   proximo();
@@ -291,7 +292,12 @@ function desenharLido(proximo){
   $('btSalvarLido').addEventListener('click', function(){
     var b = this, itens = coletar(); if(!itens.length){ $('msgLido').innerHTML = '<span class="warn">Marque pelo menos um item.</span>'; return; }
     b.disabled = true; $('msgLido').textContent = 'Salvando…';
-    api('progSalvarItens', {arquivoId: l.arquivoId, documento: l.documento, itens: itens}).then(function(r){ var resto = LIDO && LIDO.fila; LIDO = null; box.innerHTML = '<p class="ok" style="margin:8px 0 0">✓ Salvo: ' + itens.length + ' item(ns) de "' + esc(l.documento || l.arquivoNome) + '" entraram na sua RAD.</p>'; atualizarParcial(r); if(resto && resto.length) enviarComprovantes(resto); })
+    (proprio() && l.arq ? pastaCompDrv().then(function(p){ $('msgLido').innerHTML = '<span class="giro"></span>Gravando no seu Google Drive…'; return drvSalvar(p.id, l.arq.name, l.arq, l.arq.type || 'application/pdf'); })
+      .then(function(g){ var tmp = l.arquivoId; return api('progSalvarItens', {arquivoId: g.id, documento: l.documento, itens: itens, nomeArquivo: g.name}).then(function(r){
+        if((l.outrosDocentes || []).length && confirm('Este documento cita também: ' + l.outrosDocentes.join(', ') + '.\n\nGuardar uma cópia na pasta compartilhada da plataforma (por 3 anos) para eles usarem na progressão deles?'))
+          lerArquivo(l.arq).then(function(b64){ return api('progCompartilharBytes', {tmpId: tmp, nome: l.arq.name, dados: b64, mime: l.arq.type || 'application/pdf', documento: l.documento, itens: itens}); }).catch(function(){});
+        return r; }); })
+    : api('progSalvarItens', {arquivoId: l.arquivoId, documento: l.documento, itens: itens})).then(function(r){ var resto = LIDO && LIDO.fila; LIDO = null; box.innerHTML = '<p class="ok" style="margin:8px 0 0">✓ Salvo: ' + itens.length + ' item(ns) de "' + esc(l.documento || l.arquivoNome) + '" entraram na sua RAD.</p>'; atualizarParcial(r); if(resto && resto.length) enviarComprovantes(resto); })
       .catch(function(e){ b.disabled = false; $('msgLido').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
   });
 }
@@ -685,10 +691,80 @@ function gerarFolhaAnual(qual, t){
     .then(function(b64){ return api('progAnualSalvarArq', {ano: r.ano, nome: ra ? 'Folha de Rosto-Relatório ' + r.ano + '.docx' : 'Folha de Rosto-PPA ' + r.anoPlano + '.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
 }
 
+// ===================== Drive próprio do docente (v211) =====================
+// O navegador pede ao Google um token só para os arquivos criados por esta página (drive.file) e grava/lê direto no Drive
+// do docente. A plataforma (servidor) nunca abre esses arquivos: só processa os bytes que o navegador manda.
+var GDRV = {cliente: '1032500948433-kavbmg0kj85ht9d911nr0iloliru3qk6.apps.googleusercontent.com', token: null, expira: 0, tc: null, pastas: {}};
+function proprio(){ return !!(R && R.proprio) || !!(PAC && PAC.proprio); }
+function carregarGis(){ return window.google && google.accounts && google.accounts.oauth2 ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o login do Google.')); }; document.head.appendChild(s); }); }
+function tokenDrive(){
+  if(GDRV.token && Date.now() < GDRV.expira - 60000) return Promise.resolve(GDRV.token);
+  return carregarGis().then(function(){ return new Promise(function(ok, falha){
+    if(!GDRV.tc) GDRV.tc = google.accounts.oauth2.initTokenClient({client_id: GDRV.cliente, scope: 'https://www.googleapis.com/auth/drive.file', callback: function(){}});
+    GDRV.tc.callback = function(r){ if(r.error) return falha(new Error('Google Drive: ' + r.error)); GDRV.token = r.access_token; GDRV.expira = Date.now() + (Number(r.expires_in) || 3600) * 1000; ok(GDRV.token); };
+    GDRV.tc.error_callback = function(e){ falha(new Error(e && e.type === 'popup_closed' ? 'Você fechou a janela do Google antes de autorizar.' : 'O navegador bloqueou a janela do Google: permita pop-ups para este site e tente de novo.')); };
+    GDRV.tc.requestAccessToken({prompt: ''});
+  }); });
+}
+function drv(caminho, opts){ opts = opts || {};
+  return tokenDrive().then(function(t){ var hd = Object.assign({Authorization: 'Bearer ' + t}, opts.headers || {}); return fetch('https://www.googleapis.com/' + caminho, Object.assign({}, opts, {headers: hd})); })
+    .then(function(r){ if(r.status === 401){ GDRV.token = null; } if(!r.ok) return r.text().then(function(t){ throw new Error('Google Drive (' + r.status + '): ' + t.slice(0, 160)); }); return r; }); }
+function aspas(t){ return String(t).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+function drvPasta(nome, pai){
+  var k = pai + '/' + nome; if(GDRV.pastas[k]) return Promise.resolve(GDRV.pastas[k]);
+  var q = "name='" + aspas(nome) + "' and mimeType='application/vnd.google-apps.folder' and '" + pai + "' in parents and trashed=false";
+  return drv('drive/v3/files?fields=files(id,webViewLink)&q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(j){
+    if(j.files && j.files.length) return j.files[0];
+    return drv('drive/v3/files?fields=id,webViewLink', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: nome, mimeType: 'application/vnd.google-apps.folder', parents: [pai]})}).then(function(r){ return r.json(); });
+  }).then(function(p){ GDRV.pastas[k] = p; return p; }); }
+function drvListar(pai){ var q = "'" + pai + "' in parents and trashed=false";
+  return drv('drive/v3/files?pageSize=200&fields=files(id,name,webViewLink,modifiedTime,description,mimeType)&q=' + encodeURIComponent(q)).then(function(r){ return r.json(); }).then(function(j){ return j.files || []; }); }
+// grava (substitui o de mesmo nome, que vai para a lixeira dela)
+function drvSalvar(pai, nome, dados, mime, descricao){
+  var blob = dados instanceof Blob ? dados : new Blob([dados instanceof Uint8Array ? dados : b64ParaBytes(dados)], {type: mime});
+  return drvListar(pai).then(function(fs){ return Promise.all(fs.filter(function(f){ return f.name === nome; }).map(function(f){ return drv('drive/v3/files/' + f.id, {method: 'PATCH', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({trashed: true})}); })); })
+    .then(function(){ var meta = {name: nome, parents: [pai], mimeType: mime}; if(descricao) meta.description = String(descricao).slice(0, 30000);
+      var fd = new FormData(); fd.append('metadata', new Blob([JSON.stringify(meta)], {type: 'application/json'})); fd.append('file', blob);
+      return drv('upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink,modifiedTime', {method: 'POST', body: fd}); }).then(function(r){ return r.json(); }); }
+function drvBaixar(id){ return Promise.all([drv('drive/v3/files/' + id + '?fields=mimeType,name').then(function(r){ return r.json(); }), drv('drive/v3/files/' + id + '?alt=media').then(function(r){ return r.arrayBuffer(); })])
+  .then(function(x){ return {mime: x[0].mimeType, nome: x[0].name, bytes: new Uint8Array(x[1])}; }); }
+function pastaCicloDrv(){ var raiz = R && R.perfil && R.perfil.pastaId; if(!raiz) return Promise.reject(new Error('Conecte o seu Google Drive no perfil primeiro.')); return drvPasta((R && R.cicloNome) || (PAC && PAC.cicloNome) || 'Progressão', raiz); }
+function pastaCompDrv(){ return pastaCicloDrv().then(function(p){ return drvPasta('Comprovantes (Aula por IA)', p.id); }); }
+// arquivo de um comprovante: do Drive do docente (Drive próprio) ou do servidor (modelos, indexações e quem não conectou)
+function baixarArquivo(id){
+  if(!proprio()) return api('progArquivo', {id: id});
+  return drvBaixar(id).then(function(a){ return {dados: bytesParaB64(a.bytes), mime: a.mime}; }).catch(function(){ return api('progArquivo', {id: id}); }); }
+// arquivos 1–6 do pacote: na pasta do ciclo (Drive próprio) ou pelo servidor
+function salvarGerado(o){
+  if(!proprio()) return api('progSalvarGerado', o);
+  return pastaCicloDrv().then(function(p){ return drvSalvar(p.id, o.nome, o.dados, o.mime, o.incluidos ? 'incluidos:' + JSON.stringify(o.incluidos) : ''); }); }
+function salvarRetornado(r){ return r && r.dados ? salvarGerado({nome: r.nome, dados: r.dados, mime: r.mime}) : Promise.resolve(r); }
+function conectarDrive(){
+  var b = $('btDrive'), m = $('msgDrive'); if(b) b.disabled = true; if(m) m.innerHTML = '<span class="giro"></span>Abrindo a janela do Google…';
+  tokenDrive().then(function(){ if(m) m.innerHTML = '<span class="giro"></span>Criando a pasta "Progressão (Aula por IA)" no seu Drive…'; return drvPasta('Progressão (Aula por IA)', 'root'); })
+    .then(function(p){ return api('progDriveProprio', {pastaId: p.id}).then(function(r){ R = r; R.pastaDriveUrl = p.webViewLink; desenhar(); }); })
+    .catch(function(e){ if(b) b.disabled = false; if(m) m.innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; });
+}
+function htmlDrive(){
+  if(!R || R.admin) return '';
+  if(R.proprio) return '<div class="caixa" style="border-color:var(--verde)"><b class="ok">☁ Seu Google Drive está conectado.</b> <span class="aviso">Comprovantes, planilha RAD, PDF e documentos do processo ficam na pasta "Progressão (Aula por IA)" do seu Drive (pode mover ou renomear). A plataforma só vê os arquivos que ela mesma criou.</span>' +
+    '<div class="botoes"><button type="button" class="sec" id="btDriveAbrir">📁 Abrir a pasta</button><button type="button" class="sec" id="btDriveSair">Desconectar</button></div><div id="msgDrive" class="aviso"></div>' +
+    '<p class="aviso" style="margin:4px 0 0">Ainda gravam pela plataforma (próxima versão): declaração de estágio, avaliações como membro de CCO e plano de trabalho/relatório.</p></div>';
+  return '<div class="caixa"><b>☁ Guardar tudo no seu próprio Google Drive</b><p class="aviso" style="margin:4px 0 0">Clique, escolha a sua conta Google e autorize. A plataforma cria a pasta "Progressão (Aula por IA)" no seu Drive e grava tudo lá. Ela só enxerga os arquivos que ela mesma criou: o resto do seu Drive continua invisível.</p>' +
+    '<div class="botoes"><button type="button" id="btDrive">☁ Conectar meu Google Drive</button></div><div id="msgDrive" class="aviso"></div></div>';
+}
+function ligarDrive(){
+  if($('btDrive')) $('btDrive').addEventListener('click', conectarDrive);
+  if($('btDriveAbrir')) $('btDriveAbrir').addEventListener('click', function(){ var w = window.open('about:blank', '_blank'); drvPasta('Progressão (Aula por IA)', 'root').then(function(){ return drv('drive/v3/files/' + R.perfil.pastaId + '?fields=webViewLink'); }).then(function(r){ return r.json(); }).then(function(j){ w.location = j.webViewLink; }).catch(function(e){ w.close(); $('msgDrive').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
+  if($('btDriveSair')) $('btDriveSair').addEventListener('click', function(){ if(!confirm('Desconectar o seu Google Drive? Os arquivos continuam no seu Drive; a plataforma deixa de gravar lá.')) return;
+    try { if(GDRV.token) google.accounts.oauth2.revoke(GDRV.token, function(){}); } catch(e){}
+    GDRV.token = null; api('progDriveProprio', {desligar: true}).then(function(r){ R = r; desenhar(); }).catch(function(e){ alert(e.message); }); });
+}
+
 // ===================== etapa 2: o pacote para a CCO =====================
 var PAC = null;
 function carregarPacote(){
-  api('progPacote').then(function(p){ PAC = p; desenharPacote(); }).catch(function(e){ var b = $('pacoteBox'); if(b) b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso">' + esc(e.message) + '</p>'; });
+  api('progPacote').then(function(p){ PAC = p; if(!p.proprio) return; return pastaCicloDrv().then(function(c){ PAC.pasta = c.webViewLink; return drvListar(c.id); }).then(function(fs){ PAC.arquivos = fs.filter(function(f){ return /^[1-6] - /.test(f.name); }).map(function(f){ return {nome: f.name, url: f.webViewLink, em: new Date(f.modifiedTime).toLocaleDateString('pt-BR')}; }).sort(function(a, b){ return a.nome.localeCompare(b.nome); }); }).catch(function(e){ PAC.erroDrive = e.message; }); }).then(function(){ desenharPacote(); }).catch(function(e){ var b = $('pacoteBox'); if(b) b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso">' + esc(e.message) + '</p>'; });
 }
 function arqDo(n){ return (PAC.arquivos || []).filter(function(a){ return a.nome.indexOf(n + ' - ') === 0; }); }
 function linkArq(n){ var l = arqDo(n); return l.length ? l.map(function(a){ return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener">✓ ' + esc(a.nome) + '</a> <span class="aviso">' + esc(a.em) + '</span>'; }).join('<br>') : '<span class="aviso">ainda não gerado</span>'; }
@@ -708,13 +784,13 @@ function desenharPacote(){
   var msg = function(t){ $('msgPac').innerHTML = t; };
   var ok = function(){ carregarPacote(); };
   if($('arqPortaria')) $('arqPortaria').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; msg('Enviando…');
-    (/^image\//.test(f.type) ? imagemParaPdf(f) : lerArquivo(f)).then(function(b64){ return api('progSalvarGerado', {nome: '2 - Portaria da última progressão.pdf', dados: b64, mime: 'application/pdf'}); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+    (/^image\//.test(f.type) ? imagemParaPdf(f) : lerArquivo(f)).then(function(b64){ return salvarGerado({nome: '2 - Portaria da última progressão.pdf', dados: b64, mime: 'application/pdf'}); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btProt')) $('btProt').addEventListener('click', function(){ this.disabled = true; gerarProtocolo(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
-  if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(salvarRetornado).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btComp')) $('btComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btCco')) $('btCco').addEventListener('click', function(){ this.disabled = true; preencherCCO(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btConferir')) $('btConferir').addEventListener('click', conferir);
-  if($('btAta')) $('btAta').addEventListener('click', function(){ this.disabled = true; msg('Escrevendo a ata…'); api('progGerarAta', {data: $('dataAta').value.trim()}).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btAta')) $('btAta').addEventListener('click', function(){ this.disabled = true; msg('Escrevendo a ata…'); api('progGerarAta', {data: $('dataAta').value.trim()}).then(salvarRetornado).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
 }
 function emailCCO(){
   var p = PAC, cco = (p.cco || []).filter(function(c){ return c.nome; });
@@ -762,7 +838,7 @@ function gerarProtocolo(msg){
   var carregarZip = window.JSZip ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de Word.')); }; document.head.appendChild(s); });
   return carregarZip.then(function(){ return fetch('modelo-protocolo-cppd.docx?v=1'); }).then(function(r){ if(!r.ok) throw new Error('Modelo do protocolo não encontrado.'); return r.arrayBuffer(); })
     .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){ return z.file('word/document.xml').async('string').then(function(x){ z.file('word/document.xml', preencherProtocoloXml(x, textos, caixas, campus)); return z.generateAsync({type: 'base64'}); }); })
-    .then(function(b64){ return api('progSalvarGerado', {nome: '1 - Folha de protocolo.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
+    .then(function(b64){ return salvarGerado({nome: '1 - Folha de protocolo.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
 }
 function carregarPdfLib(){
   if(window.PDFLib) return Promise.resolve();
@@ -819,7 +895,7 @@ function montarComprovantes(msg, opts){
     var proximo = function(){
       var c = lista[i++]; if(!c) return Promise.resolve();
       msg('Juntando ' + i + ' de ' + lista.length + ': ' + esc(c.nome) + '…');
-      return api('progArquivo', {id: c.id}).then(function(a){
+      return baixarArquivo(c.id).then(function(a){
         var bytes = b64ParaBytes(a.dados);
         if(/pdf/.test(a.mime)) return (c.paginas > 0 ? fimDoResumo(bytes, c.paginas) : Promise.resolve(0)).then(function(np){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ var ix = d.getPageIndices(); if(np > 0) return ix.slice(0, np);
           return c.area === 'comp' && ix.length > 4 ? paginasDoDocente(bytes, ix.length).then(function(sel){ return sel || ix; }) : ix; }).then(function(ix){ return PDFLib.PDFDocument.load(bytes, {ignoreEncryption: true}).then(function(d){ return saida.copyPages(d, ix); }); }); }).then(function(pgs){ pgs.forEach(function(p){ saida.addPage(p); }); incluidos.push(c.id); });
@@ -828,7 +904,7 @@ function montarComprovantes(msg, opts){
       }).catch(function(){ falhas.push(c.nome); }).then(proximo);
     };
     return proximo().then(function(){ msg('Salvando o PDF no Drive…'); return saida.save(); }).then(function(b){
-      return opts ? opts.salvar(bytesParaB64(b), incluidos) : api('progSalvarGerado', {nome: '4 - Comprovantes da RAD.pdf', dados: bytesParaB64(b), mime: 'application/pdf', incluidos: incluidos}); })
+      return opts ? opts.salvar(bytesParaB64(b), incluidos) : salvarGerado({nome: '4 - Comprovantes da RAD.pdf', dados: bytesParaB64(b), mime: 'application/pdf', incluidos: incluidos}); })
       .then(function(){ if(falhas.length) alert('Não deu para incluir: ' + falhas.join(', ') + '. Confira esses arquivos.'); });
   });
 }
@@ -849,7 +925,7 @@ function preencherCCO(msg){
       t(2, 160, 256, ch.nome); t(2, 488, 130, ch.siape); t(2, 490, 57, pf.siape);
       msg('Salvando no Drive…'); return doc.save();
     });
-  }).then(function(b){ return api('progSalvarGerado', {nome: '5 - CCO-AVALIACAO-PARECER (preenchido).pdf', dados: bytesParaB64(b), mime: 'application/pdf'}); });
+  }).then(function(b){ return salvarGerado({nome: '5 - CCO-AVALIACAO-PARECER (preenchido).pdf', dados: bytesParaB64(b), mime: 'application/pdf'}); });
 }
 // ===================== v197 · varredura, conferência final e "Sou membro de CCO" =====================
 function hojeCCO(){ var d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
@@ -889,14 +965,20 @@ function varredura(){
 }
 // ---------- conferência final do próprio processo ----------
 var SIT_ICO = {ok: '✓', atencao: '⚠', erro: '✗'}, SIT_COR = {ok: 'ok', atencao: 'warn', erro: 'warn'};
+function arquivosConferencia(){
+  if(!proprio()) return Promise.resolve(null);
+  return pastaCicloDrv().then(function(c){ return drvListar(c.id).then(function(fs){ var l = fs.filter(function(f){ return /^[1-6] - /.test(f.name); });
+    return Promise.all(l.map(function(f){ var o = {id: f.id, nome: f.name, em: new Date(f.modifiedTime).getTime(), desc: f.description || '', mime: f.mimeType, url: f.webViewLink};
+      return /^[24] - /.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }); }); }
 function conferir(){
-  var box = $('confBox'), bt = $('btConferir'); bt.disabled = true;
+  var box = $('confBox'), bt = $('btConferir'); bt.disabled = true, ARQC = null;
   box.innerHTML = '<p class="carregando">1/2 · A IA está conferindo cada linha da RAD com o PDF dos comprovantes… (1 a 3 min)</p>';
-  api('progConferir', {etapa: 1}).then(function(r1){
+  arquivosConferencia().then(function(a){ ARQC = a; return api('progConferir', {etapa: 1, arquivos: a}); }).then(function(r1){
     if(r1.semIA){ box.innerHTML = htmlConferencia(r1); bt.disabled = false; return; }
     var n = (r1.r1.linhas || []).filter(function(l){ return l.situacao !== 'ok'; }).length;
     box.innerHTML = '<p class="carregando">2/2 · Segunda verificação: conferindo de novo ' + (n ? 'os ' + n + ' ponto(s) levantados' : 'o resultado') + '…</p>';
-    return api('progConferir', {etapa: 2}).then(function(rel){ box.innerHTML = htmlConferencia(rel); bt.disabled = false; });
+    return api('progConferir', {etapa: 2, arquivos: ARQC}).then(function(rel){ box.innerHTML = htmlConferencia(rel); bt.disabled = false;
+      if(rel.docx && proprio()) pastaCicloDrv().then(function(c){ return drvSalvar(c.id, 'Conferência do processo (Aula por IA).docx', rel.docx, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'); }).catch(function(){}); });
   }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; });
 }
 function htmlConferencia(r){
