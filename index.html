@@ -1614,22 +1614,29 @@ function transcreverAudio(blob){
   transcrevendo = true; b.disabled = true;
   d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal';
   d.innerHTML = '⏳ Transcrevendo com IA (pontuação e termos técnicos)… alguns segundos.';
-  var diag = (blob.type || '?').split(';')[0].replace('audio/', '') + ', ' + Math.round(blob.size / 1024) + ' KB';
-  paraWav(blob).then(function(w){
-    diag += ', ' + Math.round(w.segundos) + ' s, nível ' + w.nivel + '%';
-    if(w.segundos < 1) throw new Error('A gravação ficou vazia.');
-    return api('transcreverFala', {audio: w.b64, mime: 'audio/wav', token: sessao.token, visitante: visitante,
-      tema: subtopicoAtual ? subtopicoAtual.nome : (colega ? colega.tema : ''),
-      pergunta: estado.convite || document.getElementById('conviteTexto').textContent, antes: campo().value});
-  }).then(function(r){
-    if(!r.audivel){ d.textContent = 'A IA não reconheceu fala na gravação. Grave de novo, mais perto do microfone. (diagnóstico: ' + diag + ')'; return; }
-    var atual = campo().value.trim();
-    campo().value = (atual ? atual + '\n\n' : '') + r.texto;
-    campo().scrollTop = campo().scrollHeight;
-    d.innerHTML = '✓ Transcrito. <b>Confira o texto</b> e corrija se algum termo saiu errado; depois envie ou grave mais.';
-  }).catch(function(e){
-    d.textContent = 'Não deu para transcrever: ' + e.message + '. Grave de novo ou use o microfone do teclado. (diagnóstico: ' + diag + ')';
-  }).then(function(){ transcrevendo = false; b.disabled = false; b.textContent = 'Gravar mais'; });
+  var tipo = (blob.type || 'audio/webm').split(';')[0], diag = tipo.replace('audio/', '') + ', ' + Math.round(blob.size / 1024) + ' KB';
+  var pedir = function(b64, mime){ return api('transcreverFala', {audio: b64, mime: mime, token: sessao.token, visitante: visitante,
+    tema: subtopicoAtual ? subtopicoAtual.nome : (colega ? colega.tema : ''),
+    pergunta: estado.convite || document.getElementById('conviteTexto').textContent, antes: campo().value}); };
+  var wav = null;   // 2ª chance: a versão convertida pelo navegador (só se a 1ª não der)
+  var tentarWav = function(motivo){
+    return (wav || paraWav(blob)).then(function(w){ diag += ', ' + Math.round(w.segundos) + ' s, nível ' + w.nivel + '%'; return pedir(w.b64, 'audio/wav'); })
+      .catch(function(e){ throw new Error(motivo || e.message); });
+  };
+  if(blob.size < 2000){ transcrevendo = false; b.disabled = false; d.textContent = 'A gravação ficou vazia. Grave de novo.'; return; }
+  // 1ª tentativa: o áudio original, como o celular gravou (webm no Android, mp4 no iPhone) — sem conversão no aparelho
+  blob.arrayBuffer().then(function(buf){ return pedir(bytesB64(new Uint8Array(buf)), tipo); })
+    .then(function(r){ if(r.audivel) return r; diag += ' · original sem fala'; return tentarWav(); },
+          function(e){ if(/COTA|créditos|LIMITE|sem cadastro/i.test(e.message)) throw e; diag += ' · original recusado'; return tentarWav(e.message); })
+    .then(function(r){
+      if(!r.audivel){ d.textContent = 'A IA não reconheceu fala na gravação. Grave de novo, mais perto do microfone. (diagnóstico: ' + diag + ')'; return; }
+      var atual = campo().value.trim();
+      campo().value = (atual ? atual + '\n\n' : '') + r.texto;
+      campo().scrollTop = campo().scrollHeight;
+      d.innerHTML = '✓ Transcrito. <b>Confira o texto</b> e corrija se algum termo saiu errado; depois envie ou grave mais.';
+    }).catch(function(e){
+      d.textContent = 'Não deu para transcrever: ' + e.message + '. Grave de novo ou use o microfone do teclado. (diagnóstico: ' + diag + ')';
+    }).then(function(){ transcrevendo = false; b.disabled = false; b.textContent = 'Gravar mais'; });
 }
 
 function tique(){
