@@ -1615,13 +1615,13 @@ function vigiarPausa(){
   if(quieto){ if(!quietoDesde) quietoDesde = agora; } else quietoDesde = 0;
   // trechos curtos = texto aparece mais cedo: corta na 1ª pausa depois de 2,5 s; depois de 5 s aceita
   // até um respiro curto entre palavras; em 8 s corta de qualquer jeito
-  // corte só onde a voz cai de verdade: pausa (≥300 ms) a partir de 2,5 s; silêncio curto entre palavras
+  // corte só onde a voz cai de verdade: pausa (≥300 ms) a partir de 4 s; silêncio curto entre palavras
   // (≥100 ms, bem baixo) a partir de 4 s; qualquer respiro a partir de 7 s; 10 s no máximo
   var vale = nv < vozPico * 0.08, respiro = nv < vozPico * 0.25;
   if(vale){ if(!valeDesde) valeDesde = agora; } else valeDesde = 0;
   if(respiro){ if(!respiroDesde) respiroDesde = agora; } else respiroDesde = 0;
   var pausa = quietoDesde ? agora - quietoDesde : 0, entrePalavras = valeDesde ? agora - valeDesde : 0, curto = respiroDesde ? agora - respiroDesde : 0;
-  if((dur >= 2500 && pausa >= 300) || (dur >= 4000 && entrePalavras >= 100) || (dur >= 7000 && curto >= 80) || dur >= 10000) cortarTrecho();
+  if((dur >= 4000 && pausa >= 300) || (dur >= 4000 && entrePalavras >= 100) || (dur >= 7000 && curto >= 80) || dur >= 10000) cortarTrecho();
 }
 // o trecho novo começa ANTES de o anterior parar: nenhum pedaço de fala se perde no corte
 function cortarTrecho(){
