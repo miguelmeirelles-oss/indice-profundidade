@@ -1574,7 +1574,7 @@ function gravarAudio(){
       fluxo.getTracks().forEach(function(t){ t.stop(); });
       transcreverAudio(new Blob(pedacos, {type: tipo}));
     };
-    gravador.start(1000);
+    gravador.start();
     gravando = true; t0 = Date.now();
     var b = document.getElementById('btGravar'); b.textContent = 'Terminei'; b.className = 'parar';
     document.getElementById('luz').style.visibility = 'visible';
@@ -1598,11 +1598,14 @@ function paraWav(blob){
       src.buffer = aud; src.connect(off.destination); src.start(0);
       return new Promise(function(ok){ off.oncomplete = function(e){ ok(e.renderedBuffer); }; var p = off.startRendering(); if(p && p.then) p.then(ok); });
     }).then(function(ren){
-      var x = ren.getChannelData(0), out = new DataView(new ArrayBuffer(44 + x.length * 2)), esc = function(o, t){ for(var i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+      var x = ren.getChannelData(0), pico = 0; for(var k = 0; k < x.length; k++){ var a = Math.abs(x[k]); if(a > pico) pico = a; }
+      if(pico < 0.002) throw new Error('o microfone gravou só silêncio — confira se outro app está usando o microfone ou se o navegador tem permissão');
+      var ganho = Math.min(30, 0.9 / pico); if(ganho > 1.05) for(var k2 = 0; k2 < x.length; k2++) x[k2] *= ganho;
+      var out = new DataView(new ArrayBuffer(44 + x.length * 2)), esc = function(o, t){ for(var i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
       esc(0, 'RIFF'); out.setUint32(4, 36 + x.length * 2, true); esc(8, 'WAVE'); esc(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
       out.setUint32(24, 16000, true); out.setUint32(28, 32000, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true); esc(36, 'data'); out.setUint32(40, x.length * 2, true);
       for(var i = 0; i < x.length; i++){ var v = Math.max(-1, Math.min(1, x[i])); out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
-      return {b64: bytesB64(new Uint8Array(out.buffer)), segundos: ren.duration};
+      return {b64: bytesB64(new Uint8Array(out.buffer)), segundos: ren.duration, nivel: Math.round(pico * 100), ganho: Math.round(ganho * 10) / 10};
     });
   });
 }
@@ -1611,19 +1614,21 @@ function transcreverAudio(blob){
   transcrevendo = true; b.disabled = true;
   d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal';
   d.innerHTML = '⏳ Transcrevendo com IA (pontuação e termos técnicos)… alguns segundos.';
+  var diag = (blob.type || '?').split(';')[0].replace('audio/', '') + ', ' + Math.round(blob.size / 1024) + ' KB';
   paraWav(blob).then(function(w){
+    diag += ', ' + Math.round(w.segundos) + ' s, nível ' + w.nivel + '%';
     if(w.segundos < 1) throw new Error('A gravação ficou vazia.');
     return api('transcreverFala', {audio: w.b64, mime: 'audio/wav', token: sessao.token, visitante: visitante,
       tema: subtopicoAtual ? subtopicoAtual.nome : (colega ? colega.tema : ''),
       pergunta: estado.convite || document.getElementById('conviteTexto').textContent, antes: campo().value});
   }).then(function(r){
-    if(!r.audivel){ d.textContent = 'Não ouvi fala na gravação. Grave de novo, mais perto do microfone.'; return; }
+    if(!r.audivel){ d.textContent = 'A IA não reconheceu fala na gravação. Grave de novo, mais perto do microfone. (diagnóstico: ' + diag + ')'; return; }
     var atual = campo().value.trim();
     campo().value = (atual ? atual + '\n\n' : '') + r.texto;
     campo().scrollTop = campo().scrollHeight;
     d.innerHTML = '✓ Transcrito. <b>Confira o texto</b> e corrija se algum termo saiu errado; depois envie ou grave mais.';
   }).catch(function(e){
-    d.textContent = 'Não deu para transcrever (' + e.message + '). Grave de novo ou use o microfone do teclado.';
+    d.textContent = 'Não deu para transcrever: ' + e.message + '. Grave de novo ou use o microfone do teclado. (diagnóstico: ' + diag + ')';
   }).then(function(){ transcrevendo = false; b.disabled = false; b.textContent = 'Gravar mais'; });
 }
 
