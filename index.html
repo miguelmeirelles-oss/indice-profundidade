@@ -1578,7 +1578,7 @@ function gravarAudio(){
     var b = document.getElementById('btGravar'); b.textContent = 'Terminei'; b.className = 'parar';
     statusVoz('🔴 Ouvindo… o texto vai aparecendo enquanto você fala. Toque em "Terminei" quando acabar.');
     timer = setInterval(tique, 250); tique();
-    vozMon = setInterval(vigiarPausa, 100);
+    vozMon = setInterval(vigiarPausa, 40);
     limiteGrav = setTimeout(function(){ if(gravando) pararGravacao(); }, 600000);   // 10 min por vez
   }).catch(function(){
     semMicrofone(ehCelular
@@ -1588,17 +1588,16 @@ function gravarAudio(){
 }
 function statusVoz(html){ var d = document.getElementById('dicaMic'); d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal'; d.innerHTML = html; }
 function iniciarSegmento(){
-  var pd = [], idx = tomada.n++, iniSeg = Date.now();
-  try{ gravador = new MediaRecorder(fluxo); }
+  var pd = [], idx = tomada.n++, iniSeg = Date.now(), g;
+  try{ g = gravador = new MediaRecorder(fluxo); }
   catch(e){ fluxo.getTracks().forEach(function(t){ t.stop(); }); semMicrofone('Este navegador não grava áudio. Use o microfone do teclado ou digite.'); return false; }
   gravador.ondataavailable = function(e){ if(e.data && e.data.size) pd.push(e.data); };
   gravador.onstop = function(){
-    var blob = new Blob(pd, {type: this.mimeType || 'audio/webm'}); blob.segundos = (Date.now() - iniSeg) / 1000;
-    if(gravando) iniciarSegmento();   // o próximo trecho começa na hora
-    else encerrarMicrofone();
+    var blob = new Blob(pd, {type: g.mimeType || 'audio/webm'}); blob.segundos = (Date.now() - iniSeg) / 1000;
+    if(!gravando && g === gravador) encerrarMicrofone();
     enviarSegmento(blob, idx);
   };
-  gravador.start(); segIni = Date.now(); quietoDesde = 0;
+  gravador.start(); segIni = Date.now(); quietoDesde = 0; valeDesde = 0; respiroDesde = 0;
   return true;
 }
 function nivelVoz(){
@@ -1607,14 +1606,28 @@ function nivelVoz(){
   var soma = 0; for(var i = 0; i < a.length; i++){ var v = (a[i] - 128) / 128; soma += v * v; }
   return Math.sqrt(soma / a.length);
 }
-var vozPico = 0.02;
+var vozPico = 0.02, valeDesde = 0, respiroDesde = 0;
 function vigiarPausa(){
   if(!gravando || !gravador || gravador.state !== 'recording') return;
   var nv = nivelVoz(), agora = Date.now(), dur = agora - segIni;
-  vozPico = Math.max(nv, vozPico * 0.995);   // acompanha o volume da pessoa
+  vozPico = Math.max(nv, vozPico * 0.998);   // acompanha o volume da pessoa
   var quieto = nv < Math.max(0.01, vozPico * 0.18);
   if(quieto){ if(!quietoDesde) quietoDesde = agora; } else quietoDesde = 0;
-  if((dur >= 4000 && quietoDesde && agora - quietoDesde >= 350) || dur >= 12000){ try{ gravador.stop(); }catch(e){} }
+  // trechos curtos = texto aparece mais cedo: corta na 1ª pausa depois de 2,5 s; depois de 5 s aceita
+  // até um respiro curto entre palavras; em 8 s corta de qualquer jeito
+  // corte só onde a voz cai de verdade: pausa (≥300 ms) a partir de 2,5 s; silêncio curto entre palavras
+  // (≥100 ms, bem baixo) a partir de 4 s; qualquer respiro a partir de 7 s; 10 s no máximo
+  var vale = nv < vozPico * 0.08, respiro = nv < vozPico * 0.25;
+  if(vale){ if(!valeDesde) valeDesde = agora; } else valeDesde = 0;
+  if(respiro){ if(!respiroDesde) respiroDesde = agora; } else respiroDesde = 0;
+  var pausa = quietoDesde ? agora - quietoDesde : 0, entrePalavras = valeDesde ? agora - valeDesde : 0, curto = respiroDesde ? agora - respiroDesde : 0;
+  if((dur >= 2500 && pausa >= 300) || (dur >= 4000 && entrePalavras >= 100) || (dur >= 7000 && curto >= 80) || dur >= 10000) cortarTrecho();
+}
+// o trecho novo começa ANTES de o anterior parar: nenhum pedaço de fala se perde no corte
+function cortarTrecho(){
+  var velho = gravador;
+  if(!iniciarSegmento()) return;
+  try{ velho.stop(); }catch(e){}
 }
 function encerrarMicrofone(){
   clearInterval(vozMon);
