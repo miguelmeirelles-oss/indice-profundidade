@@ -645,10 +645,12 @@ function desenharAnual(){
     passo('Folha de rosto do plano ' + r.anoPlano, arq(/^Folha de Rosto-PPA/), '<button type="button" data-anfolha="ppa">Gerar (Word)</button>') +
     passo('RAD do plano ' + r.anoPlano, arq(/^RAD Plano/), '<button type="button" data-anrad="ppa">Gerar</button>') +
     '<div id="anDocMsg" class="aviso" style="margin-top:6px"></div></div>';
+  h += '<div class="caixa"><h2>✅ Conferir antes de mandar à chefia</h2><p class="aviso" style="margin-top:0">Como um coordenador rigoroso: regras da DIREN (só o ano letivo, tudo comprovado, mínimo de ' + r.minimo + ' pts, RAD em modo PT) e da Portaria MEC 750/2024 (horas de aula por semana), as duas RADs × plataforma, as folhas de rosto e, pela IA, cada item do relatório com o PDF dos comprovantes (2 etapas). O relatório da conferência fica na pasta, mas não vai no e-mail.</p>' +
+    '<div class="botoes"><button type="button" id="anConferir">✅ Conferir relatório e plano</button></div><div id="anConfBox"></div></div>';
   // ---- 5 · e-mail ----
   h += '<div class="caixa"><h2>5 · E-mail para a chefia (coordenação)</h2><div class="grade" style="grid-template-columns:1fr"><div><label>Para</label><input id="anPara" value="' + esc(r.email.para) + '" placeholder="e-mail da chefia imediata"></div>' +
     '<div><label>Assunto</label><input id="anAssunto" value="' + esc(r.email.assunto) + '"></div><div><label>Texto</label><textarea id="anCorpo" rows="11">' + esc(r.email.corpo) + '</textarea></div></div>' +
-    '<p class="aviso">Anexos: ' + (r.arquivos.length ? r.arquivos.map(function(a){ return esc(a.nome); }).join(' · ') : 'nenhum ainda') + '. Você recebe uma cópia.</p>' + (r.envios.length ? '<p class="ok">✓ Enviado em ' + r.envios.map(esc).join(', ') + '</p>' : '') +
+    '<p class="aviso">Anexos: ' + (r.arquivos.length ? r.arquivos.filter(function(a){ return !/^(Comprovante de disciplinas|Conferência)/.test(a.nome); }).map(function(a){ return esc(a.nome); }).join(' · ') : 'nenhum ainda') + '. Você recebe uma cópia.</p>' + (r.envios.length ? '<p class="ok">✓ Enviado em ' + r.envios.map(esc).join(', ') + '</p>' : '') +
     '<div class="botoes"><button type="button" class="sec" id="anSalvarEmail">Salvar</button><button type="button" id="anEnviar"' + (r.arquivos.length ? '' : ' disabled') + '>✉ ' + (r.envios.length ? 'Enviar de novo' : 'Enviar à chefia') + '</button></div><div id="anEmailMsg" class="aviso"></div></div>';
   $('corpo').innerHTML = h;
   ligarAnual();
@@ -716,8 +718,9 @@ function ligarAnual(){
     lerArquivo(f).then(function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovante de disciplinas ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); }).then(feito).catch(function(e){ $('anDiscInfo').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
   $('anComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg, {ano: r.ano, discId: (discAnexado(r) || {}).id,
     carregar: function(){ return apiAn('progAnualComprovantes', {ano: r.ano}).then(function(x){ return x.comprovantes; }); },
-    salvar: function(b64){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf'}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
+    salvar: function(b64, inc){ return apiAn('progAnualSalvarArq', {ano: r.ano, nome: 'Comprovantes relatório ' + r.ano + '.pdf', dados: b64, mime: 'application/pdf', incluidos: inc}); } }).then(function(){ abrirAnual(); }).catch(erro('anDocMsg')); });
   // e-mail
+  $('anConferir').addEventListener('click', conferirAnual);
   $('anSalvarEmail').addEventListener('click', function(){ this.disabled = true; apiAn('progAnualSalvar', {ano: r.ano, dados: coletarEmailAnual()}).then(function(x){ feito(x); $('anEmailMsg').textContent = 'Salvo.'; }).catch(erro('anEmailMsg')); });
   $('anEnviar').addEventListener('click', function(){ var d = coletarEmailAnual(), re = r.envios.length > 0;
     if(!confirm((re ? 'Já foi enviado. Enviar DE NOVO' : 'Enviar agora') + ' para ' + d.para + ' com ' + r.arquivos.length + ' anexo(s)?')) return;
@@ -817,9 +820,12 @@ function apiAn(acao, d){
   var pr = AN && AN.proprio;
   var completar = function(r){ if(!r || !r.proprio || !r.anoPlano) return r; return pastaAnualDrv(r).then(function(p){ r.pasta = p.webViewLink; return arqsDrv(p.id); }).then(function(l){ r.arquivos = l; return r; }); };
   if(!pr) return api(acao, d).then(completar);
-  if(acao === 'progAnualSalvarArq') return pastaAnualDrv(AN).then(function(p){ return drvSalvar(p.id, d.nome, d.dados, d.mime); }).then(function(){ return apiAn('progAnualAbrir', {ano: AN.ano}); });
+  if(acao === 'progAnualSalvarArq') return pastaAnualDrv(AN).then(function(p){ return drvSalvar(p.id, d.nome, d.dados, d.mime, Array.isArray(d.incluidos) ? 'incluidos:' + JSON.stringify(d.incluidos) : ''); }).then(function(){ return apiAn('progAnualAbrir', {ano: AN.ano}); });
   var pre = Promise.resolve();
-  if(acao === 'progAnualEmail') pre = bytesDosArquivos(AN.arquivos.filter(function(a){ return !/^Comprovante de disciplinas/.test(a.nome); })).then(function(l){ d.anexos = l; });
+  if(acao === 'progAnualConferir') pre = pastaAnualDrv(AN).then(function(p){ return drvListar(p.id); }).then(function(l){ l = l.filter(function(f){ return /^(Folha de Rosto|RAD |Comprovantes relat|Comprovante de disciplinas)/.test(f.name); });
+    return Promise.all(l.map(function(f){ var o = {id: f.id, nome: f.name, em: new Date(f.modifiedTime).getTime(), desc: f.description || '', mime: f.mimeType};
+      return /^(RAD |Comprovantes relat)/.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }).then(function(l){ d.arquivos = l; });
+  if(acao === 'progAnualEmail') pre = bytesDosArquivos(AN.arquivos.filter(function(a){ return !/^(Comprovante de disciplinas|Conferência)/.test(a.nome); })).then(function(l){ d.anexos = l; });
   return pre.then(function(){ return api(acao, d); }).then(function(r){
     return (r && r.arquivoNovo ? pastaAnualDrv(r).then(function(p){ return drvSalvar(p.id, r.arquivoNovo.nome, r.arquivoNovo.dados, r.arquivoNovo.mime); }) : Promise.resolve()).then(function(){ return completar(r); }); });
 }
@@ -1116,6 +1122,17 @@ function conferir(){
     box.innerHTML = '<p class="carregando">2/2 · Segunda verificação: conferindo de novo ' + (n ? 'os ' + n + ' ponto(s) levantados' : 'o resultado') + '…</p>';
     return api('progConferir', {etapa: 2, arquivos: ARQC}).then(function(rel){ box.innerHTML = htmlConferencia(rel); bt.disabled = false;
       if(rel.docx && proprio()) pastaCicloDrv().then(function(c){ return drvSalvar(c.id, 'Conferência do processo (Aula por IA).docx', rel.docx, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'); }).catch(function(){}); });
+  }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; });
+}
+function conferirAnual(){
+  var box = $('anConfBox'), bt = $('anConferir'), ano = AN.ano; bt.disabled = true;
+  box.innerHTML = '<p class="carregando"><span class="giro"></span>1/2 · Conferindo as regras, as RADs e as folhas; a IA confere cada item com o PDF dos comprovantes… (1 a 3 min)</p>';
+  apiAn('progAnualConferir', {ano: ano, etapa: 1}).then(function(r1){
+    if(r1.semIA){ box.innerHTML = htmlConferencia(r1); bt.disabled = false; return; }
+    var n = (r1.r1.linhas || []).filter(function(l){ return l.situacao !== 'ok'; }).length;
+    box.innerHTML = '<p class="carregando"><span class="giro"></span>2/2 · Segunda verificação: conferindo de novo ' + (n ? 'os ' + n + ' ponto(s) levantados' : 'o resultado') + '…</p>';
+    return apiAn('progAnualConferir', {ano: ano, etapa: 2}).then(function(rel){ box.innerHTML = htmlConferencia(rel); bt.disabled = false;
+      if(rel.docx && AN.proprio) pastaAnualDrv(AN).then(function(p){ return drvSalvar(p.id, 'Conferência relatório ' + ano + ' e plano ' + (ano + 1) + ' (Aula por IA).docx', rel.docx, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'); }).catch(function(){}); });
   }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; });
 }
 function htmlConferencia(r){
