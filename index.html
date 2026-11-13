@@ -580,7 +580,7 @@ if (/[?&]embed=trilha\b/.test(location.search)) document.documentElement.classLi
     <div class="botoes">
       <button class="gravar" id="btGravar" onclick="alternarGravacao()">Começar a falar</button>
       <span class="cronometro" id="cronometro">
-        <span class="ouvindo" id="luz" style="visibility:hidden"></span>0:00
+        <span class="ouvindo" id="luz" style="visibility:hidden"></span><span id="tempoGrav">0:00</span>
       </span>
     </div>
 
@@ -1545,50 +1545,84 @@ function alternarGravacao(){
   gravando = true; t0 = Date.now();
   var b = document.getElementById('btGravar');
   b.textContent = 'Terminei'; b.className = 'parar';
-  document.getElementById('luz').style.visibility = 'visible';
   timer = setInterval(tique, 250); tique();
 }
 
 function pararGravacao(){
   gravando = false;
   clearTimeout(limiteGrav);
-  if(gravador && gravador.state !== 'inactive'){ try{ gravador.stop(); }catch(e){} }
+  if(gravador && gravador.state !== 'inactive'){ try{ gravador.stop(); }catch(e){} } else if(fluxo) encerrarMicrofone();
   if(rec){ rec.onend = null; try{ rec.stop(); }catch(e){} }
   clearInterval(timer);
   estado.segundos += Math.round((Date.now() - t0)/1000);
   var b = document.getElementById('btGravar');
   b.textContent = preferirTeclado ? 'Usar o microfone do teclado' : 'Gravar mais';
   b.className = 'gravar';
-  document.getElementById('luz').style.visibility = 'hidden';
+  if(segPend > 0){ b.disabled = true; statusVoz('✍️ Terminando de escrever os últimos trechos…'); }
+  var l = document.getElementById('luz'); if(l){ l.style.visibility = 'hidden'; l.classList.remove('on'); }
 }
 
-/* ---------- gravar na página e transcrever com a IA ---------- */
+/* ---------- gravar na página e transcrever com a IA, ENQUANTO o aluno fala ----------
+   A gravação é cortada nas pausas (depois de 4 s, quando a voz fica baixa por um instante; no máximo 12 s)
+   e cada trecho vai para a IA na hora. O texto aparece no campo na ordem, poucos segundos atrás da fala.
+   Cortar na pausa evita partir palavra no meio. Cada trecho leva o texto anterior como contexto. */
+var vozCtx = null, vozAnal = null, vozMon = null, segIni = 0, quietoDesde = 0, segFila = Promise.resolve(), segPend = 0, tomada = null;
 function gravarAudio(){
   navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}}).then(function(st){
-    fluxo = st; pedacos = [];
-    try{ gravador = new MediaRecorder(st); }
-    catch(e){ st.getTracks().forEach(function(t){ t.stop(); }); semMicrofone('Este navegador não grava áudio. Use o microfone do teclado ou digite.'); return; }
-    gravador.ondataavailable = function(e){ if(e.data && e.data.size) pedacos.push(e.data); };
-    gravador.onstop = function(){
-      var tipo = gravador.mimeType || 'audio/webm';
-      fluxo.getTracks().forEach(function(t){ t.stop(); });
-      transcreverAudio(new Blob(pedacos, {type: tipo}));
-    };
-    gravador.start();
+    fluxo = st;
+    try{ var AC = window.AudioContext || window.webkitAudioContext; vozCtx = new AC(); vozAnal = vozCtx.createAnalyser(); vozAnal.fftSize = 1024; vozCtx.createMediaStreamSource(st).connect(vozAnal); }
+    catch(e){ vozCtx = null; vozAnal = null; }
+    tomada = {n: 0, comFala: 0, diag: '', novoParagrafo: !!campo().value.trim()};
+    if(!iniciarSegmento()) return;
     gravando = true; t0 = Date.now();
     var b = document.getElementById('btGravar'); b.textContent = 'Terminei'; b.className = 'parar';
-    document.getElementById('luz').style.visibility = 'visible';
-    var d = document.getElementById('dicaMic'); d.textContent = 'Gravando… fale com calma. Quando terminar, toque em "Terminei" (até 3 minutos por vez; dá para gravar mais depois).'; d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal';
+    statusVoz('🔴 Ouvindo… o texto vai aparecendo enquanto você fala. Toque em "Terminei" quando acabar.');
     timer = setInterval(tique, 250); tique();
-    limiteGrav = setTimeout(function(){ if(gravando) pararGravacao(); }, 180000);
+    vozMon = setInterval(vigiarPausa, 100);
+    limiteGrav = setTimeout(function(){ if(gravando) pararGravacao(); }, 600000);   // 10 min por vez
   }).catch(function(){
     semMicrofone(ehCelular
       ? 'O microfone está bloqueado para este site. Libere nas configurações do navegador (permissões do site → microfone) e toque de novo — ou use o microfone do teclado.'
       : 'O microfone está bloqueado. Clique no cadeado ao lado do endereço, libere o microfone e recarregue a página. Enquanto isso, você pode digitar a resposta.');
   });
 }
+function statusVoz(html){ var d = document.getElementById('dicaMic'); d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal'; d.innerHTML = html; }
+function iniciarSegmento(){
+  var pd = [], idx = tomada.n++, iniSeg = Date.now();
+  try{ gravador = new MediaRecorder(fluxo); }
+  catch(e){ fluxo.getTracks().forEach(function(t){ t.stop(); }); semMicrofone('Este navegador não grava áudio. Use o microfone do teclado ou digite.'); return false; }
+  gravador.ondataavailable = function(e){ if(e.data && e.data.size) pd.push(e.data); };
+  gravador.onstop = function(){
+    var blob = new Blob(pd, {type: this.mimeType || 'audio/webm'}); blob.segundos = (Date.now() - iniSeg) / 1000;
+    if(gravando) iniciarSegmento();   // o próximo trecho começa na hora
+    else encerrarMicrofone();
+    enviarSegmento(blob, idx);
+  };
+  gravador.start(); segIni = Date.now(); quietoDesde = 0;
+  return true;
+}
+function nivelVoz(){
+  if(!vozAnal) return 1;
+  var a = new Uint8Array(vozAnal.fftSize); vozAnal.getByteTimeDomainData(a);
+  var soma = 0; for(var i = 0; i < a.length; i++){ var v = (a[i] - 128) / 128; soma += v * v; }
+  return Math.sqrt(soma / a.length);
+}
+var vozPico = 0.02;
+function vigiarPausa(){
+  if(!gravando || !gravador || gravador.state !== 'recording') return;
+  var nv = nivelVoz(), agora = Date.now(), dur = agora - segIni;
+  vozPico = Math.max(nv, vozPico * 0.995);   // acompanha o volume da pessoa
+  var quieto = nv < Math.max(0.01, vozPico * 0.18);
+  if(quieto){ if(!quietoDesde) quietoDesde = agora; } else quietoDesde = 0;
+  if((dur >= 4000 && quietoDesde && agora - quietoDesde >= 350) || dur >= 12000){ try{ gravador.stop(); }catch(e){} }
+}
+function encerrarMicrofone(){
+  clearInterval(vozMon);
+  if(fluxo) fluxo.getTracks().forEach(function(t){ t.stop(); });
+  if(vozCtx){ try{ vozCtx.close(); }catch(e){} vozCtx = null; vozAnal = null; }
+}
 function bytesB64(bytes){ var s = '', k = 0x8000; for(var i = 0; i < bytes.length; i += k) s += String.fromCharCode.apply(null, bytes.subarray(i, i + k)); return btoa(s); }
-// qualquer formato que o navegador grave (webm no Android/PC, mp4 no iPhone) vira WAV 16 kHz mono, que o Gemini lê sempre
+// 2ª chance: qualquer formato vira WAV 16 kHz mono (só se o áudio original não der)
 function paraWav(blob){
   return blob.arrayBuffer().then(function(buf){
     var AC = window.AudioContext || window.webkitAudioContext, ac = new AC();
@@ -1599,51 +1633,67 @@ function paraWav(blob){
       return new Promise(function(ok){ off.oncomplete = function(e){ ok(e.renderedBuffer); }; var p = off.startRendering(); if(p && p.then) p.then(ok); });
     }).then(function(ren){
       var x = ren.getChannelData(0), pico = 0; for(var k = 0; k < x.length; k++){ var a = Math.abs(x[k]); if(a > pico) pico = a; }
-      if(pico < 0.002) throw new Error('o microfone gravou só silêncio — confira se outro app está usando o microfone ou se o navegador tem permissão');
+      if(pico < 0.002) throw new Error('o microfone gravou só silêncio');
       var ganho = Math.min(30, 0.9 / pico); if(ganho > 1.05) for(var k2 = 0; k2 < x.length; k2++) x[k2] *= ganho;
       var out = new DataView(new ArrayBuffer(44 + x.length * 2)), esc = function(o, t){ for(var i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
       esc(0, 'RIFF'); out.setUint32(4, 36 + x.length * 2, true); esc(8, 'WAVE'); esc(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
       out.setUint32(24, 16000, true); out.setUint32(28, 32000, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true); esc(36, 'data'); out.setUint32(40, x.length * 2, true);
       for(var i = 0; i < x.length; i++){ var v = Math.max(-1, Math.min(1, x[i])); out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
-      return {b64: bytesB64(new Uint8Array(out.buffer)), segundos: ren.duration, nivel: Math.round(pico * 100), ganho: Math.round(ganho * 10) / 10};
+      return {b64: bytesB64(new Uint8Array(out.buffer)), segundos: ren.duration, nivel: Math.round(pico * 100)};
     });
   });
 }
-function transcreverAudio(blob){
-  var d = document.getElementById('dicaMic'), b = document.getElementById('btGravar');
-  transcrevendo = true; b.disabled = true;
-  d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal';
-  d.innerHTML = '⏳ Transcrevendo com IA (pontuação e termos técnicos)… alguns segundos.';
+// um trecho: manda o áudio original; se não der, a versão convertida. Devolve {texto, diag}
+function transcreverTrecho(blob, parte){
   var tipo = (blob.type || 'audio/webm').split(';')[0], diag = tipo.replace('audio/', '') + ', ' + Math.round(blob.size / 1024) + ' KB';
-  var pedir = function(b64, mime){ return api('transcreverFala', {audio: b64, mime: mime, token: sessao.token, visitante: visitante,
+  var pedir = function(b64, mime){ return api('transcreverFala', {audio: b64, mime: mime, token: sessao.token, visitante: visitante, parte: parte, trecho: true, segundos: blob.segundos || 0,
     tema: subtopicoAtual ? subtopicoAtual.nome : (colega ? colega.tema : ''),
     pergunta: estado.convite || document.getElementById('conviteTexto').textContent, antes: campo().value}); };
-  var wav = null;   // 2ª chance: a versão convertida pelo navegador (só se a 1ª não der)
   var tentarWav = function(motivo){
-    return (wav || paraWav(blob)).then(function(w){ diag += ', ' + Math.round(w.segundos) + ' s, nível ' + w.nivel + '%'; return pedir(w.b64, 'audio/wav'); })
+    return paraWav(blob).then(function(w){ diag += ', ' + Math.round(w.segundos) + ' s, nível ' + w.nivel + '%'; return pedir(w.b64, 'audio/wav'); })
       .catch(function(e){ throw new Error(motivo || e.message); });
   };
-  if(blob.size < 2000){ transcrevendo = false; b.disabled = false; d.textContent = 'A gravação ficou vazia. Grave de novo.'; return; }
-  // 1ª tentativa: o áudio original, como o celular gravou (webm no Android, mp4 no iPhone) — sem conversão no aparelho
-  blob.arrayBuffer().then(function(buf){ return pedir(bytesB64(new Uint8Array(buf)), tipo); })
+  return blob.arrayBuffer().then(function(buf){ return pedir(bytesB64(new Uint8Array(buf)), tipo); })
     .then(function(r){ if(r.audivel) return r; diag += ' · original sem fala'; return tentarWav(); },
           function(e){ if(/COTA|créditos|LIMITE|sem cadastro/i.test(e.message)) throw e; diag += ' · original recusado'; return tentarWav(e.message); })
-    .then(function(r){
-      if(!r.audivel){ d.textContent = 'A IA não reconheceu fala na gravação. Grave de novo, mais perto do microfone. (diagnóstico: ' + diag + ')'; return; }
-      var atual = campo().value.trim();
-      campo().value = (atual ? atual + '\n\n' : '') + r.texto;
-      campo().scrollTop = campo().scrollHeight;
-      d.innerHTML = '✓ Transcrito. <b>Confira o texto</b> e corrija se algum termo saiu errado; depois envie ou grave mais.';
-    }).catch(function(e){
-      d.textContent = 'Não deu para transcrever: ' + e.message + '. Grave de novo ou use o microfone do teclado. (diagnóstico: ' + diag + ')';
-    }).then(function(){ transcrevendo = false; b.disabled = false; b.textContent = 'Gravar mais'; });
+    .then(function(r){ return {texto: r.audivel ? r.texto : '', diag: diag}; }, function(e){ e.diag = diag; throw e; });
 }
+function enviarSegmento(blob, idx){
+  var tom = tomada, b = document.getElementById('btGravar');
+  if(blob.size < 1500){ fimDosTrechos(tom); return; }
+  segPend++; transcrevendo = true;
+  var p = transcreverTrecho(blob, idx);
+  // a inserção segue a ordem da fala, mesmo que um trecho volte antes do outro
+  segFila = segFila.then(function(){ return p.then(function(r){
+    tom.diag = r.diag;
+    if(!r.texto) return;
+    tom.comFala++;
+    var atual = campo().value.replace(/\s+$/, ''), sep = !atual ? '' : (tom.novoParagrafo ? '\n\n' : ' ');
+    tom.novoParagrafo = false;
+    campo().value = atual + sep + r.texto;
+    campo().scrollTop = campo().scrollHeight;
+  }, function(e){
+    tom.erro = e.message; tom.diag = e.diag || tom.diag;
+  }); }).then(function(){ segPend--; fimDosTrechos(tom); });
+  if(gravando) statusVoz('🔴 Ouvindo… ✍️ escrevendo o que você disse (o texto chega alguns segundos depois da fala).');
+  else { b.disabled = true; statusVoz('✍️ Terminando de escrever os últimos trechos…'); }
+}
+function fimDosTrechos(tom){
+  if(segPend > 0 || gravando) return;
+  transcrevendo = false;
+  var b = document.getElementById('btGravar'); b.disabled = false;
+  if(tom.erro && !tom.comFala) statusVoz('Não deu para transcrever: ' + esc(tom.erro) + '. Grave de novo ou use o microfone do teclado. (diagnóstico: ' + esc(tom.diag) + ')');
+  else if(!tom.comFala) statusVoz('A IA não reconheceu fala na gravação. Grave de novo, mais perto do microfone. (diagnóstico: ' + esc(tom.diag) + ')');
+  else statusVoz('✓ Transcrito. <b>Confira o texto</b> e corrija se algum termo saiu errado; depois envie ou grave mais.' + (tom.erro ? ' <span style="color:#8a1c1c">Um trecho falhou (' + esc(tom.erro) + ') — confira se faltou alguma parte.</span>' : ''));
+}
+// compatibilidade: uma gravação inteira de uma vez (usada nos testes)
+function transcreverAudio(blob){ tomada = {n: 1, comFala: 0, diag: '', novoParagrafo: !!campo().value.trim()}; enviarSegmento(blob, 0); }
 
+// mostra o tempo TOTAL falado (soma das gravações), e a luz piscando enquanto grava
 function tique(){
-  var s = Math.floor((Date.now() - t0)/1000);
-  document.getElementById('cronometro').innerHTML =
-    '<span class="ouvindo on" style="visibility:visible"></span>' +
-    Math.floor(s/60) + ':' + ('0' + (s % 60)).slice(-2);
+  var s = (estado.segundos || 0) + Math.floor((Date.now() - t0)/1000);
+  var l = document.getElementById('luz'); if(l){ l.style.visibility = 'visible'; l.classList.add('on'); }
+  var t = document.getElementById('tempoGrav'); if(t) t.textContent = Math.floor(s/60) + ':' + ('0' + (s % 60)).slice(-2);
 }
 
 function semMicrofone(msg){
