@@ -587,12 +587,11 @@ if (/[?&]embed=trilha\b/.test(location.search)) document.documentElement.classLi
     <div style="margin-top:16px">
       <label for="transcricao">Sua explicação</label>
       <textarea id="transcricao" placeholder="Clique em começar a falar. O texto aparece aqui e você pode corrigir antes de enviar."></textarea>
-      <p class="aviso" id="dicaMic">Confira a transcrição antes de enviar: o
-        reconhecimento de voz erra termos técnicos, e a avaliação usa o texto.</p>
-      <p class="aviso" style="margin-top:6px">Texto ditado costuma vir sem
-        pontuação, e isso <b>não afeta a sua nota</b> — a avaliação lê os
-        conceitos, não as vírgulas. Vale corrigir apenas os termos técnicos que
-        saírem trocados, porque esses sim podem ser lidos como erro.</p>
+      <p class="aviso" id="dicaMic">Toque em "Começar a falar" e responda falando: a IA
+        transcreve com pontuação e com os termos técnicos certos. Confira o texto antes de enviar.</p>
+      <p class="aviso" style="margin-top:6px">Pontuação e grafia <b>não afetam a sua nota</b> —
+        a avaliação lê os conceitos. Se usar o microfone do teclado, vale corrigir os termos
+        técnicos que saírem trocados.</p>
     </div>
 
     <div class="botoes">
@@ -814,7 +813,7 @@ var subtopicoAtual = null;   // {id, nome} quando a avaliação vem do currícul
 var estado = {turnos:[], mapa:null, convite:'', rodada:0,
               indiceInicial:null, indiceAtual:null, segundos:0,
               ultimoParcial:null, rodadasMin:1, rodadasMax:10};
-var rec=null, gravando=false, t0=0, timer=null;
+var rec=null, gravando=false, t0=0, timer=null, gravador=null, fluxo=null, pedacos=[], limiteGrav=null, transcrevendo=false;
 
 /* ---------- contas ---------- */
 var clientIdGoogle = '';
@@ -1447,7 +1446,10 @@ var ehCelular = ehIOS || ehAndroid;
 // tem o ciclo de encerrar e reiniciar que a gravação pela página sofre.
 // Por isso ele é o caminho padrão no celular — no Android a gravação pela
 // página continua disponível para quem preferir.
-var preferirTeclado = ehCelular;
+// Desde 11/2026 a página grava o áudio e a IA transcreve (pontuação e termos técnicos);
+// o microfone do teclado fica como alternativa.
+function podeGravarAudio(){ return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.MediaRecorder && (window.AudioContext || window.webkitAudioContext)); }
+var preferirTeclado = ehCelular && !podeGravarAudio();
 
 var AVISO_TECLADO = 'Use o microfone do teclado: toque no campo acima e depois ' +
   'no ícone de microfone, ao lado da barra de espaço. É mais estável no ' +
@@ -1480,6 +1482,8 @@ function alternarGravacao(){
     return;
   }
   if(gravando){ pararGravacao(); return; }
+  if(transcrevendo) return;
+  if(podeGravarAudio()){ gravarAudio(); return; }
   rec = iniciarRec();
   if(!rec){
     semMicrofone(ehCelular ? AVISO_TECLADO
@@ -1547,6 +1551,8 @@ function alternarGravacao(){
 
 function pararGravacao(){
   gravando = false;
+  clearTimeout(limiteGrav);
+  if(gravador && gravador.state !== 'inactive'){ try{ gravador.stop(); }catch(e){} }
   if(rec){ rec.onend = null; try{ rec.stop(); }catch(e){} }
   clearInterval(timer);
   estado.segundos += Math.round((Date.now() - t0)/1000);
@@ -1554,6 +1560,71 @@ function pararGravacao(){
   b.textContent = preferirTeclado ? 'Usar o microfone do teclado' : 'Gravar mais';
   b.className = 'gravar';
   document.getElementById('luz').style.visibility = 'hidden';
+}
+
+/* ---------- gravar na página e transcrever com a IA ---------- */
+function gravarAudio(){
+  navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true, noiseSuppression: true}}).then(function(st){
+    fluxo = st; pedacos = [];
+    try{ gravador = new MediaRecorder(st); }
+    catch(e){ st.getTracks().forEach(function(t){ t.stop(); }); semMicrofone('Este navegador não grava áudio. Use o microfone do teclado ou digite.'); return; }
+    gravador.ondataavailable = function(e){ if(e.data && e.data.size) pedacos.push(e.data); };
+    gravador.onstop = function(){
+      var tipo = gravador.mimeType || 'audio/webm';
+      fluxo.getTracks().forEach(function(t){ t.stop(); });
+      transcreverAudio(new Blob(pedacos, {type: tipo}));
+    };
+    gravador.start(1000);
+    gravando = true; t0 = Date.now();
+    var b = document.getElementById('btGravar'); b.textContent = 'Terminei'; b.className = 'parar';
+    document.getElementById('luz').style.visibility = 'visible';
+    var d = document.getElementById('dicaMic'); d.textContent = 'Gravando… fale com calma. Quando terminar, toque em "Terminei" (até 3 minutos por vez; dá para gravar mais depois).'; d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal';
+    timer = setInterval(tique, 250); tique();
+    limiteGrav = setTimeout(function(){ if(gravando) pararGravacao(); }, 180000);
+  }).catch(function(){
+    semMicrofone(ehCelular
+      ? 'O microfone está bloqueado para este site. Libere nas configurações do navegador (permissões do site → microfone) e toque de novo — ou use o microfone do teclado.'
+      : 'O microfone está bloqueado. Clique no cadeado ao lado do endereço, libere o microfone e recarregue a página. Enquanto isso, você pode digitar a resposta.');
+  });
+}
+function bytesB64(bytes){ var s = '', k = 0x8000; for(var i = 0; i < bytes.length; i += k) s += String.fromCharCode.apply(null, bytes.subarray(i, i + k)); return btoa(s); }
+// qualquer formato que o navegador grave (webm no Android/PC, mp4 no iPhone) vira WAV 16 kHz mono, que o Gemini lê sempre
+function paraWav(blob){
+  return blob.arrayBuffer().then(function(buf){
+    var AC = window.AudioContext || window.webkitAudioContext, ac = new AC();
+    return new Promise(function(ok, falha){ ac.decodeAudioData(buf, ok, falha); }).then(function(aud){
+      try{ ac.close(); }catch(e){}
+      var taxa = 16000, n = Math.max(1, Math.ceil(aud.duration * taxa)), OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, off = new OAC(1, n, taxa), src = off.createBufferSource();
+      src.buffer = aud; src.connect(off.destination); src.start(0);
+      return new Promise(function(ok){ off.oncomplete = function(e){ ok(e.renderedBuffer); }; var p = off.startRendering(); if(p && p.then) p.then(ok); });
+    }).then(function(ren){
+      var x = ren.getChannelData(0), out = new DataView(new ArrayBuffer(44 + x.length * 2)), esc = function(o, t){ for(var i = 0; i < t.length; i++) out.setUint8(o + i, t.charCodeAt(i)); };
+      esc(0, 'RIFF'); out.setUint32(4, 36 + x.length * 2, true); esc(8, 'WAVE'); esc(12, 'fmt '); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 1, true);
+      out.setUint32(24, 16000, true); out.setUint32(28, 32000, true); out.setUint16(32, 2, true); out.setUint16(34, 16, true); esc(36, 'data'); out.setUint32(40, x.length * 2, true);
+      for(var i = 0; i < x.length; i++){ var v = Math.max(-1, Math.min(1, x[i])); out.setInt16(44 + i * 2, v < 0 ? v * 0x8000 : v * 0x7fff, true); }
+      return {b64: bytesB64(new Uint8Array(out.buffer)), segundos: ren.duration};
+    });
+  });
+}
+function transcreverAudio(blob){
+  var d = document.getElementById('dicaMic'), b = document.getElementById('btGravar');
+  transcrevendo = true; b.disabled = true;
+  d.style.color = 'var(--cinza)'; d.style.fontWeight = 'normal';
+  d.innerHTML = '⏳ Transcrevendo com IA (pontuação e termos técnicos)… alguns segundos.';
+  paraWav(blob).then(function(w){
+    if(w.segundos < 1) throw new Error('A gravação ficou vazia.');
+    return api('transcreverFala', {audio: w.b64, mime: 'audio/wav', token: sessao.token, visitante: visitante,
+      tema: subtopicoAtual ? subtopicoAtual.nome : (colega ? colega.tema : ''),
+      pergunta: estado.convite || document.getElementById('conviteTexto').textContent, antes: campo().value});
+  }).then(function(r){
+    if(!r.audivel){ d.textContent = 'Não ouvi fala na gravação. Grave de novo, mais perto do microfone.'; return; }
+    var atual = campo().value.trim();
+    campo().value = (atual ? atual + '\n\n' : '') + r.texto;
+    campo().scrollTop = campo().scrollHeight;
+    d.innerHTML = '✓ Transcrito. <b>Confira o texto</b> e corrija se algum termo saiu errado; depois envie ou grave mais.';
+  }).catch(function(e){
+    d.textContent = 'Não deu para transcrever (' + e.message + '). Grave de novo ou use o microfone do teclado.';
+  }).then(function(){ transcrevendo = false; b.disabled = false; b.textContent = 'Gravar mais'; });
 }
 
 function tique(){
@@ -1572,21 +1643,21 @@ function semMicrofone(msg){
 }
 
 // No celular já orientamos antes de o aluno esbarrar em qualquer bloqueio.
+var DICA_GRAVAR = 'Toque em "Começar a falar" e responda falando: a IA transcreve com pontuação e com os termos técnicos certos. Confira o texto antes de enviar.';
 if(ehCelular){
   document.addEventListener('DOMContentLoaded', function(){
-    ajustarModoTeclado();
-    if(ehAndroid){
+    if(preferirTeclado) ajustarModoTeclado(); else { var dm = document.getElementById('dicaMic'); if(dm) dm.textContent = DICA_GRAVAR; }
+    if(ehAndroid || (ehIOS && !preferirTeclado)){
       var b = document.getElementById('btGravar');
       var link = document.createElement('button');
       link.className = 'link';
-      link.textContent = 'prefiro gravar pela página';
+      link.textContent = preferirTeclado ? 'prefiro gravar pela página' : 'prefiro o microfone do teclado';
       link.onclick = function(){
-        preferirTeclado = false;
-        link.remove();
+        preferirTeclado = !preferirTeclado;
+        link.textContent = preferirTeclado ? 'prefiro gravar pela página' : 'prefiro o microfone do teclado';
+        if(preferirTeclado){ ajustarModoTeclado(); return; }
         b.textContent = 'Começar a falar';
-        document.getElementById('dicaMic').textContent =
-          'Confira a transcrição antes de enviar: o reconhecimento de voz erra ' +
-          'termos técnicos, e a avaliação usa o texto.';
+        document.getElementById('dicaMic').textContent = DICA_GRAVAR;
         document.getElementById('dicaMic').style.color = 'var(--cinza)';
       };
       if(b) b.parentNode.appendChild(link);
@@ -1664,7 +1735,8 @@ function continuar(){
 
 /* ---------- envio ---------- */
 function enviarFala(encerrar){
-  if(gravando) pararGravacao();
+  if(gravando){ pararGravacao(); }
+  if(transcrevendo || (gravador && gravador.state === 'recording')){ var ef = document.getElementById('erroFala'); ef.textContent = 'Espere a transcrição terminar e confira o texto antes de enviar.'; ef.classList.remove('oculto'); return; }
   var texto = campo().value.trim();
   var err = document.getElementById('erroFala');
   var minimo = estado.turnos.length === 0 ? 25 : 8;
