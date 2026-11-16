@@ -561,7 +561,7 @@ function abrirPlayer(t){
   try{ P.vel = Number(localStorage.getItem('trilha_vel') || 1) || 1; }catch(e){}
   U.iniciar();
   var tr = t.trilha;
-  var h = '<div class="botoes" style="margin:0 0 6px;justify-content:space-between"><a class="link" id="tr_lnVoltar">← ' + (MODO === 'aluno' ? 'outras aulas em trilha' : 'todas as aulas em trilha') + '</a>' +
+  var h = '<div class="botoes" style="margin:0 0 6px;justify-content:space-between"><a class="link" id="tr_lnVoltar">← ' + (MODO === 'aluno' ? 'voltar à biblioteca' : 'todas as aulas em trilha') + '</a>' +
     (MODO === 'aluno' ? '' : t.previa ? '<span class="t-tag">pré-visualização (ainda não salva)</span>' : '<span class="aviso">v' + t.versao + ' · <a href="' + esc(t.pasta) + '" target="_blank" rel="noopener">pasta no Drive</a></span>') + '</div>' +
     '<h2 style="margin:0">' + esc(tr.titulo) + '</h2>' +
     '<div class="t-blocos" id="tr_chips">' + tr.blocos.map(function(b, i){ return '<button class="t-chip" data-trbloco="' + i + '">' + (i + 1) + '. ' + esc(b.titulo) + '</button>'; }).join('') + '</div>' +
@@ -2701,7 +2701,7 @@ window.Trilha = {
     if(RAIZ && RAIZ !== el){ pararTudo(); RAIZ.innerHTML = ''; }   // já aberta: mantém onde estava
     RAIZ = el; el.classList.add('t-app');
     el.innerHTML = MODO === 'aluno' ?
-      '<h2>🎓 Aulas em trilha</h2><p class="aviso" style="margin-top:-6px">Estude no seu ritmo: a aula anda sozinha, com narração, e você pode tirar dúvidas por voz.</p><div id="tr_erroGeral" class="erro oculto"></div><div id="tr_corpo"></div>' :
+      '<h2>📚 Biblioteca de aulas</h2><p class="aviso" style="margin-top:-6px">O curso inteiro, para estudar o que quiser, no seu ritmo: a aula anda sozinha, com narração, e você pode tirar dúvidas por voz.</p><div id="tr_erroGeral" class="erro oculto"></div><div id="tr_corpo"></div>' :
       '<div class="caixa"><h2>🎓 Aula em trilha <span class="t-tag">os alunos já veem</span></h2>' +
       '<p class="aviso" style="margin-top:-6px">Aqui você monta as aulas em trilha. Os alunos só assistem e interagem (na visão de aluno: Aluno → Aulas em trilha).</p>' +
       '<div id="tr_erroGeral" class="erro oculto"></div><div id="tr_corpo"></div></div>';

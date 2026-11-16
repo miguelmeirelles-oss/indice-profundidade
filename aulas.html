@@ -362,6 +362,17 @@
   details.ajuda>div{position:absolute;z-index:60;top:19px;left:-10px;width:300px;max-width:78vw;margin:0;background:#fff;color:var(--navy);
     border:1px solid var(--linha,#d9dee8);border-left:4px solid var(--menu);border-radius:8px;box-shadow:0 8px 24px rgba(14,42,92,.18);
     padding:10px 12px;font-size:13px;line-height:1.5;font-weight:normal;text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
+.hubModos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.hubModo{display:flex;flex-direction:column;align-items:center;gap:2px;margin:0;padding:10px 4px;border:2px solid var(--linha);border-radius:12px;background:#fff;color:var(--navy);font-size:13.5px;font-weight:bold;line-height:1.2;text-align:center;min-height:0}
+.hubModo span{font-size:20px}.hubModo small{font-weight:normal;color:#6b7a99;font-size:11.5px}
+.hubModo[aria-pressed="true"]{border-color:#2E62C6;background:#eef3fd}.hubModo:disabled{opacity:.5}
+.hubFaixa{display:flex;gap:8px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+.hubChip{flex:0 0 auto;scroll-snap-align:center;display:inline-flex;align-items:center;gap:6px;margin:0;padding:6px 12px;border:1.5px solid var(--linha);border-radius:999px;background:#fff;color:var(--navy);font-size:13.5px;font-weight:normal;white-space:nowrap;max-width:240px;overflow:hidden;text-overflow:ellipsis;min-height:0}
+.hubChip .pt{width:9px;height:9px;border-radius:50%;flex:0 0 auto}.hubChip[aria-pressed="true"]{border-color:#2E62C6;background:#eef3fd;font-weight:bold}
+.hubCartao{border:2px solid #2E62C6;border-radius:14px;padding:12px;background:#fff;touch-action:pan-y}
+.hubAcoes{display:flex;flex-direction:column;gap:8px;margin-top:10px}.hubAcoes button{width:100%;margin:0}
+.hubNav{display:flex;justify-content:space-between;gap:8px;margin-top:10px;font-size:13.5px}
+.hubTarefa{display:flex;gap:10px;align-items:center;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff;cursor:pointer}
 </style>
 <style>
   input[type=number]{-moz-appearance:textfield;appearance:textfield}
@@ -406,8 +417,8 @@
     <div class="abas" role="group" aria-label="Seções do aluno">
       <button type="button" class="aba" data-abaal="mat" aria-pressed="true">Minhas matérias</button>
       <button type="button" class="aba" data-abaal="provas" aria-pressed="false">Minhas provas</button>
-      <button type="button" class="aba" data-abaal="desemp" aria-pressed="false">📈 Desempenho</button>
-      <button type="button" class="aba oculto" data-abaal="trilha" id="abaAlTrilha" aria-pressed="false">🎓 Aulas em trilha</button>
+      <button type="button" class="aba" data-abaal="desemp" aria-pressed="false">🎯 Estudar para a prova</button>
+      <button type="button" class="aba oculto" data-abaal="trilha" id="abaAlTrilha" aria-pressed="false">📚 Biblioteca de aulas</button>
       <button type="button" class="aba" data-abaal="insc" aria-pressed="false">Inscrever-se numa matéria</button>
     </div>
     <div id="alunoLista">
@@ -418,7 +429,7 @@
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
       </div>
-      <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>📈 Desempenho</h2><div id="revisaoBox"></div><div id="desempCorpo"><p class="carregando">Carregando…</p></div></div>
+      <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>🎯 Estudar para a prova</h2><p class="aviso" style="margin-top:-6px">Todas as suas matérias, com o próximo passo de cada uma até a prova. Toque em "Abrir a matéria" para estudar os assuntos um a um.</p><div id="revisaoBox"></div><div id="desempCorpo"><p class="carregando">Carregando…</p></div></div>
       <div class="caixa oculto" id="caixaTrilhaAluno" data-painelal="trilha"></div>
       <div class="caixa" id="caixaProvas" data-painelal="provas">
         <h2>📝 Minhas provas</h2>
@@ -1249,8 +1260,8 @@ function carregarMinhas(){
       return '<div class="cartao"><div class="l1"><span>' + esc(m.nome) + ' · ' + esc(m.semestre) + '</span>' + tag + '</div>' +
         '<div class="l2">Prof. ' + esc(m.professor) + (m.ativa ? '' : ' · disciplina encerrada') + '</div>' +
         '<div class="botoes" style="margin-top:8px">' +
-        (m.situacao === 'aprovada' && m.ativa ? '<button type="button" class="mini" data-estudar="' + i + '">📚 Estudar</button>' : '') +
-        (m.situacao === 'aprovada' ? '<button type="button" class="secundario mini" data-caderno="' + i + '">📒 Meu caderno</button>' : '') +
+        (m.situacao === 'aprovada' && m.ativa ? '<button type="button" class="mini" data-estudar="' + i + '">🎯 Estudar</button>' : '') +
+        (m.situacao === 'aprovada' ? '<button type="button" class="secundario mini" data-caderno="' + i + '">📒 Minhas respostas</button>' : '') +
         (m.situacao === 'aprovada' ? '<button type="button" class="' + (m.ativa ? 'secundario ' : '') + 'mini" data-abrir="' + i + '">Notas</button>' +
           '<button type="button" class="secundario mini" data-apost="' + i + '">Apostila</button>' : '') +
         (m.material ? '<a class="botaoLink" href="' + esc(m.material) + '" target="_blank" rel="noopener">📁 Material no Drive</a>' : '') +
@@ -1486,7 +1497,7 @@ function htmlResumoEstudos(rs){
 }
 function desenharCaderno(m, r){
   var el = $('alunoDetalhe'), media = function(l){ return l.length ? Math.round(l.reduce(function(s, q){ return s + q.melhor.nota; }, 0) / l.length) : null; };
-  var h = cabEstudo(m) + '<div class="caixa"><h2>📒 Meu caderno · ' + esc(m.nome) + '</h2>' +
+  var h = cabEstudo(m) + '<div class="caixa"><h2>📒 Minhas respostas · ' + esc(m.nome) + '</h2>' +
     '<div class="botoes" style="margin:0 0 12px"><button type="button" class="mini" id="btIrDiag">📈 Ver meu diagnóstico</button><span class="aviso">pontos fortes, fracos e o que fazer agora</span></div>';
   if(!r.assuntos.length) h += '<p class="aviso">Você ainda não respondeu questões abertas nesta matéria. Elas aparecem aqui assim que você responder no <b>Estudo dirigido</b> ou no fim de uma <b>aula em trilha</b>.</p>';
   else {
@@ -1548,6 +1559,7 @@ function carregarDesempenho(atualizar){
   api('meuDesempenho', {atualizar: !!atualizar}).then(function(r){
     DES.r = r; try{ localStorage.setItem(ck, JSON.stringify({r: r, t: Date.now()})); }catch(e){}
     desenharDesempenho();
+    if(EST.modo === 'hub' && EST.m && !$('alunoDetalhe').classList.contains('oculto') && $('hubCorpo')) desenharHub(EST.m);
   }).catch(function(e){ var a = el.querySelector('[data-desatualiza]'); if(a) a.remove(); if(!DES.r) el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
 function notaCor(n){ return n === null || n === undefined ? '#6b7a99' : n >= 7 ? '#1a7a3c' : n >= 5 ? '#B8890A' : '#c62828'; }
@@ -1589,7 +1601,7 @@ function desenharDesempenho(){
       (m.temas.length ? '<details style="margin-top:6px"><summary class="link">Assuntos em ordem de prioridade</summary>' + m.temas.map(function(t){
         return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--linha)"><span>' + (t.importante ? '⭐ ' : '') + esc(t.grupo ? t.grupo + ' › ' + t.nome : t.nome) + '</span><span class="aviso">' +
           [t.sala !== null ? 'em aula ' + dezEst(t.sala) : '', t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'não estudou'].filter(Boolean).join(' · ') + '</span></div>'; }).join('') + '<p class="aviso">⭐ = o professor marcou como importante.</p></details>' : '') +
-      '<div class="botoes" style="margin-top:10px"><button type="button" class="secundario mini" data-diag="' + mi + '">🔎 Diagnóstico</button><button type="button" class="secundario mini" data-cad="' + mi + '">📒 Meu caderno</button></div></div>';
+      '<div class="botoes" style="margin-top:10px"><button type="button" class="mini" data-hub="' + mi + '">🎯 Abrir a matéria</button><button type="button" class="secundario mini" data-diag="' + mi + '">🔎 Diagnóstico</button><button type="button" class="secundario mini" data-cad="' + mi + '">📒 Minhas respostas</button></div></div>';
   }).join('');
   h += '<p class="aviso">Atualizado ' + esc(r.gerado) + ' · <button type="button" class="link" id="btDesempAtual">atualizar agora</button></p>';
   el.innerHTML = h;
@@ -1608,13 +1620,19 @@ function desenharDesempenho(){
   });
   ligarModoRevisao(el, r);
   el.querySelectorAll('[data-diag]').forEach(function(b){ b.addEventListener('click', function(){ abrirDiagnostico(mDe(r.materias[Number(b.dataset.diag)])); }); });
+  el.querySelectorAll('[data-hub]').forEach(function(b){ b.addEventListener('click', function(){ abrirEstudo(mDe(r.materias[Number(b.dataset.hub)])); }); });
   el.querySelectorAll('[data-cad]').forEach(function(b){ b.addEventListener('click', function(){ abrirCaderno(mDe(r.materias[Number(b.dataset.cad)])); }); });
   el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha', b.dataset.recaula); }); });
   el.querySelectorAll('[data-iraula],[data-irquest]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); var q = !!b.dataset.irquest; abaAluno('trilha', b.dataset.irquest || b.dataset.iraula, q); window.scrollTo(0, 0); }); });
   el.querySelectorAll('[data-fazer]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); b.closest('[data-tarefa]').click(); }); });
   el.querySelectorAll('[data-tarefa]').forEach(function(b){ b.addEventListener('click', function(){
     var k = b.dataset.tarefa.split(':'), m = r.materias[Number(k[0])], t = m.tarefas[Number(k[1])], mm = mDe(m);
-    if(t.tipo === 'trilha'){ abaAluno('trilha', t.trilhaId); window.scrollTo(0, 0); return; }
+    EST.modo = ''; EST.temaAtual = '';
+    fazerTarefa(mm, t, m);
+  }); });
+}
+function fazerTarefa(mm, t, m){
+    if(t.tipo === 'trilha'){ voltarListaAluno(); abaAluno('trilha', t.trilhaId); window.scrollTo(0, 0); return; }
     if(t.tipo === 'simulado'){ abrirSimulado(mm, m.temaIds); return; }
     if(t.tipo === 'relampago'){ abrirRelampago(mm, m.temaIds); return; }
     if(t.tipo === 'vespera'){ abrirFolhaVespera(mm, m.temaIds); return; }
@@ -1625,7 +1643,6 @@ function desenharDesempenho(){
       EST.ultima = {tentativa: 1, nota: t.questao.nota, melhorAntes: t.questao.nota};
       desenharQuestaoEstudo('');
     } else pedirQuestaoEstudo(t.temaId);
-  }); });
 }
 // ===== balões "?" da aba Desempenho =====
 var BAL = {
@@ -1757,7 +1774,7 @@ function abrirDiagnostico(m){
         return '<div style="display:flex;gap:10px;align-items:center;font-size:14px"><span style="flex:1 1 140px">' + esc(t.tema) + '</span><span class="barraDom" style="flex:1;max-width:220px;margin:0"><i style="width:' + t.dominio + '%;background:' + corDom(t.dominio) + '"></i></span><b>' + dezEst(t.dominio) + '</b></div>'; }).join('');
       if(rel.ia && rel.ia.como_responde) h += '<div class="eixo" style="border-color:#8a6100;margin-top:12px"><b>Como você responde</b><br>' + esc(rel.ia.como_responde) + '</div>';
     }
-    h += '<div class="botoes" style="margin-top:12px"><button type="button" class="secundario mini" id="btDiagCad">📒 Meu caderno</button><button type="button" class="secundario mini" id="btDiagEst">📚 Estudar agora</button></div></div>';
+    h += '<div class="botoes" style="margin-top:12px"><button type="button" class="secundario mini" id="btDiagCad">📒 Minhas respostas</button><button type="button" class="secundario mini" id="btDiagEst">📚 Estudar agora</button></div></div>';
     el.innerHTML = h;
     el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
     $('btDiagCad').addEventListener('click', function(){ abrirCaderno(m); });
@@ -1959,16 +1976,123 @@ function htmlRelatorio(r){
   return h;
 }
 function cabEstudo(m, extra){
-  return '<div class="caixa" style="margin-bottom:0"><button type="button" class="link" data-voltar>&#8592; voltar</button> <span class="aviso">📚 Estudo dirigido · ' + esc(m.nome) + '</span>' + (extra || '') + '</div>';
+  return '<div class="caixa" style="margin-bottom:0"><button type="button" class="link" data-voltar>&#8592; voltar</button> <span class="aviso">' + (EST.modo === 'hub' ? '🎯 ' : '📝 ') + esc(m.nome) + '</span>' + (extra || '') + '</div>';
 }
-function abrirEstudo(m){
-  EST.m = m; EST.q = null; EST.ultima = null;
+/* ===== TELA DA MATÉRIA ("🎯 Estudar"): próximo passo, três jeitos de estudar e os assuntos da prova, um a um =====
+   Usa o mesmo plano da aba "Estudar para a prova" (meuDesempenho). Trocar de assunto: deslizar a faixa, tocar,
+   arrastar o cartão para o lado ou "próximo assunto →"; depois de responder uma questão, o próximo assunto já vem sugerido. */
+function voltarEstudo(m){ if(EST.modo === 'hub') abrirEstudo(m, EST.temaAtual); else abrirTreino(m); }
+function hubMateria(m){ return DES.r ? DES.r.materias.filter(function(x){ return x.disciplinaId === m.disciplinaId && x.professorId === m.professorId; })[0] : null; }
+function abrirEstudo(m, temaSel){
+  EST.m = m; EST.modo = 'hub'; EST.q = null; EST.ultima = null; if(temaSel !== undefined) EST.temaAtual = temaSel || '';
+  var el = $('alunoDetalhe');
+  $('alunoLista').classList.add('oculto'); el.classList.remove('oculto'); window.scrollTo(0, 0);
+  if(!DES.r){ try{ var g = JSON.parse(localStorage.getItem('desemp_' + String(token || '').slice(-16)) || 'null'); if(g && g.r && g.r.materias) DES.r = g.r; }catch(e){} }
+  if(hubMateria(m)) desenharHub(m);
+  else { el.innerHTML = cabHub(m) + '<div class="caixa"><p class="carregando">Montando o seu plano para a prova…</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); }
+  api('meuDesempenho', {atualizar: false}).then(function(r){
+    var antes = JSON.stringify(hubMateria(m) || null); DES.r = r;
+    try{ localStorage.setItem('desemp_' + String(token || '').slice(-16), JSON.stringify({r: r, t: Date.now()})); }catch(e){}
+    if(EST.modo !== 'hub' || EST.m !== m || $('alunoDetalhe').classList.contains('oculto')) return;
+    if(!hubMateria(m)){ el.innerHTML = cabHub(m) + '<div class="caixa"><p class="aviso">Ainda não há plano para esta matéria.</p><div class="botoes"><button type="button" id="hubTreinoSo">📝 Treinar questões</button></div></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); $('hubTreinoSo').addEventListener('click', function(){ abrirTreino(m); }); return; }
+    if(JSON.stringify(hubMateria(m)) !== antes) desenharHub(m);
+  }).catch(function(e){ if(!hubMateria(m)){ el.innerHTML = cabHub(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p><div class="botoes"><button type="button" id="hubTreinoSo">📝 Treinar questões</button></div></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); $('hubTreinoSo').addEventListener('click', function(){ abrirTreino(m); }); } });
+}
+function cabHub(m){ return '<div class="caixa" style="margin-bottom:0"><button type="button" class="link" data-voltar>&#8592; minhas matérias</button> <span class="aviso">🎯 ' + esc(m.nome) + '</span></div>'; }
+function desenharHub(m){
+  var mm = hubMateria(m), el = $('alunoDetalhe'); if(!mm) return;
+  var mi = DES.r.materias.indexOf(mm), temas = mm.temas || [];
+  var preparo = temas.length ? Math.round(temas.reduce(function(s, t){ return s + (t.dominio || 0); }, 0) / temas.length) : 0;
+  var prox = (mm.tarefas || [])[0];
+  var aulas = [], vistas = {};
+  temas.forEach(function(t){ (t.trilhas || []).forEach(function(a){ if(!vistas[a.id]){ vistas[a.id] = 1; aulas.push(a); } }); });
+  var h = cabHub(m) + '<div class="caixa" id="hubCorpo">' +
+    '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><h2 style="margin:0">' + esc(mm.prova.titulo) + ' · ' + esc(mm.prova.data) + '</h2><span class="aviso">' + (mm.prova.dias === 0 ? 'é hoje' : 'em ' + mm.prova.dias + ' dia' + (mm.prova.dias === 1 ? '' : 's')) + (mm.prova.estimada ? ' (data estimada)' : '') + '</span></div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin:10px 0 2px"><span>Seu preparo nos assuntos da prova ' + ajuda('Média do seu domínio em cada assunto que cai nesta prova (o que você já estudou nas questões do estudo). Assunto ainda não estudado conta como zero. Sobe a cada questão bem respondida.') + '</span><b>' + preparo + '%</b></div>' +
+    '<div class="barraDom"><i style="width:' + preparo + '%;background:' + corDom(preparo) + '"></i></div>' +
+    (mm.aviso ? '<div class="' + (mm.modoFinal ? 'erro' : 'alerta') + '" style="margin:8px 0">' + esc(mm.aviso) + '</div>' : '') +
+    (prox ? '<div class="convite" style="margin:12px 0;border-left-color:#2E62C6"><span class="aviso">Seu próximo passo</span><div style="font-weight:bold;margin:2px 0">' + esc(prox.texto) + '</div><div class="aviso">' + esc(prox.tema) + (prox.porque ? ' · ' + esc(prox.porque) : '') + '</div><div class="botoes" style="margin:8px 0 0"><button type="button" id="hubProx">Começar →</button></div></div>'
+      : '<div class="ok" style="margin:12px 0">Você está em dia com os assuntos já dados. 👏 Treine as questões ou escolha um assunto abaixo.</div>') +
+    '<p style="margin:12px 0 6px"><b>Escolha como estudar</b></p>' +
+    '<div class="hubModos">' +
+      '<button type="button" class="hubModo" data-modo="plano"><span>🧭</span>Seguir o plano<small>' + (mm.tarefas || []).length + ' tarefa' + ((mm.tarefas || []).length === 1 ? '' : 's') + '</small></button>' +
+      '<button type="button" class="hubModo" data-modo="treino"><span>📝</span>Só treinar questões<small>dos assuntos da prova</small></button>' +
+      '<button type="button" class="hubModo" data-modo="aulas"' + (aulas.length ? '' : ' disabled') + '><span>▶</span>Ver as aulas<small>' + (aulas.length ? aulas.length + ' aula' + (aulas.length > 1 ? 's' : '') + ' da prova' : 'nenhuma ainda') + '</small></button>' +
+    '</div><div id="hubPainel"></div>' +
+    (temas.length ? '<p style="margin:16px 0 4px"><b>Assuntos da ' + esc(mm.prova.titulo) + '</b> <span class="aviso">· na ordem do que mais precisa · deslize para ver todos</span></p>' +
+      '<div class="hubFaixa" id="hubFaixa">' + temas.map(function(t, i){ return '<button type="button" class="hubChip" data-chip="' + i + '"><span class="pt" style="background:' + corDom(t.dominio) + '"></span>' + esc(t.nome) + '</button>'; }).join('') + '</div>' +
+      '<div id="hubTema"></div>' : '<p class="aviso" style="margin-top:14px">Os assuntos aparecem depois das aulas gravadas.</p>') +
+    htmlModoRevisao(mm, mi) +
+    '<div class="botoes" style="margin-top:12px"><button type="button" class="secundario mini" id="hubDiag">🔎 Diagnóstico</button><button type="button" class="secundario mini" id="hubResp">📒 Minhas respostas</button><button type="button" class="secundario mini" id="hubTodas">🎯 Todas as matérias</button></div></div>';
+  el.innerHTML = h;
+  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  var mmBase = {nome: mm.nome, professorId: mm.professorId, disciplinaId: mm.disciplinaId};
+  if($('hubProx')) $('hubProx').addEventListener('click', function(){ EST.temaAtual = prox.temaId || ''; fazerTarefa(mmBase, prox, mm); });
+  $('hubDiag').addEventListener('click', function(){ abrirDiagnostico(mmBase); });
+  $('hubResp').addEventListener('click', function(){ abrirCaderno(mmBase); });
+  $('hubTodas').addEventListener('click', function(){ voltarListaAluno(); abaAluno('desemp'); window.scrollTo(0, 0); });
+  ligarModoRevisao(el, DES.r);
+  // os três jeitos de estudar
+  el.querySelectorAll('[data-modo]').forEach(function(b){ b.addEventListener('click', function(){
+    var modo = b.dataset.modo, p = $('hubPainel'), ja = b.getAttribute('aria-pressed') === 'true';
+    el.querySelectorAll('[data-modo]').forEach(function(x){ x.setAttribute('aria-pressed', 'false'); });
+    if(modo === 'treino'){ abrirTreino(m); return; }
+    if(ja){ p.innerHTML = ''; return; }
+    b.setAttribute('aria-pressed', 'true');
+    if(modo === 'plano'){
+      p.innerHTML = (mm.tarefas || []).length ? (mm.tarefas || []).map(function(t, k){ return '<div class="hubTarefa" data-htar="' + k + '"><div style="flex:1"><b>' + (k < mm.porDia ? '' : '<span class="aviso">depois · </span>') + esc(t.texto) + '</b><div class="aviso">' + esc(t.tema) + (t.porque ? ' · ' + esc(t.porque) : '') + '</div></div><span style="font-size:20px">›</span></div>'; }).join('') +
+        '<p class="aviso">' + mm.porDia + ' por dia até a prova. Tarefa feita sai da lista. ' + ajuda(BAL.hoje) + '</p>' : '<p class="ok">Nada pendente no plano agora. 👏</p>';
+      p.querySelectorAll('[data-htar]').forEach(function(x){ x.addEventListener('click', function(){ var t = mm.tarefas[Number(x.dataset.htar)]; EST.temaAtual = t.temaId || ''; fazerTarefa(mmBase, t, mm); }); });
+    } else {
+      p.innerHTML = aulas.map(function(a){ return '<div class="hubTarefa" data-haula="' + esc(a.id) + '"><div style="flex:1"><b>▶ ' + esc(a.titulo) + '</b><div class="barraDom" style="margin-top:4px"><i style="width:' + (a.progresso || 0) + '%;background:#1a7a3c"></i></div><span class="aviso">' + (a.progresso >= 100 ? '✓ assistida' : a.progresso ? a.progresso + '% assistido' : 'ainda não assistiu') + '</span></div><span style="font-size:20px">›</span></div>'; }).join('') +
+        '<p class="aviso">Só as aulas dos assuntos desta prova. O curso inteiro está na 📚 Biblioteca de aulas.</p>';
+      p.querySelectorAll('[data-haula]').forEach(function(x){ x.addEventListener('click', function(){ voltarListaAluno(); abaAluno('trilha', x.dataset.haula); window.scrollTo(0, 0); }); });
+    }
+  }); });
+  // assuntos: faixa + cartão do assunto escolhido
+  if(!temas.length) return;
+  var idx = Math.max(0, temas.map(function(t){ return t.id; }).indexOf(EST.temaAtual));
+  var mostrar = function(i, rolar){
+    idx = (i + temas.length) % temas.length; var t = temas[idx]; EST.temaAtual = t.id;
+    el.querySelectorAll('[data-chip]').forEach(function(c){ c.setAttribute('aria-pressed', String(Number(c.dataset.chip) === idx)); });
+    var chip = el.querySelector('[data-chip="' + idx + '"]'); if(chip && chip.scrollIntoView) chip.scrollIntoView({behavior: 'smooth', block: 'nearest', inline: 'center'});
+    var tr = (t.trilhas || [])[0], prox2 = temas[(idx + 1) % temas.length];
+    $('hubTema').innerHTML = '<div class="hubCartao" id="hubCartao">' +
+      '<div class="aviso">' + (idx + 1) + ' de ' + temas.length + (t.grupo ? ' · ' + esc(t.grupo) : '') + '</div>' +
+      '<div style="font-weight:bold;font-size:17px;margin:2px 0 6px">' + (t.importante ? '⭐ ' : '') + esc(t.nome) + '</div>' +
+      '<div class="barraDom"><i style="width:' + (t.dominio || 0) + '%;background:' + corDom(t.dominio) + '"></i></div>' +
+      '<div class="aviso">' + [t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'ainda não estudou', t.sala !== null ? 'em aula ' + dezEst(t.sala) : ''].filter(Boolean).join(' · ') + '</div>' +
+      '<div class="hubAcoes">' +
+        (tr ? '<button type="button" data-hacao="ver">▶ ' + (tr.progresso >= 100 ? 'Rever a aula' : tr.progresso ? 'Continuar a aula' : 'Assistir a aula') + '</button>' : '') +
+        '<button type="button"' + (tr ? ' class="secundario"' : '') + ' data-hacao="questao">📝 Responder uma questão</button>' +
+        '<button type="button" class="secundario" data-hacao="explicar">🎤 Explicar para um colega</button></div>' +
+      '<div class="hubNav"><button type="button" class="link" data-hnav="-1">← anterior</button><button type="button" class="link" data-hnav="1">próximo: ' + esc(prox2.nome.length > 28 ? prox2.nome.slice(0, 27) + '…' : prox2.nome) + ' →</button></div></div>';
+    $('hubTema').querySelectorAll('[data-hnav]').forEach(function(b){ b.addEventListener('click', function(){ mostrar(idx + Number(b.dataset.hnav)); }); });
+    $('hubTema').querySelectorAll('[data-hacao]').forEach(function(b){ b.addEventListener('click', function(){
+      var a = b.dataset.hacao;
+      if(a === 'ver'){ voltarListaAluno(); abaAluno('trilha', tr.id); window.scrollTo(0, 0); }
+      else if(a === 'questao'){ EST.m = mmBase; $('alunoLista').classList.add('oculto'); $('alunoDetalhe').classList.remove('oculto'); window.scrollTo(0, 0); pedirQuestaoEstudo(t.id); }
+      else explicarColega(mmBase, t.nome);
+    }); });
+    // arrastar o cartão para o lado troca de assunto (celular)
+    var c = $('hubCartao'), x0 = null, y0 = null;
+    c.addEventListener('touchstart', function(e){ x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, {passive: true});
+    c.addEventListener('touchend', function(e){ if(x0 === null) return; var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0; x0 = null; if(Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) mostrar(idx + (dx < 0 ? 1 : -1)); });
+    if(rolar) $('hubTema').scrollIntoView({behavior: 'smooth', block: 'nearest'});
+  };
+  el.querySelectorAll('[data-chip]').forEach(function(c){ c.addEventListener('click', function(){ mostrar(Number(c.dataset.chip), true); }); });
+  mostrar(idx, false);
+}
+
+// "Só treinar questões": o estudo dirigido de sempre (questões dos assuntos da prova)
+function abrirTreino(m){
+  EST.m = m; EST.modo = 'treino'; EST.temaAtual = ''; EST.q = null; EST.ultima = null;
   var el = $('alunoDetalhe');
   $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
   el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Carregando…</p></div>';
-  el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
   api('estudoInicio', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
-    var h = cabEstudo(m) + '<div class="caixa"><h2>📚 Estudo dirigido · ' + esc(m.nome) + '</h2>';
+    var h = cabEstudo(m) + '<div class="caixa"><h2>📝 Treinar questões · ' + esc(m.nome) + '</h2>';
     if(r.prova) h += '<div class="ajudaEst" style="margin-top:0"><b>🎯 Próxima prova: ' + esc(r.prova.titulo) + ' · ' + esc(String(r.prova.data).split(' ')[0]) + '</b> (' + (r.prova.dias === 0 ? 'hoje' : 'em ' + r.prova.dias + ' dia' + (r.prova.dias > 1 ? 's' : '')) + ')' +
       (r.prova.foco ? (r.prova.aulas.length ? ' — cai: aula' + (r.prova.aulas.length > 1 ? 's ' : ' ') + r.prova.aulas.join(', ') + '.' : '') + ' As questões são só dos assuntos que caem nesta prova.' : ' — o professor não marcou os assuntos: as questões são de todas as aulas já dadas.') + '</div>';
     else h += '<p class="aviso" style="margin-top:0">Sem prova marcada: as questões são das aulas já dadas.</p>';
@@ -1980,17 +2104,17 @@ function abrirEstudo(m){
     if(r.temas.length){
       h += '<p style="margin:6px 0"><b>Seu domínio por assunto</b> <span class="aviso">(toque no assunto para estudar ele todo, ou abra ▸ para escolher um subassunto)</span></p>' + htmlTemasEstudo(r.temas);
     } else h += '<p class="aviso">Ainda não há assuntos liberados para estudo nesta matéria.</p>';
-    h += '<div class="botoes" style="margin-top:14px"><button type="button" id="estAgora"' + (r.temas.length && r.restantesHoje ? '' : ' disabled') + '>▶ Estudar agora</button><button type="button" class="secundario" id="estRelBt">📈 Diagnóstico</button><button type="button" class="secundario" id="estCadBt">📒 Meu caderno</button></div>' +
+    h += '<div class="botoes" style="margin-top:14px"><button type="button" id="estAgora"' + (r.temas.length && r.restantesHoje ? '' : ' disabled') + '>▶ Estudar agora</button><button type="button" class="secundario" id="estRelBt">📈 Diagnóstico</button><button type="button" class="secundario" id="estCadBt">📒 Minhas respostas</button></div>' +
       '<p class="aviso" style="margin-top:6px">"Estudar agora" escolhe a questão para você: prioriza os assuntos da prova, os mais fracos e os que você não vê há mais tempo. ' +
       (r.restantesHoje ? 'Hoje você ainda pode fazer ' + r.restantesHoje + ' correção(ões).' : '<b>Você usou as ' + r.limite + ' correções de hoje. Volte amanhã!</b>') + ' O estudo não vale nota: é treino para a prova.</p></div>';
     el.innerHTML = h;
-    el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno);
+    el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
     el.querySelectorAll('[data-tema]').forEach(function(b){ b.addEventListener('click', function(){ if(r.restantesHoje) pedirQuestaoEstudo(b.dataset.tema); }); });
     ligarAssuntosEstudo(el);
     var ag = $('estAgora'); if(ag) ag.addEventListener('click', function(){ pedirQuestaoEstudo(''); });
     $('estRelBt').addEventListener('click', function(){ abrirDiagnostico(m); });
     $('estCadBt').addEventListener('click', function(){ abrirCaderno(m); });
-  }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', voltarListaAluno); });
+  }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); }); });
 }
 // assuntos (na ordem da matéria) → subassuntos; o assunto inteiro também pode ser escolhido
 function textoDom(d){ return d === null ? 'ainda não estudou' : dezEst(d) + (d >= 70 ? ' · dominado' : d >= 50 ? ' · quase lá' : ' · precisa reforçar'); }
@@ -2022,9 +2146,9 @@ function ligarAssuntosEstudo(el){
 function pedirQuestaoEstudo(temaId){
   var m = EST.m, el = $('alunoDetalhe');
   el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Preparando a questão…</p></div>';
-  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarEstudo(m); });
   api('estudoProxima', {professorId: m.professorId, disciplinaId: m.disciplinaId, temaId: temaId}).then(function(q){ EST.q = q; EST.ultima = null; desenharQuestaoEstudo(''); })
-    .catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); }); });
+    .catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarEstudo(m); }); });
 }
 function desenharQuestaoEstudo(rascunhoTxt){
   var m = EST.m, q = EST.q, el = $('alunoDetalhe'), u = EST.ultima;
@@ -2037,7 +2161,7 @@ function desenharQuestaoEstudo(rascunhoTxt){
     '<textarea id="estResp" placeholder="Escreva sua resposta com suas palavras…" style="min-height:140px">' + esc(rascunhoTxt || '') + '</textarea>' +
     '<div class="botoes"><button type="button" id="estEnviar">Enviar resposta</button><button type="button" class="secundario" id="estPular">Pular esta questão</button></div><div id="estMsg"></div></div>';
   el.innerHTML = h;
-  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarEstudo(m); });
   var ta = $('estResp');
   // colar continua bloqueado (o microfone do teclado funciona normalmente)
   var barrar = function(e){ e.preventDefault(); $('estMsg').innerHTML = '<div class="erro">Escreva a resposta com suas palavras.</div>'; };
@@ -2046,7 +2170,7 @@ function desenharQuestaoEstudo(rascunhoTxt){
   $('estAjuda').addEventListener('change', function(){ $('estAjudaBox').classList.toggle('oculto', !this.checked); });
   EST.conf = '';
   el.querySelectorAll('[data-conf]').forEach(function(b){ b.addEventListener('click', function(){ EST.conf = b.dataset.conf; el.querySelectorAll('[data-conf]').forEach(function(x){ x.classList.toggle('secundario', x !== b); }); }); });
-  $('estPular').addEventListener('click', function(){ pedirQuestaoEstudo(''); });
+  $('estPular').addEventListener('click', function(){ pedirQuestaoEstudo(EST.modo === 'hub' ? EST.temaAtual || '' : ''); });
   $('estEnviar').addEventListener('click', function(){
     var txt = ta.value.trim();
     if(txt.length < 10){ $('estMsg').innerHTML = '<div class="erro">Escreva sua resposta antes de enviar.</div>'; return; }
@@ -2079,23 +2203,30 @@ function desenharCorrecaoEstudo(txt){
     '<div class="eixo" style="border-color:#2E62C6"><b>🧩 Estrutura da resposta</b><br>' + esc(r.feedback.estrutura) + '</div>' +
     '<div class="eixo" style="border-color:#8a6100"><b>🧠 Forma de pensar</b><br>' + esc(r.feedback.pensamento) + '</div>' +
     htmlModelo(r.modelo) +
-    '<div class="botoes"><button type="button" id="estDeNovo">✍ Explicar de novo</button><button type="button" class="secundario" id="estProx"' + (r.restantesHoje ? '' : ' disabled') + '>Próxima questão</button><button type="button" class="secundario" id="estInicio">Voltar ao início</button></div>' +
+    (function(){
+      var mm = EST.modo === 'hub' ? hubMateria(m) : null, ts = mm ? mm.temas || [] : [], i = ts.map(function(x){ return x.id; }).indexOf(EST.temaAtual), nx = i >= 0 && ts.length > 1 ? ts[(i + 1) % ts.length] : null;
+      if(!mm) return '<div class="botoes"><button type="button" id="estDeNovo">✍ Explicar de novo</button><button type="button" class="secundario" id="estProx"' + (r.restantesHoje ? '' : ' disabled') + '>Próxima questão</button><button type="button" class="secundario" id="estInicio">Voltar ao início</button></div>';
+      return '<div class="botoes"><button type="button" id="estDeNovo">✍ Explicar de novo</button><button type="button" class="secundario" id="estProx"' + (r.restantesHoje ? '' : ' disabled') + '>Outra questão deste assunto</button></div>' +
+        (nx ? '<div class="convite" style="margin:10px 0 0;border-left-color:#2E62C6"><span class="aviso">Próximo assunto da ' + esc(mm.prova.titulo) + '</span><div style="font-weight:bold;margin:2px 0 6px">' + esc(nx.nome) + '</div><button type="button" id="estProxAss" data-id="' + esc(nx.id) + '">Ir para o próximo assunto →</button></div>' : '') +
+        '<div class="botoes"><button type="button" class="secundario" id="estInicio">Voltar aos assuntos</button></div>';
+    })() +
     '<p class="aviso">' + (r.restantesHoje ? 'Hoje você ainda pode fazer ' + r.restantesHoje + ' correção(ões).' : 'Você usou as correções de hoje. Volte amanhã!') + '</p></div>';
   el.innerHTML = h;
-  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarEstudo(m); });
   $('estDeNovo').addEventListener('click', function(){ desenharQuestaoEstudo(''); });
-  $('estProx').addEventListener('click', function(){ pedirQuestaoEstudo(''); });
-  $('estInicio').addEventListener('click', function(){ abrirEstudo(m); });
+  $('estProx').addEventListener('click', function(){ pedirQuestaoEstudo(EST.modo === 'hub' ? EST.temaAtual || '' : ''); });
+  if($('estProxAss')) $('estProxAss').addEventListener('click', function(){ abrirEstudo(m, this.dataset.id); });
+  $('estInicio').addEventListener('click', function(){ voltarEstudo(m); });
   el.scrollIntoView({behavior:'smooth', block:'start'});
 }
 function abrirRelatorioEstudo(){
   var m = EST.m, el = $('alunoDetalhe');
   el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Preparando o seu relatório… (pode levar uns 15 s)</p></div>';
-  el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
+  el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarEstudo(m); });
   api('estudoRelatorio', {professorId: m.professorId, disciplinaId: m.disciplinaId}).then(function(r){
     el.innerHTML = cabEstudo(m) + '<div class="caixa"><h2>📈 Meu relatório · ' + esc(m.nome) + '</h2>' + htmlRelatorio(r) + '</div>';
-    el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); });
-  }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ abrirEstudo(m); }); });
+    el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarEstudo(m); });
+  }).catch(function(e){ el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; el.querySelector('[data-voltar]').addEventListener('click', function(){ voltarEstudo(m); }); });
 }
 
 function abrirApostilaAluno(m){
@@ -2481,8 +2612,8 @@ function desenharEstudoTurma(disc, r){
   var t = r.turma, c = r.compilado || {temTrilhas: false, temAvaliacoes: false, turma: {}, porAluno: {}, temas: []};
   var pa = c.porAluno || {}, temV = c.temTrilhas, temA = c.temAvaliacoes;
   var h = '<h2>Estudo dos alunos · ' + esc(disc.nome) + ' ' + ajuda('O <b>estudo dirigido</b> é o treino dos alunos para a prova (em "Minhas matérias" → 📚 Estudar). Não conta na nota. As questões são criadas pela IA a partir das aulas, da sua apostila e das suas regras, e ficam num banco reaproveitado por todos. Aqui você acompanha quem está estudando, os temas mais fracos da turma e o relatório de cada aluno.') + '</h2>';
-  // quem está no modo revisão para a prova (o aluno marca na aba Desempenho)
-  if((r.revisando || []).length) h += '<div class="convite" style="margin:0 0 12px;border-left-color:#1a7a3c"><b>🔁 Revisando para a prova (' + r.revisando.length + ')</b> ' + ajuda('Alunos que marcaram, na aba Desempenho, que já estudaram e entraram no modo revisão: revisão espaçada, simulado, revisão relâmpago e folha de véspera. A nota do simulado é a que eles tirariam se a prova fosse hoje (não vale nota).') +
+  // quem está no modo revisão para a prova (o aluno marca na aba Estudar para a prova)
+  if((r.revisando || []).length) h += '<div class="convite" style="margin:0 0 12px;border-left-color:#1a7a3c"><b>🔁 Revisando para a prova (' + r.revisando.length + ')</b> ' + ajuda('Alunos que marcaram, na aba Estudar para a prova, que já estudaram e entraram no modo revisão: revisão espaçada, simulado, revisão relâmpago e folha de véspera. A nota do simulado é a que eles tirariam se a prova fosse hoje (não vale nota).') +
     '<div class="tabelaBox" style="margin-top:6px"><table><tr><th>Aluno</th><th>Desde</th><th>Simulados</th><th>Último simulado</th></tr>' + r.revisando.map(function(x){ return '<tr><td>' + esc(x.nome) + '</td><td>' + esc(x.desde) + '</td><td>' + x.simulados + '</td><td>' + (x.ultimo === null ? '—' : '<b>' + String(x.ultimo).replace('.', ',') + '</b>') + '</td></tr>'; }).join('') + '</table></div></div>';
   // 1) a semana em números
   var card = function(ic, tit, val, sub){ return '<div style="background:#f5f8fe;border:1px solid var(--linha);border-radius:10px;padding:10px 12px;flex:1 1 150px;min-width:140px"><div class="aviso">' + ic + ' ' + tit + '</div><div style="font-size:22px;font-weight:bold;color:var(--navy);line-height:1.2">' + val + '</div><div class="aviso">' + (sub || '') + '</div></div>'; };
