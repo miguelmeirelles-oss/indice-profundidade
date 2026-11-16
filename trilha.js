@@ -955,7 +955,7 @@ function fimDoBloco(pulou){
   var h = '<div class="t-checagem" style="margin-top:6px"><div style="margin-bottom:10px"><span id="tr_pVid">' + passo(1, 'Vídeo-aula', !pulou) + '</span>' + passo(2, 'Questões') + (ass ? passo(3, 'Estudar com IA') : '') + '</div>';
   h += '<p style="margin:0 0 6px"><b>2 · Questões</b></p>';
   if(c && c.tipo === 'multipla'){
-    h += '<p style="margin:4px 0"><b>✔ Confira se entendeu</b></p><p>' + esc(c.pergunta) + '</p>' + c.alternativas.map(function(a, i){ return '<button class="t-op" data-trop="' + i + '">' + esc(a) + '</button>'; }).join('') + '<div id="tr_retCheck"></div>';
+    h += '<p style="margin:4px 0"><b>✔ Confira se entendeu</b></p><p>' + esc(c.pergunta) + '</p>' + ordemSorteada(c.alternativas).map(function(i){ return '<button class="t-op" data-trop="' + i + '">' + esc(c.alternativas[i]) + '</button>'; }).join('') + '<div id="tr_retCheck"></div>';
   } else if(c && c.tipo === 'aberta'){
     h += '<p style="margin:4px 0"><b>✔ Pense nisto</b></p><p>' + esc(c.pergunta) + '</p><details><summary class="link">ver o que uma boa resposta contém</summary><p>' + esc(c.esperado) + '</p></details>';
   }
@@ -2717,3 +2717,10 @@ window.Trilha = {
   parar: function(){ if(T){ pausar(); if(wsD) encerrarDuvida(); U.enviar(true); } }
 };
 })();
+// a certa costuma vir na 1ª posição: mostra em ordem sorteada, salvo quando alguma depende da ordem ("todas as anteriores")
+function ordemSorteada(alts){
+  var ord = alts.map(function(x, i){ return i; });
+  if(alts.some(function(a){ return /anteriores|todas as (alternativas|op[cç][oõ]es)|nenhuma das|\bletras?\s+[a-e]\b|\balternativas?\s+[a-e]\b/i.test(a); })) return ord;
+  for(var i = ord.length - 1; i > 0; i--){ var j = Math.floor(Math.random() * (i + 1)), x = ord[i]; ord[i] = ord[j]; ord[j] = x; }
+  return ord;
+}

@@ -813,7 +813,7 @@ function desenharAbertas(grupos){
     var desvio = g.agora - Date.now();
     var n = g.questoes.length, feitaQ = function(q){ return !q.aguardando && (q.respondida || q.esgotada); }, feitas = g.questoes.filter(feitaQ);
     var listaFeitas = g.questoes.map(function(q, i){ return feitaQ(q) ? '<div style="padding:6px 0;border-top:1px dashed var(--linha);font-size:14px">' + (q.respondida ? '✓ ' : '⏱ não deu tempo · ') + '<span class="aviso">' + (i + 1) + ' de ' + n + ' · </span>' + esc(q.enunciado) + '</div>' : ''; }).join('');
-    var notaRes = '<p class="aviso" style="margin:6px 0 0">O resultado aparece em "Minhas matérias" depois que a questão fechar.</p>';
+    var notaRes = '<p class="aviso" style="margin:6px 0 0">Se acertou ou errou (fechadas e abertas) aparece em "Minhas matérias" quando as questões fecharem — antes disso o gabarito fica escondido, para ninguém passar a resposta.</p>';
     // tudo respondido: só uma linha discreta (abre para ver as questões), para não atrapalhar o resto da página
     if(g.presente && n && feitas.length === n)
       return '<details class="caixa" style="padding:8px 14px;border-left:5px solid #1a7a3c"><summary style="cursor:pointer">✓ <b>Questões da aula ' + g.aulaNumero + '</b> · ' + esc(g.disciplina) + ' <span class="aviso">— respondidas · fecham em <span class="contagem" data-fim="' + g.fechaEm + '" data-desvio="' + desvio + '">' + mmss(g.fechaEm - g.agora) + '</span></span></summary>' + listaFeitas + notaRes + '</details>';
@@ -840,7 +840,7 @@ function desenharAbertas(grupos){
       }
       h += '<p style="font-weight:bold;font-size:15.5px">' + esc(q.enunciado) + '</p>';
       if(q.esgotada && !q.respondida){ h += '<div class="erro" style="margin-bottom:0">Seu tempo para esta questão acabou.</div></div>'; return; }
-      if(q.respondida){ h += '<div class="ok" style="margin-bottom:0">Resposta registrada. O resultado aparece em "Minhas matérias" depois que a questão fechar.</div></div>'; return; }
+      if(q.respondida){ h += '<div class="ok" style="margin-bottom:0">Resposta registrada. Se acertou ou errou aparece em "Minhas matérias" quando a questão fechar.</div></div>'; return; }
       if(q.tipo === 'fechada'){
         q.alternativas.forEach(function(a, k){
           h += '<button type="button" class="opc" data-alt="' + a.i + '" aria-pressed="' + (rascunho[q.id] === a.i) + '">' + String.fromCharCode(65 + k) + ') ' + esc(a.texto) + '</button>';
@@ -2147,12 +2147,13 @@ function abrirMateria(m){
           : (q.nota !== null ? '<b>' + dez(q.nota) + '</b> de 10' : '');
         return '<div class="detalhe" style="margin-top:8px"><div class="linha" style="border:0;padding:0 0 6px;align-items:flex-start"><span>' + (q.revisao ? '<span class="tag t-warn">🔁 revisão</span> ' : '') + '<span class="tag t-azul">' + q.tipo + '</span> <b>' + esc(q.enunciado) + '</b></span><span style="white-space:nowrap">' + pontos + '</span></div>' +
           (temVale && q.nota !== null && !q.emCorrecao ? '<p class="aviso" style="margin:0 0 4px">Nota da correção: <b>' + dez(q.nota) + ' de 10</b> → esta questão vale ' + nota10(q.vale) + ' dos 10 pontos da aula, então ficou com ' + nota10(q.pontos || 0) + '.</p>' : '') +
+          (q.tipo === 'fechada' && q.escolhida >= 0 && q.gabarito >= 0 ? '<p style="margin:0 0 4px">' + (q.escolhida === q.gabarito ? '<span class="tag t-ok">✓ Você acertou</span>' : '<span class="tag t-err">✗ Você errou</span> <span class="aviso">a certa está marcada com ✓</span>') + '</p>' : '') +
           '<p class="aviso" style="margin:0">Sua resposta: ' + (q.suaResposta === null ? '<b>não respondeu</b> (vale zero)' : esc(q.suaResposta)) + '</p>' +
           (q.explicacoes && q.explicacoes.length && q.alternativas && q.alternativas.length
             ? '<ol class="alts" type="A" style="margin:6px 0 0">' + q.alternativas.map(function(alt, k){
                 return '<li' + (k === q.gabarito ? ' class="certa"' : '') + '>' + esc(alt) + (k === q.gabarito ? ' ✓' : k === q.escolhida ? ' ✗ <span class="aviso">(sua resposta)</span>' : '') +
                   (q.explicacoes[k] ? '<span class="expl">' + esc(q.explicacoes[k]) + '</span>' : '') + '</li>'; }).join('') + '</ol>'
-            : (q.correta ? '<p class="aviso" style="margin:0">Correta: <b>' + esc(q.correta) + '</b></p>' : '')) +
+            : (q.correta ? '<p class="aviso" style="margin:0">Correta: <b>' + esc(q.correta) + '</b> ✓</p>' : '')) +
           (q.comentario ? '<p class="aviso" style="margin:4px 0 0">' + esc(q.comentario) + '</p>' : '') + '</div>';
       }).join('');
       if(qs && x.tipo === 'nota') qs += '<p style="margin:8px 0 0;text-align:right">Total da aula: <b>' + dez(x.nota) + '</b> de 10' + (x.provisoria ? '*' : '') + '</p>';
