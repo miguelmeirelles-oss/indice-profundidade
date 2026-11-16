@@ -230,7 +230,7 @@ function desenharLista(){
       '<div class="botoes" style="margin:4px 0 10px"><input type="text" id="tr_buscaTrilha" placeholder="🔎 buscar aula…" style="flex:1 1 200px;max-width:340px"><button class="mini secundario" id="tr_btAbrirTodos">abrir todos</button><button class="mini secundario" id="tr_btFecharTodos">fechar todos</button><button class="mini" id="tr_btOrganizar">✏️ Organizar</button></div>' +
       '<div id="tr_listaTrilhasProf"></div>' +
       '<details class="convite" id="tr_atuLote" style="margin-top:12px"><summary class="link"><b>📦 Atualizar várias aulas de uma vez</b> (troca pela versão nova e mantém a sua organização)</summary><div id="tr_atuLoteCorpo" style="margin-top:8px"></div></details>' +
-      '<div class="convite" style="margin-top:12px"><b>🎙 Voz da conversa (natural) em todas as aulas</b><div class="aviso" style="margin:4px 0 6px">Grava uma aula depois da outra com a mesma voz da gravação aula por aula. <b>Deixe esta aba aberta</b> até terminar (uns 3 a 5 minutos por aula); pode usar outras abas.</div><div class="botoes" style="margin:0"><button class="mini" id="tr_btGravarTodasLive">🎙 Gravar com a voz da conversa todas as aulas que faltam</button></div></div>' +
+      '<div class="convite" style="margin-top:12px"><b>🎙 Voz da conversa (natural) em todas as aulas</b><div class="aviso" style="margin:4px 0 6px">Grava uma aula depois da outra com a mesma voz da gravação aula por aula. <b>Deixe esta aba aberta</b> até terminar (uns 3 a 5 minutos por aula); pode usar outras abas.</div><div class="botoes" style="margin:0"><button class="mini" id="tr_btGravarTodasLive">🎙 Gravar com a voz da conversa todas as aulas que faltam</button></div>' + (function(){ var f = L.trilhas.filter(function(x){ return (x.disciplina_id || '') === filtroProf() && x.tipo !== 'video' && x.faltam !== 0; }); return '<div class="aviso" style="margin:6px 0 0">' + (f.length ? '⏳ Nesta matéria, <b>' + f.length + ' aula(s)</b> ainda têm falas sem áudio: ' + f.slice(0, 6).map(function(x){ return esc(x.titulo); }).join(', ') + (f.length > 6 ? '…' : '') : '✓ Todas as aulas desta matéria já têm as falas gravadas.') + '</div>'; })() + '</div>' +
     '';
   } else h += '<p class="aviso">Nenhuma ainda. Crie a primeira aqui embaixo.</p>';
   h += '</div>';
@@ -264,9 +264,11 @@ function desenharLista(){
   if($('atuLote')) $('atuLote').addEventListener('toggle', function(){ if(this.open && !$('atuLoteCorpo').innerHTML) atuLoteInicio(); });
   desenharListaProf();
   if($('btGravarTodasLive')) $('btGravarTodasLive').addEventListener('click', function(){
-    var ids = []; gruposDaLista(filtroProf()).forEach(function(g){ g.aulas.forEach(function(t){ if(t.tipo !== 'video') ids.push(t.id); }); });
-    if(!ids.length){ erroGeral('Nenhuma aula para gravar nesta matéria.'); return; }
-    if(!confirm('Gravar com a voz da conversa as falas que faltam em ' + ids.length + ' aula(s) desta matéria?\n\nDeixe esta aba aberta até terminar. As aulas que já têm todas as falas gravadas são puladas.')) return;
+    // só as aulas que ainda têm fala sem áudio (o servidor conta pelo resumo; sem abrir aula por aula)
+    var ids = [], falas = 0, total = 0, nomeM = nomeDisc(filtroProf());
+    gruposDaLista(filtroProf()).forEach(function(g){ g.aulas.forEach(function(t){ if(t.tipo === 'video') return; total++; if(t.faltam === 0) return; ids.push(t.id); falas += t.faltam || 0; }); });
+    if(!ids.length){ erroGeral(''); $('corpo').insertAdjacentHTML('afterbegin', '<div class="ok">✓ Todas as ' + total + ' aulas de ' + esc(nomeM) + ' já têm todas as falas gravadas. Nada para gravar.</div>'); return; }
+    if(!confirm(nomeM + ': ' + ids.length + ' de ' + total + ' aula(s) ainda têm falas sem áudio' + (falas ? ' (' + falas + ' falas)' : '') + '.\n\nGravar só essas com a voz da conversa? Deixe esta aba aberta até terminar (uns 3 a 5 minutos por aula).')) return;
     LV = {fila: ids, total: ids.length, n: 0, parar: false}; proximaDoLote();
   });
   if($('btGravarTodas')) $('btGravarTodas').addEventListener('click', function(){ this.disabled = true; $('msgLote').textContent = 'Colocando na fila…'; api('trilhaNarrarFundo', {todas: true, voz: $('vozLote').value}).then(function(r){ return api('trilhasListar').then(function(r2){ L = r2; desenharLista(); $('msgLote').textContent = r.falas ? '✓ ' + r.falas + ' fala(s) de ' + r.aulas + ' aula(s) na fila. Pode fechar o site.' : 'Nada para gravar: já está tudo com a voz da IA.'; }); }).catch(function(e){ erroGeral(e.message); }); });
