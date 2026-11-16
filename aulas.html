@@ -2086,7 +2086,7 @@ function desenharHub(m){
 
 // "Só treinar questões": o estudo dirigido de sempre (questões dos assuntos da prova)
 function abrirTreino(m){
-  EST.m = m; EST.modo = 'treino'; EST.temaAtual = ''; EST.q = null; EST.ultima = null;
+  EST.m = m; EST.modo = 'treino'; EST.q = null; EST.ultima = null;
   var el = $('alunoDetalhe');
   $('alunoLista').classList.add('oculto'); el.classList.remove('oculto');
   el.innerHTML = cabEstudo(m) + '<div class="caixa"><p class="carregando">Carregando…</p></div>';
