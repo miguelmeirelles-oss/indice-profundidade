@@ -901,8 +901,9 @@ function formProva(p, pre){
       }).join('') + '</div>' +
     '<div class="campoLargo"><label class="rot" for="pIns">Instruções gerais de correção (opcional)</label><textarea id="pIns" placeholder="ex.: Na questão 3, aceitar tanto pasteurização lenta quanto rápida.">' + esc(v.instrucoes) + '</textarea>' +
       '<label style="display:flex;gap:8px;align-items:center;font-size:13.5px;cursor:pointer;margin:6px 0 0"><input type="checkbox" id="pPadrao" style="width:17px;height:17px"> Usar estes critérios e instruções como padrão nas próximas provas desta disciplina</label></div></div>' +
-    // aulas que caem nesta prova (o estudo dirigido dos alunos foca nelas até a data da prova)
-    '<div class="campoLargo" style="margin-bottom:14px"><label class="rot">Aulas que caem nesta prova ' +
+    '<div class="campoLargo" style="margin-bottom:14px" id="pAssBox"></div>' +
+    // aulas que caem nesta prova: só quando a etapa ainda não tem assuntos (jeito antigo)
+    '<div class="campoLargo" style="margin-bottom:14px" id="pAulasBox"><label class="rot">Aulas que caem nesta prova ' +
       '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Até a data desta prova, o <b>estudo dirigido</b> dos alunos foca nos assuntos destas aulas. Sem nenhuma marcada, o estudo usa todas as aulas já dadas.</div></details></label>' +
       ((dadosDisc.aulasDisc || []).length ? '<div style="display:flex;flex-direction:column;gap:3px">' + dadosDisc.aulasDisc.map(function(a){
         var tema = String(a.tema || '').replace(/^\s*aula\s*\d+\s*[-–:·.]\s*/i, '');
@@ -999,11 +1000,67 @@ function formProva(p, pre){
       salvarPadrao: $('pPadrao').checked, gerada: geradaAtual,
       restrita: quemFazAlguns(), alunos: quemFazMarcados(),
       aulas: Array.prototype.filter.call(el.querySelectorAll('[data-paula]'), function(c){ return c.checked; }).map(function(c){ return c.dataset.paula; }),
+      temasFora: assuntosProva.fora(), temasMais: assuntosProva.mais(),
       publicada: $('pPub').checked, questoes: qsEdit.map(function(q){ q.pontos = String(q.pontos).replace(',', '.'); return q; })}})
       .then(listarProvas).catch(function(e){ bt.disabled = false; $('pErro').textContent = e.message; $('pErro').classList.remove('oculto'); });
   });
+  assuntosProva.iniciar(v, $('pItem').value);
+  if($('pItem').tagName === 'SELECT') $('pItem').addEventListener('change', function(){ assuntosProva.iniciar({}, this.value); });
   el.scrollIntoView({behavior:'smooth', block:'start'});
 }
+
+/* ---- assuntos que caem na prova: os da etapa (P1, P2…) definidos na disciplina; o professor só desmarca o que não cai ---- */
+function etapaDoItem(itemId){
+  var et = dadosDisc.etapasDisc || [];
+  for(var i = 0; i < et.length; i++) if(et[i].itens.indexOf(itemId) !== -1) return i;
+  return -1;
+}
+function arvoreAssuntos(attr, marcado){
+  var gs = [], porG = {};
+  (dadosDisc.temasDisc || []).forEach(function(t){ var g = t.grupo || 'Outros assuntos'; if(!porG[g]){ porG[g] = []; gs.push(g); } porG[g].push(t); });
+  var et = dadosDisc.etapasDisc || [];
+  return gs.map(function(g){
+    var ts = porG[g], n = ts.filter(function(t){ return marcado(t); }).length, provasG = ts.map(function(t){ return t.etapa >= 0 && et[t.etapa] ? et[t.etapa].nome : ''; }).filter(function(x, i, a){ return x && a.indexOf(x) === i; });
+    return '<details style="margin:4px 0"><summary style="cursor:pointer;font-size:14px"><label style="display:inline-flex;gap:6px;align-items:center;cursor:pointer;font-weight:bold"><input type="checkbox" data-grupoass="' + esc(g) + '"' + (n === ts.length ? ' checked' : '') + ' style="width:17px;height:17px"> ' + esc(g) + '</label> <span class="aviso">' + n + ' de ' + ts.length + (provasG.length ? ' · ' + esc(provasG.join(' e ')) : '') + '</span></summary><div style="padding:4px 0 4px 26px">' +
+      ts.map(function(t){ return marcaCaixa(attr, t.id, marcado(t), esc(t.nome) + (t.etapa >= 0 && et[t.etapa] ? ' <span class="aviso">' + esc(et[t.etapa].nome) + '</span>' : '')); }).join('') + '</div></details>';
+  }).join('');
+}
+function ligarArvore(box, attr){
+  box.querySelectorAll('[data-grupoass]').forEach(function(c){
+    c.addEventListener('click', function(ev){ ev.stopPropagation(); });
+    c.addEventListener('change', function(){ var det = c.closest('details'); det.querySelectorAll('[' + attr + ']').forEach(function(x){ x.checked = c.checked; }); atualizarGrupos(box, attr); });
+  });
+  box.querySelectorAll('[' + attr + ']').forEach(function(x){ x.addEventListener('change', function(){ atualizarGrupos(box, attr); }); });
+  atualizarGrupos(box, attr);
+}
+function atualizarGrupos(box, attr){
+  box.querySelectorAll('[data-grupoass]').forEach(function(c){
+    var xs = c.closest('details').querySelectorAll('[' + attr + ']'), n = Array.prototype.filter.call(xs, function(x){ return x.checked; }).length;
+    c.checked = n === xs.length && n > 0; c.indeterminate = n > 0 && n < xs.length;
+  });
+}
+var assuntosProva = {
+  base: [], ativo: false,
+  iniciar: function(prova, itemId){
+    var box = $('pAssBox'), aulasBox = $('pAulasBox'), ei = etapaDoItem(itemId), et = dadosDisc.etapasDisc || [];
+    var fora = prova ? (prova.temasFora || []) : (this.foraAtual ? this.foraAtual() : []), mais = prova ? (prova.temasMais || []) : (this.maisAtual ? this.maisAtual() : []);
+    var base = (dadosDisc.temasDisc || []).filter(function(t){ return ei >= 0 && t.etapa === ei; }).map(function(t){ return t.id; });
+    this.base = base; this.ativo = !!(base.length || mais.length);
+    if(!this.ativo){
+      box.innerHTML = (dadosDisc.temasDisc || []).length && ei >= 0 ? '<p class="aviso" style="margin:0">💡 Os assuntos da ' + esc(et[ei].nome) + ' ainda não foram definidos. Defina em Aula por IA → Disciplinas → Editar ("Assuntos que caem nesta prova") e eles aparecem aqui já marcados. Enquanto isso, marque as aulas abaixo.</p>' : '';
+      aulasBox.style.display = ''; return;
+    }
+    aulasBox.style.display = 'none';
+    box.innerHTML = '<label class="rot">Assuntos que caem nesta prova ' +
+      '<details class="ajuda"><summary aria-label="O que é isto?">?</summary><div>Vêm marcados os assuntos da <b>' + esc(ei >= 0 ? et[ei].nome : 'etapa') + '</b>, como definidos na disciplina (Aula por IA → Disciplinas → Editar). Abra cada grande tema e desmarque o que não cai; pode também marcar assunto de outra etapa. Os alunos estudam exatamente estes assuntos até a data da prova, e o gerador de prova parte deles. Assunto novo que surgir nas próximas aulas da mesma etapa entra sozinho.</div></details></label>' +
+      arvoreAssuntos('data-pass', function(t){ return (base.indexOf(t.id) !== -1 && fora.indexOf(t.id) === -1) || mais.indexOf(t.id) !== -1; });
+    ligarArvore(box, 'data-pass');
+  },
+  marcados: function(){ return Array.prototype.filter.call(document.querySelectorAll('[data-pass]'), function(x){ return x.checked; }).map(function(x){ return x.dataset.pass; }); },
+  foraAtual: function(){ var m = this.marcados(); return this.ativo ? this.base.filter(function(id){ return m.indexOf(id) === -1; }) : []; },
+  maisAtual: function(){ var b = this.base; return this.ativo ? this.marcados().filter(function(id){ return b.indexOf(id) === -1; }) : []; },
+  fora: function(){ return this.foraAtual(); }, mais: function(){ return this.maisAtual(); }
+};
 
 function desenharQs(){
   $('qsBox').innerHTML = qsEdit.map(function(q, i){
@@ -1628,11 +1685,7 @@ function abrirGeradorNovo(){
       '<div><label class="rot" for="gTot">Total de pontos</label><input type="number" id="gTot" min="1" max="100" step="0.5" value="' + esc(c.total || 10) + '"></div>' +
       '<div><label class="rot" for="gDif">Dificuldade</label><select id="gDif">' + [['facil', 'Mais fácil'], ['media', 'Média'], ['dificil', 'Mais difícil']].map(function(o){ return '<option value="' + o[0] + '"' + ((c.dificuldade || 'media') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div>' +
       '<div><label class="rot" for="gFig">Gráficos e figuras</label><select id="gFig">' + [['nenhuma', 'Sem figuras'], ['poucas', 'Poucas (1–2)'], ['padrao', 'Como nas minhas provas (3–4)'], ['muitas', 'Em quase todas']].map(function(o){ return '<option value="' + o[0] + '"' + ((c.figuras || 'padrao') === o[0] ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select></div></div>' +
-    '<label class="rot">Assuntos que caem</label>' +
-      (Object.keys(grupos).length ? Object.keys(grupos).map(function(g){
-        return '<details' + (grupos[g].some(function(t){ return temasSel.indexOf(t.id) !== -1; }) ? ' open' : '') + ' style="margin:4px 0"><summary style="cursor:pointer;font-weight:bold;font-size:14px">' + esc(g) + ' <span class="aviso">(' + grupos[g].length + ')</span></summary><div style="padding:4px 0 4px 10px">' +
-          grupos[g].map(function(t){ return marcaCaixa('data-gtema', t.id, temasSel.indexOf(t.id) !== -1, esc(t.nome)); }).join('') + '</div></details>';
-      }).join('') : '<p class="aviso" style="margin:0">Esta disciplina ainda não tem assuntos organizados (eles aparecem depois das aulas gravadas). Use as aulas abaixo ou escreva os assuntos.</p>') +
+    '<label class="rot">Assuntos que caem <span class="aviso" id="gAssOrig" style="font-weight:normal"></span></label><div id="gAssBox"></div>' +
     ((dd.aulasDisc || []).length ? '<details style="margin:8px 0"><summary style="cursor:pointer;font-weight:bold;font-size:14px">Ou escolha pelas aulas <span class="aviso">(' + dd.aulasDisc.length + ')</span></summary><div style="padding:4px 0 4px 10px">' +
       dd.aulasDisc.map(function(a){ var tema = String(a.tema || '').replace(/^\s*aula\s*\d+\s*[-–:·.]\s*/i, ''); return marcaCaixa('data-gaula', a.id, aulasSel.indexOf(a.id) !== -1, '<b>Aula ' + a.numero + '</b>' + (tema ? ' · ' + esc(tema) : '')); }).join('') + '</div></details>' : '') +
     '<label class="rot" for="gLivre" style="margin-top:8px">Outros assuntos (texto livre, opcional)</label><textarea id="gLivre" style="min-height:50px" placeholder="ex.: Água em alimentos: umidade × Aw, isotermas, transição vítrea">' + esc(c.assuntosLivres || '') + '</textarea>' +
@@ -1646,8 +1699,30 @@ function abrirGeradorNovo(){
     '<div class="botoes"><button type="button" id="gGerar">Gerar prova</button><button type="button" class="secundario" id="gCanc">Cancelar</button>' +
       '<span class="aviso">Usa 2 chamadas da IA (gera e revisa) e leva de 2 a 4 minutos.</span></div><div id="gMsg"></div></div>';
   desenharModelos(c.modelos || null);
+  // assuntos: os da etapa escolhida (P1, P2…), como na disciplina e no cadastro da prova; sem etapa definida, os da última vez
+  var desenharAssGer = function(sel){
+    var box = $('gAssBox');
+    if(!(dd.temasDisc || []).length){ box.innerHTML = '<p class="aviso" style="margin:0">Esta disciplina ainda não tem assuntos organizados (eles aparecem depois das aulas gravadas). Use as aulas abaixo ou escreva os assuntos.</p>'; return; }
+    box.innerHTML = arvoreAssuntos('data-gtema', function(t){ return sel.indexOf(t.id) !== -1; });
+    ligarArvore(box, 'data-gtema');
+  };
+  var assDaEtapa = function(tit){
+    var et = dd.etapasDisc || [], norm = function(x){ return String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }, ei = -1;
+    et.forEach(function(e, i){ if(ei < 0 && norm(e.nome) && norm(tit).indexOf(norm(e.nome)) === 0) ei = i; });
+    if(ei < 0) return null;
+    var base = (dd.temasDisc || []).filter(function(t){ return t.etapa === ei; }).map(function(t){ return t.id; });
+    var pr = (dd.provas || []).filter(function(x){ return etapaDoItem(x.item) === ei && !(x.alunos || []).length; })[0];
+    if(pr){ base = base.filter(function(id){ return (pr.temasFora || []).indexOf(id) === -1; }).concat(pr.temasMais || []); }
+    return base.length ? {ids: base, origem: et[ei].nome + (pr ? ' · como no cadastro de "' + pr.titulo + '"' : ' · como na disciplina')} : null;
+  };
+  var aplicarTit = function(tit, primeira){
+    var a = assDaEtapa(tit);
+    $('gAssOrig').textContent = a ? '(' + a.origem + ')' : '';
+    desenharAssGer(a ? a.ids : (primeira ? temasSel : []));
+  };
+  aplicarTit(c.titulo || 'P1', true);
   $('gCanc').addEventListener('click', function(){ el.innerHTML = ''; });
-  $('gTit').addEventListener('change', function(){ $('gCodEx').textContent = this.value; });
+  $('gTit').addEventListener('change', function(){ $('gCodEx').textContent = this.value; aplicarTit(this.value, false); });
   $('gGerar').addEventListener('click', function(){
     var b = this, m = $('gMsg');
     var cfg = {titulo: $('gTit').value, n: $('gN').value, total: $('gTot').value, dificuldade: $('gDif').value, figuras: $('gFig').value,

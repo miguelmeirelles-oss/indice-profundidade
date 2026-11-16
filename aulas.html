@@ -4536,7 +4536,7 @@ function desenharTemas(){
   var linhaSub = function(t, g){
     var opcoes = (g ? [['herdar', 'segue o grande tema (' + NOMES_IMP[g.importancia] + ')']] : []).concat([['alta', NOMES_IMP.alta], ['normal', NOMES_IMP.normal], ['nao', NOMES_IMP.nao]]);
     var det = detalheDesemp(t.desempenho);
-    return '<div class="temaLinha subtema" data-sub="' + esc(t.id) + '">' + setasTema(t.id) + '<span class="nome">' + esc(t.nome) + (t.critico ? ' <span class="tag t-err">crítico</span>' : '') +
+    return '<div class="temaLinha subtema" data-sub="' + esc(t.id) + '">' + setasTema(t.id) + '<span class="nome">' + esc(t.nome) + (t.prova && g && g.prova && g.prova !== t.prova ? ' <span class="tag t-azul">' + esc(t.prova) + '</span>' : t.prova && !g ? ' <span class="tag t-azul">' + esc(t.prova) + '</span>' : '') + (t.critico ? ' <span class="tag t-err">crítico</span>' : '') +
       '<br><span class="aviso" style="font-weight:normal">' + (t.aulas.length ? 'aula' + (t.aulas.length > 1 ? 's ' : ' ') + t.aulas.join(', ') : 'ainda sem aula neste semestre') + (det ? ' · ' + det : '') + '</span>' +
       (t.descricao ? '<br><span class="aviso" style="font-weight:normal;font-style:italic">o que cai: ' + esc(t.descricao) + '</span>' : '') + '</span>' +
       chipDesemp(t.desempenho) +
@@ -4550,7 +4550,7 @@ function desenharTemas(){
     var aberto = !!TEMAS.abertos[g.id];
     return '<div class="grupoTema" data-grupo="' + esc(g.id) + '"><div class="temaLinha" style="border-bottom:0">' + setasTema(g.id) +
       '<button type="button" class="link" data-abrir="' + esc(g.id) + '" style="font-size:15px;text-decoration:none" aria-expanded="' + aberto + '">' + (aberto ? '▾' : '▸') + '</button>' +
-      '<span class="nome" style="cursor:pointer" data-abrir="' + esc(g.id) + '">' + (g.importancia === 'alta' ? '⭐ ' : '') + esc(g.nome) + (g.critico ? ' <span class="tag t-err">crítico</span>' : '') +
+      '<span class="nome" style="cursor:pointer" data-abrir="' + esc(g.id) + '">' + (g.importancia === 'alta' ? '⭐ ' : '') + esc(g.nome) + (g.prova ? ' <span class="tag t-azul">' + esc(g.prova) + '</span>' : (g.importancia !== 'nao' ? ' <span class="tag t-cinza" title="Marque em Disciplinas → Editar em que prova cai">sem prova</span>' : '')) + (g.critico ? ' <span class="tag t-err">crítico</span>' : '') +
         '<br><span class="aviso" style="font-weight:normal">' + g.subtemas.length + ' subtema(s)' + (g.aulas.length ? ' · aulas ' + g.aulas.join(', ') : '') + '</span></span>' +
       chipDesemp(g.desempenho) +
       '<select data-impg="' + esc(g.id) + '" aria-label="Prioridade do grande tema">' + ['alta', 'normal', 'nao'].map(function(v){ return '<option value="' + v + '"' + (g.importancia === v ? ' selected' : '') + '>' + NOMES_IMP[v] + '</option>'; }).join('') + '</select>' +
@@ -5113,7 +5113,8 @@ function desenharEtapas(){
       '<label>Peso na média <input type="number" min="0" step="0.5" data-c="peso" value="' + esc(e.peso) + '" style="width:70px"></label>' +
       '<label title="vale só para as aulas sem assunto marcado">Exercícios até <input type="date" data-c="fim" value="' + esc(e.fim) + '" style="width:150px"></label>' +
       (etapasEdit.length > 1 ? '<button type="button" class="secundario mini" data-tiraret="' + i + '">Remover etapa</button>' : '') + '</div>' +
-      (GRUPOS_FORM === null ? '' : '<div data-tmbox="1" style="margin:6px 0 4px;font-size:14px"><b>Assuntos que caem nesta prova:</b> ' + (GRUPOS_FORM.length ? GRUPOS_FORM.map(function(g){ return '<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 12px 2px 0;font-weight:normal"><input type="checkbox" data-tm="' + esc(g.id) + '"' + ((e.temas || []).indexOf(g.id) !== -1 ? ' checked' : '') + '> ' + esc(g.nome) + '</label>'; }).join('') : '<span class="aviso">cadastre os grandes temas em Temas da disciplina para escolher aqui.</span>') + '</div>') +
+      (GRUPOS_FORM === null ? '' : '<div data-tmbox="1" style="margin:6px 0 4px;font-size:14px"><b>Assuntos que caem nesta prova:</b> ' + (GRUPOS_FORM.length ? GRUPOS_FORM.map(function(g){ return '<label style="display:inline-flex;gap:4px;align-items:center;margin:2px 12px 2px 0;font-weight:normal"><input type="checkbox" data-tm="' + esc(g.id) + '"' + ((e.temas || []).indexOf(g.id) !== -1 ? ' checked' : '') + '> ' + esc(g.nome) + '</label>'; }).join('') : '<span class="aviso">ainda não há grandes temas (eles aparecem depois das aulas gravadas).</span>') + '</div>') +
+      '<div style="margin:2px 0 6px;font-size:14px"><label>Ou escreva o que cai <span class="aviso">(vale também para os temas que ainda vão surgir)</span><input type="text" data-c="assuntos" value="' + esc(e.assuntos || '') + '" placeholder="ex.: água, pH e acidez, carboidratos" style="width:100%;margin-top:3px"></label></div>' +
       '<table class="itensEd"><tbody>' + e.itens.map(function(it, j){
         return '<tr data-it="' + j + '"><td><select data-t="tipo" aria-label="Tipo">' + ['prova', 'trabalho', 'aulas'].map(function(t){ return '<option value="' + t + '"' + (it.tipo === t ? ' selected' : '') + '>' + NOMES_TIPO[t] + '</option>'; }).join('') + '</select></td>' +
           '<td><input type="text" data-t="nome" value="' + esc(it.nome) + '" aria-label="Nome do item"></td>' +
@@ -5125,7 +5126,7 @@ function desenharEtapas(){
   }).join('') + avisoTemasSemProva() +
   '<p class="aviso" style="margin-top:6px">Média final = ' + (pesosIguais(etapasEdit) ? '(' + etapasEdit.map(function(e){ return esc(e.nome); }).join(' + ') + ') ÷ ' + etapasEdit.length
     : '(' + etapasEdit.map(function(e){ return esc(e.nome) + ' × ' + nota10(e.peso); }).join(' + ') + ') ÷ soma dos pesos') +
-  '. <b>Os exercícios em aula entram na etapa pelo assunto</b> marcado acima (ex.: P1 = água e carboidratos), mesmo que a prova seja adiada; esses assuntos também definem o que cai na prova no estudo dirigido e nas aulas em trilha. Aulas sem assunto marcado entram pela data: até a data informada ou, se ficar em branco, até a data da prova da etapa cadastrada no Prova por IA.</p>';
+  '. <b>É aqui que se define o que cai em cada prova</b> (ex.: P1 = água, pH e acidez, carboidratos; P2 = proteínas e lipídios). A cada aula catalogada, a IA encaixa cada assunto na prova certa pelo conteúdo, não pela data (aula de revisão entra como complemento dos temas que já existem). No Prova por IA, ao escolher a P1 ou a P2, esses assuntos já vêm marcados para você só desmarcar o que não cai; o estudo dos alunos e o gerador de prova usam a mesma lista. Os exercícios em aula também entram na etapa pelo assunto, mesmo que a prova seja adiada. Aulas sem assunto marcado entram pela data: até a data informada ou, se ficar em branco, até a data da prova da etapa cadastrada no Prova por IA.</p>';
   var box = $('etapasBox');
   box.querySelectorAll('[data-tm]').forEach(function(c){ c.addEventListener('change', function(){ lerEtapas(); desenharEtapas(); }); });
   box.querySelectorAll('[data-tiraret]').forEach(function(b){ b.addEventListener('click', function(){ lerEtapas(); etapasEdit.splice(Number(b.dataset.tiraret), 1); desenharEtapas(); }); });
@@ -5151,6 +5152,7 @@ function lerEtapas(){
   $('etapasBox').querySelectorAll('[data-et]').forEach(function(box){
     var e = etapasEdit[Number(box.dataset.et)];
     box.querySelectorAll('.etapaCab [data-c]').forEach(function(inp){ e[inp.dataset.c] = inp.dataset.c === 'peso' ? String(inp.value).replace(',', '.') : inp.value; });
+    var ass = box.querySelector('[data-c="assuntos"]'); if(ass) e.assuntos = ass.value;
     var tb = box.querySelector('[data-tmbox]'); if(tb) e.temas = Array.prototype.slice.call(tb.querySelectorAll('[data-tm]')).filter(function(c){ return c.checked; }).map(function(c){ return c.dataset.tm; });
     box.querySelectorAll('[data-it]').forEach(function(tr){
       var it = e.itens[Number(tr.dataset.it)];
