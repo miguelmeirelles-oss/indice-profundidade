@@ -1598,7 +1598,7 @@ function desenharDesempenho(){
         : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
       (m.recomendacoes.length ? '<details style="margin-top:8px"><summary class="link">💡 Pelo que você respondeu em aula (' + m.recomendacoes.length + ')</summary>' + m.recomendacoes.map(function(x, k){
         return '<div class="eixo" style="border-color:#8a6100">' + esc(x.texto) + '<br>' + esc(x.acao) + (x.trilhaId ? ' <button type="button" class="link" data-recaula="' + esc(x.trilhaId) + '">abrir a aula</button> · <button type="button" class="link" data-irquest="' + esc(x.trilhaId) + '">ir às questões</button>' : '') + '</div>'; }).join('') + '</details>' : '') +
-      (m.temas.length ? '<details style="margin-top:6px"><summary class="link">Assuntos em ordem de prioridade</summary>' + m.temas.map(function(t){
+      (m.temas.length ? '<details style="margin-top:6px"><summary class="link">Assuntos na ordem das aulas</summary>' + m.temas.map(function(t){
         return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--linha)"><span>' + (t.importante ? '⭐ ' : '') + esc(t.grupo ? t.grupo + ' › ' + t.nome : t.nome) + '</span><span class="aviso">' +
           [t.sala !== null ? 'em aula ' + dezEst(t.sala) : '', t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'não estudou'].filter(Boolean).join(' · ') + '</span></div>'; }).join('') + '<p class="aviso">⭐ = o professor marcou como importante.</p></details>' : '') +
       '<div class="botoes" style="margin-top:10px"><button type="button" class="mini" data-hub="' + mi + '">🎯 Abrir a matéria</button><button type="button" class="secundario mini" data-diag="' + mi + '">🔎 Diagnóstico</button><button type="button" class="secundario mini" data-cad="' + mi + '">📒 Minhas respostas</button></div></div>';
@@ -2019,7 +2019,7 @@ function desenharHub(m){
       '<button type="button" class="hubModo" data-modo="treino"><span>📝</span>Só treinar questões<small>dos assuntos da prova</small></button>' +
       '<button type="button" class="hubModo" data-modo="aulas"' + (aulas.length ? '' : ' disabled') + '><span>▶</span>Ver as aulas<small>' + (aulas.length ? aulas.length + ' aula' + (aulas.length > 1 ? 's' : '') + ' da prova' : 'nenhuma ainda') + '</small></button>' +
     '</div><div id="hubPainel"></div>' +
-    (temas.length ? '<p style="margin:16px 0 4px"><b>Assuntos da ' + esc(mm.prova.titulo) + '</b> <span class="aviso">· na ordem do que mais precisa · deslize para ver todos</span></p>' +
+    (temas.length ? '<p style="margin:16px 0 4px"><b>Assuntos da ' + esc(mm.prova.titulo) + '</b> <span class="aviso">· na ordem das aulas · a cor mostra o seu domínio · deslize para ver todos</span></p>' +
       '<div class="hubFaixa" id="hubFaixa">' + temas.map(function(t, i){ return '<button type="button" class="hubChip" data-chip="' + i + '"><span class="pt" style="background:' + corDom(t.dominio) + '"></span>' + esc(t.nome) + '</button>'; }).join('') + '</div>' +
       '<div id="hubTema"></div>' : '<p class="aviso" style="margin-top:14px">Os assuntos aparecem depois das aulas gravadas.</p>') +
     htmlModoRevisao(mm, mi) +
