@@ -372,6 +372,8 @@
 .hubCartao{border:2px solid #2E62C6;border-radius:14px;padding:12px;background:#fff;touch-action:pan-y}
 .hubAcoes{display:flex;flex-direction:column;gap:8px;margin-top:10px}.hubAcoes button{width:100%;margin:0}
 .hubNav{display:flex;justify-content:space-between;gap:8px;margin-top:10px;font-size:13.5px}
+.tarefaG{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff}
+.passosG{display:flex;gap:6px;flex-wrap:wrap}.passosG .feitoG{border-color:#1a7a3c;color:#1a7a3c}
 .hubTarefa{display:flex;gap:10px;align-items:center;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff;cursor:pointer}
 </style>
 <style>
@@ -430,6 +432,7 @@
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
       </div>
       <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>🎯 Estudar para a prova</h2><p class="aviso" style="margin-top:-6px">Todas as suas matérias, com o próximo passo de cada uma até a prova. Toque em "Abrir a matéria" para estudar os assuntos um a um.</p><div id="revisaoBox"></div><div id="desempCorpo"><p class="carregando">Carregando…</p></div></div>
+      <div id="voltaEstudo" class="oculto" data-painelal="trilha" style="position:sticky;top:0;z-index:20;margin:0 0 8px"></div>
       <div class="caixa oculto" id="caixaTrilhaAluno" data-painelal="trilha"></div>
       <div class="caixa" id="caixaProvas" data-painelal="provas">
         <h2>📝 Minhas provas</h2>
@@ -1318,10 +1321,29 @@ function abaAluno(a, abrirId, questoes){
   try{ localStorage.setItem('aulas_abaal', a); }catch(e){}
   document.querySelectorAll('[data-abaal]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.abaal === a)); });
   document.querySelectorAll('[data-painelal]').forEach(function(x){ x.classList.toggle('foraAba', x.dataset.painelal !== a); });
+  if(a !== 'trilha') VOLTA = null;
+  desenharVolta();
   if(a === 'trilha') abrirTrilhaAluno(abrirId, questoes);   // abrirId: vindo do plano/revisão, abre direto a aula
   if(a === 'desemp') carregarDesempenho(false);
 }
-document.querySelectorAll('[data-abaal]').forEach(function(b){ b.addEventListener('click', function(){ voltarListaAluno(); abaAluno(b.dataset.abaal); }); });
+document.querySelectorAll('[data-abaal]').forEach(function(b){ b.addEventListener('click', function(){ VOLTA = null; voltarListaAluno(); abaAluno(b.dataset.abaal); }); });
+// Vindo do estudo para a Biblioteca: guarda de onde veio e mostra "← voltar" no topo da Biblioteca
+var VOLTA = null;
+function irParaAula(id, questoes){
+  VOLTA = EST.modo === 'hub' && EST.m ? {hub: true, m: EST.m, tema: EST.temaAtual || ''} : {hub: false, y: window.scrollY};
+  voltarListaAluno(); abaAluno('trilha', id, questoes); window.scrollTo(0, 0);
+}
+function desenharVolta(){
+  var v = $('voltaEstudo'); if(!v) return;
+  if(!VOLTA){ v.classList.add('oculto'); v.innerHTML = ''; return; }
+  v.classList.remove('oculto');
+  v.innerHTML = '<button type="button" id="btVoltaEstudo" style="width:100%;margin:0;text-align:left">&#8592; Voltar para Estudar para a prova' + (VOLTA.hub ? ' · ' + esc(VOLTA.m.nome) : '') + '</button>';
+  $('btVoltaEstudo').addEventListener('click', function(){
+    var x = VOLTA; VOLTA = null; if(window.Trilha) Trilha.parar();
+    if(x.hub){ abaAluno('desemp'); abrirEstudo(x.m, x.tema); }
+    else { voltarListaAluno(); abaAluno('desemp'); setTimeout(function(){ window.scrollTo(0, x.y || 0); }, 300); }
+  });
+}
 function voltarListaAluno(){ if(typeof fimLeitura === 'function') fimLeitura(); $('alunoLista').classList.remove('oculto'); $('alunoDetalhe').classList.add('oculto'); }
 
 /* ================= MINHAS PROVAS (aluno) =================
@@ -1563,6 +1585,33 @@ function carregarDesempenho(atualizar){
   }).catch(function(e){ var a = el.querySelector('[data-desatualiza]'); if(a) a.remove(); if(!DES.r) el.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
 function notaCor(n){ return n === null || n === undefined ? '#6b7a99' : n >= 7 ? '#1a7a3c' : n >= 5 ? '#B8890A' : '#c62828'; }
+// As tarefas do mesmo assunto (assistir a aula e responder/refazer) viram UMA linha com os passos em ordem
+function gruposDeTarefas(ts){
+  var gs = [];
+  ts.forEach(function(t, i){
+    var ult = gs[gs.length - 1], eVer = t.tipo === 'trilha', eResp = t.tipo === 'questao' || t.tipo === 'refazer' || !t.tipo;
+    if(ult && ult.tema === t.tema && ((eVer && !ult.ver && !ult.resp) || (eResp && !ult.resp && !ult.outro))){ if(eVer){ ult.ver = t; ult.iv = i; } else { ult.resp = t; ult.ir = i; } if(!ult.porque) ult.porque = t.porque; ult.n++; return; }
+    var g = {tema: t.tema, porque: t.porque || '', n: 1};
+    if(eVer){ g.ver = t; g.iv = i; } else if(eResp){ g.resp = t; g.ir = i; } else { g.outro = t; g.io = i; }
+    gs.push(g);
+  });
+  return gs;
+}
+function htmlGrupoTarefa(g, mi){
+  if(g.outro){
+    var rot = {simulado: '📝 Começar o simulado', relampago: '⚡ Começar', vespera: '📄 Abrir a folha', explicar: '🎤 Explicar'}[g.outro.tipo] || '▶ Começar';
+    return '<div class="tarefaG"><div style="flex:1 1 200px"><b>' + esc(g.outro.texto) + '</b><div class="aviso">' + esc(g.tema || '') + (g.porque ? ' · ' + esc(g.porque) : '') + '</div></div><div class="passosG"><button type="button" class="mini" data-ftar="' + mi + ':' + g.io + '">' + rot + '</button></div></div>';
+  }
+  var aulaFeita = !g.ver && g.resp && g.resp.aula, primeiro = g.ver ? 'ver' : 'resp';
+  var tituloAula = g.ver ? (String(g.ver.texto).match(/"([^"]+)"/) || [])[1] || '' : '';
+  var passo1 = g.ver ? '<button type="button" class="mini' + (primeiro === 'ver' ? '' : ' secundario') + '" data-ftar="' + mi + ':' + g.iv + '">1 ▶ ' + (/^Reveja/.test(g.ver.texto) ? 'Rever a aula' : 'Assistir a aula') + '</button>'
+    : aulaFeita ? '<button type="button" class="mini secundario feitoG" data-iraula="' + esc(g.resp.aula) + '" title="rever a aula">1 ✓ Aula assistida</button>' : '';
+  var passo2 = g.resp ? '<button type="button" class="mini' + (primeiro === 'resp' ? '' : ' secundario') + '" data-ftar="' + mi + ':' + g.ir + '">' + (passo1 ? '2 ' : '') + (g.resp.tipo === 'refazer' ? '↻ Refazer a questão' : '✍ Responder 2 questões') + '</button>' : '';
+  return '<div class="tarefaG"><div style="flex:1 1 200px"><b>' + esc(g.tema) + '</b>' +
+    (tituloAula ? '<div class="aviso">Aula: ' + esc(tituloAula) + '</div>' : '') +
+    (g.resp && g.resp.tipo === 'refazer' && g.resp.detalhe ? '<div class="aviso">' + esc(g.resp.texto) + ': ' + esc(g.resp.detalhe) + '</div>' : '') +
+    (g.porque ? '<div class="aviso">' + esc(g.porque) + '</div>' : '') + '</div><div class="passosG">' + passo1 + passo2 + '</div></div>';
+}
 function desenharDesempenho(){
   var r = DES.r, el = $('desempCorpo');
   if(!r.materias.length){ el.innerHTML = '<p class="aviso">Você ainda não está em nenhuma matéria em andamento.</p>'; return; }
@@ -1593,8 +1642,13 @@ function desenharDesempenho(){
         '<div class="barraDom" style="margin:3px 0"><i style="width:' + Math.round(m.plano.feitas / m.plano.total * 100) + '%;background:#1a7a3c"></i></div>' +
         (m.plano.feitasLista.length ? '<details><summary class="link" style="font-size:13px">o que você já fez</summary>' + m.plano.feitasLista.map(function(x){ return '<div class="aviso">✓ ' + esc(x) + '</div>'; }).join('') + '</details>' : '') + '</div>' : '') +
       (m.modoFinal ? '<div class="convite" style="margin:8px 0" data-final="' + mi + '"><b>📝 O que você errou nas provas</b><div data-finalcorpo="' + mi + '"><p class="carregando">Analisando as suas provas corrigidas…</p></div></div>' : '') +
-      (m.tarefas.length ? '<div style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' por dia até a prova)</span> ' + ajuda(m.revisao && m.revisao.ligado ? BAL.hojeRev : BAL.hoje) + '</div>' + hoje.map(function(t, k){ return tarefa(t, k); }).join('') +
-        (depois.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + depois.length + ')</summary>' + depois.map(function(t, k){ return tarefa(t, k + m.porDia); }).join('') + '</details>' : '')
+      (m.tarefas.length ? (function(){
+        var gs = gruposDeTarefas(m.tarefas), nHoje = 0, conta = 0;
+        while(nHoje < gs.length && (nHoje === 0 || conta + gs[nHoje].n <= m.porDia)){ conta += gs[nHoje].n; nHoje++; }
+        var gh = gs.slice(0, nHoje), gd = gs.slice(nHoje);
+        return '<div style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' tarefa' + (m.porDia > 1 ? 's' : '') + ' por dia até a prova)</span> ' + ajuda(m.revisao && m.revisao.ligado ? BAL.hojeRev : BAL.hoje) + '</div>' + gh.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
+          (gd.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + gd.length + ' assunto' + (gd.length > 1 ? 's' : '') + ')</summary>' + gd.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') + '</details>' : '');
+      })()
         : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
       (m.recomendacoes.length ? '<details style="margin-top:8px"><summary class="link">💡 Pelo que você respondeu em aula (' + m.recomendacoes.length + ')</summary>' + m.recomendacoes.map(function(x, k){
         return '<div class="eixo" style="border-color:#8a6100">' + esc(x.texto) + '<br>' + esc(x.acao) + (x.trilhaId ? ' <button type="button" class="link" data-recaula="' + esc(x.trilhaId) + '">abrir a aula</button> · <button type="button" class="link" data-irquest="' + esc(x.trilhaId) + '">ir às questões</button>' : '') + '</div>'; }).join('') + '</details>' : '') +
@@ -1622,9 +1676,9 @@ function desenharDesempenho(){
   el.querySelectorAll('[data-diag]').forEach(function(b){ b.addEventListener('click', function(){ abrirDiagnostico(mDe(r.materias[Number(b.dataset.diag)])); }); });
   el.querySelectorAll('[data-hub]').forEach(function(b){ b.addEventListener('click', function(){ abrirEstudo(mDe(r.materias[Number(b.dataset.hub)])); }); });
   el.querySelectorAll('[data-cad]').forEach(function(b){ b.addEventListener('click', function(){ abrirCaderno(mDe(r.materias[Number(b.dataset.cad)])); }); });
-  el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ abaAluno('trilha', b.dataset.recaula); }); });
-  el.querySelectorAll('[data-iraula],[data-irquest]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); var q = !!b.dataset.irquest; abaAluno('trilha', b.dataset.irquest || b.dataset.iraula, q); window.scrollTo(0, 0); }); });
-  el.querySelectorAll('[data-fazer]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); b.closest('[data-tarefa]').click(); }); });
+  el.querySelectorAll('[data-recaula]').forEach(function(b){ b.addEventListener('click', function(){ EST.modo = ''; irParaAula(b.dataset.recaula); }); });
+  el.querySelectorAll('[data-iraula],[data-irquest]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); EST.modo = ''; irParaAula(b.dataset.irquest || b.dataset.iraula, !!b.dataset.irquest); }); });
+  el.querySelectorAll('[data-ftar]').forEach(function(b){ b.addEventListener('click', function(ev){ ev.stopPropagation(); var k = b.dataset.ftar.split(':'), m = r.materias[Number(k[0])]; EST.modo = ''; EST.temaAtual = ''; fazerTarefa(mDe(m), m.tarefas[Number(k[1])], m); }); });
   el.querySelectorAll('[data-tarefa]').forEach(function(b){ b.addEventListener('click', function(){
     var k = b.dataset.tarefa.split(':'), m = r.materias[Number(k[0])], t = m.tarefas[Number(k[1])], mm = mDe(m);
     EST.modo = ''; EST.temaAtual = '';
@@ -1632,7 +1686,7 @@ function desenharDesempenho(){
   }); });
 }
 function fazerTarefa(mm, t, m){
-    if(t.tipo === 'trilha'){ voltarListaAluno(); abaAluno('trilha', t.trilhaId); window.scrollTo(0, 0); return; }
+    if(t.tipo === 'trilha'){ irParaAula(t.trilhaId); return; }
     if(t.tipo === 'simulado'){ abrirSimulado(mm, m.temaIds); return; }
     if(t.tipo === 'relampago'){ abrirRelampago(mm, m.temaIds); return; }
     if(t.tipo === 'vespera'){ abrirFolhaVespera(mm, m.temaIds); return; }
@@ -2040,13 +2094,14 @@ function desenharHub(m){
     if(ja){ p.innerHTML = ''; return; }
     b.setAttribute('aria-pressed', 'true');
     if(modo === 'plano'){
-      p.innerHTML = (mm.tarefas || []).length ? (mm.tarefas || []).map(function(t, k){ return '<div class="hubTarefa" data-htar="' + k + '"><div style="flex:1"><b>' + (k < mm.porDia ? '' : '<span class="aviso">depois · </span>') + esc(t.texto) + '</b><div class="aviso">' + esc(t.tema) + (t.porque ? ' · ' + esc(t.porque) : '') + '</div></div><span style="font-size:20px">›</span></div>'; }).join('') +
-        '<p class="aviso">' + mm.porDia + ' por dia até a prova. Tarefa feita sai da lista. ' + ajuda(BAL.hoje) + '</p>' : '<p class="ok">Nada pendente no plano agora. 👏</p>';
-      p.querySelectorAll('[data-htar]').forEach(function(x){ x.addEventListener('click', function(){ var t = mm.tarefas[Number(x.dataset.htar)]; EST.temaAtual = t.temaId || ''; fazerTarefa(mmBase, t, mm); }); });
+      p.innerHTML = (mm.tarefas || []).length ? gruposDeTarefas(mm.tarefas).map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
+        '<p class="aviso">' + mm.porDia + ' tarefa(s) por dia até a prova. Passo feito sai da lista. ' + ajuda(BAL.hoje) + '</p>' : '<p class="ok">Nada pendente no plano agora. 👏</p>';
+      p.querySelectorAll('[data-ftar]').forEach(function(x){ x.addEventListener('click', function(){ var t = mm.tarefas[Number(x.dataset.ftar.split(':')[1])]; EST.temaAtual = t.temaId || ''; fazerTarefa(mmBase, t, mm); }); });
+      p.querySelectorAll('[data-iraula]').forEach(function(x){ x.addEventListener('click', function(){ irParaAula(x.dataset.iraula); }); });
     } else {
       p.innerHTML = aulas.map(function(a){ return '<div class="hubTarefa" data-haula="' + esc(a.id) + '"><div style="flex:1"><b>▶ ' + esc(a.titulo) + '</b><div class="barraDom" style="margin-top:4px"><i style="width:' + (a.progresso || 0) + '%;background:#1a7a3c"></i></div><span class="aviso">' + (a.progresso >= 100 ? '✓ assistida' : a.progresso ? a.progresso + '% assistido' : 'ainda não assistiu') + '</span></div><span style="font-size:20px">›</span></div>'; }).join('') +
         '<p class="aviso">Só as aulas dos assuntos desta prova. O curso inteiro está na 📚 Biblioteca de aulas.</p>';
-      p.querySelectorAll('[data-haula]').forEach(function(x){ x.addEventListener('click', function(){ voltarListaAluno(); abaAluno('trilha', x.dataset.haula); window.scrollTo(0, 0); }); });
+      p.querySelectorAll('[data-haula]').forEach(function(x){ x.addEventListener('click', function(){ irParaAula(x.dataset.haula); }); });
     }
   }); });
   // assuntos: faixa + cartão do assunto escolhido
@@ -2070,7 +2125,7 @@ function desenharHub(m){
     $('hubTema').querySelectorAll('[data-hnav]').forEach(function(b){ b.addEventListener('click', function(){ mostrar(idx + Number(b.dataset.hnav)); }); });
     $('hubTema').querySelectorAll('[data-hacao]').forEach(function(b){ b.addEventListener('click', function(){
       var a = b.dataset.hacao;
-      if(a === 'ver'){ voltarListaAluno(); abaAluno('trilha', tr.id); window.scrollTo(0, 0); }
+      if(a === 'ver') irParaAula(tr.id);
       else if(a === 'questao'){ EST.m = mmBase; $('alunoLista').classList.add('oculto'); $('alunoDetalhe').classList.remove('oculto'); window.scrollTo(0, 0); pedirQuestaoEstudo(t.id); }
       else explicarColega(mmBase, t.nome);
     }); });
@@ -2523,7 +2578,7 @@ function carregarTrilha(el, modo, abrirId, questoes){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); if(abrirId && Trilha.irPara) Trilha.irPara(abrirId, questoes); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=52';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=53';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);
