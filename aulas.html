@@ -4541,7 +4541,7 @@ function situacaoTrechos(a){
   var naoChegaram = [];
   for(var i = 1; i <= total; i++) if(!tem[i]) naoChegaram.push(i);
   var comErro = blocos.filter(function(b){ return b.status !== 'feito'; });
-  var nomes = {pendente: 'na fila', processando: 'sendo transcrito agora', falhou: 'falhou 5 vezes'};
+  var nomes = {pendente: 'na fila', processando: 'sendo transcrito agora', falhou: 'falhou 10 vezes'};
   var h = '<details style="margin-top:6px" open><summary class="link">Por que ainda não terminou?</summary><div class="detalhe" style="margin-top:8px">';
   h += '<p style="margin:0 0 6px"><b>' + a.blocosFeitos + ' de ' + total + '</b> trechos transcritos.</p>';
   if(naoChegaram.length){
