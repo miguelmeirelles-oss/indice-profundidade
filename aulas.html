@@ -3897,9 +3897,28 @@ function avisoTrechos(est){
   if(!est) return '';
   var recebidos = Math.max(est.blocosRecebidos || 0, G.aula && G.aula.id === est.id ? (G.ordem || 0) : 0);
   var falta = recebidos - (est.blocosFeitos || 0);
-  return falta > 0 ? '<div class="convite" style="margin-top:8px"><b>' + est.blocosFeitos + ' trecho(s) prontos, ' + falta + ' ainda sendo transcrito(s).</b> Cada um leva por volta de 1 minuto; este aviso se atualiza sozinho. Se gerar agora, as questões usam só os prontos.</div>'
+  var noServ = (est.blocos || []).filter(function(b){ return b.status !== 'feito'; }).length;
+  var bt = !noServ ? '' : Q.forcando === est.id ? '<div style="margin-top:6px"><button type="button" class="mini" disabled>Transcrevendo… (1 a 2 minutos)</button></div>'
+    : '<div style="margin-top:6px"><button type="button" class="mini" data-trforcar="' + esc(est.id) + '">Transcrever agora</button> <span class="aviso">use se algum trecho parecer travado</span></div>';
+  return falta > 0 ? '<div class="convite" style="margin-top:8px"><b>' + est.blocosFeitos + ' trecho(s) prontos, ' + falta + ' ainda sendo transcrito(s).</b> Cada um leva por volta de 1 minuto; este aviso se atualiza sozinho. Se gerar agora, as questões usam só os prontos.' + bt + '</div>'
     : (est.blocosFeitos ? '<div class="ok" style="margin-top:8px">Todos os ' + est.blocosFeitos + ' trechos estão transcritos.</div>' : '');
 }
+// botão "Transcrever agora" do aviso: pede de novo, na hora, os trechos que já chegaram e não ficaram prontos
+document.addEventListener('click', function(ev){
+  var b = ev.target.closest && ev.target.closest('[data-trforcar]'); if(!b) return;
+  var aulaId = b.dataset.trforcar, est = Q.estadoTrechos && Q.estadoTrechos.id === aulaId ? Q.estadoTrechos : G.estado;
+  var falta = ((est && est.blocos) || []).filter(function(x){ return x.status !== 'feito'; }).map(function(x){ return x.ordem; });
+  if(!falta.length) return;
+  Q.forcando = aulaId; b.disabled = true; b.textContent = 'Transcrevendo… (1 a 2 minutos)';
+  var fila = falta.slice(), ativos = 0;
+  var atualizar = function(){ return api('estadoAula', {aulaId: aulaId}).then(function(e2){ Q.estadoTrechos = e2; if(G.aula && e2.id === G.aula.id) G.estado = e2; var alvo = $('avisoTrechos'); if(alvo) alvo.innerHTML = avisoTrechos(e2); }).catch(function(){}); };
+  var proximo = function(){
+    if(!fila.length){ if(!ativos){ Q.forcando = null; atualizar(); } return; }
+    var o = fila.shift(); ativos++;
+    api('transcreverBloco', {aulaId: aulaId, ordem: o, forcar: true}).catch(function(){}).then(function(){ ativos--; proximo(); });
+  };
+  var nIni = Math.min(3, fila.length); for(var i = 0; i < nIni; i++) proximo();
+});
 function vigiarTrechos(){
   if(Q.vigia) clearInterval(Q.vigia);
   Q.vigia = setInterval(function(){
@@ -4634,7 +4653,7 @@ function carregarLinhaTempo(){
       function proximo(){
         if(!fila.length){ if(!ativos) carregarLinhaTempo(); return; }
         var o = fila.shift(); ativos++;
-        api('transcreverBloco', {aulaId: a.id, ordem: o}).catch(function(){}).then(function(){ ativos--; proximo(); });
+        api('transcreverBloco', {aulaId: a.id, ordem: o, forcar: true}).catch(function(){}).then(function(){ ativos--; proximo(); });
       }
       for(var i = 0; i < 3; i++) proximo();
     }); });
