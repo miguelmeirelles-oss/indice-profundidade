@@ -1638,7 +1638,7 @@ function desenharDesempenho(){
       htmlModoRevisao(m, mi) +
       (m.aviso ? '<div class="' + (m.modoFinal ? 'erro' : 'alerta') + '" style="margin:6px 0">' + esc(m.aviso) + '</div>' : '') +
       (m.conquistas && m.conquistas.length ? '<div style="margin:6px 0">' + m.conquistas.map(function(c){ return '<span style="display:inline-block;padding:3px 10px;margin:2px 4px 2px 0;border-radius:999px;background:#fff7d6;border:1px solid #E8B923;font-size:13px">' + esc(c) + '</span>'; }).join('') + ' ' + ajuda(BAL.conquistas) + '</div>' : '') +
-      (m.plano && m.plano.total ? '<div style="margin:8px 0 2px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><b>Plano da semana ' + ajuda(BAL.plano) + '</b><span>' + m.plano.feitas + ' de ' + m.plano.total + ' tarefa' + (m.plano.total > 1 ? 's' : '') + ' feita' + (m.plano.feitas === 1 ? '' : 's') + (m.plano.feitas === m.plano.total ? ' 🎉' : '') + '</span></div>' +
+      (m.plano && m.plano.total ? '<div style="margin:8px 0 2px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><b>Plano da semana ' + ajuda(BAL.plano) + '</b><span>' + m.plano.feitas + ' de ' + m.plano.total + ' passo' + (m.plano.total > 1 ? 's' : '') + ' feito' + (m.plano.feitas === 1 ? '' : 's') + (m.plano.feitas === m.plano.total ? ' 🎉' : '') + '</span></div>' +
         '<div class="barraDom" style="margin:3px 0"><i style="width:' + Math.round(m.plano.feitas / m.plano.total * 100) + '%;background:#1a7a3c"></i></div>' +
         (m.plano.feitasLista.length ? '<details><summary class="link" style="font-size:13px">o que você já fez</summary>' + m.plano.feitasLista.map(function(x){ return '<div class="aviso">✓ ' + esc(x) + '</div>'; }).join('') + '</details>' : '') + '</div>' : '') +
       (m.modoFinal ? '<div class="convite" style="margin:8px 0" data-final="' + mi + '"><b>📝 O que você errou nas provas</b><div data-finalcorpo="' + mi + '"><p class="carregando">Analisando as suas provas corrigidas…</p></div></div>' : '') +
@@ -1646,7 +1646,7 @@ function desenharDesempenho(){
         var gs = gruposDeTarefas(m.tarefas), nHoje = 0, conta = 0;
         while(nHoje < gs.length && (nHoje === 0 || conta + gs[nHoje].n <= m.porDia)){ conta += gs[nHoje].n; nHoje++; }
         var gh = gs.slice(0, nHoje), gd = gs.slice(nHoje);
-        return '<div style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' tarefa' + (m.porDia > 1 ? 's' : '') + ' por dia até a prova)</span> ' + ajuda(m.revisao && m.revisao.ligado ? BAL.hojeRev : BAL.hoje) + '</div>' + gh.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
+        return '<div style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' passo' + (m.porDia > 1 ? 's' : '') + ' por dia até a prova)</span> ' + ajuda(m.revisao && m.revisao.ligado ? BAL.hojeRev : BAL.hoje) + '</div>' + gh.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
           (gd.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + gd.length + ' assunto' + (gd.length > 1 ? 's' : '') + ')</summary>' + gd.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') + '</details>' : '');
       })()
         : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
@@ -2096,7 +2096,7 @@ function desenharHub(m){
     b.setAttribute('aria-pressed', 'true');
     if(modo === 'plano'){
       p.innerHTML = (mm.tarefas || []).length ? gruposDeTarefas(mm.tarefas).map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
-        '<p class="aviso">' + mm.porDia + ' tarefa(s) por dia até a prova. Passo feito sai da lista. ' + ajuda(BAL.hoje) + '</p>' : '<p class="ok">Nada pendente no plano agora. 👏</p>';
+        '<p class="aviso">' + mm.porDia + ' passo(s) por dia até a prova. Passo feito sai da lista. ' + ajuda(BAL.hoje) + '</p>' : '<p class="ok">Nada pendente no plano agora. 👏</p>';
       p.querySelectorAll('[data-ftar]').forEach(function(x){ x.addEventListener('click', function(){ var t = mm.tarefas[Number(x.dataset.ftar.split(':')[1])]; EST.temaAtual = t.temaId || ''; fazerTarefa(mmBase, t, mm); }); });
       p.querySelectorAll('[data-iraula]').forEach(function(x){ x.addEventListener('click', function(){ irParaAula(x.dataset.iraula); }); });
     } else {
