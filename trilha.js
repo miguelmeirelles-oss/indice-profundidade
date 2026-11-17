@@ -857,6 +857,9 @@ function narrar(){
   var b = blocoAtual(), p = b.passos[P.passo], chave = b.id + ':' + P.passo, inicio = Date.now();
   var seguir = function(){
     if(!P.tocando) return;
+    var au = P.aud;
+    if(au && au.currentTime > 0 && !au.paused && !au.ended){ au.onended = seguir; return; }   // a voz gravada ainda está falando
+    try{ if('speechSynthesis' in window && speechSynthesis.speaking && P.esperaVoz !== P.falaId){ P.esperaVoz = P.falaId; var meuId = P.falaId, olhar = function(){ if(meuId !== P.falaId || !P.tocando) return; if(speechSynthesis.speaking) P.timers.push(setTimeout(olhar, 300)); else seguir(); }; P.timers.push(setTimeout(olhar, 300)); return; } }catch(e){}
     var falta = Math.max(0, G.fimAcoes - Date.now());
     P.timers.push(setTimeout(function(){
       if(!P.tocando) return;
@@ -878,8 +881,9 @@ function narrar(){
       if(!P.tocando || blocoAtual() !== b || b.passos[P.passo] !== p) return;
       var a = AUD || new Audio(); a.src = url; a.playbackRate = P.vel; P.aud = a;
       a.onplaying = function(){ $('avisoVoz').classList.add('oculto'); var d = a.duration, est = p.fala.length * 0.062; comecar(isFinite(d) && d > 0 ? Math.max(0.6, Math.min(1.6, (d / P.vel) / est)) : 1); };
-      a.onended = seguir; a.onerror = function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); };
-      a.play().catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); });
+      var planoB = function(){ if(P.aud !== a || !P.tocando) return; if(a.currentTime > 0 && !a.paused) return; P.aud = null; falarNavegador(p.fala, seguir, tempoLeitura, comecar); };
+      a.onended = seguir; a.onerror = function(){ P.timers.push(setTimeout(planoB, 800)); };
+      a.play().catch(function(){ P.timers.push(setTimeout(planoB, 800)); });   // o navegador às vezes recusa e toca logo depois: confere antes de trocar de voz
     }).catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); });
     return;
   }
