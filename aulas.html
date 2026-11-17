@@ -3568,11 +3568,13 @@ function atualizarEstado(){
 /* Transcrição em paralelo, separada do envio: cada trecho é pedido logo depois de
    chegar ao servidor, até 3 ao mesmo tempo. O envio dos próximos trechos não espera.
    Cada trecho é pedido no máximo 3 vezes por aqui; o que sobrar fica para a varredura. */
-var transcrevendo = {}, pedidosTrecho = {};
+var transcrevendo = {}, pedidosTrecho = {}, pedidoEm = {};
 function pedirTranscricao(aulaId, ordens){
   ordens.forEach(function(o){
     var k = aulaId + '|' + o;
-    if(transcrevendo[k] || (pedidosTrecho[k] || 0) >= 3) return;
+    if(transcrevendo[k]) return;
+    if((pedidosTrecho[k] || 0) >= 3 && Date.now() - (pedidoEm[k] || 0) < 8 * 60000) return;   // depois de 3 pedidos, tenta de novo a cada 8 min
+    pedidoEm[k] = Date.now();
     if(Object.keys(transcrevendo).length >= 3) return;   // entra na próxima rodada
     transcrevendo[k] = true; pedidosTrecho[k] = (pedidosTrecho[k] || 0) + 1;
     api('transcreverBloco', {aulaId: aulaId, ordem: o}).then(function(est){
