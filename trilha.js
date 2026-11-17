@@ -816,7 +816,7 @@ function irPara(bi, pi, continuar){
   U.visto(b.id + ':' + P.passo);
   mostrarAjuste();
   if(continuar){ if(ehVideo()) tocar(); else narrar(); }
-  if(!T.previa && !ehVideo()) preCarregarAudio(1);
+  if(!T.previa && !ehVideo()) preCarregarAudio(3);
 }
 function avancar(d){
   var b = blocoAtual(), np = P.passo + d, nb = P.bloco, cont = P.tocando;
@@ -867,14 +867,17 @@ function narrar(){
   var tempoLeitura = Math.max(4000, p.fala.length * 62 / P.vel);
   // o desenho do passo (gráfico e cena) começa junto com a voz; com a voz gravada, os atrasos acompanham a duração real da fala
   var desenhou = false, comecar = function(k){ if(desenhou || !P.tocando || blocoAtual() !== b || b.passos[P.passo] !== p) return; desenhou = true; G.desenhar(comAtrasos(b, P.passo, k || 1), P.passo); };
-  P.timers.push(setTimeout(function(){ comecar(1); }, 4000)); // se a voz demorar demais, a aula não fica parada
-  $('avisoVoz').classList.add('oculto');
+  // com voz gravada, o desenho espera a voz começar (as duas andam juntas); só se ela não vier em 12 s a aula segue sem ela
+  var comVozGravada = P.modoVoz === 'ia' && T.narracao[chave] === 'ok';
+  P.timers.push(setTimeout(function(){ comecar(1); }, comVozGravada ? 12000 : 4000));
+  if(comVozGravada && !P.cacheAud[chave]) $('avisoVoz').textContent = 'Carregando a voz…', $('avisoVoz').classList.remove('oculto');
+  else $('avisoVoz').classList.add('oculto');
   if(P.modoVoz === 'mudo'){ comecar(1); P.timers.push(setTimeout(seguir, tempoLeitura)); return; }
   if(P.modoVoz === 'ia' && T.narracao[chave] === 'ok'){
     pegarAudio(chave).then(function(url){
       if(!P.tocando || blocoAtual() !== b || b.passos[P.passo] !== p) return;
       var a = AUD || new Audio(); a.src = url; a.playbackRate = P.vel; P.aud = a;
-      a.onplaying = function(){ var d = a.duration, est = p.fala.length * 0.062; comecar(isFinite(d) && d > 0 ? Math.max(0.6, Math.min(1.6, (d / P.vel) / est)) : 1); };
+      a.onplaying = function(){ $('avisoVoz').classList.add('oculto'); var d = a.duration, est = p.fala.length * 0.062; comecar(isFinite(d) && d > 0 ? Math.max(0.6, Math.min(1.6, (d / P.vel) / est)) : 1); };
       a.onended = seguir; a.onerror = function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); };
       a.play().catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); });
     }).catch(function(){ falarNavegador(p.fala, seguir, tempoLeitura, comecar); });
@@ -932,10 +935,14 @@ function pegarAudio(chave){
   P.cacheAud[chave].catch(function(){ delete P.cacheAud[chave]; });
   return P.cacheAud[chave];
 }
+// busca antes as próximas falas (inclusive a 1ª do bloco seguinte): quando chegar a vez, a voz já está no aparelho
 function preCarregarAudio(n){
-  if(P.modoVoz !== 'ia') return;
-  var b = blocoAtual();
-  for(var i = 1; i <= n; i++){ var k = b.id + ':' + (P.passo + i); if(T.narracao[k] === 'ok') pegarAudio(k); }
+  if(P.modoVoz !== 'ia' || !T || !T.trilha) return;
+  var bs = T.trilha.blocos, bi = P.bloco, pi = P.passo, k;
+  for(var i = 0; i <= n; i++){
+    if(i > 0){ pi++; if(pi >= bs[bi].passos.length){ bi++; pi = 0; if(bi >= bs.length) return; } }
+    k = bs[bi].id + ':' + pi; if(T.narracao[k] === 'ok') pegarAudio(k);
+  }
 }
 // fim do bloco: 1) vídeo-aula (feito) 2) questões 3) Estudar com IA
 function temaDoBloco(b){ var a = (T.temasBlocos || []).filter(function(x){ return x.bloco === b.id; })[0]; return a && a.id ? a : null; }
@@ -2564,7 +2571,7 @@ function abrirNarrador(){
         var sc = m.serverContent; if(!sc || !N.atual) return;
         (sc.modelTurn && sc.modelTurn.parts || []).forEach(function(p){ if(p.inlineData && /audio/.test(p.inlineData.mimeType || '')) N.pcm.push(bytesDeB64(p.inlineData.data)); });
         if(sc.outputTranscription && sc.outputTranscription.text) N.ouvido += sc.outputTranscription.text;
-        if(sc.turnComplete) terminouFala();
+        if(sc.turnComplete){ clearTimeout(N.fimT); N.fimT = setTimeout(terminouFala, 700); }   // espera os últimos pedaços de áudio
       });
     };
     ws.onclose = function(ev){
@@ -2588,8 +2595,18 @@ function proximaFala(){
 function terminouFala(){
   clearTimeout(N.timer);
   var it = N.atual; N.atual = null;
+  if(!it) return;   // a conexão caiu durante a espera: a fala já voltou para a fila
   var p = it.b.passos[it.i], sim = parecido(p.fala, N.ouvido), bytes = N.pcm.reduce(function(s, x){ return s + x.length; }, 0);
   if(bytes < 24000){ logN('⚠ ' + esc(it.b.titulo) + ' · passo ' + (it.i + 1) + ': a voz veio vazia; não guardei.'); proximaFala(); return; }
+  // o fim da fala ficou de fora? (as últimas palavras do texto não aparecem no que a voz disse): grava de novo, até 2 vezes
+  var palavras = function(s){ return String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(function(w){ return w.length > 3; }); };
+  var fimTexto = palavras(p.fala).slice(-4), ditoFim = palavras(N.ouvido).slice(-12);
+  var faltamFim = fimTexto.filter(function(w){ return ditoFim.indexOf(w) === -1; }).length;
+  if(fimTexto.length >= 3 && faltamFim >= 2 && (it.tent || 0) < 2){
+    it.tent = (it.tent || 0) + 1;
+    logN('↻ ' + esc(it.b.titulo) + ' · passo ' + (it.i + 1) + ': a voz cortou o fim da fala; gravando de novo (' + it.tent + 'ª vez).');
+    N.fila.unshift(it); proximaFala(); return;
+  }
   var wav = wavDePCM(N.pcm);
   api('trilhaAudioSalvar', {id: T.id, chave: it.k, b64: b64DeBytes(wav), voz: N.voz}).then(function(){
     T.narracao[it.k] = 'ok'; delete P.cacheAud[it.k];
