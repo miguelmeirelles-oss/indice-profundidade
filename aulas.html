@@ -2056,13 +2056,14 @@ function cabHub(m){ return '<div class="caixa" style="margin-bottom:0"><button t
 function desenharHub(m){
   var mm = hubMateria(m), el = $('alunoDetalhe'); if(!mm) return;
   var mi = DES.r.materias.indexOf(mm), temas = mm.temas || [];
-  var preparo = temas.length ? Math.round(temas.reduce(function(s, t){ return s + (t.dominio || 0); }, 0) / temas.length) : 0;
+  var domT = function(t){ return t.estimado !== undefined ? t.estimado : t.dominio; };
+  var preparo = temas.length ? Math.round(temas.reduce(function(s, t){ return s + (domT(t) || 0); }, 0) / temas.length) : 0;
   var prox = (mm.tarefas || [])[0];
   var aulas = [], vistas = {};
   temas.forEach(function(t){ (t.trilhas || []).forEach(function(a){ if(!vistas[a.id]){ vistas[a.id] = 1; aulas.push(a); } }); });
   var h = cabHub(m) + '<div class="caixa" id="hubCorpo">' +
     '<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:baseline"><h2 style="margin:0">' + esc(mm.prova.titulo) + ' · ' + esc(mm.prova.data) + '</h2><span class="aviso">' + (mm.prova.dias === 0 ? 'é hoje' : 'em ' + mm.prova.dias + ' dia' + (mm.prova.dias === 1 ? '' : 's')) + (mm.prova.estimada ? ' (data estimada)' : '') + '</span></div>' +
-    '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin:10px 0 2px"><span>Seu preparo nos assuntos da prova ' + ajuda('Média do seu domínio em cada assunto que cai nesta prova (o que você já estudou nas questões do estudo). Assunto ainda não estudado conta como zero. Sobe a cada questão bem respondida.') + '</span><b>' + preparo + '%</b></div>' +
+    '<div style="display:flex;justify-content:space-between;font-size:13.5px;margin:10px 0 2px"><span>Seu preparo nos assuntos da prova ' + ajuda('Média do seu domínio em cada assunto que cai nesta prova. Usa as questões do estudo (pesam mais) e as questões respondidas em aula (pesam menos, porque a correção em sala é mais tranquila). Assunto sem nenhuma questão conta como zero.') + '</span><b>' + preparo + '%</b></div>' +
     '<div class="barraDom"><i style="width:' + preparo + '%;background:' + corDom(preparo) + '"></i></div>' +
     (mm.aviso ? '<div class="' + (mm.modoFinal ? 'erro' : 'alerta') + '" style="margin:8px 0">' + esc(mm.aviso) + '</div>' : '') +
     (prox ? '<div class="convite" style="margin:12px 0;border-left-color:#2E62C6"><span class="aviso">Seu próximo passo</span><div style="font-weight:bold;margin:2px 0">' + esc(prox.texto) + '</div><div class="aviso">' + esc(prox.tema) + (prox.porque ? ' · ' + esc(prox.porque) : '') + '</div><div class="botoes" style="margin:8px 0 0"><button type="button" id="hubProx">Começar →</button></div></div>'
@@ -2074,7 +2075,7 @@ function desenharHub(m){
       '<button type="button" class="hubModo" data-modo="aulas"' + (aulas.length ? '' : ' disabled') + '><span>▶</span>Ver as aulas<small>' + (aulas.length ? aulas.length + ' aula' + (aulas.length > 1 ? 's' : '') + ' da prova' : 'nenhuma ainda') + '</small></button>' +
     '</div><div id="hubPainel"></div>' +
     (temas.length ? '<p style="margin:16px 0 4px"><b>Assuntos da ' + esc(mm.prova.titulo) + '</b> <span class="aviso">· na ordem das aulas · a cor mostra o seu domínio · deslize para ver todos</span></p>' +
-      '<div class="hubFaixa" id="hubFaixa">' + temas.map(function(t, i){ return '<button type="button" class="hubChip" data-chip="' + i + '"><span class="pt" style="background:' + corDom(t.dominio) + '"></span>' + esc(t.nome) + '</button>'; }).join('') + '</div>' +
+      '<div class="hubFaixa" id="hubFaixa">' + temas.map(function(t, i){ return '<button type="button" class="hubChip" data-chip="' + i + '"><span class="pt" style="background:' + corDom(domT(t)) + '"></span>' + esc(t.nome) + '</button>'; }).join('') + '</div>' +
       '<div id="hubTema"></div>' : '<p class="aviso" style="margin-top:14px">Os assuntos aparecem depois das aulas gravadas.</p>') +
     htmlModoRevisao(mm, mi) +
     '<div class="botoes" style="margin-top:12px"><button type="button" class="secundario mini" id="hubDiag">🔎 Diagnóstico</button><button type="button" class="secundario mini" id="hubResp">📒 Minhas respostas</button><button type="button" class="secundario mini" id="hubTodas">🎯 Todas as matérias</button></div></div>';
@@ -2115,8 +2116,8 @@ function desenharHub(m){
     $('hubTema').innerHTML = '<div class="hubCartao" id="hubCartao">' +
       '<div class="aviso">' + (idx + 1) + ' de ' + temas.length + (t.grupo ? ' · ' + esc(t.grupo) : '') + '</div>' +
       '<div style="font-weight:bold;font-size:17px;margin:2px 0 6px">' + (t.importante ? '⭐ ' : '') + esc(t.nome) + '</div>' +
-      '<div class="barraDom"><i style="width:' + (t.dominio || 0) + '%;background:' + corDom(t.dominio) + '"></i></div>' +
-      '<div class="aviso">' + [t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'ainda não estudou', t.sala !== null ? 'em aula ' + dezEst(t.sala) : ''].filter(Boolean).join(' · ') + '</div>' +
+      '<div class="barraDom"><i style="width:' + (domT(t) || 0) + '%;background:' + corDom(domT(t)) + '"></i></div>' +
+      '<div class="aviso">' + [t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'sem questões do estudo', t.sala !== null ? 'em aula ' + dezEst(t.sala) : ''].filter(Boolean).join(' · ') + '</div>' +
       '<div class="hubAcoes">' +
         (tr ? '<button type="button" data-hacao="ver">▶ ' + (tr.progresso >= 100 ? 'Rever a aula' : tr.progresso ? 'Continuar a aula' : 'Assistir a aula') + '</button>' : '') +
         '<button type="button"' + (tr ? ' class="secundario"' : '') + ' data-hacao="questao">📝 Responder uma questão</button>' +
