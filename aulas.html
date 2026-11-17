@@ -1597,6 +1597,19 @@ function gruposDeTarefas(ts){
   });
   return gs;
 }
+// o plano inteiro até a prova, em sessões de estudo (não em dias do calendário: o aluno não estuda todo dia)
+function htmlRoteiro(m){
+  var r = m.roteiro || []; if(r.length < 2) return '';
+  var ses = [], cur = null, cap = Math.max(1, m.porDia || 1);
+  r.forEach(function(t){ if(!cur || (cur.n > 0 && cur.n + t.passos > cap)){ cur = {n: 0, itens: []}; ses.push(cur); } cur.itens.push(t); cur.n += t.passos; });
+  var dias = m.prova ? m.prova.dias : 0, folga = dias - ses.length;
+  var cab = ses.length + ' ' + (ses.length > 1 ? 'sessões' : 'sessão') + ' de estudo' + (dias > 0 ? ' e ' + dias + ' dia' + (dias > 1 ? 's' : '') + ' até a ' + esc(m.prova.titulo) : '') +
+    (dias > 0 ? (folga > 0 ? ': sobram ' + folga + ' dia' + (folga > 1 ? 's' : '') + ' de folga.' : folga < 0 ? ': em alguns dias faça 2 sessões.' : ': uma por dia.') : '.');
+  return '<details class="roteiro" style="margin-top:6px"><summary class="link">📅 Ver tudo o que falta até a prova (' + r.length + ' assunto' + (r.length > 1 ? 's' : '') + ')</summary>' +
+    '<p class="aviso" style="margin:6px 0">' + cab + ' Não precisa ser todo dia: quando você voltar, o plano continua de onde parou. ▶ = assistir a aula · ✍ = responder questões.</p>' +
+    ses.map(function(x, i){ return '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid ' + (i ? 'var(--linha)' : '#E8B923') + '"><b style="font-size:14px">' + (i ? 'Sessão ' + (i + 1) : 'Sessão 1 · próxima') + '</b>' +
+      x.itens.map(function(t){ return '<div style="font-size:14px;padding:2px 0">' + (t.novo ? '▶ ✍ ' : '✍ ') + esc(t.nome) + (t.aula ? '<span class="aviso"> · aula "' + esc(t.aula) + '"</span>' : '') + '</div>'; }).join('') + '</div>'; }).join('') + '</details>';
+}
 function htmlGrupoTarefa(g, mi){
   if(g.outro){
     var rot = {simulado: '📝 Começar o simulado', relampago: '⚡ Começar', vespera: '📄 Abrir a folha', explicar: '🎤 Explicar'}[g.outro.tipo] || '▶ Começar';
@@ -1632,7 +1645,7 @@ function desenharDesempenho(){
     };
     return '<div class="caixa" style="margin:0 0 14px;border-left:6px solid ' + (m.modoFinal ? '#c62828' : notaCor(m.media)) + '">' +
       '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">' + esc(m.nome) + '</h3>' +
-        (m.media === null || (m.parcial && !m.media) ? '<span class="aviso">sem notas ainda ' + ajuda(BAL.media) + '</span></div>' : '<span><span class="aviso">média ' + (m.parcial ? 'parcial ' : '') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + String(m.media).replace('.', ',') + '</b> ' + ajuda(BAL.media) + '</span></div>') +
+        (m.media === null || (m.parcial && !m.media) ? '<span class="aviso">sem notas ainda ' + ajuda(BAL.media) + '</span></div>' : '<span><span class="aviso">' + (m.parcial ? 'sua nota até agora ' : 'média ') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + String(m.media).replace('.', ',') + '</b> ' + ajuda(BAL.media) + '</span></div>') +
       '<div style="margin:4px 0"><span class="tag">' + esc(m.prova.titulo) + (m.prova.estimada ? ' (data estimada)' : '') + '</span> <span class="aviso">' + (m.prova.dias === 0 ? 'hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + '</span> ' + ajuda(m.prova.estimada ? BAL.estimada : BAL.prova) + '</div>' +
       (m.foco ? '<div class="aviso" style="margin:0 0 4px">🎯 Foco do plano: ' + esc(m.foco) + ' ' + ajuda(BAL.foco) + '</div>' : '') +
       htmlModoRevisao(m, mi) +
@@ -1647,7 +1660,7 @@ function desenharDesempenho(){
         while(nHoje < gs.length && (nHoje === 0 || conta + gs[nHoje].n <= m.porDia)){ conta += gs[nHoje].n; nHoje++; }
         var gh = gs.slice(0, nHoje), gd = gs.slice(nHoje);
         return '<div style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' passo' + (m.porDia > 1 ? 's' : '') + ' por dia até a prova)</span> ' + ajuda(m.revisao && m.revisao.ligado ? BAL.hojeRev : BAL.hoje) + '</div>' + gh.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
-          (gd.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + gd.length + ' assunto' + (gd.length > 1 ? 's' : '') + ')</summary>' + gd.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') + '</details>' : '');
+          ((m.roteiro || []).length >= 2 ? htmlRoteiro(m) : gd.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + gd.length + ' assunto' + (gd.length > 1 ? 's' : '') + ')</summary>' + gd.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') + '</details>' : '');
       })()
         : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
       (m.recomendacoes.length ? '<details style="margin-top:8px"><summary class="link">💡 Pelo que você respondeu em aula (' + m.recomendacoes.length + ')</summary>' + m.recomendacoes.map(function(x, k){
@@ -1701,7 +1714,7 @@ function fazerTarefa(mm, t, m){
 // ===== balões "?" da aba Desempenho =====
 var BAL = {
   geral: 'Cada matéria em que você está inscrito aparece aqui, a que pede mais atenção primeiro (nota baixa, prova perto, assuntos fracos). Nada aqui vale nota: é um guia para estudar.',
-  media: '<b>Média</b> = as notas das etapas (P1, P2… com as aulas, provas e trabalhos de cada uma), com os pesos que o professor definiu. <b>Parcial</b> = ainda faltam notas para lançar. Média 7 ou mais: aprovado direto; abaixo de 7: prova final, e passa com (média + final) ÷ 2 ≥ 5.',
+  media: '<b>Média</b> = as notas das etapas (P1, P2… com as aulas, provas e trabalhos de cada uma), com os pesos que o professor definiu. <b>Nota até agora</b> = enquanto o semestre não termina, mostra a média só do que já foi avaliado (o que ainda não aconteceu não conta como zero). Média 7 ou mais: aprovado direto; abaixo de 7: prova final, e passa com (média + final) ÷ 2 ≥ 5.',
   prova: 'Data da próxima prova marcada pelo professor.',
   estimada: 'O professor ainda não marcou a prova: a data é uma <b>estimativa</b> (a data de corte da etapa, se houver; senão, P1 no meio e P2 no fim do semestre). Quando ele marcar, a data certa aparece aqui.',
   foco: 'O plano só cobra os assuntos da prova que vem. Se você foi mal num assunto da prova anterior, ele aparece como comentário, mas não entra nas tarefas.',
@@ -2096,7 +2109,7 @@ function desenharHub(m){
     b.setAttribute('aria-pressed', 'true');
     if(modo === 'plano'){
       p.innerHTML = (mm.tarefas || []).length ? gruposDeTarefas(mm.tarefas).map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
-        '<p class="aviso">' + mm.porDia + ' passo(s) por dia até a prova. Passo feito sai da lista. ' + ajuda(BAL.hoje) + '</p>' : '<p class="ok">Nada pendente no plano agora. 👏</p>';
+        '<p class="aviso">' + mm.porDia + ' passo(s) por dia até a prova. Passo feito sai da lista. ' + ajuda(BAL.hoje) + '</p>' + htmlRoteiro(mm) : '<p class="ok">Nada pendente no plano agora. 👏</p>';
       p.querySelectorAll('[data-ftar]').forEach(function(x){ x.addEventListener('click', function(){ var t = mm.tarefas[Number(x.dataset.ftar.split(':')[1])]; EST.temaAtual = t.temaId || ''; fazerTarefa(mmBase, t, mm); }); });
       p.querySelectorAll('[data-iraula]').forEach(function(x){ x.addEventListener('click', function(){ irParaAula(x.dataset.iraula); }); });
     } else {
