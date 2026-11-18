@@ -208,6 +208,7 @@ var conferida = null;  // última trilha conferida (antes de salvar)
 
 function inicio(){
   if(!token){ irParaLogin(); return; }
+  if(ABRIR_ID && $('corpo')) $('corpo').innerHTML = '<p class="carregando">Abrindo a aula…</p>';
   api('trilhasListar').then(function(r){ L = r; if(ABRIR_ID){ var ida = ABRIR_ID; ABRIR_ID = ''; abrirTrilha(ida); } else desenharLista(); })
     .catch(function(e){ $('corpo').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
@@ -548,7 +549,7 @@ function carregarUso(){
 /* ===================== PLAYER ===================== */
 var P = {bloco: 0, passo: 0, tocando: false, modoVoz: 'auto', vel: 1, timers: [], raf: null, fimAcoes: 0, aud: null, cacheAud: {}, fimDoBloco: false};
 function abrirTrilha(id, gravar){
-  $('corpo').innerHTML = '<p class="aviso">Abrindo a aula…</p>';
+  if($('corpo')) $('corpo').innerHTML = '<p class="carregando">Abrindo a aula…</p>';
   api('trilhaVer', {id: id}).then(function(t){
     abrirPlayer(t);
     // veio do botão "Gravar com a voz da IA": já abre o painel da narração
