@@ -426,14 +426,14 @@
       <button type="button" class="aba" data-abaal="insc" aria-pressed="false">Inscrever-se numa matéria</button>
     </div>
     <div id="alunoLista">
-      <div id="cartaoAvisos"></div>
+      <div id="cartaoAvisos" data-painelal="mat"></div>
       <div id="correio" style="margin-bottom:12px"></div>
       <div id="avisoVista"></div>
       <div class="caixa" data-painelal="mat">
         <h2>Minhas matérias</h2>
         <div id="listaMinhas"><p class="carregando">Carregando…</p></div>
       </div>
-      <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>🎯 Estudar para a prova</h2><p class="aviso" style="margin-top:-6px">Todas as suas matérias, com o próximo passo de cada uma até a prova. Toque em "Abrir a matéria" para estudar os assuntos um a um.</p><div id="revisaoBox"></div><div id="desempCorpo"><p class="carregando">Carregando…</p></div></div>
+      <div class="caixa" id="caixaDesemp" data-painelal="desemp"><h2>🎯 Estudar para a prova</h2><p class="aviso" style="margin-top:-6px">Suas matérias, a que pede mais atenção primeiro. Toque em <b>🎯 Estudar</b> para ver o próximo passo, o plano até a prova e os assuntos.</p><div id="desempCorpo"><p class="carregando">Carregando…</p></div><div id="revisaoBox"></div></div>
       <div id="voltaEstudo" class="oculto" data-painelal="trilha" style="position:sticky;top:0;z-index:20;margin:0 0 8px"></div>
       <div class="caixa oculto" id="caixaTrilhaAluno" data-painelal="trilha"></div>
       <div class="caixa" id="caixaProvas" data-painelal="provas">
@@ -1634,44 +1634,20 @@ function desenharDesempenho(){
   var h = '<div style="display:flex;gap:18px;flex-wrap:wrap;margin:0 0 12px">' +
     '<div><span class="aviso">sequência</span><div class="numEst">' + (r.sequencia ? '🔥 ' + r.sequencia + ' dia' + (r.sequencia > 1 ? 's' : '') : '—') + '</div></div>' +
     '<div><span class="aviso">questões na semana</span><div class="numEst">' + Math.min(r.semana, r.metaSemana) + '/' + r.metaSemana + '</div></div></div>' +
-    '<div class="aviso" style="margin:0 0 10px">A matéria que pede mais atenção vem primeiro. O plano é refeito com o que você estuda: tarefa feita sai da lista. ' + ajuda(BAL.geral) + '</div>';
+    '';
   h += r.materias.map(function(m, mi){
-    var hoje = m.tarefas.slice(0, m.porDia), depois = m.tarefas.slice(m.porDia);
-    var tarefa = function(t, ti){
-      var ic = {trilha: '🎓', refazer: '↻', simulado: '', relampago: '', vespera: '', explicar: '🎤'}[t.tipo]; if(ic === undefined) ic = '✍';
-      var aula = t.tipo === 'trilha' ? t.trilhaId : t.aula, rot = {refazer: '↻ Refazer', simulado: '📝 Começar o simulado', relampago: '⚡ Começar', vespera: '📄 Abrir a folha', explicar: '🎤 Explicar'}[t.tipo] || '✍ Responder';
-      return '<div data-tarefa="' + mi + ':' + ti + '" style="cursor:pointer;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid var(--linha);border-radius:10px;padding:8px 10px;margin:6px 0;background:#fff">' +
-        '<div style="flex:1 1 200px"><b>' + ic + ' ' + esc(t.texto) + '</b>' + (t.detalhe ? '<div class="aviso">' + esc(t.detalhe) + '</div>' : '') + '<div class="aviso">' + esc(t.tema) + (t.porque ? ' · ' + esc(t.porque) : '') + '</div></div>' +
-        '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
-        (t.tipo === 'trilha' ? '<button type="button" class="mini" data-iraula="' + esc(aula) + '">▶ Assistir a aula</button>' + (aula ? '<button type="button" class="mini secundario" data-irquest="' + esc(aula) + '">📝 Ir direto às questões</button>' : '')
-          : '<button type="button" class="mini" data-fazer="' + mi + ':' + ti + '">' + rot + '</button>' + (aula ? '<button type="button" class="mini secundario" data-iraula="' + esc(aula) + '">▶ Ver a aula</button>' : '')) + '</div></div>';
-    };
-    return '<div class="caixa" style="margin:0 0 14px;border-left:6px solid ' + (m.modoFinal ? '#c62828' : notaCor(m.media)) + '">' +
-      '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h3 style="margin:0">' + esc(m.nome) + '</h3>' +
-        (m.media === null || (m.parcial && !m.media) ? '<span class="aviso">sem notas ainda ' + ajuda(BAL.media) + '</span></div>' : '<span><span class="aviso">' + (m.parcial ? 'sua nota até agora ' : 'média ') + '</span><b style="font-size:22px;color:' + notaCor(m.media) + '">' + String(m.media).replace('.', ',') + '</b> ' + ajuda(BAL.media) + '</span></div>') +
-      '<div style="margin:4px 0"><span class="tag">' + esc(m.prova.titulo) + (m.prova.estimada ? ' (data estimada)' : '') + '</span> <span class="aviso">' + (m.prova.dias === 0 ? 'hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + '</span> ' + ajuda(m.prova.estimada ? BAL.estimada : BAL.prova) + '</div>' +
-      (m.foco ? '<div class="aviso" style="margin:0 0 4px">🎯 Foco do plano: ' + esc(m.foco) + ' ' + ajuda(BAL.foco) + '</div>' : '') +
-      htmlModoRevisao(m, mi) +
-      (m.aviso ? '<div class="' + (m.modoFinal ? 'erro' : 'alerta') + '" style="margin:6px 0">' + esc(m.aviso) + '</div>' : '') +
-      (m.conquistas && m.conquistas.length ? '<div style="margin:6px 0">' + m.conquistas.map(function(c){ return '<span style="display:inline-block;padding:3px 10px;margin:2px 4px 2px 0;border-radius:999px;background:#fff7d6;border:1px solid #E8B923;font-size:13px">' + esc(c) + '</span>'; }).join('') + ' ' + ajuda(BAL.conquistas) + '</div>' : '') +
-      (m.plano && m.plano.total ? '<div style="margin:8px 0 2px"><div style="display:flex;justify-content:space-between;font-size:13.5px"><b>Plano da semana ' + ajuda(BAL.plano) + '</b><span>' + m.plano.feitas + ' de ' + m.plano.total + ' passo' + (m.plano.total > 1 ? 's' : '') + ' feito' + (m.plano.feitas === 1 ? '' : 's') + (m.plano.feitas === m.plano.total ? ' 🎉' : '') + '</span></div>' +
-        '<div class="barraDom" style="margin:3px 0"><i style="width:' + Math.round(m.plano.feitas / m.plano.total * 100) + '%;background:#1a7a3c"></i></div>' +
-        (m.plano.feitasLista.length ? '<details><summary class="link" style="font-size:13px">o que você já fez</summary>' + m.plano.feitasLista.map(function(x){ return '<div class="aviso">✓ ' + esc(x) + '</div>'; }).join('') + '</details>' : '') + '</div>' : '') +
+    var temas = m.temas || [], domT = function(t){ return t.estimado !== undefined ? t.estimado : t.dominio; };
+    var preparo = temas.length ? Math.round(temas.reduce(function(s, t){ return s + (domT(t) || 0); }, 0) / temas.length) : null;
+    var semNota = m.media === null || (m.parcial && !m.media), prox = m.tarefas[0];
+    return '<div class="caixa" style="margin:0 0 12px;border-left:6px solid ' + (m.modoFinal ? '#c62828' : semNota ? '#b9c3d6' : notaCor(m.media)) + '">' +
+      '<div style="display:flex;justify-content:space-between;gap:10px;align-items:baseline"><h3 style="margin:0">' + esc(m.nome) + '</h3>' +
+        (semNota ? '' : '<span style="white-space:nowrap"><span class="aviso">' + (m.parcial ? 'nota até agora ' : 'média ') + '</span><b style="font-size:19px;color:' + notaCor(m.media) + '">' + String(m.media).replace('.', ',') + '</b> ' + ajuda(BAL.media) + '</span>') + '</div>' +
+      '<div class="aviso" style="margin:4px 0 0"><b>' + esc(m.prova.titulo) + '</b> ' + (m.prova.dias === 0 ? 'é hoje' : 'em ' + m.prova.dias + ' dia' + (m.prova.dias === 1 ? '' : 's')) + ' · ' + esc(m.prova.data) + (m.prova.estimada ? ' (data estimada)' : '') + '</div>' +
+      (preparo !== null ? '<div style="display:flex;justify-content:space-between;font-size:13px;margin:8px 0 2px"><span>Seu preparo para a ' + esc(m.prova.titulo) + '</span><b>' + preparo + '%</b></div><div class="barraDom"><i style="width:' + preparo + '%;background:' + corDom(preparo) + '"></i></div>' : '') +
+      (m.aviso ? '<div class="' + (m.modoFinal ? 'erro' : 'alerta') + '" style="margin:8px 0">' + esc(m.aviso) + '</div>' : '') +
       (m.modoFinal ? '<div class="convite" style="margin:8px 0" data-final="' + mi + '"><b>📝 O que você errou nas provas</b><div data-finalcorpo="' + mi + '"><p class="carregando">Analisando as suas provas corrigidas…</p></div></div>' : '') +
-      (m.tarefas.length ? (function(){
-        var gs = gruposDeTarefas(m.tarefas), nHoje = 0, conta = 0;
-        while(nHoje < gs.length && (nHoje === 0 || conta + gs[nHoje].n <= m.porDia)){ conta += gs[nHoje].n; nHoje++; }
-        var gh = gs.slice(0, nHoje), gd = gs.slice(nHoje);
-        return '<div style="margin:10px 0 2px"><b>Hoje</b> <span class="aviso">(' + m.porDia + ' passo' + (m.porDia > 1 ? 's' : '') + ' por dia até a prova)</span> ' + ajuda(m.revisao && m.revisao.ligado ? BAL.hojeRev : BAL.hoje) + '</div>' + gh.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
-          ((m.roteiro || []).length >= 2 ? htmlRoteiro(m) : gd.length ? '<details style="margin-top:4px"><summary class="link">Próximos dias (' + gd.length + ' assunto' + (gd.length > 1 ? 's' : '') + ')</summary>' + gd.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') + '</details>' : '');
-      })()
-        : '<div class="ok" style="margin:8px 0">Nada urgente nesta matéria: você está em dia com os assuntos já dados. 👏</div>') +
-      (m.recomendacoes.length ? '<details style="margin-top:8px"><summary class="link">💡 Pelo que você respondeu em aula (' + m.recomendacoes.length + ')</summary>' + m.recomendacoes.map(function(x, k){
-        return '<div class="eixo" style="border-color:#8a6100">' + esc(x.texto) + '<br>' + esc(x.acao) + (x.trilhaId ? ' <button type="button" class="link" data-recaula="' + esc(x.trilhaId) + '">abrir a aula</button> · <button type="button" class="link" data-irquest="' + esc(x.trilhaId) + '">ir às questões</button>' : '') + '</div>'; }).join('') + '</details>' : '') +
-      (m.temas.length ? '<details style="margin-top:6px"><summary class="link">Assuntos na ordem das aulas</summary>' + m.temas.map(function(t){
-        return '<div style="display:flex;justify-content:space-between;gap:8px;font-size:14px;padding:4px 0;border-bottom:1px dashed var(--linha)"><span>' + (t.importante ? '⭐ ' : '') + esc(t.grupo ? t.grupo + ' › ' + t.nome : t.nome) + '</span><span class="aviso">' +
-          [t.sala !== null ? 'em aula ' + dezEst(t.sala) : '', t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'não estudou'].filter(Boolean).join(' · ') + '</span></div>'; }).join('') + '<p class="aviso">⭐ = o professor marcou como importante.</p></details>' : '') +
-      '<div class="botoes" style="margin-top:10px"><button type="button" class="mini" data-hub="' + mi + '">🎯 Abrir a matéria</button><button type="button" class="secundario mini" data-diag="' + mi + '">🔎 Diagnóstico</button><button type="button" class="secundario mini" data-cad="' + mi + '">📒 Minhas respostas</button></div></div>';
+      (prox ? '<p style="margin:10px 0 0;font-size:14px"><span class="aviso">Próximo passo:</span> ' + esc(prox.texto) + '</p>' : '<p class="ok" style="margin:10px 0 0">Em dia com os assuntos já dados. 👏</p>') +
+      '<div class="botoes" style="margin-top:10px"><button type="button" data-hub="' + mi + '">🎯 Estudar para a ' + esc(m.prova.titulo) + '</button></div></div>';
   }).join('');
   h += '<p class="aviso">Atualizado ' + esc(r.gerado) + ' · <button type="button" class="link" id="btDesempAtual">atualizar agora</button></p>';
   el.innerHTML = h;
@@ -1740,6 +1716,8 @@ function selEstudo(it){
 }
 function htmlModoRevisao(m, mi){
   var r = m.revisao; if(!r || !r.podeLigar) return '';
+  var ts = m.temas || [], vistos = ts.filter(function(t){ return t.estudado; }).length;
+  if(!r.ligado && (!ts.length || vistos < ts.length / 2)) return '';
   if(!r.ligado) return '<div style="margin:8px 0"><button type="button" class="mini secundario" data-revligar="' + mi + '">🔁 Já estudei: revisar para a ' + esc(m.prova.titulo) + '</button> ' + ajuda(BAL.revisao) + '</div>';
   return '<div class="convite" style="margin:8px 0;border-left-color:#1a7a3c"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>🔁 Modo revisão para a ' + esc(m.prova.titulo) + ' ' + ajuda(BAL.revisao) + '</b><span class="aviso">desde ' + esc(r.desde) + ' · <button type="button" class="link" data-revdesligar="' + mi + '">sair</button></span></div>' +
     '<div class="botoes" style="margin:6px 0 0"><button type="button" class="mini" data-revsim="' + mi + '">📝 Simulado</button><button type="button" class="mini secundario" data-revrel="' + mi + '">⚡ Relâmpago</button><button type="button" class="mini secundario" data-revfolha="' + mi + '">📄 Folha de véspera</button><button type="button" class="mini secundario" data-revexp="' + mi + '">🎤 Explicar para um colega</button></div>' +
@@ -1869,7 +1847,7 @@ function carregarRevisaoCurso(){
 function desenharRevisaoBox(){
   var box = $('revisaoBox'), v = REV.r && REV.r.revisao;
   if(!v){
-    box.innerHTML = '<div class="convite" style="margin:0 0 14px"><b>🎯 Vai fazer ENADE, seleção de mestrado ou de doutorado?</b><p class="aviso" style="margin:4px 0 8px">Monte uma revisão direcionada: a IA escolhe só as aulas do curso que mais caem nesse tipo de prova (inclusive de matérias que você cursou há tempos), na ordem de prioridade.</p><button type="button" class="mini" id="btRevNova">🎯 Montar minha revisão</button></div>';
+    box.innerHTML = '<p class="aviso" style="margin:14px 0 0">🎓 Vai fazer ENADE, seleção de mestrado ou de doutorado? <button type="button" class="link" id="btRevNova">Montar uma revisão do curso</button></p>';
     $('btRevNova').addEventListener('click', formRevisao); return;
   }
   box.innerHTML = '<div class="convite" style="margin:0 0 14px;border-left-color:#7D3C98"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>🎯 Sua revisão: ' + esc(v.nomeObjetivo) + (v.detalhe ? ' · ' + esc(v.detalhe) : '') + '</b><span class="aviso">' + v.aulas + ' aulas' + (v.dias !== null ? ' · prova em ' + v.dias + ' dia' + (v.dias === 1 ? '' : 's') : '') + '</span></div>' +
@@ -2084,9 +2062,9 @@ function desenharHub(m){
     (mm.aviso ? '<div class="' + (mm.modoFinal ? 'erro' : 'alerta') + '" style="margin:8px 0">' + esc(mm.aviso) + '</div>' : '') +
     (prox ? '<div class="convite" style="margin:12px 0;border-left-color:#2E62C6"><span class="aviso">Seu próximo passo</span><div style="font-weight:bold;margin:2px 0">' + esc(prox.texto) + '</div><div class="aviso">' + esc(prox.tema) + (prox.porque ? ' · ' + esc(prox.porque) : '') + '</div><div class="botoes" style="margin:8px 0 0"><button type="button" id="hubProx">Começar →</button></div></div>'
       : '<div class="ok" style="margin:12px 0">Você está em dia com os assuntos já dados. 👏 Treine as questões ou escolha um assunto abaixo.</div>') +
-    '<p style="margin:12px 0 6px"><b>Escolha como estudar</b> ' + ajuda('<b>🧭 Seguir o plano</b>: o app decide por você. Primeiro passa pelos assuntos que você ainda não praticou, na ordem das aulas (cada um com 1 ▶ assistir a aula e 2 ✍ responder questões). Depois volta nos assuntos em que você foi pior. Mostra os passos de hoje, calculados para dar conta de tudo até a prova; passo feito sai da lista.<br><br><b>🎯 Escolher o assunto</b>: você decide. Os assuntos da prova aparecem em fila, na ordem das aulas; a cor mostra o seu domínio (verde = bem, amarelo = quase, vermelho = reforçar, cinza = ainda sem questões). Toque num assunto para assistir a aula, responder questões ou explicar, e use ← → para ir ao anterior ou ao próximo.<br><br>Tudo o que você faz num caminho conta no outro.') + '</p>' +
+    '<p style="margin:12px 0 6px"><b>Escolha como estudar</b> ' + ajuda('<b>Seu próximo passo → Começar</b> é o caminho mais simples: o app escolhe por você e você só vai tocando em Começar.<br><br><b>🧭 Ver o plano</b>: mostra os passos de hoje e tudo o que falta até a prova. Primeiro passa pelos assuntos que você ainda não praticou, na ordem das aulas (cada um com 1 ▶ assistir a aula e 2 ✍ responder questões). Depois volta nos assuntos em que você foi pior. Mostra os passos de hoje, calculados para dar conta de tudo até a prova; passo feito sai da lista.<br><br><b>🎯 Escolher o assunto</b>: você decide. Os assuntos da prova aparecem em fila, na ordem das aulas; a cor mostra o seu domínio (verde = bem, amarelo = quase, vermelho = reforçar, cinza = ainda sem questões). Toque num assunto para assistir a aula, responder questões ou explicar, e use ← → para ir ao anterior ou ao próximo.<br><br>Tudo o que você faz num caminho conta no outro.') + '</p>' +
     '<div class="hubModos">' +
-      '<button type="button" class="hubModo" data-modo="plano"><span>🧭</span>Seguir o plano<small>o app escolhe o próximo passo</small></button>' +
+      '<button type="button" class="hubModo" data-modo="plano"><span>🧭</span>Ver o plano<small>hoje e o que falta até a prova</small></button>' +
       '<button type="button" class="hubModo" data-modo="assunto"' + (temas.length ? '' : ' disabled') + '><span>🎯</span>Escolher o assunto<small>você escolhe, na ordem das aulas</small></button>' +
     '</div>' +
     '<div class="hubLinks"><button type="button" class="link" data-modo="treino">📝 Treinar questões misturadas</button>' +
@@ -2611,7 +2589,7 @@ function carregarTrilha(el, modo, abrirId, questoes){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo, abrirId: abrirId || '', abrirQuestoes: !!questoes}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=57';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=58';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);

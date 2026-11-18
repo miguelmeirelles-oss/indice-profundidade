@@ -209,7 +209,12 @@ var conferida = null;  // última trilha conferida (antes de salvar)
 function inicio(){
   if(!token){ irParaLogin(); return; }
   if(ABRIR_ID && $('corpo')) $('corpo').innerHTML = '<p class="carregando">Abrindo a aula…</p>';
-  api('trilhasListar').then(function(r){ L = r; if(ABRIR_ID){ var ida = ABRIR_ID; ABRIR_ID = ''; abrirTrilha(ida); } else desenharLista(); })
+  var jaAbriu = '';
+  if(ABRIR_ID){ jaAbriu = ABRIR_ID; ABRIR_ID = ''; abrirTrilha(jaAbriu); }
+  api('trilhasListar').then(function(r){ L = r;
+    if(ABRIR_ID){ var ida = ABRIR_ID; ABRIR_ID = ''; abrirTrilha(ida); }
+    else if(jaAbriu && T && T.id === jaAbriu){ try{ desenharMarca(); }catch(e){} }   // a aula já está aberta: só atualiza a marca "Já estudei"
+    else if(!jaAbriu) desenharLista(); })
     .catch(function(e){ $('corpo').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
 }
 
