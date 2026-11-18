@@ -541,6 +541,8 @@
         <p class="aviso" style="margin-top:12px">A chave é gratuita e sai em aistudio.google.com, em "Get API key". Com mais de uma chave, quando a cota de uma acaba o sistema passa para a próxima.</p>
       </div>
 
+      <div class="caixa" id="cxClaude" hidden></div>
+
       <div class="caixa">
         <h2>Consumo da IA e rotinas automáticas</h2>
         <p style="margin-top:0">A cota grátis do Gemini é <b>por projeto</b> e <b>zera todo dia entre 4h e 5h</b> (horário de Brasília). A gravação, as questões e as correções dependem dela; por isso as tarefas automáticas mais pesadas vêm <b>desligadas</b>. Ligue só o que for usar.</p>
@@ -5736,7 +5738,52 @@ function carregarConfigGeral(){
   $('cfgApostilas').innerHTML = '<p class="carregando">Carregando…</p>';
   api('configGeral').then(desenharConfigGeral).catch(function(e){ $('cfgApostilas').innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
 }
+function desenharClaude(c){
+  var cx = $('cxClaude'); if(!cx) return;
+  if(!c.permitido && !c.professores){ cx.hidden = true; return; }
+  cx.hidden = false;
+  var h = '<h2>Claude nas funções fortes</h2>';
+  if(c.permitido){
+    h += '<p style="margin-top:0">As tarefas que usam os modelos fortes (gerar e revisar prova, corrigir as provas dos alunos, vista de prova, ler questões de prova) podem usar o <b>Claude da sua assinatura do claude.ai</b>, em vez do Gemini. Consome o uso do seu plano do Claude, não API paga. O Claude demora 1 a 3 minutos a mais para começar cada tarefa. A análise de vídeo continua no Gemini.</p>' +
+      '<p style="margin:6px 0 4px"><b>Preferência</b></p>' +
+      '<label style="display:flex;gap:8px;align-items:center;margin:2px 0"><input type="radio" name="cfgPref" value="claude"' + (c.preferir !== 'gemini' ? ' checked' : '') + '> Preferir o <b>Claude</b> (se ele falhar, usa o Gemini)</label>' +
+      '<label style="display:flex;gap:8px;align-items:center;margin:2px 0"><input type="radio" name="cfgPref" value="gemini"' + (c.preferir === 'gemini' ? ' checked' : '') + '> Preferir o <b>Gemini</b> (se ele falhar, usa o Claude)</label>' +
+      '<p style="margin:10px 0 4px"><b>Rotina do Claude</b> ' + (c.configurado ? '<span class="tag t-ok">configurada · código termina em …' + esc(c.fim) + '</span>' : '<span class="tag t-warn">ainda não configurada</span>') + '</p>' +
+      '<details class="aviso" style="margin:2px 0 8px"><summary class="link">Como criar a rotina (uma vez)</summary><ol style="margin:6px 0;padding-left:20px">' +
+      '<li>No claude.ai, abra <b>Code → Routines</b> (claude.ai/code/routines) e abra a rotina <b>"Aula por IA – funções fortes"</b> (ou crie uma com o texto que o administrador passar).</li>' +
+      '<li>Na rotina: <b>Add another trigger → API → Generate token</b>. Copie a <b>URL</b> e o <b>código</b> (aparece uma vez só).</li>' +
+      '<li>No ambiente da rotina, libere a rede para <b>script.google.com</b> e <b>script.googleusercontent.com</b>.</li>' +
+      '<li>Cole os dois abaixo, salve e clique em <b>Testar</b>.</li></ol></details>' +
+      '<label class="rot" for="cfgClUrl">URL da rotina</label><input type="text" id="cfgClUrl" placeholder="https://api.anthropic.com/v1/claude_code/routines/trig_…/fire" autocomplete="off">' +
+      '<label class="rot" for="cfgClTk">Código da rotina</label><input type="password" id="cfgClTk" placeholder="sk-ant-oat01-…' + (c.configurado ? ' (deixe em branco para manter)' : '') + '" autocomplete="off">' +
+      '<div class="botoes"><button type="button" id="cfgClSalvar">Salvar</button><button type="button" class="secundario" id="cfgClTestar"' + (c.configurado ? '' : ' disabled') + '>Testar</button>' + (c.configurado ? '<button type="button" class="link" id="cfgClRemover">tirar a rotina</button>' : '') + '</div><div id="cfgClMsg"></div>';
+  }
+  if(c.professores){
+    h += '<h4 style="margin-top:14px">Quem pode usar o Claude <span class="aviso">(só você vê)</span></h4><div id="cfgClQuem">' +
+      c.professores.map(function(p){ return '<label style="display:flex;gap:8px;align-items:center;margin:3px 0"><input type="checkbox" data-clquem="' + esc(p.email) + '"' + (p.permitido ? ' checked' : '') + '> ' + esc(p.nome) + ' <span class="aviso">' + esc(p.email) + '</span></label>'; }).join('') +
+      '</div><div class="botoes"><button type="button" class="secundario mini" id="cfgClQuemSalvar">Salvar quem pode usar</button></div><div id="cfgClQuemMsg"></div>';
+  }
+  cx.innerHTML = h;
+  var msg = function(t, erro){ var m = $('cfgClMsg'); if(m) m.innerHTML = '<div class="' + (erro ? 'erro' : 'ok') + '">' + t + '</div>'; };
+  var salvar = function(extra){
+    var pref = (cx.querySelector('[name=cfgPref]:checked') || {}).value;
+    return api('salvarClaudeConfig', {dados: Object.assign({preferir: pref, url: ($('cfgClUrl') || {}).value || '', tokenRotina: ($('cfgClTk') || {}).value || ''}, extra || {})});
+  };
+  var bs = $('cfgClSalvar'); if(bs) bs.addEventListener('click', function(){ bs.disabled = true; salvar().then(function(x){ desenharClaude(x); msg('✓ Salvo.'); }).catch(function(e){ bs.disabled = false; msg(esc(e.message), true); }); });
+  cx.querySelectorAll('[name=cfgPref]').forEach(function(r){ r.addEventListener('change', function(){ salvar().then(function(x){ desenharClaude(x); msg('✓ Preferência salva.'); }).catch(function(e){ msg(esc(e.message), true); }); }); });
+  var br = $('cfgClRemover'); if(br) br.addEventListener('click', function(){ if(!window.confirm('Tirar a rotina do Claude? As funções fortes voltam a usar só o Gemini.')) return; salvar({remover: true}).then(function(x){ desenharClaude(x); msg('Rotina tirada.'); }).catch(function(e){ msg(esc(e.message), true); }); });
+  var bt = $('cfgClTestar'); if(bt) bt.addEventListener('click', function(){
+    bt.disabled = true; var t0 = Date.now(); var tic = setInterval(function(){ var s2 = Math.round((Date.now() - t0) / 1000); $('cfgClMsg').innerHTML = '<p class="carregando">Mandando um pedido de teste ao Claude… ' + Math.floor(s2 / 60) + ' min ' + (s2 % 60) + ' s (a sessão leva de 1 a 3 minutos para começar)</p>'; }, 1000);
+    api('claudeTestar', {}).then(function(r){ clearInterval(tic); bt.disabled = false; msg(r.ok ? '✓ Funcionou: o Claude respondeu em ' + r.segundos + ' s' + (r.modelo ? ' (' + esc(r.modelo) + ')' : '') + '.' : 'O Claude respondeu, mas fora do formato esperado.', !r.ok); })
+      .catch(function(e){ clearInterval(tic); bt.disabled = false; msg(esc(e.message), true); });
+  });
+  var bq = $('cfgClQuemSalvar'); if(bq) bq.addEventListener('click', function(){
+    var l = Array.prototype.filter.call(cx.querySelectorAll('[data-clquem]'), function(x){ return x.checked; }).map(function(x){ return x.dataset.clquem; });
+    bq.disabled = true; api('claudePermissoes', {emails: l}).then(function(x){ desenharClaude(x); $('cfgClQuemMsg').innerHTML = '<div class="ok">✓ Salvo.</div>'; }).catch(function(e){ bq.disabled = false; $('cfgClQuemMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
 function desenharConfigGeral(c){
+  api('claudeConfig').then(desenharClaude).catch(function(){});
   $('cfgRecAuto').checked = !!c.recomendacoes_auto;
   carregarRegistroTrans();
   $('cfgApostilas').innerHTML = c.disciplinas.length ? c.disciplinas.map(function(d){
