@@ -4816,7 +4816,11 @@ function ligarMapaPrevia(){
     api('mapaPrevia', {disciplinaId: TEMAS.disc}).then(function(p){
       var topicos = [], porTop = {};
       p.aulas.forEach(function(a){ if(!porTop[a.topico]){ porTop[a.topico] = []; topicos.push(a.topico); } porTop[a.topico].push(a); });
+      var opc = topicos.map(function(t){ return '<optgroup label="' + esc(t) + '">' + porTop[t].map(function(a){ return '<option value="' + esc(a.id) + '">' + esc(a.titulo) + '</option>'; }).join('') + '</optgroup>'; }).join('');
       box.innerHTML = '<p style="margin:10px 0 4px"><b>' + p.ligados + ' de ' + p.total + '</b> assuntos antigos ligados a aulas da Biblioteca.</p>' +
+        '<details open style="margin:6px 0"><summary class="link">Conferir e corrigir cada ligação</summary><div style="max-height:460px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;margin-top:6px">' +
+        p.itens.map(function(it){ return '<div style="padding:5px 0;border-bottom:1px dashed var(--linha)"><div style="font-size:13.5px"><b>' + esc(it.nome) + '</b>' + (it.grupo ? ' <span class="aviso">(' + esc(it.grupo) + ')</span>' : '') + '</div>' +
+          '<select data-mapaaj="' + esc(it.id) + '" style="width:100%;max-width:520px"><option value="">— fica fora da Biblioteca —</option>' + opc.replace('value="' + esc(it.aula) + '"', 'value="' + esc(it.aula) + '" selected') + '</select></div>'; }).join('') + '</div></details>' +
         '<details open style="margin:6px 0"><summary class="link">Como fica o mapa (' + p.aulas.length + ' aulas)</summary><div style="max-height:420px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;margin-top:6px">' +
         topicos.map(function(t){ return '<p style="margin:8px 0 2px"><b>' + esc(t) + '</b></p>' + porTop[t].map(function(a){ return '<div style="font-size:13.5px;padding:2px 0 2px 10px">▶ ' + esc(a.titulo) + (a.assuntos.length ? '<span class="aviso"> ← ' + a.assuntos.map(esc).join('; ') + '</span>' : '') + '</div>'; }).join(''); }).join('') + '</div></details>' +
         (p.fora.length ? '<details style="margin:6px 0"><summary class="link">Ficam "fora da Biblioteca" (' + p.fora.length + ')</summary><div class="aviso" style="padding:6px 10px">' + p.fora.map(function(f){ return esc(f.nome); }).join(' · ') + '<br>Eles continuam valendo (questões e estudo). Você liga cada um a uma aula quando quiser, e quando criar uma aula nova na Biblioteca o sistema tenta ligar sozinho.</div></details>' : '') +
@@ -4825,7 +4829,8 @@ function ligarMapaPrevia(){
       $('btMapaCancelar').addEventListener('click', function(){ box.innerHTML = ''; b.disabled = false; });
       $('btMapaAplicar').addEventListener('click', function(){
         var x = $('btMapaAplicar'); x.disabled = true; $('mapaMsg').innerHTML = '<p class="carregando">Aplicando… (até 1 minuto)</p>';
-        api('mapaAplicar', {disciplinaId: TEMAS.disc}).then(function(res){ TEMAS.abertos = {}; return recarregarTemas('✓ Mapa aplicado: ' + res.ligados + ' assuntos ligados às ' + res.aulas + ' aulas da Biblioteca; ' + res.fora + ' ficaram fora da Biblioteca.'); })
+        var aj = {}; box.querySelectorAll('[data-mapaaj]').forEach(function(sel){ aj[sel.dataset.mapaaj] = sel.value; });
+        api('mapaAplicar', {disciplinaId: TEMAS.disc, ajustes: aj}).then(function(res){ TEMAS.abertos = {}; return recarregarTemas('✓ Mapa aplicado: ' + res.ligados + ' assuntos ligados às ' + res.aulas + ' aulas da Biblioteca; ' + res.fora + ' ficaram fora da Biblioteca.'); })
           .catch(function(e){ x.disabled = false; $('mapaMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
       });
     }).catch(function(e){ b.disabled = false; box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
