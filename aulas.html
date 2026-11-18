@@ -362,7 +362,9 @@
   details.ajuda>div{position:absolute;z-index:60;top:19px;left:-10px;width:300px;max-width:78vw;margin:0;background:#fff;color:var(--navy);
     border:1px solid var(--linha,#d9dee8);border-left:4px solid var(--menu);border-radius:8px;box-shadow:0 8px 24px rgba(14,42,92,.18);
     padding:10px 12px;font-size:13px;line-height:1.5;font-weight:normal;text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
-.hubModos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.hubModos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.hubLinks{display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 0;font-size:13.5px}
+.hubFaixa.pisca{outline:3px solid #E8B923;outline-offset:3px;border-radius:10px;transition:outline-color .6s}
 .hubModo{display:flex;flex-direction:column;align-items:center;gap:2px;margin:0;padding:10px 4px;border:2px solid var(--linha);border-radius:12px;background:#fff;color:var(--navy);font-size:13.5px;font-weight:bold;line-height:1.2;text-align:center;min-height:0}
 .hubModo span{font-size:20px}.hubModo small{font-weight:normal;color:#6b7a99;font-size:11.5px}
 .hubModo[aria-pressed="true"]{border-color:#2E62C6;background:#eef3fd}.hubModo:disabled{opacity:.5}
@@ -2083,10 +2085,12 @@ function desenharHub(m){
       : '<div class="ok" style="margin:12px 0">Você está em dia com os assuntos já dados. 👏 Treine as questões ou escolha um assunto abaixo.</div>') +
     '<p style="margin:12px 0 6px"><b>Escolha como estudar</b></p>' +
     '<div class="hubModos">' +
-      '<button type="button" class="hubModo" data-modo="plano"><span>🧭</span>Seguir o plano<small>' + (mm.tarefas || []).length + ' tarefa' + ((mm.tarefas || []).length === 1 ? '' : 's') + '</small></button>' +
-      '<button type="button" class="hubModo" data-modo="treino"><span>📝</span>Só treinar questões<small>dos assuntos da prova</small></button>' +
-      '<button type="button" class="hubModo" data-modo="aulas"' + (aulas.length ? '' : ' disabled') + '><span>▶</span>Ver as aulas<small>' + (aulas.length ? aulas.length + ' aula' + (aulas.length > 1 ? 's' : '') + ' da prova' : 'nenhuma ainda') + '</small></button>' +
-    '</div><div id="hubPainel"></div>' +
+      '<button type="button" class="hubModo" data-modo="plano"><span>🧭</span>Seguir o plano<small>não sei por onde começar</small></button>' +
+      '<button type="button" class="hubModo" data-modo="assunto"' + (temas.length ? '' : ' disabled') + '><span>🎯</span>Escolher o assunto<small>quero ir direto</small></button>' +
+    '</div>' +
+    '<div class="hubLinks"><button type="button" class="link" data-modo="treino">📝 Treinar questões misturadas</button>' +
+      (aulas.length ? '<button type="button" class="link" data-modo="aulas">▶ Aulas desta prova (' + aulas.length + ')</button>' : '') + '</div>' +
+    '<div id="hubPainel"></div>' +
     (temas.length ? '<p style="margin:16px 0 4px"><b>Assuntos da ' + esc(mm.prova.titulo) + '</b> <span class="aviso">· na ordem das aulas · a cor mostra o seu domínio · deslize para ver todos</span></p>' +
       '<div class="hubFaixa" id="hubFaixa">' + temas.map(function(t, i){ return '<button type="button" class="hubChip" data-chip="' + i + '"><span class="pt" style="background:' + corDom(domT(t)) + '"></span>' + esc(t.nome) + '</button>'; }).join('') + '</div>' +
       '<div id="hubTema"></div>' : '<p class="aviso" style="margin-top:14px">Os assuntos aparecem depois das aulas gravadas.</p>') +
@@ -2105,6 +2109,13 @@ function desenharHub(m){
     var modo = b.dataset.modo, p = $('hubPainel'), ja = b.getAttribute('aria-pressed') === 'true';
     el.querySelectorAll('[data-modo]').forEach(function(x){ x.setAttribute('aria-pressed', 'false'); });
     if(modo === 'treino'){ abrirTreino(m); return; }
+    if(modo === 'assunto'){
+      p.innerHTML = '';
+      var f = $('hubFaixa'); if(!f) return;
+      if(f.scrollIntoView) f.scrollIntoView({behavior: 'smooth', block: 'center'});
+      f.classList.add('pisca'); setTimeout(function(){ f.classList.remove('pisca'); }, 1600);
+      return;
+    }
     if(ja){ p.innerHTML = ''; return; }
     b.setAttribute('aria-pressed', 'true');
     if(modo === 'plano'){
@@ -2273,6 +2284,7 @@ function desenharCorrecaoEstudo(txt){
     '<details style="margin:0 0 8px"><summary class="link" style="font-size:13px">ver a sua resposta</summary><p class="aviso" style="white-space:pre-line;margin:6px 0 0">' + esc(txt) + '</p></details>' +
     '<div style="display:flex;gap:18px;align-items:baseline;flex-wrap:wrap"><div><span class="aviso">sua nota</span><div class="numEst" style="color:' + cor + '">' + dezEst(r.nota) + '</div></div>' +
       '<span class="aviso">tentativa ' + r.tentativa + (subiu ? ' · <b style="color:#1a7a3c">subiu de ' + dezEst(r.melhorAntes) + ' para ' + dezEst(r.nota) + '! 🎉</b>' : '') + ' · o estudo não vale nota</span></div>' +
+    '<p class="aviso" style="margin:4px 0 8px">💪 Esta correção é mais exigente que a da prova, de propósito: quem vai bem aqui chega bem na prova.</p>' +
     '<div class="eixo" style="border-color:#1a7a3c"><b>✅ O que você acertou</b><br>' + esc(r.feedback.acertos) + '</div>' +
     '<div class="eixo" style="border-color:#c62828"><b>🔬 Conteúdo técnico</b><br>' + esc(r.feedback.conteudo) + '</div>' +
     '<div class="eixo" style="border-color:#2E62C6"><b>🧩 Estrutura da resposta</b><br>' + esc(r.feedback.estrutura) + '</div>' +
