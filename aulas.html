@@ -3219,12 +3219,12 @@ function previaEmailPF(box, grupoId, m){
   box.querySelector('[data-pfcanc]').addEventListener('click', function(){ box.innerHTML = ''; });
   box.querySelector('[data-pfenviar]').addEventListener('click', function(){
     var bt = this, msg = box.querySelector('[data-pfmsg]'), extras = {}, ok = true;
-    box.querySelectorAll('[data-pfextra]').forEach(function(i){ var v = i.value.trim(); if(!/^[^s@,;]+@[^s@,;]+.[^s@,;]+$/.test(v)) ok = false; extras[i.dataset.pfextra] = v; });
+    box.querySelectorAll('[data-pfextra]').forEach(function(i){ var v = i.value.trim(); if(!/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(v)) ok = false; extras[i.dataset.pfextra] = v; });
     if(!ok){ msg.innerHTML = '<span class="t-err">Preencha um e-mail válido para cada docente sem e-mail.</span>'; return; }
     if(!box.querySelector('[data-pfconf]').checked){ msg.innerHTML = '<span class="t-err">Marque que conferiu antes de enviar.</span>'; return; }
     var re = box.querySelector('[data-pfreenv]'); if(re && !re.checked){ msg.innerHTML = '<span class="t-err">Marque que quer enviar de novo.</span>'; return; }
     bt.disabled = true; msg.textContent = 'Enviando…';
-    api('pfEmailEnviar', {disciplinaId: PFV.d.id, grupoId: grupoId, tipo: m.tipo, extras: extras, reenviar: !!re}).then(function(x){ PFV.r = x; desenharPF(); $('pfMsg').textContent = '✉ E-mail "' + m.assunto + '" enviado para ' + m.para.length + ' docente(s).'; })
+    api('pfEmailEnviar', {disciplinaId: PFV.d.id, grupoId: grupoId, tipo: m.tipo, extras: extras, reenviar: !!re}).then(function(x){ PFV.r = x; desenharPF(); $('pfMsg').textContent = '✉ E-mail "' + m.assunto + '" enviado para ' + m.para.length + ' docente(s).' + (x.emailsSalvos && x.emailsSalvos.length ? ' E-mail de ' + x.emailsSalvos.join(', ') + ' salvo na aba Dados da banca.' : ''); })
       .catch(function(e){ bt.disabled = false; msg.innerHTML = '<span class="t-err">' + esc(e.message) + '</span>'; });
   });
 }
