@@ -832,7 +832,7 @@ function liberarSom(){
 function tocar(){
   if(ehVideo()){ P.tocando = true; $('btPlay').textContent = '⏸ Pausar'; if(VID.p && VID.pronto) try{ VID.p.playVideo(); }catch(e){} return; }
   liberarSom(); P.tocando = true; telaAcesa(true); $('btPlay').textContent = '⏸ Pausar'; narrar(); }
-function pausar(){ telaAcesa(false); if(ehVideo() && VID.p && VID.pronto) try{ VID.p.pauseVideo(); }catch(e){} P.tocando = false; $('btPlay').textContent = '▶ Continuar'; limparTimers(); pararSom(); }
+function pausar(){ telaAcesa(false); if(ehVideo() && VID.p && VID.pronto) try{ VID.p.pauseVideo(); }catch(e){} P.tocando = false; if($('btPlay')) $('btPlay').textContent = '▶ Continuar'; limparTimers(); pararSom(); }
 function limparTimers(){ P.timers.forEach(clearTimeout); P.timers = []; }
 function pararSom(){
   P.falaId = (P.falaId || 0) + 1; // falas canceladas não podem mais mandar seguir
@@ -2737,7 +2737,7 @@ window.Trilha = {
   },
   // saiu da aba: para a narração e a conversa
   voltar: function(){ inicio(); },
-  parar: function(){ if(T){ pausar(); if(wsD) encerrarDuvida(); U.enviar(true); } }
+  parar: function(){ if(!T) return; try{ pausar(); }catch(e){} try{ if(wsD) encerrarDuvida(); }catch(e){} try{ U.enviar(true); }catch(e){} }
 };
 })();
 // a certa costuma vir na 1ª posição: mostra em ordem sorteada, salvo quando alguma depende da ordem ("todas as anteriores")

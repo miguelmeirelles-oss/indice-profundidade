@@ -1317,7 +1317,7 @@ function carregarMaterias(){
 // abas da visão de aluno: Minhas matérias, Minhas provas, Aulas em trilha, Inscrever-se
 function abaAluno(a, abrirId, questoes){
   if(['mat', 'provas', 'desemp', 'trilha', 'insc'].indexOf(a) === -1) a = 'mat';
-  if(a !== 'trilha' && window.Trilha) Trilha.parar();
+  if(a !== 'trilha' && window.Trilha) try{ Trilha.parar(); }catch(e){}
   try{ localStorage.setItem('aulas_abaal', a); }catch(e){}
   document.querySelectorAll('[data-abaal]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.abaal === a)); });
   document.querySelectorAll('[data-painelal]').forEach(function(x){ x.classList.toggle('foraAba', x.dataset.painelal !== a); });
@@ -1339,7 +1339,7 @@ function desenharVolta(){
   v.classList.remove('oculto');
   v.innerHTML = '<button type="button" id="btVoltaEstudo" style="width:100%;margin:0;text-align:left">&#8592; Voltar para Estudar para a prova' + (VOLTA.hub ? ' · ' + esc(VOLTA.m.nome) : '') + '</button>';
   $('btVoltaEstudo').addEventListener('click', function(){
-    var x = VOLTA; VOLTA = null; if(window.Trilha) Trilha.parar();
+    var x = VOLTA; VOLTA = null; try{ if(window.Trilha) Trilha.parar(); }catch(e){}
     if(x.hub){ abaAluno('desemp'); abrirEstudo(x.m, x.tema); }
     else { voltarListaAluno(); abaAluno('desemp'); setTimeout(function(){ window.scrollTo(0, x.y || 0); }, 300); }
   });
@@ -2108,8 +2108,14 @@ function desenharHub(m){
     if(ja){ p.innerHTML = ''; return; }
     b.setAttribute('aria-pressed', 'true');
     if(modo === 'plano'){
-      p.innerHTML = (mm.tarefas || []).length ? gruposDeTarefas(mm.tarefas).map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
-        '<p class="aviso">' + mm.porDia + ' passo(s) por dia até a prova. Passo feito sai da lista. ' + ajuda(BAL.hoje) + '</p>' + htmlRoteiro(mm) : '<p class="ok">Nada pendente no plano agora. 👏</p>';
+      p.innerHTML = (mm.tarefas || []).length ? (function(){
+        var gs = gruposDeTarefas(mm.tarefas), nH = 0, conta = 0;
+        while(nH < gs.length && (nH === 0 || conta + gs[nH].n <= mm.porDia)){ conta += gs[nH].n; nH++; }
+        var gd = gs.slice(nH);
+        return '<div style="margin:2px 0 4px"><b>Hoje</b> <span class="aviso">(' + mm.porDia + ' passo' + (mm.porDia > 1 ? 's' : '') + ' por dia até a prova · passo feito sai da lista)</span> ' + ajuda(BAL.hoje) + '</div>' +
+          gs.slice(0, nH).map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') +
+          ((mm.roteiro || []).length >= 2 ? htmlRoteiro(mm) : gd.length ? '<details style="margin-top:4px"><summary class="link">Próximos (' + gd.length + ' assunto' + (gd.length > 1 ? 's' : '') + ')</summary>' + gd.map(function(g){ return htmlGrupoTarefa(g, mi); }).join('') + '</details>' : '');
+      })() : '<p class="ok">Nada pendente no plano agora. 👏</p>';
       p.querySelectorAll('[data-ftar]').forEach(function(x){ x.addEventListener('click', function(){ var t = mm.tarefas[Number(x.dataset.ftar.split(':')[1])]; EST.temaAtual = t.temaId || ''; fazerTarefa(mmBase, t, mm); }); });
       p.querySelectorAll('[data-iraula]').forEach(function(x){ x.addEventListener('click', function(){ irParaAula(x.dataset.iraula); }); });
     } else {
@@ -2564,7 +2570,7 @@ function textoCapitulo(t){
 var abaAtual = 'aula';
 document.querySelectorAll('[data-aba]').forEach(function(b){ b.addEventListener('click', function(){ abrirAba(b.dataset.aba); }); });
 function abrirAba(a){
-  if(a !== 'trilha' && window.Trilha) Trilha.parar();   // saiu da aula em trilha: para a narração e a conversa
+  if(a !== 'trilha' && window.Trilha) try{ Trilha.parar(); }catch(e){}   // saiu da aula em trilha: para a narração e a conversa
   abaAtual = a;
   document.querySelectorAll('[data-aba]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.dataset.aba === a)); });
   ['aula', 'quest', 'notas', 'hist', 'estudo', 'disc', 'insc', 'cfg', 'chat', 'msgs', 'trilha'].forEach(function(x){
@@ -2592,7 +2598,7 @@ function carregarTrilha(el, modo, abrirId, questoes){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo}); if(abrirId && Trilha.irPara) Trilha.irPara(abrirId, questoes); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=55';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=56';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);
