@@ -1735,13 +1735,36 @@ function abrirGeradorNovo(){
     if(!cfg.temas.length && !cfg.aulas.length && !cfg.assuntosLivres.trim() && !(dd.aulasDisc || []).length){ m.innerHTML = '<div class="erro">Marque os assuntos ou escreva o que cai na prova.</div>'; return; }
     gravarCfgGerador(cfg);
     b.disabled = true;
-    m.innerHTML = '<p class="carregando">1 de 2 · A IA está montando a prova… (1 a 2 minutos)</p>';
-    api('gerarProvaIA', {disciplinaId: discSel, cfg: cfg}).then(function(g){
+    var t0 = Date.now(), etapa = '1 de 2 · A IA está montando a prova…', antes = {};
+    (dadosDisc.provasGeradas || []).forEach(function(x){ antes[x.codigo] = true; });
+    var relogio = function(){ var s = Math.round((Date.now() - t0) / 1000), mm = Math.floor(s / 60), ss = s % 60;
+      if(m.querySelector('.erro')) return;
+      m.innerHTML = '<p class="carregando">' + etapa + ' <b>' + mm + ' min ' + (ss < 10 ? '0' : '') + ss + ' s</b></p><p class="aviso" style="margin:2px 0 0">Costuma levar de 1 a 4 minutos por etapa (a IA mais forte é mais lenta, e o Google às vezes está sobrecarregado). Não precisa clicar de novo: deixe esta página aberta.</p>'; };
+    relogio(); var tic = setInterval(relogio, 1000);
+    var parar = function(){ clearInterval(tic); };
+    // a resposta pode se perder (conexão, tempo-limite do servidor) mesmo com a prova pronta: procura na lista por até 7 minutos
+    var procurar = function(){
+      var fim = t0 + 7 * 60000;
+      var tenta = function(){
+        return api('provasDisciplina', {disciplinaId: discSel}).then(function(r){
+          var nova = (r.provasGeradas || []).filter(function(x){ return !antes[x.codigo]; })[0];
+          if(nova) return api('provaGerada', {codigo: nova.codigo});
+          if(Date.now() > fim) throw new Error('A prova não ficou pronta. Tente gerar de novo daqui a alguns minutos (o Google pode estar sobrecarregado).');
+          return new Promise(function(res){ setTimeout(res, 20000); }).then(tenta);
+        });
+      };
+      etapa = '1 de 2 · A resposta está demorando; conferindo se a prova já ficou pronta…';
+      return tenta();
+    };
+    api('gerarProvaIA', {disciplinaId: discSel, cfg: cfg}).catch(function(e){
+      if(Date.now() - t0 < 20000 || /sendo montada|Marque os assuntos|chave/i.test(e.message)) throw e;   // erro de verdade, rápido: mostra
+      return procurar();
+    }).then(function(g){
       GER = g;
-      m.innerHTML = '<p class="carregando">2 de 2 · Revisando conceitos, dados, gráficos e contas… (1 a 2 minutos)</p>';
-      return api('revisarProvaGerada', {codigo: g.codigo, criacao: true}).then(function(rv){ GER = rv.prova; desenharGerador({revisao: rv.feitos}); })
-        .catch(function(e){ desenharGerador({erro: 'A prova foi gerada, mas a revisão falhou (' + e.message + '). Use "Revisar de novo com IA" quando quiser.'}); });
-    }).then(atualizarListaGeradas).catch(function(e){ b.disabled = false; m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+      etapa = '2 de 2 · Revisando conceitos, dados, gráficos e contas…'; t0 = Date.now(); relogio();
+      return api('revisarProvaGerada', {codigo: g.codigo, criacao: true}).then(function(rv){ parar(); GER = rv.prova; desenharGerador({revisao: rv.feitos}); })
+        .catch(function(e){ parar(); desenharGerador({erro: 'A prova foi gerada, mas a revisão falhou (' + e.message + '). Use "Revisar de novo com IA" quando quiser.'}); });
+    }).then(atualizarListaGeradas).catch(function(e){ parar(); b.disabled = false; m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
   el.scrollIntoView({behavior: 'smooth', block: 'start'});
 }
