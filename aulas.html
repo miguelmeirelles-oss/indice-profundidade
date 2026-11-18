@@ -4870,7 +4870,8 @@ function desenharTemasMapa(){
   };
   var h = '<div class="caixa"><div class="linha" style="border:0;padding:0"><h2 style="margin:0">Assuntos · ' + esc(r.disciplina) + ' ' + ajuda('Nesta disciplina, o <b>mapa dos assuntos é a Biblioteca de aulas</b>: cada tópico da Biblioteca é um grande tema e cada aula da Biblioteca é um assunto, na sua ordem. Para mudar nomes, ordem ou tópicos, organize a Biblioteca: aqui acompanha sozinho.<br><br><b>Depois de cada aula gravada</b>, a IA só diz quais aulas da Biblioteca você explicou (não inventa assunto). O que você deu e não existe na Biblioteca vai para <b>Fora da Biblioteca</b>.<br><br><b>Aula nova na Biblioteca</b>: de madrugada o sistema classifica a relevância, liga às aulas gravadas que já trataram do assunto e tenta ligar o que estava fora da Biblioteca. O botão "Organizar agora" faz isso na hora.<br><br><b>Prioridade</b> (⭐ importante, normal, não cobrar) vale para tudo: plano de estudo, revisão em aula e prova. A <b>relevância (IA)</b> é a opinião da IA sobre o quanto o assunto é cobrado na profissão; a sua prioridade vale por cima.') + '</h2>' +
     '<button type="button" class="link" id="fecharTemas">fechar</button></div>' +
-    '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="btMapaOrg">🔄 Organizar agora</button><span class="aviso">liga o que está fora da Biblioteca, encaixa aulas novas e classifica a relevância (1 a 2 chamadas da IA)</span></div><div id="mapaOrgMsg"></div>';
+    '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="btMapaOrg">🔄 Organizar agora</button><span class="aviso">liga o que está fora da Biblioteca, encaixa aulas novas e classifica a relevância (1 a 2 chamadas da IA)</span></div><div id="mapaOrgMsg"></div>' +
+    '<div class="botoes" style="margin-top:4px"><button type="button" class="secundario mini" id="btMapaRev">🔍 Revisar "dado nas aulas"</button><span class="aviso">a IA relê cada aula gravada inteira e refaz quais aulas da Biblioteca você explicou (1 a 2 chamadas por aula gravada; só tira uma ligação se a conferência confirmar)</span></div><div id="mapaRevMsg"></div>';
   if(r.pendentes.aulas || r.pendentes.questoes){
     h += '<div class="convite" style="margin-top:10px">' + (r.pendentes.aulas ? '<b>' + r.pendentes.aulas + ' aula(s)</b> gravada(s) ainda sem ligar à Biblioteca. ' : '') + (r.pendentes.questoes ? r.pendentes.questoes + ' questão(ões) sem assunto. ' : '') +
       '<button type="button" class="mini" id="btIdentificar">Ligar agora</button> <span class="aviso">também acontece sozinho de madrugada e quando você libera questões com revisão</span><div id="msgIdent"></div></div>';
@@ -4895,6 +4896,47 @@ function desenharTemasMapa(){
     api('mapaOrganizarAgora', {disciplinaId: TEMAS.disc}).then(function(x){
       return recarregarTemas('✓ Organizado: ' + x.novasNoMapa + ' aula(s) nova(s) no mapa, ' + x.aulasNovasLigadas + ' ligada(s) a aulas gravadas, ' + x.foraLigados + ' assunto(s) de fora ligado(s), ' + x.classificados + ' classificado(s).');
     }).catch(function(e){ bo.disabled = false; $('mapaOrgMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  var br = $('btMapaRev');
+  if(br) br.addEventListener('click', function(){
+    br.disabled = true; var msg = $('mapaRevMsg'), porAula = {}, linhas = [];
+    msg.innerHTML = '<p class="carregando">Buscando as aulas gravadas…</p>';
+    api('mapaRevisarAulas', {disciplinaId: TEMAS.disc}).then(function(x){
+      var lista = x.gravadas || [], i = 0;
+      if(!lista.length) throw new Error('Nenhuma aula gravada com ata nesta disciplina.');
+      var passo = function(){
+        if(i >= lista.length) return null;
+        var lote = lista.slice(i, i + 1); i += 1;
+        msg.innerHTML = '<p class="carregando">Relendo a aula ' + lote[0].numero + ' inteira (' + Math.min(i, lista.length) + ' de ' + lista.length + ')…</p>';
+        var dado = function(b){ return b.como === 'explicou' || b.como === 'revisou'; };
+        var ler = function(extra, tent){
+          return api('mapaRevisarAulas', Object.assign({disciplinaId: TEMAS.disc, aulaIds: [lote[0].id]}, extra)).catch(function(e){ if(tent < 2) return ler(extra, tent + 1); throw e; });
+        };
+        var tentarLer = function(tent){ return ler({}, 0).then(function(y){ var a = (y.aulas || [])[0]; return a && !a.nova.length && a.atual.length && tent < 1 ? tentarLer(tent + 1) : y; }); };
+        return tentarLer(0).then(function(y){
+          var a = (y.aulas || [])[0]; if(!a || !a.nova.length) return passo();   // a IA não respondeu nada: a aula fica como está
+          var fica = {}; a.nova.filter(dado).forEach(function(b){ fica[b.trilha] = true; });
+          var duvida = a.atual.filter(function(b){ return !fica[b.trilha]; }).map(function(b){ return b.trilha; });
+          var conf = duvida.length ? ler({conferir: duvida}, 0).then(function(z){ var c = (z.aulas || [])[0]; if(c) c.nova.filter(dado).forEach(function(b){ fica[b.trilha] = true; }); }).catch(function(){ duvida.forEach(function(t){ fica[t] = true; }); }) : Promise.resolve();
+          return conf.then(function(){
+            porAula[a.id] = Object.keys(fica);
+            var antes = {}; a.atual.forEach(function(b){ antes[b.trilha] = b.titulo; });
+            var saem = Object.keys(antes).filter(function(t){ return !fica[t]; }).map(function(t){ return antes[t]; });
+            var entram = a.nova.filter(function(b){ return dado(b) && !antes[b.trilha]; }).map(function(b){ return b.titulo; });
+            if(saem.length || entram.length) linhas.push('<li><b>Aula ' + a.numero + '</b>' + (a.tema ? ' (' + esc(a.tema) + ')' : '') + (saem.length ? '<br>− ' + saem.map(esc).join('; ') : '') + (entram.length ? '<br>+ ' + entram.map(esc).join('; ') : '') + '</li>');
+            return passo();
+          });
+        });
+      };
+      return passo();
+    }).then(function(){
+      msg.innerHTML = '<p class="carregando">Gravando…</p>';
+      return api('mapaRevisarAplicar', {disciplinaId: TEMAS.disc, porAula: porAula});
+    }).then(function(z){
+      return recarregarTemas('✓ Revisado: ' + z.assuntos + ' assunto(s) mudaram (' + z.tiradas + ' ligação(ões) tirada(s), ' + z.postas + ' posta(s)).').then(function(){
+        if(linhas.length && $('mapaRevMsg')) $('mapaRevMsg').innerHTML = '<details class="aviso" style="margin:6px 0"><summary class="link">ver o que mudou em cada aula gravada</summary><ul style="margin:6px 0;padding-left:18px">' + linhas.join('') + '</ul></details>';
+      });
+    }).catch(function(e){ br.disabled = false; msg.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
   var bd = $('btMapaDesfazer');
   if(bd) bd.addEventListener('click', function(){
