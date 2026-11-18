@@ -3072,6 +3072,28 @@ function htmlPrazosPF(r){
     '<div class="botoes"><button type="button" class="mini" id="pfPrazoEnviar">📣 Enviar recado à turma</button></div><div id="pfPrazoMsg" class="aviso"></div></details></div>';
   return h;
 }
+function htmlPeriodoPF(r){
+  var p = r.periodo || {}, aberto = p.falta || PFV.editPeriodo;
+  if(!aberto) return '<p class="aviso" style="margin:0 0 8px">📅 Período do TCC na ata: <b>' + esc(p.texto) + '</b> <button type="button" class="link" id="pfPerEdit" style="font-size:13px">alterar</button></p>';
+  return '<div class="' + (p.falta ? 'alerta' : 'convite') + '" style="margin:0 0 10px"><b>📅 ' + (p.falta ? 'Informe o período do TCC desta turma' : 'Alterar o período do TCC') + '</b>' +
+    '<p class="aviso" style="margin:4px 0 6px">Aparece na ata gerada pelo formulário: "desenvolvido no período de <i>início</i> a <i>fim</i>". Vale para as próximas atas.' + (p.falta && p.noForm ? ' Hoje o formulário está usando: <b>' + esc(p.noForm) + '</b>.' : '') + '</p>' +
+    '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end"><label class="aviso">início<br><input type="date" id="pfPerIni" value="' + esc(p.ini || '') + '"></label>' +
+    '<label class="aviso">fim<br><input type="date" id="pfPerFim" value="' + esc(p.fim || '') + '"></label>' +
+    '<button type="button" class="mini" id="pfPerSalvar">Salvar</button>' + (p.falta ? '' : '<button type="button" class="mini secundario" id="pfPerCanc">Cancelar</button>') + '</div><div id="pfPerMsg" class="aviso"></div></div>';
+}
+function ligarPeriodoPF(){
+  var ed = $('pfPerEdit'); if(ed) ed.addEventListener('click', function(){ PFV.editPeriodo = true; desenharPF(); });
+  var cc = $('pfPerCanc'); if(cc) cc.addEventListener('click', function(){ PFV.editPeriodo = false; desenharPF(); });
+  var sv = $('pfPerSalvar'); if(!sv) return;
+  sv.addEventListener('click', function(){
+    var ini = $('pfPerIni').value, fim = $('pfPerFim').value, msg = $('pfPerMsg');
+    if(!ini || !fim){ msg.innerHTML = '<span class="t-err">Preencha as duas datas.</span>'; return; }
+    if(ini >= fim){ msg.innerHTML = '<span class="t-err">O início tem que ser antes do fim.</span>'; return; }
+    sv.disabled = true; msg.textContent = 'Salvando…';
+    api('pfPeriodoSalvar', {disciplinaId: PFV.d.id, ini: ini, fim: fim}).then(function(x){ PFV.r = x; PFV.editPeriodo = false; desenharPF(); $('pfMsg').textContent = '✓ Período salvo: as próximas atas saem com "' + x.periodo.texto + '".'; })
+      .catch(function(e){ sv.disabled = false; msg.innerHTML = '<span class="t-err">' + esc(e.message) + '</span>'; });
+  });
+}
 function desenharPF(){
   var r = PFV.r, e2 = r.etapa === 2, el = $('aulaTopo');
   var conta = function(f){ return r.grupos.filter(f).length; };
@@ -3080,6 +3102,7 @@ function desenharPF(){
     '<div style="display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px">' + numPF('inscritos', r.inscritos) + numPF('grupos', r.grupos.length) +
     (e2 ? numPF('com banca', conta(function(g){ return g.banca.length; })) + numPF('defenderam', conta(function(g){ return g.cor === 'ok'; }))
         : numPF('com nota', conta(function(g){ return g.nota !== null; })) + numPF('aprovados', conta(function(g){ return g.nota !== null && g.nota >= r.aprova; }))) + '</div>' +
+    (e2 ? htmlPeriodoPF(r) : '') +
     '<div class="botoes" style="margin:0">' + (r.pastaUrl ? '<a class="botaoLink" href="' + esc(r.pastaUrl) + '" target="_blank" rel="noopener">📁 Documentos de ' + esc(r.semestre) + '</a>' : '') +
     '<button type="button" class="mini secundario" id="pfSync">↻ Atualizar planilha de controle' + (e2 ? ' e formulário' : '') + '</button>' +
     (e2 && r.podeEnviar ? '<button type="button" class="mini" id="pfConvite">✉ Convite das defesas</button>' : '') + '</div><div id="pfMsg" class="aviso"></div><div id="pfConviteBox"></div></div>' + (e2 ? htmlPrazosPF(r) : '');
@@ -3114,6 +3137,7 @@ function desenharPF(){
     if(!confirm('Enviar este recado a todos os alunos inscritos (na plataforma e no celular)?')) return;
     b.disabled = true; $('pfPrazoMsg').textContent = 'Enviando…';
     api('enviarRecado', {disciplinaId: PFV.d.id, texto: t, porEmail: false}).then(function(){ $('pfPrazoMsg').innerHTML = '<span class="ok">✓ Recado enviado à turma.</span>'; }).catch(function(e){ b.disabled = false; $('pfPrazoMsg').textContent = e.message; }); });
+  ligarPeriodoPF();
   $('pfSync').addEventListener('click', function(){ var b = this; b.disabled = true; $('pfMsg').textContent = 'Atualizando…';
     api('pfSincronizar', {disciplinaId: PFV.d.id}).then(function(x){ b.disabled = false; $('pfMsg').textContent = 'Planilha de controle: ' + x.controle + ' célula(s) atualizada(s)' + (e2 ? ' · formulário da ata: ' + x.form + ' projeto(s) com banca' : '') + (x.erros.length ? ' · ' + x.erros.join('; ') : '') + '.'; })
       .catch(function(e){ b.disabled = false; $('pfMsg').textContent = e.message; }); });
