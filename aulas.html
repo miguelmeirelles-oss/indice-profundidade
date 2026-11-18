@@ -2083,10 +2083,10 @@ function desenharHub(m){
     (mm.aviso ? '<div class="' + (mm.modoFinal ? 'erro' : 'alerta') + '" style="margin:8px 0">' + esc(mm.aviso) + '</div>' : '') +
     (prox ? '<div class="convite" style="margin:12px 0;border-left-color:#2E62C6"><span class="aviso">Seu próximo passo</span><div style="font-weight:bold;margin:2px 0">' + esc(prox.texto) + '</div><div class="aviso">' + esc(prox.tema) + (prox.porque ? ' · ' + esc(prox.porque) : '') + '</div><div class="botoes" style="margin:8px 0 0"><button type="button" id="hubProx">Começar →</button></div></div>'
       : '<div class="ok" style="margin:12px 0">Você está em dia com os assuntos já dados. 👏 Treine as questões ou escolha um assunto abaixo.</div>') +
-    '<p style="margin:12px 0 6px"><b>Escolha como estudar</b></p>' +
+    '<p style="margin:12px 0 6px"><b>Escolha como estudar</b> ' + ajuda('<b>🧭 Seguir o plano</b>: o app decide por você. Primeiro passa pelos assuntos que você ainda não praticou, na ordem das aulas (cada um com 1 ▶ assistir a aula e 2 ✍ responder questões). Depois volta nos assuntos em que você foi pior. Mostra os passos de hoje, calculados para dar conta de tudo até a prova; passo feito sai da lista.<br><br><b>🎯 Escolher o assunto</b>: você decide. Os assuntos da prova aparecem em fila, na ordem das aulas; a cor mostra o seu domínio (verde = bem, amarelo = quase, vermelho = reforçar, cinza = ainda sem questões). Toque num assunto para assistir a aula, responder questões ou explicar, e use ← → para ir ao anterior ou ao próximo.<br><br>Tudo o que você faz num caminho conta no outro.') + '</p>' +
     '<div class="hubModos">' +
-      '<button type="button" class="hubModo" data-modo="plano"><span>🧭</span>Seguir o plano<small>não sei por onde começar</small></button>' +
-      '<button type="button" class="hubModo" data-modo="assunto"' + (temas.length ? '' : ' disabled') + '><span>🎯</span>Escolher o assunto<small>quero ir direto</small></button>' +
+      '<button type="button" class="hubModo" data-modo="plano"><span>🧭</span>Seguir o plano<small>o app escolhe o próximo passo</small></button>' +
+      '<button type="button" class="hubModo" data-modo="assunto"' + (temas.length ? '' : ' disabled') + '><span>🎯</span>Escolher o assunto<small>você escolhe, na ordem das aulas</small></button>' +
     '</div>' +
     '<div class="hubLinks"><button type="button" class="link" data-modo="treino">📝 Treinar questões misturadas</button>' +
       (aulas.length ? '<button type="button" class="link" data-modo="aulas">▶ Aulas desta prova (' + aulas.length + ')</button>' : '') + '</div>' +
