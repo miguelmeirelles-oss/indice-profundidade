@@ -4751,6 +4751,7 @@ function detalheDesemp(d){
   return det.join(' · ');
 }
 function desenharTemas(){
+  if(TEMAS.r && TEMAS.r.mapa) return desenharTemasMapa();
   var el = $('painelTemas'), r = TEMAS.r, discId = TEMAS.disc;
   var grupos = r.grupos, todosSub = r.temas;
   var linhaSub = function(t, g){
@@ -4787,6 +4788,7 @@ function desenharTemas(){
     '<b>Ordem:</b> as setas ↑↓ põem os grandes temas e os subtemas na sequência do curso (é a ordem que o aluno vê no estudo e nas aulas em trilha).<br><br><b>⋯ mais:</b> "o que cai" (uma linha sua que vai para os prompts das questões do estudo e das aulas em trilha), as aulas que tratam do subtema, mudar de nível e apagar.<br><br>' +
     'As mudanças são salvas na hora; a lista se reorganiza quando o painel for aberto de novo. Ao copiar a disciplina para o próximo semestre, os temas e as prioridades vão junto (sem as notas).') + '</h2>' +
     '<button type="button" class="link" id="fecharTemas">fechar</button></div>';
+  if(r.temBiblioteca >= 3) h += '<div class="convite" style="margin-top:10px;border-left-color:#2E62C6"><b>📚 Organizar os assuntos pela Biblioteca de aulas</b><p class="aviso" style="margin:4px 0 8px">A Biblioteca (' + r.temBiblioteca + ' aulas, na sua ordem) vira o mapa da disciplina: cada aula da Biblioteca é um assunto e cada tópico, um grande tema. As aulas gravadas e as questões passam a ser ligadas a ela, e os temas param de bagunçar a cada aula. Primeiro você vê a prévia; nada muda antes de aplicar, e dá para desfazer.</p><button type="button" class="mini" id="btMapaPrev">Ver a prévia</button><div id="mapaPrev"></div></div>';
   if(grupos.length || r.soltos.length) h += '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="btRecatalogar">🔄 Recatalogar nomes dos temas</button> ' +
     ajuda('A IA relê as atas, os resumos da gravação e a <b>apostila de referência</b> (se você enviou uma em "Estudo dos alunos") e propõe nomes com os <b>termos que você usa em aula</b> (ex.: "Valor D" em vez de "Tempo de redução decimal"). Também pode sugerir juntar temas repetidos.<br><br>Nada muda antes de você conferir: aparece a lista "antes → depois" para marcar o que aceita. Prioridades, questões, desempenho e o banco do estudo dirigido continuam ligados aos temas. Usa 1 chamada da IA.') +
     '</div><div id="recatalogo"></div>';
@@ -4803,11 +4805,103 @@ function desenharTemas(){
   el.innerHTML = h;
   ligarPainelTemas();
   ligarExtrasTemas();
+  ligarMapaPrevia();
+}
+// ---- mapa da Biblioteca: prévia e aplicação ----
+function ligarMapaPrevia(){
+  var b = $('btMapaPrev'); if(!b) return;
+  b.addEventListener('click', function(){
+    var box = $('mapaPrev'); b.disabled = true;
+    box.innerHTML = '<p class="carregando">A IA está ligando cada assunto antigo à aula da Biblioteca correspondente… (até 1 minuto)</p>';
+    api('mapaPrevia', {disciplinaId: TEMAS.disc}).then(function(p){
+      var topicos = [], porTop = {};
+      p.aulas.forEach(function(a){ if(!porTop[a.topico]){ porTop[a.topico] = []; topicos.push(a.topico); } porTop[a.topico].push(a); });
+      box.innerHTML = '<p style="margin:10px 0 4px"><b>' + p.ligados + ' de ' + p.total + '</b> assuntos antigos ligados a aulas da Biblioteca.</p>' +
+        '<details open style="margin:6px 0"><summary class="link">Como fica o mapa (' + p.aulas.length + ' aulas)</summary><div style="max-height:420px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:6px 10px;margin-top:6px">' +
+        topicos.map(function(t){ return '<p style="margin:8px 0 2px"><b>' + esc(t) + '</b></p>' + porTop[t].map(function(a){ return '<div style="font-size:13.5px;padding:2px 0 2px 10px">▶ ' + esc(a.titulo) + (a.assuntos.length ? '<span class="aviso"> ← ' + a.assuntos.map(esc).join('; ') + '</span>' : '') + '</div>'; }).join(''); }).join('') + '</div></details>' +
+        (p.fora.length ? '<details style="margin:6px 0"><summary class="link">Ficam "fora da Biblioteca" (' + p.fora.length + ')</summary><div class="aviso" style="padding:6px 10px">' + p.fora.map(function(f){ return esc(f.nome); }).join(' · ') + '<br>Eles continuam valendo (questões e estudo). Você liga cada um a uma aula quando quiser, e quando criar uma aula nova na Biblioteca o sistema tenta ligar sozinho.</div></details>' : '') +
+        '<p class="aviso">As questões de sala, o banco do estudo e as respostas dos alunos passam junto para o assunto novo. A importância que você marcou vai junto.</p>' +
+        '<div class="botoes"><button type="button" id="btMapaAplicar">Aplicar o mapa</button><button type="button" class="secundario" id="btMapaCancelar">Cancelar</button></div><div id="mapaMsg"></div>';
+      $('btMapaCancelar').addEventListener('click', function(){ box.innerHTML = ''; b.disabled = false; });
+      $('btMapaAplicar').addEventListener('click', function(){
+        var x = $('btMapaAplicar'); x.disabled = true; $('mapaMsg').innerHTML = '<p class="carregando">Aplicando… (até 1 minuto)</p>';
+        api('mapaAplicar', {disciplinaId: TEMAS.disc}).then(function(res){ TEMAS.abertos = {}; return recarregarTemas('✓ Mapa aplicado: ' + res.ligados + ' assuntos ligados às ' + res.aulas + ' aulas da Biblioteca; ' + res.fora + ' ficaram fora da Biblioteca.'); })
+          .catch(function(e){ x.disabled = false; $('mapaMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+      });
+    }).catch(function(e){ b.disabled = false; box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
+// ---- aba Temas no modo "mapa = Biblioteca": só consulta e prioridade; a estrutura vem da Biblioteca ----
+function desenharTemasMapa(){
+  var el = $('painelTemas'), r = TEMAS.r, grupos = r.grupos, fora = r.soltos || [];
+  var tagRel = function(t){ return t.relevancia === 'alta' ? ' <span class="tag" style="background:#e6f4ea;color:#1a7a3c;border-color:#1a7a3c">🔑 central</span>' : t.relevancia === 'baixa' ? ' <span class="tag t-warn">📉 pouco cobrado</span>' : ''; };
+  var selImp = function(t, g){
+    var opcoes = (g ? [['herdar', 'segue o tópico (' + NOMES_IMP[g.importancia] + ')']] : []).concat([['alta', NOMES_IMP.alta], ['normal', NOMES_IMP.normal], ['nao', NOMES_IMP.nao]]);
+    return '<select data-imp="' + esc(t.id) + '" aria-label="Prioridade">' + opcoes.map(function(o){ return '<option value="' + o[0] + '"' + (t.importancia === o[0] || (!g && t.importancia === 'herdar' && o[0] === 'normal') ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>';
+  };
+  var info = function(t){
+    var det = detalheDesemp(t.desempenho);
+    return '<br><span class="aviso" style="font-weight:normal">' + (t.aulas.length ? 'dado na' + (t.aulas.length > 1 ? 's aulas ' : ' aula ') + t.aulas.join(', ') : 'ainda não dado em sala') + (det ? ' · ' + det : '') + '</span>' +
+      (t.relevMotivo ? '<br><span class="aviso" style="font-weight:normal">relevância (IA): ' + ({alta: 'central', media: 'média', baixa: 'pouco cobrado'}[t.relevancia] || t.relevancia) + ' · ' + esc(t.relevMotivo) + '</span>' : '');
+  };
+  var linha = function(t, g){
+    return '<div class="temaLinha subtema" data-sub="' + esc(t.id) + '"><span class="nome">▶ ' + esc(t.nome) + (t.prova && (!g || g.prova !== t.prova) ? ' <span class="tag t-azul">' + esc(t.prova) + '</span>' : '') + (t.critico ? ' <span class="tag t-err">crítico</span>' : '') + tagRel(t) + info(t) + '</span>' +
+      chipDesemp(t.desempenho) + selImp(t, g) + maisSubtema(t, 'mapa') + '</div>';
+  };
+  var opcoesAulas = grupos.map(function(g){ return '<optgroup label="' + esc(g.nome) + '">' + g.subtemas.map(function(s){ return '<option value="' + esc(s.id) + '">' + esc(s.nome) + '</option>'; }).join('') + '</optgroup>'; }).join('');
+  var linhaFora = function(t){
+    return '<div class="temaLinha subtema" data-sub="' + esc(t.id) + '"><span class="nome">' + esc(t.nome) + (t.prova ? ' <span class="tag t-azul">' + esc(t.prova) + '</span>' : '') + tagRel(t) + info(t) + '</span>' + chipDesemp(t.desempenho) + selImp(t, null) +
+      '<select data-ligarfora="' + esc(t.id) + '" aria-label="Ligar a uma aula da Biblioteca" style="max-width:260px"><option value="">ligar à aula da Biblioteca…</option>' + opcoesAulas + '</select>' + maisSubtema(t, 'fora') + '</div>';
+  };
+  var bloco = function(g){
+    var aberto = !!TEMAS.abertos[g.id];
+    return '<div class="grupoTema" data-grupo="' + esc(g.id) + '"><div class="temaLinha" style="border-bottom:0">' +
+      '<button type="button" class="link" data-abrir="' + esc(g.id) + '" style="font-size:15px;text-decoration:none" aria-expanded="' + aberto + '">' + (aberto ? '▾' : '▸') + '</button>' +
+      '<span class="nome" style="cursor:pointer" data-abrir="' + esc(g.id) + '">' + (g.importancia === 'alta' ? '⭐ ' : '') + esc(g.nome) + (g.prova ? ' <span class="tag t-azul">' + esc(g.prova) + '</span>' : (g.importancia !== 'nao' ? ' <span class="tag t-cinza" title="Marque em Disciplinas → Editar em que prova cai">sem prova</span>' : '')) +
+        '<br><span class="aviso" style="font-weight:normal">' + g.subtemas.length + ' aula(s) da Biblioteca' + (g.aulas.length ? ' · dado nas aulas ' + g.aulas.join(', ') : '') + '</span></span>' +
+      chipDesemp(g.desempenho) +
+      '<select data-impg="' + esc(g.id) + '" aria-label="Prioridade do tópico">' + ['alta', 'normal', 'nao'].map(function(v){ return '<option value="' + v + '"' + (g.importancia === v ? ' selected' : '') + '>' + NOMES_IMP[v] + '</option>'; }).join('') + '</select></div>' +
+      '<div class="subtemas"' + (aberto ? '' : ' hidden') + '>' + g.subtemas.map(function(t){ return linha(t, g); }).join('') + '</div></div>';
+  };
+  var h = '<div class="caixa"><div class="linha" style="border:0;padding:0"><h2 style="margin:0">Assuntos · ' + esc(r.disciplina) + ' ' + ajuda('Nesta disciplina, o <b>mapa dos assuntos é a Biblioteca de aulas</b>: cada tópico da Biblioteca é um grande tema e cada aula da Biblioteca é um assunto, na sua ordem. Para mudar nomes, ordem ou tópicos, organize a Biblioteca: aqui acompanha sozinho.<br><br><b>Depois de cada aula gravada</b>, a IA só diz quais aulas da Biblioteca você explicou (não inventa assunto). O que você deu e não existe na Biblioteca vai para <b>Fora da Biblioteca</b>.<br><br><b>Aula nova na Biblioteca</b>: de madrugada o sistema classifica a relevância, liga às aulas gravadas que já trataram do assunto e tenta ligar o que estava fora da Biblioteca. O botão "Organizar agora" faz isso na hora.<br><br><b>Prioridade</b> (⭐ importante, normal, não cobrar) vale para tudo: plano de estudo, revisão em aula e prova. A <b>relevância (IA)</b> é a opinião da IA sobre o quanto o assunto é cobrado na profissão; a sua prioridade vale por cima.') + '</h2>' +
+    '<button type="button" class="link" id="fecharTemas">fechar</button></div>' +
+    '<div class="botoes" style="margin-top:8px"><button type="button" class="secundario mini" id="btMapaOrg">🔄 Organizar agora</button><span class="aviso">liga o que está fora da Biblioteca, encaixa aulas novas e classifica a relevância (1 a 2 chamadas da IA)</span></div><div id="mapaOrgMsg"></div>';
+  if(r.pendentes.aulas || r.pendentes.questoes){
+    h += '<div class="convite" style="margin-top:10px">' + (r.pendentes.aulas ? '<b>' + r.pendentes.aulas + ' aula(s)</b> gravada(s) ainda sem ligar à Biblioteca. ' : '') + (r.pendentes.questoes ? r.pendentes.questoes + ' questão(ões) sem assunto. ' : '') +
+      '<button type="button" class="mini" id="btIdentificar">Ligar agora</button> <span class="aviso">também acontece sozinho de madrugada e quando você libera questões com revisão</span><div id="msgIdent"></div></div>';
+  }
+  h += grupos.map(bloco).join('');
+  if(fora.length) h += '<div class="convite" style="margin-top:14px"><b>📦 Fora da Biblioteca (' + fora.length + ')</b><p class="aviso" style="margin:4px 0 6px">Assuntos dados em sala que não estão em nenhuma aula da Biblioteca. Continuam valendo (questões e estudo). Ligue a uma aula, ou deixe até criar a aula na Biblioteca: o sistema tenta ligar sozinho.</p>' + fora.map(linhaFora).join('') + '</div>';
+  if(r.podeDesfazerMapa) h += '<p class="aviso" style="margin-top:14px">Mapa pela Biblioteca ligado. <button type="button" class="link" id="btMapaDesfazer" style="font-size:13px">desfazer e voltar aos temas de antes</button></p>';
+  h += '<div id="msgTemas"></div></div>';
+  el.innerHTML = h;
+  ligarPainelTemas();
+  ligarExtrasTemas();
+  el.querySelectorAll('[data-ligarfora]').forEach(function(s){ s.addEventListener('change', function(){
+    if(!s.value) return; var de = s.dataset.ligarfora, alvo = s.options[s.selectedIndex].textContent;
+    if(!window.confirm('Ligar este assunto à aula "' + alvo + '"? As questões, as aulas gravadas e as respostas dos alunos passam para ela.')){ s.value = ''; return; }
+    s.disabled = true;
+    api('ligarForaBiblioteca', {disciplinaId: TEMAS.disc, foraId: de, alvoId: s.value}).then(function(){ return recarregarTemas('✓ Ligado a "' + alvo + '".'); })
+      .catch(function(e){ s.disabled = false; s.value = ''; $('msgTemas').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  }); });
+  var bo = $('btMapaOrg');
+  if(bo) bo.addEventListener('click', function(){
+    bo.disabled = true; $('mapaOrgMsg').innerHTML = '<p class="carregando">Organizando… (até 1 minuto)</p>';
+    api('mapaOrganizarAgora', {disciplinaId: TEMAS.disc}).then(function(x){
+      return recarregarTemas('✓ Organizado: ' + x.novasNoMapa + ' aula(s) nova(s) no mapa, ' + x.aulasNovasLigadas + ' ligada(s) a aulas gravadas, ' + x.foraLigados + ' assunto(s) de fora ligado(s), ' + x.classificados + ' classificado(s).');
+    }).catch(function(e){ bo.disabled = false; $('mapaOrgMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+  var bd = $('btMapaDesfazer');
+  if(bd) bd.addEventListener('click', function(){
+    if(!window.confirm('Desfazer o mapa pela Biblioteca e voltar aos temas de antes? As questões e respostas voltam para os temas antigos.')) return;
+    bd.disabled = true;
+    api('mapaDesfazer', {disciplinaId: TEMAS.disc}).then(function(){ TEMAS.abertos = {}; return recarregarTemas('Voltou aos temas de antes.'); }).catch(function(e){ bd.disabled = false; $('msgTemas').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
 }
 // Recatalogar: mostra a proposta da IA ("antes → depois") e grava só o que o professor marcar
 // ---- organização extra: ordem, o que cai, aulas, nível, apagar ----
 function setasTema(id){ return '<span style="display:inline-flex;flex-direction:column;gap:2px;margin-right:6px"><button type="button" class="secundario mini" data-ordem="' + esc(id) + '" data-dir="cima" title="subir" aria-label="subir" style="padding:0 7px;line-height:1.3">↑</button><button type="button" class="secundario mini" data-ordem="' + esc(id) + '" data-dir="baixo" title="descer" aria-label="descer" style="padding:0 7px;line-height:1.3">↓</button></span>'; }
-function maisSubtema(t){
+function maisSubtema(t, noMapa){
   var aulas = (TEMAS.r.aulasDisc || []);
   return '<details class="maisTema" style="flex-basis:100%;width:100%;margin:6px 0 2px"><summary class="link" style="font-size:13px">⋯ mais</summary><div style="padding:8px 0 4px">' +
     '<label class="rot" for="desc_' + esc(t.id) + '">O que cai neste subtema <span class="aviso" style="font-weight:normal">(vai para os prompts das questões; diga também o que NÃO cobrar)</span></label>' +
@@ -4816,7 +4910,8 @@ function maisSubtema(t){
     '<p class="rot" style="margin:10px 0 4px">Aulas que tratam deste subtema</p>' +
     (aulas.length ? '<div style="max-height:180px;overflow:auto;border:1px solid var(--linha);border-radius:8px;padding:4px 8px">' + aulas.map(function(a){ return '<label style="display:flex;gap:6px;align-items:flex-start;font-size:13.5px;margin:3px 0;cursor:pointer"><input type="checkbox" data-aulatema="' + esc(t.id) + '" value="' + esc(a.id) + '"' + ((t.aulaIds || []).indexOf(a.id) !== -1 ? ' checked' : '') + ' style="width:15px;height:15px;margin-top:2px"> Aula ' + a.numero + ' · ' + esc(a.tema || 'sem tema') + '</label>'; }).join('') + '</div>' +
       '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-salvaraulas="' + esc(t.id) + '">Salvar as aulas</button><span class="aviso">o estudo dirigido só libera o subtema que tem aula dada ligada</span></div>' : '<p class="aviso">Ainda não há aulas nesta disciplina.</p>') +
-    '<div class="botoes" style="margin-top:10px"><button type="button" class="secundario mini" data-promover="' + esc(t.id) + '">⬆ Virar grande tema</button><button type="button" class="secundario mini" data-apagartema="' + esc(t.id) + '">Apagar</button></div></div></details>';
+    (noMapa ? (noMapa === 'fora' ? '<div class="botoes" style="margin-top:10px"><button type="button" class="secundario mini" data-apagartema="' + esc(t.id) + '">Apagar</button></div>' : '') + '</div></details>' :
+    '<div class="botoes" style="margin-top:10px"><button type="button" class="secundario mini" data-promover="' + esc(t.id) + '">⬆ Virar grande tema</button><button type="button" class="secundario mini" data-apagartema="' + esc(t.id) + '">Apagar</button></div></div></details>');
 }
 function maisGrupo(g, grupos){
   if(g.subtemas.length) return '';
@@ -4952,7 +5047,7 @@ function ligarPainelTemas(){
       el.querySelectorAll('option[value="' + x.t.id + '"]').forEach(function(o){ o.remove(); });
     }).catch(function(e){ s.disabled = false; s.value = ''; erro(e); });
   }); });
-  $('btNovoTema').addEventListener('click', function(){
+  if($('btNovoTema')) $('btNovoTema').addEventListener('click', function(){
     var n = $('novoTema').value.trim(), como = $('novoComo').value; if(!n) return;
     var t = como === 'grupo' ? {nome: n, grupo: true} : {nome: n, pai: como};
     api('salvarTema', {disciplinaId: discId, tema: t}).then(function(x){
