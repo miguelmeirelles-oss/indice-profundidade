@@ -326,6 +326,33 @@ function api(acao, dados, tentativa){
 
 /* Resumo ao entrar: o que as tarefas automáticas fizeram (terminou, parou pela cota e quando volta, falhou).
    Some ao clicar em "Entendido"; continua guardado em Mensagens → Para você. */
+
+function chipIAForte(){
+  api('claudeConfig', {}).then(function(c){
+    if(!c || !c.professores || !c.permitido) return;   // só o administrador (e com o Claude liberado)
+    var b = document.getElementById('chipIAForte');
+    if(!b){
+      b = document.createElement('button'); b.type = 'button'; b.id = 'chipIAForte';
+      b.style.cssText = 'position:fixed;right:12px;bottom:12px;z-index:9999;border:1px solid #c9d3e3;border-radius:999px;padding:7px 12px;font-size:13px;background:#fff;color:#1f2a44;box-shadow:0 2px 8px rgba(0,0,0,.15);cursor:pointer';
+      document.body.appendChild(b);
+      b.addEventListener('click', function(){
+        if(b.dataset.so){ alert(b.dataset.so); return; }
+        var nova = b.dataset.pref === 'claude' ? 'gemini' : 'claude';
+        b.disabled = true; b.textContent = 'trocando…';
+        api('salvarClaudeConfig', {dados: {preferir: nova}}).then(function(x){ pintar(x); }).catch(function(e){ b.disabled = false; pintar(c); alert(e.message); });
+      });
+    }
+    var pintar = function(x){
+      c = x; b.disabled = false; b.dataset.pref = x.preferir;
+      var so = x.usarClaude && !x.usarGemini ? 'Só o Claude está ligado para as funções fortes: o Gemini foi desligado em Configurações → Claude nas funções fortes. Para poder trocar, ligue os dois lá.'
+        : !x.usarClaude ? (x.configurado ? 'Só o Gemini está ligado para as funções fortes: o Claude foi desligado em Configurações → Claude nas funções fortes. Para poder trocar, ligue os dois lá.' : 'Só o Gemini está disponível: a rotina do Claude ainda não foi configurada (Configurações → Claude nas funções fortes).') : '';
+      if(so) b.dataset.so = so; else delete b.dataset.so;
+      b.innerHTML = '🧠 IA forte: <b>' + (x.preferir === 'claude' ? 'Claude' : 'Gemini') + '</b>' + (so ? ' <span style="opacity:.6">(só este)</span>' : ' ⇄');
+      b.title = so || ((x.preferir === 'claude' ? 'Gerar/corrigir provas usa primeiro o Claude da sua assinatura (se falhar, o Gemini).' : 'Gerar/corrigir provas usa primeiro o Gemini (se falhar, o Claude).') + ' Clique para trocar.');
+    };
+    pintar(c);
+  }).catch(function(){});
+}
 function mostrarAvisosSistema(){
   api('avisosSistema', {}).then(function(r){
     if(!r.avisos.length || document.getElementById('avisosSis')) return;
@@ -375,6 +402,7 @@ function iniciar(){
     $('linkSair').addEventListener('click', function(e){ e.preventDefault(); desligarAvisosAoSair(token); try{ localStorage.removeItem('ip_token'); sessionStorage.removeItem('ip_token'); }catch(x){} location.href = 'index.html'; });
     $('btMensagens').classList.remove('oculto');
     if(r.professor) mostrarAvisosSistema();
+    if(r.professor) chipIAForte();
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
