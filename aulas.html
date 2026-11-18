@@ -1611,7 +1611,7 @@ function htmlRoteiro(m){
   return '<details class="roteiro" style="margin-top:6px"><summary class="link">📅 Ver tudo o que falta até a prova (' + r.length + ' assunto' + (r.length > 1 ? 's' : '') + ')</summary>' +
     '<p class="aviso" style="margin:6px 0">' + cab + ' Não precisa ser todo dia: quando você voltar, o plano continua de onde parou. ▶ = assistir a aula · ✍ = responder questões.</p>' +
     ses.map(function(x, i){ return '<div style="margin:6px 0;padding:6px 10px;border-left:3px solid ' + (i ? 'var(--linha)' : '#E8B923') + '"><b style="font-size:14px">' + (i ? 'Sessão ' + (i + 1) : 'Sessão 1 · próxima') + '</b>' +
-      x.itens.map(function(t){ return '<div style="font-size:14px;padding:2px 0">' + (t.novo ? '▶ ✍ ' : '✍ ') + esc(t.nome) + (t.aula ? '<span class="aviso"> · aula "' + esc(t.aula) + '"</span>' : '') + '</div>'; }).join('') + '</div>'; }).join('') + '</details>';
+      x.itens.map(function(t){ return '<div style="font-size:14px;padding:2px 0">' + (t.novo ? '▶ ✍ ' : '✍ ') + esc(t.nome) + (t.aula ? '<span class="aviso"> · aula "' + esc(t.aula) + '"</span>' : '') + (t.opcional ? ' <span class="tag" style="font-size:11px">se sobrar tempo</span>' : '') + '</div>'; }).join('') + '</div>'; }).join('') + '</details>';
 }
 function htmlGrupoTarefa(g, mi){
   if(g.outro){
@@ -2071,7 +2071,7 @@ function desenharHub(m){
       (aulas.length ? '<button type="button" class="link" data-modo="aulas">▶ Aulas desta prova (' + aulas.length + ')</button>' : '') + '</div>' +
     '<div id="hubPainel"></div>' +
     (temas.length ? '<p style="margin:16px 0 4px"><b>Assuntos da ' + esc(mm.prova.titulo) + '</b> <span class="aviso">· na ordem das aulas · a cor mostra o seu domínio · deslize para ver todos</span></p>' +
-      '<div class="hubFaixa" id="hubFaixa">' + temas.map(function(t, i){ return '<button type="button" class="hubChip" data-chip="' + i + '"><span class="pt" style="background:' + corDom(domT(t)) + '"></span>' + esc(t.nome) + '</button>'; }).join('') + '</div>' +
+      '<div class="hubFaixa" id="hubFaixa">' + temas.map(function(t, i){ return '<button type="button" class="hubChip" data-chip="' + i + '"' + (t.relev === 'baixa' ? ' style="opacity:.6" title="pouco cobrado na profissão"' : '') + '><span class="pt" style="background:' + corDom(domT(t)) + '"></span>' + (t.relev === 'alta' ? '🔑 ' : '') + esc(t.nome) + '</button>'; }).join('') + '</div>' +
       '<div id="hubTema"></div>' : '<p class="aviso" style="margin-top:14px">Os assuntos aparecem depois das aulas gravadas.</p>') +
     htmlModoRevisao(mm, mi) +
     '<div class="botoes" style="margin-top:12px"><button type="button" class="secundario mini" id="hubDiag">🔎 Diagnóstico</button><button type="button" class="secundario mini" id="hubResp">📒 Minhas respostas</button><button type="button" class="secundario mini" id="hubTodas">🎯 Todas as matérias</button></div></div>';
@@ -2125,6 +2125,8 @@ function desenharHub(m){
     $('hubTema').innerHTML = '<div class="hubCartao" id="hubCartao">' +
       '<div class="aviso">' + (idx + 1) + ' de ' + temas.length + (t.grupo ? ' · ' + esc(t.grupo) : '') + '</div>' +
       '<div style="font-weight:bold;font-size:17px;margin:2px 0 6px">' + (t.importante ? '⭐ ' : '') + esc(t.nome) + '</div>' +
+      (t.relev === 'baixa' ? '<div class="aviso" style="margin:0 0 6px">📉 Pouco cobrado na profissão: estude se sobrar tempo.' + (t.relevMotivo ? ' ' + esc(t.relevMotivo) : '') + '</div>'
+        : t.relev === 'alta' ? '<div class="aviso" style="margin:0 0 6px">🔑 Assunto central.' + (t.relevMotivo ? ' ' + esc(t.relevMotivo) : '') + '</div>' : '') +
       '<div class="barraDom"><i style="width:' + (domT(t) || 0) + '%;background:' + corDom(domT(t)) + '"></i></div>' +
       '<div class="aviso">' + [t.dominio !== null ? 'estudo ' + dezEst(t.dominio) : 'sem questões do estudo', t.sala !== null ? 'em aula ' + dezEst(t.sala) : ''].filter(Boolean).join(' · ') + '</div>' +
       '<div class="hubAcoes">' +
@@ -4755,8 +4757,10 @@ function desenharTemas(){
     var opcoes = (g ? [['herdar', 'segue o grande tema (' + NOMES_IMP[g.importancia] + ')']] : []).concat([['alta', NOMES_IMP.alta], ['normal', NOMES_IMP.normal], ['nao', NOMES_IMP.nao]]);
     var det = detalheDesemp(t.desempenho);
     return '<div class="temaLinha subtema" data-sub="' + esc(t.id) + '">' + setasTema(t.id) + '<span class="nome">' + esc(t.nome) + (t.prova && g && g.prova && g.prova !== t.prova ? ' <span class="tag t-azul">' + esc(t.prova) + '</span>' : t.prova && !g ? ' <span class="tag t-azul">' + esc(t.prova) + '</span>' : '') + (t.critico ? ' <span class="tag t-err">crítico</span>' : '') +
+      (t.relevancia === 'alta' ? ' <span class="tag" style="background:#e6f4ea;color:#1a7a3c;border-color:#1a7a3c">🔑 central</span>' : t.relevancia === 'baixa' ? ' <span class="tag t-warn">📉 pouco cobrado</span>' : '') +
       '<br><span class="aviso" style="font-weight:normal">' + (t.aulas.length ? 'aula' + (t.aulas.length > 1 ? 's ' : ' ') + t.aulas.join(', ') : 'ainda sem aula neste semestre') + (det ? ' · ' + det : '') + '</span>' +
-      (t.descricao ? '<br><span class="aviso" style="font-weight:normal;font-style:italic">o que cai: ' + esc(t.descricao) + '</span>' : '') + '</span>' +
+      (t.descricao ? '<br><span class="aviso" style="font-weight:normal;font-style:italic">o que cai: ' + esc(t.descricao) + '</span>' : '') +
+      (t.relevMotivo ? '<br><span class="aviso" style="font-weight:normal">relevância (IA): ' + ({alta: 'central', media: 'média', baixa: 'pouco cobrado'}[t.relevancia] || t.relevancia) + ' · ' + esc(t.relevMotivo) + '</span>' : '') + '</span>' +
       chipDesemp(t.desempenho) +
       '<select data-imp="' + esc(t.id) + '" aria-label="Prioridade">' + opcoes.map(function(o){ return '<option value="' + o[0] + '"' + (t.importancia === o[0] || (!g && t.importancia === 'herdar' && o[0] === 'normal') ? ' selected' : '') + '>' + o[1] + '</option>'; }).join('') + '</select>' +
       '<button type="button" class="secundario mini" data-renomear="' + esc(t.id) + '">Renomear</button>' +
