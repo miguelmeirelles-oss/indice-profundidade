@@ -752,7 +752,8 @@ function iniciar(){
     if(r.professor) chipIAForte();
     if(r.professor) api('auditorListar').then(function(a){
       var l = (a && a.relatorios) || [], pub = a && a.publicacao;
-      var nov = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '');
+      var venc = ((a && a.tokens) || []).filter(function(t){ return t.dias <= 30; });
+      var nov = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '') + (venc.length ? '|token ' + venc.map(function(t){ return t.vence; }).join(',') : '');
       window.NOVIDADE_AUDITOR_FORA = !!nov && vistoCfg()['cxAuditor'] !== nov;
       atualizarBolinhaCfg();
     }).catch(function(){});
@@ -5839,10 +5840,14 @@ function desenharClaude(c){
 function desenharAuditor(res){
   var cx = $('cxAuditor'); if(!cx) return; cx.hidden = false;
   var l = Array.isArray(res) ? res : (res.relatorios || []), pub = res.publicacao;
-  cx.dataset.novidade = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '');
+  var vencendo = (res.tokens || []).filter(function(t){ return t.dias <= 30; });
+  cx.dataset.novidade = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '') + (vencendo.length ? '|token ' + vencendo.map(function(t){ return t.vence; }).join(',') : '');
+  var avisoToken = vencendo.map(function(t){ return '<div class="erro" style="margin:6px 0">⚠ O <b>' + esc(t.nome) + '</b> ' + (t.dias < 0 ? 'venceu em ' + esc(t.vence) + ': a publicação automática parou.' : 'vence em <b>' + t.dias + ' dia(s)</b> (' + esc(t.vence) + ').') +
+    ' Para renovar: no GitHub, Settings → Developer settings → Personal access tokens → <i>Regenerate</i> (1 ano) e ' + esc(t.onde) + '. Se preferir, peça ao Claude Code que ele guia.</div>'; }).join('') +
+    (res.tokens || []).filter(function(t){ return t.dias > 30; }).map(function(t){ return '<p class="aviso" style="margin:2px 0">🔑 ' + esc(t.nome) + ': vale até ' + esc(t.vence) + '.</p>'; }).join('');
   var ghBox = '<details class="aviso" style="margin:6px 0 10px"' + (res.github ? '' : ' open') + '><summary class="link">Publicação automática pelo GitHub: ' + (res.github ? '<b>ligada</b> (token …' + esc(res.githubFim) + ')' : '<b>desligada</b>') + '</summary>' +
     '<p style="margin:6px 0">Com o token, <b>✅ Aprovar</b> aceita a correção no repositório e o robô do GitHub confere, testa, publica e, se o servidor não responder, volta sozinho à versão anterior. Sem o token, aprovar só marca (e a publicação é pedida no chat).</p>' +
-    '<input type="password" id="audGh" placeholder="github_pat_…' + (res.github ? ' (deixe em branco e salve para desligar)' : '') + '" autocomplete="off" style="max-width:420px"> <button type="button" class="mini secundario" id="audGhSalvar">Salvar token</button></details>';
+    '<input type="password" id="audGh" placeholder="github_pat_…' + (res.github ? ' (deixe em branco e salve para desligar)' : '') + '" autocomplete="off" style="max-width:420px"> <button type="button" class="mini secundario" id="audGhSalvar">Salvar token</button></details>' + avisoToken;
   var pubBox = pub ? '<p style="margin:0 0 10px">Última publicação pelo robô: ' + (pub.estado === 'ok' ? '✅ publicada' : pub.estado === 'falhou' ? '❌ <b>não publicou</b> (nada mudou no ar, ou voltou sozinho)' : pub.estado === 'andamento' ? '⏳ em andamento' : pub.estado === 'nenhuma' ? 'nenhuma ainda' : '⚠ ' + esc(pub.erro || '')) +
     (pub.em ? ' · ' + esc(pub.em) : '') + (pub.url ? ' · <a href="' + esc(pub.url) + '" target="_blank" rel="noopener">detalhes</a>' : '') +
     (pub.estado === 'ok' || pub.estado === 'falhou' ? ' · <button type="button" class="link" id="audVoltar">↩ voltar à versão anterior</button>' : '') + '</p>' : '';
