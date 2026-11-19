@@ -53,7 +53,7 @@ var PROMPT_TRILHA = [
 "",
 "CENA DE MOLÉCULAS (parte de baixo da tela; mostre o que a fala está explicando, como num desenho animado do fenômeno):",
 "- Declare no bloco: \"cena\": {\"elementos\": [ … ]}. Coordenadas da cena: x de 0 a 100 (esquerda → direita), y de 0 a 60 (topo → base). Elementos começam escondidos.",
-"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
+"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos), \"acido_graxo\" (ácido graxo em zigue-zague com a cabeça COOH; \"forma\": \"saturado\" ou \"trans\" = cadeia reta, \"cis\" = dobrada na dupla ligação; \"unidades\": nº de carbonos, 4 a 24; \"angulo\": giro em graus — várias cadeias retas lado a lado mostram o empacotamento compacto da gordura sólida, as cis dobradas mostram o empacotamento frouxo do óleo). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
 "- Em cada passo, \"cena_acoes\" (mesma regra de \"atraso\"; cada passo herda a cena dos anteriores até um \"limpar_cena\"):",
 "  {\"tipo\":\"aparecer\",\"elemento\":\"id\"} · {\"tipo\":\"sumir\",\"elemento\":\"id\"} · {\"tipo\":\"mover\",\"elemento\":\"id\",\"para\":[x,y],\"duracao\":1500}",
 "  {\"tipo\":\"destacar\",\"elemento\":\"id\"} · {\"tipo\":\"danificar\",\"alvo\":\"id\",\"rotulo\":\"texto\"} · {\"tipo\":\"vagar\",\"elemento\":\"id\",\"agitacao\":0.1}",
@@ -172,14 +172,15 @@ var PROMPT_TRILHA = [
 ].join('\n');
 
 // pedido de AJUSTE de uma aula já pronta (o professor anota o que mudar em cada passo)
-function promptAjuste(trilha, notas){
+function promptAjuste(trilha, notas, direto){
   var ini = PROMPT_TRILHA.indexOf('REGRA PRINCIPAL'); if(ini < 0) ini = PROMPT_TRILHA.indexOf('REGRAS DE CONTEÚDO');
   var fim = PROMPT_TRILHA.indexOf('============================== MATERIAL DAS AULAS');
   return [
     'Você vai AJUSTAR uma AULA EM TRILHA já pronta da plataforma "Aula por IA" (aula interativa: slides com gráficos que se animam, narrada por voz de IA, com dúvidas por voz).',
     'Abaixo vêm as regras do formato (as mesmas de quando a aula foi criada), o JSON ATUAL da aula e os AJUSTES que o professor pediu, passo a passo.',
     'Faça SÓ o que foi pedido e mantenha o resto igual: os mesmos ids de blocos e a mesma ordem dos passos (assim a narração já gravada continua valendo onde a fala não mudou).',
-    'Primeiro mostre ao professor, em poucas linhas, o que você vai mudar em cada passo (se a sua interface permitir, mostre também uma prévia visual do gráfico dos passos alterados). Depois devolva o JSON COMPLETO da aula ajustada, num bloco de código ou arquivo .json.',
+    direto ? 'Devolva SOMENTE o JSON COMPLETO da aula ajustada (sem texto antes ou depois, sem bloco de código): ele é salvo direto como nova versão da aula.'
+      : 'Primeiro mostre ao professor, em poucas linhas, o que você vai mudar em cada passo (se a sua interface permitir, mostre também uma prévia visual do gráfico dos passos alterados). Depois devolva o JSON COMPLETO da aula ajustada, num bloco de código ou arquivo .json.',
     '', PROMPT_TRILHA.slice(ini, fim).replace(/\n?REVISÃO COM O PROFESSOR[^\n]*\n/, '\n').replace(/\n?DIVIDIR EM AULAS CURTAS[^\n]*\n/, '\n').replace(/\n?LOTE:[^\n]*\n/, '\n'),
     '============================== AJUSTES PEDIDOS PELO PROFESSOR ==============================', notas,
     '', '============================== JSON ATUAL DA AULA ==============================', JSON.stringify(trilha, null, 1)
@@ -595,8 +596,8 @@ function abrirPlayer(t){
     (MODO === 'prof' ? '<details class="convite" id="tr_ajusteBox" style="margin-top:14px"><summary class="link"><b>📝 Pedir ajustes à IA</b> (anote o que mudar em cada passo)</summary>' +
       '<label class="aviso" id="tr_rotAjuste" for="txtAjuste" style="display:block;margin-top:8px"></label><textarea id="tr_txtAjuste" style="min-height:60px;font-family:inherit;font-size:14px" placeholder="ex.: a seta tem que apontar para a curva de cima; fala longa demais; trocar o exemplo do leite por café"></textarea>' +
       '<label class="aviso" for="txtAjusteGeral" style="display:block;margin-top:6px">Ajuste na aula toda (opcional)</label><input type="text" id="tr_txtAjusteGeral" style="width:100%" placeholder="ex.: falas mais curtas; mais um bloco sobre histerese">' +
-      '<div class="botoes"><button class="mini" id="tr_btCopiarAjuste">📋 Copiar pedido de ajustes para a IA</button><button class="mini secundario" id="tr_btLimparAjuste">Limpar anotações</button><span id="tr_nAjustes" class="aviso"></span></div>' +
-      '<p class="aviso" style="margin-bottom:0">Cole na sua IA (de preferência na mesma conversa em que a aula foi criada). Depois traga o JSON corrigido em <b>Criar uma aula em trilha → passo 3</b> e salve como <b>nova versão</b> desta aula. Se a IA errar, volte para a versão anterior em <b>🕘 Versões desta aula</b>.</p><div id="tr_msgAjuste"></div></details>' : '') +
+      '<div class="botoes"><button class="mini" id="tr_btAplicarAjuste">✨ Aplicar os ajustes com a IA</button><button class="mini secundario" id="tr_btCopiarAjuste">📋 Copiar o pedido (usar em outra IA)</button><button class="mini secundario" id="tr_btLimparAjuste">Limpar anotações</button><span id="tr_nAjustes" class="aviso"></span></div>' +
+      '<p class="aviso" style="margin-bottom:0"><b>✨ Aplicar</b>: a IA forte escolhida (o chip 🧠 no canto) refaz a aula e ela é salva como <b>nova versão</b>; leva de 1 a 5 minutos. Se não gostar, volte para a anterior em <b>🕘 Versões desta aula</b>. <b>📋 Copiar</b>: para colar em outra IA e trazer o JSON em <b>Criar uma aula em trilha → passo 3</b>.</p><div id="tr_msgAjuste"></div></details>' : '') +
     (MODO === 'prof' && !t.previa ? '<details class="convite" id="tr_versoesBox" style="margin-top:14px"><summary class="link"><b>🕘 Versões desta aula</b> (voltar para uma anterior, comentar, apagar)</summary><div id="tr_versoesCorpo"></div></details>' : '') +
     (MODO === 'prof' && !t.previa && tr.video ? '<details class="convite" id="tr_notaBox" style="margin-top:14px"><summary class="link"><b>📌 Nota do professor neste trecho</b> (aparece para o aluno nesse momento do vídeo; serve para corrigir ou completar sem refazer o vídeo)</summary>' +
       '<label class="aviso" id="tr_rotNota" for="txtNota" style="display:block;margin-top:8px"></label><textarea id="tr_txtNota" maxlength="400" style="min-height:56px;font-family:inherit;font-size:14px" placeholder="ex.: atenção: aqui o vídeo diz 0,7, mas o certo é 0,6"></textarea><div class="botoes"><button class="mini" id="tr_btNota">Salvar a nota</button><span id="tr_msgNota" class="aviso"></span></div></details>' : '') +
@@ -609,6 +610,19 @@ function abrirPlayer(t){
     $('txtAjuste').addEventListener('input', function(){ var a = lerAjustes(), k = blocoAtual().id + ':' + P.passo; if(this.value.trim()) a[k] = this.value.trim(); else delete a[k]; gravarAjustes(a); mostrarAjuste(); });
     $('txtAjusteGeral').addEventListener('input', function(){ var a = lerAjustes(); if(this.value.trim()) a.geral = this.value.trim(); else delete a.geral; gravarAjustes(a); mostrarAjuste(); });
     $('btLimparAjuste').addEventListener('click', function(){ if(confirm('Apagar as anotações de ajuste desta aula?')){ gravarAjustes({}); $('txtAjusteGeral').value = ''; mostrarAjuste(); } });
+    $('btAplicarAjuste').addEventListener('click', function(){
+      var l = textoAjustes(), bt = this;
+      if(!l.length){ $('msgAjuste').innerHTML = '<div class="erro">Anote pelo menos um ajuste (em algum passo ou na aula toda).</div>'; return; }
+      bt.disabled = true; var t0 = Date.now(), rel = setInterval(function(){ var s = Math.round((Date.now() - t0) / 1000); if($('msgAjuste')) $('msgAjuste').innerHTML = '<p class="carregando">A IA está refazendo a aula com ' + l.length + ' ajuste(s)… ' + Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2) + ' (pode levar até 5 min; não feche a página)</p>'; }, 1000);
+      api('trilhaAjustarIA', {id: T.id, pedido: promptAjuste(T.trilha, l.join('\n'), true), comentario: 'Ajuste pela IA: ' + l.join(' | ').slice(0, 400), motorAcoes: acoesDoMotor()}).then(function(r){
+        clearInterval(rel); bt.disabled = false;
+        if(r.erros && r.erros.length){ $('msgAjuste').innerHTML = '<div class="erro"><b>A IA devolveu uma aula com problemas; nada foi salvo.</b> Tente de novo ou use 📋 Copiar.<br>' + r.erros.slice(0, 8).map(esc).join('<br>') + '</div>'; return; }
+        gravarAjustes({});
+        var aviso = (r.avisos && r.avisos.length) ? '<br><span class="aviso">' + r.avisos.slice(0, 5).map(esc).join('<br>') + '</span>' : '';
+        abrirTrilha(T.id);
+        setTimeout(function(){ if($('msgAjuste')){ $('ajusteBox').open = true; $('msgAjuste').innerHTML = '<div class="ok">✓ Ajustes aplicados por ' + esc(r.modelo || 'IA') + ': salva a versão ' + r.versao + '. Não gostou? Volte em 🕘 Versões desta aula.' + aviso + '</div>'; } }, 1500);
+      }).catch(function(e){ clearInterval(rel); bt.disabled = false; $('msgAjuste').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    });
     $('btCopiarAjuste').addEventListener('click', function(){
       var l = textoAjustes();
       if(!l.length){ $('msgAjuste').innerHTML = '<div class="erro">Anote pelo menos um ajuste (em algum passo ou na aula toda).</div>'; return; }
@@ -1419,6 +1433,20 @@ var Cena = (function () {
         mk("path", { d: pth, stroke: cor, "stroke-width": .5, fill: "none" }, g);
         for (let i = 0; i < n; i++) { const gg = mk("g", { transform: `translate(${((i - (n - 1) / 2) * dx).toFixed(2)},${((i % 2 ? .9 : -.9) * tam).toFixed(2)})` }, g); hexagono(gg, r, cor); }
         if (d.rotulo) rot(g, 0, 4.6 * tam, d.rotulo, 3.3);
+      }
+      else if (t === "acido_graxo") {   // cadeia em zigue-zague: saturado e trans retos; cis com dobra na dupla ligação
+        const n = Math.max(4, Math.min(24, d.unidades || 16)), L = 1.5 * tam, forma = d.forma || "saturado", cor = PAL[d.cor] || PAL.cadeia, meio = Math.floor(n / 2) - 1;
+        const pts = []; let x = 0, y = 0, dir = 0;
+        for (let i = 0; i < n; i++) { pts.push([x, y]); if (forma === "cis" && i === meio) dir += 60; const a = (dir + (i % 2 ? -30 : 30)) * Math.PI / 180; x += L * Math.cos(a); y += L * Math.sin(a); }
+        const mx = pts.reduce((s, p) => s + p[0], 0) / n, my = pts.reduce((s, p) => s + p[1], 0) / n;
+        const gg = mk("g", { transform: "rotate(" + (d.angulo || 0) + ")" }, g);
+        mk("path", { d: pts.map((p, i) => (i ? "L" : "M") + (p[0] - mx).toFixed(2) + "," + (p[1] - my).toFixed(2)).join(""), stroke: cor, "stroke-width": .6 * tam, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, gg);
+        if (forma !== "saturado") {   // a dupla ligação: um segundo traço paralelo, do lado de dentro
+          const a = pts[meio], b = pts[meio + 1], dx = b[0] - a[0], dy = b[1] - a[1], k = .55 * tam / Math.hypot(dx, dy), ox = -dy * k, oy = dx * k;
+          mk("path", { d: "M" + (a[0] - mx + ox + dx * .15).toFixed(2) + "," + (a[1] - my + oy + dy * .15).toFixed(2) + "L" + (b[0] - mx + ox - dx * .15).toFixed(2) + "," + (b[1] - my + oy - dy * .15).toFixed(2), stroke: cor, "stroke-width": .45 * tam, fill: "none", "stroke-linecap": "round" }, gg);
+        }
+        mk("circle", { cx: (pts[0][0] - mx).toFixed(2), cy: (pts[0][1] - my).toFixed(2), r: 1.3 * tam, fill: PAL.o2, opacity: .9 }, gg);   // a "cabeça" (COOH)
+        if (d.rotulo) rot(g, 0, 7.5 * tam, d.rotulo, 3.2);
       }
       else if (t === "rede") {
         const w = d.w || 30, h = d.h || 24, cor = PAL[d.cor] || PAL.cadeia;
