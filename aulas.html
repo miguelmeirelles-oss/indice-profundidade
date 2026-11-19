@@ -509,6 +509,14 @@
     <div id="pMsgs" class="oculto"><div id="painelMsgsDentro"></div></div>
 
     <div id="pCfg" class="oculto">
+      <style>
+        #pCfg .caixa > h2.cabRec { cursor: pointer; user-select: none; margin-bottom: 0; }
+        #pCfg .caixa > h2.cabRec::before { content: '▸ '; color: var(--cinza, #6b7280); }
+        #pCfg .caixa.aberta > h2.cabRec::before { content: '▾ '; }
+        #pCfg .caixa.aberta > h2.cabRec { margin-bottom: 8px; }
+        #pCfg .caixa.recolhida > *:not(h2.cabRec) { display: none !important; }
+        #pCfg .caixa.recolhida { padding-top: 12px; padding-bottom: 12px; }
+      </style>
       <div class="caixa" id="cfgAudios"></div>
       <div class="caixa">
         <h2>QR code do cadastro</h2>
@@ -5854,7 +5862,33 @@ function desenharAuditor(res){
     b.disabled = true; api('auditorDesfazer', {id: b.dataset.audesf}).then(desenharAuditor).catch(function(e){ b.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   }); });
 }
+// ---- Configurações: caixas recolhidas ----
+function recolherCaixasCfg(){
+  var pc = $('pCfg'); if(!pc) return;
+  var abertas = {}; try { abertas = JSON.parse(localStorage.getItem('cfgAbertas') || '{}'); } catch(e){}
+  Array.prototype.forEach.call(pc.querySelectorAll(':scope > .caixa'), function(cx){
+    var h2 = cx.querySelector(':scope > h2'); if(!h2) return;
+    var chave = cx.id || h2.textContent.replace(/[^\wÀ-ú ]/g, '').trim().slice(0, 40), alerta = /⚠/.test(h2.textContent);
+    if(!h2.classList.contains('cabRec')){
+      h2.classList.add('cabRec'); h2.title = 'Clique para abrir ou fechar';
+      h2.addEventListener('click', function(ev){
+        if(ev.target.closest('details, button, a, input')) return;   // o "?" de ajuda e links dentro do título continuam funcionando
+        var abrir = cx.classList.contains('recolhida');
+        cx.classList.toggle('recolhida', !abrir); cx.classList.toggle('aberta', abrir);
+        try { var a = JSON.parse(localStorage.getItem('cfgAbertas') || '{}'); a[chave] = abrir; localStorage.setItem('cfgAbertas', JSON.stringify(a)); } catch(e){}
+      });
+    }
+    var aberta = alerta || abertas[chave] === true;
+    cx.classList.toggle('recolhida', !aberta); cx.classList.toggle('aberta', aberta);
+  });
+}
+(function(){
+  var pc = document.getElementById('pCfg'); if(!pc || !window.MutationObserver) return;
+  var t = null;
+  new MutationObserver(function(){ clearTimeout(t); t = setTimeout(recolherCaixasCfg, 30); }).observe(pc, { childList: true, subtree: true });
+})();
 function desenharConfigGeral(c){
+  setTimeout(recolherCaixasCfg, 0);
   api('claudeConfig').then(desenharClaude).catch(function(){});
   api('auditorListar').then(desenharAuditor).catch(function(){});
   $('cfgRecAuto').checked = !!c.recomendacoes_auto;
