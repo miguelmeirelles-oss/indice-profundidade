@@ -88,13 +88,13 @@
       else if (t === "acido_graxo") {   // cadeia em zigue-zague: saturado e trans retos; cis com dobra na dupla ligação
         const n = Math.max(4, Math.min(24, d.unidades || 16)), L = 1.5 * tam, forma = d.forma || "saturado", cor = PAL[d.cor] || PAL.cadeia, meio = Math.floor(n / 2) - 1;
         const pts = []; let x = 0, y = 0, dir = 0;
-        for (let i = 0; i < n; i++) { pts.push([x, y]); if (forma === "cis" && i === meio) dir += 60; const a = (dir + (i % 2 ? -30 : 30)) * Math.PI / 180; x += L * Math.cos(a); y += L * Math.sin(a); }
+        for (let i = 0; i < n; i++) { pts.push([x, y]); if (forma === "cis" && i === meio) dir += 38; const a = (dir + (i % 2 ? -30 : 30)) * Math.PI / 180; x += L * Math.cos(a); y += L * Math.sin(a); }
         const mx = pts.reduce((s, p) => s + p[0], 0) / n, my = pts.reduce((s, p) => s + p[1], 0) / n;
         const gg = mk("g", { transform: "rotate(" + (d.angulo || 0) + ")" }, g);
         mk("path", { d: pts.map((p, i) => (i ? "L" : "M") + (p[0] - mx).toFixed(2) + "," + (p[1] - my).toFixed(2)).join(""), stroke: cor, "stroke-width": .6 * tam, fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, gg);
         if (forma !== "saturado") {   // a dupla ligação: um segundo traço paralelo, do lado de dentro
-          const a = pts[meio], b = pts[meio + 1], dx = b[0] - a[0], dy = b[1] - a[1], k = .55 * tam / Math.hypot(dx, dy), ox = -dy * k, oy = dx * k;
-          mk("path", { d: "M" + (a[0] - mx + ox + dx * .15).toFixed(2) + "," + (a[1] - my + oy + dy * .15).toFixed(2) + "L" + (b[0] - mx + ox - dx * .15).toFixed(2) + "," + (b[1] - my + oy - dy * .15).toFixed(2), stroke: cor, "stroke-width": .45 * tam, fill: "none", "stroke-linecap": "round" }, gg);
+          const a = pts[meio], b = pts[meio + 1], dx = b[0] - a[0], dy = b[1] - a[1], k = .75 * tam / Math.hypot(dx, dy), ox = -dy * k, oy = dx * k;
+          mk("path", { d: "M" + (a[0] - mx + ox + dx * .15).toFixed(2) + "," + (a[1] - my + oy + dy * .15).toFixed(2) + "L" + (b[0] - mx + ox - dx * .15).toFixed(2) + "," + (b[1] - my + oy - dy * .15).toFixed(2), stroke: cor, "stroke-width": .5 * tam, fill: "none", "stroke-linecap": "round" }, gg);
         }
         mk("circle", { cx: (pts[0][0] - mx).toFixed(2), cy: (pts[0][1] - my).toFixed(2), r: 1.3 * tam, fill: PAL.o2, opacity: .9 }, gg);   // a "cabeça" (COOH)
         if (d.rotulo) rot(g, 0, 7.5 * tam, d.rotulo, 3.2);
