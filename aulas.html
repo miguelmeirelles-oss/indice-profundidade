@@ -516,6 +516,9 @@
         #pCfg .caixa.aberta > h2.cabRec { margin-bottom: 8px; }
         #pCfg .caixa.recolhida > *:not(h2.cabRec) { display: none !important; }
         #pCfg .caixa.recolhida { padding-top: 12px; padding-bottom: 12px; }
+        #pCfg .caixa.novidade > h2.cabRec { color: #c62828; }
+        #pCfg .caixa.novidade > h2.cabRec::after { content: '  ● novo'; font-size: 12px; font-weight: bold; color: #c62828; }
+        .aba.temNovidade::after { content: ' ●'; color: #c62828; }
       </style>
       <div class="caixa" id="cfgAudios"></div>
       <div class="caixa">
@@ -746,6 +749,12 @@ function iniciar(){
     });
     $('btMensagens').classList.remove('oculto');
     if(r.professor) chipIAForte();
+    if(r.professor) api('auditorListar').then(function(a){
+      var l = (a && a.relatorios) || [], pub = a && a.publicacao;
+      var nov = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '');
+      window.NOVIDADE_AUDITOR_FORA = !!nov && vistoCfg()['cxAuditor'] !== nov;
+      atualizarBolinhaCfg();
+    }).catch(function(){});
     if(r.professor) api('contarAvisosProf', {}).then(function(c){ AVISOS_PROF = c.naoLidos || 0; atualizarSeloMsgs(); if(c.naoLidos) mostrarAvisosSistema(); }).catch(function(){});
     if(r.professor){ $('visao').classList.remove('oculto'); trocarVisao('prof'); }
     else trocarVisao('aluno');
@@ -5829,6 +5838,7 @@ function desenharClaude(c){
 function desenharAuditor(res){
   var cx = $('cxAuditor'); if(!cx) return; cx.hidden = false;
   var l = Array.isArray(res) ? res : (res.relatorios || []), pub = res.publicacao;
+  cx.dataset.novidade = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '');
   var ghBox = '<details class="aviso" style="margin:6px 0 10px"' + (res.github ? '' : ' open') + '><summary class="link">Publicação automática pelo GitHub: ' + (res.github ? '<b>ligada</b> (token …' + esc(res.githubFim) + ')' : '<b>desligada</b>') + '</summary>' +
     '<p style="margin:6px 0">Com o token, <b>✅ Aprovar</b> aceita a correção no repositório e o robô do GitHub confere, testa, publica e, se o servidor não responder, volta sozinho à versão anterior. Sem o token, aprovar só marca (e a publicação é pedida no chat).</p>' +
     '<input type="password" id="audGh" placeholder="github_pat_…' + (res.github ? ' (deixe em branco e salve para desligar)' : '') + '" autocomplete="off" style="max-width:420px"> <button type="button" class="mini secundario" id="audGhSalvar">Salvar token</button></details>';
@@ -5865,6 +5875,7 @@ function desenharAuditor(res){
 // ---- Configurações: caixas recolhidas ----
 function recolherCaixasCfg(){
   var pc = $('pCfg'); if(!pc) return;
+  var au = $('cfgAudios'); if(au){ var ha = au.querySelector(':scope > h2'); if(ha && /⚠/.test(ha.textContent)) au.dataset.novidade = 'audios ' + (au.textContent.match(/\d+/g) || []).join('-'); else delete au.dataset.novidade; }
   var abertas = {}; try { abertas = JSON.parse(localStorage.getItem('cfgAbertas') || '{}'); } catch(e){}
   Array.prototype.forEach.call(pc.querySelectorAll(':scope > .caixa'), function(cx){
     var h2 = cx.querySelector(':scope > h2'); if(!h2) return;
@@ -5875,12 +5886,33 @@ function recolherCaixasCfg(){
         if(ev.target.closest('details, button, a, input')) return;   // o "?" de ajuda e links dentro do título continuam funcionando
         var abrir = cx.classList.contains('recolhida');
         cx.classList.toggle('recolhida', !abrir); cx.classList.toggle('aberta', abrir);
+        if(abrir){ marcarVistoCfg(cx); if(cx.id === 'cxAuditor') window.NOVIDADE_AUDITOR_FORA = false; atualizarBolinhaCfg(); }
         try { var a = JSON.parse(localStorage.getItem('cfgAbertas') || '{}'); a[chave] = abrir; localStorage.setItem('cfgAbertas', JSON.stringify(a)); } catch(e){}
       });
     }
-    var aberta = alerta || abertas[chave] === true;
+    // abertas por padrão: os áudios guardados no computador e a tabela de consumo da IA (dá para fechar e o site lembra)
+    var padrao = cx.id === 'cfgAudios' || /^Consumo da IA/.test(h2.textContent.trim());
+    var aberta = alerta || abertas[chave] === true || (abertas[chave] === undefined && padrao);
     cx.classList.toggle('recolhida', !aberta); cx.classList.toggle('aberta', aberta);
+    cx.dataset.chaveRec = chave;
+    if(aberta) marcarVistoCfg(cx);
+    var nov = cx.dataset.novidade || '';
+    cx.classList.toggle('novidade', !!nov && vistoCfg()[chave] !== nov);
   });
+  atualizarBolinhaCfg();
+}
+function vistoCfg(){ try { return JSON.parse(localStorage.getItem('cfgVisto') || '{}'); } catch(e){ return {}; } }
+function marcarVistoCfg(cx){
+  var nov = cx.dataset.novidade || '', chave = cx.dataset.chaveRec; if(!nov || !chave) return;
+  var v = vistoCfg(); if(v[chave] === nov) return; v[chave] = nov;
+  try { localStorage.setItem('cfgVisto', JSON.stringify(v)); } catch(e){}
+  cx.classList.remove('novidade'); atualizarBolinhaCfg();
+}
+// bolinha vermelha na aba: novidade numa caixa já desenhada, ou relatório novo do auditor visto na entrada
+function atualizarBolinhaCfg(){
+  var aba = document.querySelector('.aba[data-aba="cfg"]'); if(!aba) return;
+  var tem = !!document.querySelector('#pCfg .caixa.novidade') || !!window.NOVIDADE_AUDITOR_FORA;
+  aba.classList.toggle('temNovidade', tem);
 }
 (function(){
   var pc = document.getElementById('pCfg'); if(!pc || !window.MutationObserver) return;
@@ -5917,6 +5949,8 @@ function detalheUso(m){
 // Tabela no formato do painel do Google (AI Studio): barra + "usado / limite" por modelo, e o total do dia
 function desenharUsoModelos(u){
   var box = $('cfgUsoTabela'); if(!box) return;
+  try { var cxU = box.closest('.caixa'), esg = (u && u.modelos || []).filter(function(m){ return m.esgotou; }).map(function(m){ return m.modelo; });
+    if(cxU){ if(esg.length) cxU.dataset.novidade = 'esgotou ' + new Date().toISOString().slice(0, 10) + ' ' + esg.join(','); else delete cxU.dataset.novidade; setTimeout(recolherCaixasCfg, 0); } } catch(e){}
   if(!u || !u.modelos){ box.innerHTML = ''; return; }
   var nK = Math.max(1, u.chaves), varias = nK > 1;
   var nome = function(m){ return m.replace(/^gemini-/, 'Gemini ').replace(/-flash-lite$/, ' Flash Lite').replace(/-flash$/, ' Flash'); };
