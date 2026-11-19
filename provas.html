@@ -810,7 +810,13 @@ function listarProvas(){
         return;
       }
       b.disabled = true;
-      api('liberarResultados', {provaId: p.id, liberar: liberar}).then(function(res){
+      var liberarCom = function(forcar){ return api('liberarResultados', {provaId: p.id, liberar: liberar, forcar: !!forcar}).catch(function(x){
+        var mm = String(x.message).match(/^SEGUNDA:(\d+):(\d+)/); if(!mm) throw x;
+        var txt = (Number(mm[1]) ? mm[1] + ' questão(ões) em que as duas IAs discordaram e você ainda não decidiu' : '') + (Number(mm[1]) && Number(mm[2]) ? ' e ' : '') + (Number(mm[2]) ? mm[2] + ' prova(s) ainda esperando a 2ª opinião' : '');
+        if(!window.confirm('Atenção: há ' + txt + '. Liberar mesmo assim? (Nas divergências, vale a nota da 1ª correção.)')) { b.disabled = false; throw new Error('Liberação cancelada: decida as divergências em cada prova (em amarelo).'); }
+        return liberarCom(true);
+      }); };
+      liberarCom(false).then(function(res){
         AVISO_LIBERACAO = res && res.agendado ? '⏳ A prova ainda está no horário de aplicação/envio. Os alunos <b>ainda não veem nada</b>: a correção será liberada automaticamente para a turma em <b>' + esc(res.liberaEm) + '</b> (aviso no celular). Até lá, continue corrigindo normalmente.'
           : res && res.liberados ? '✓ Correção liberada para a turma: ' + res.avisados + ' aluno(s) avisado(s) agora.' : '';
         listarProvas();
@@ -2170,6 +2176,16 @@ function envioPeloProfessor(aluno, provaId){
 // ---- ajustes da correção: confiança da leitura, salvar comentário na hora, recorrigir uma questão, vista ----
 function corConf(n){ return n >= 85 ? '#1a7a3c' : n >= 60 ? '#b07d00' : '#c62828'; }
 function marcarIlegivel(t){ return esc(t).replace(/\[(ilegível|ilegivel)[^\]]*\]/gi, function(m){ return '<span class="ilegivel">' + m + '</span>'; }); }
+function htmlSegunda(q, entregaId){
+  var g = q.segunda; if(!g) return '';
+  if(g.concorda) return '<p class="aviso" style="margin:6px 0 0">✓ <b>Conferida por 2 IAs</b> (' + esc(g.ia1 || '1ª') + ' e ' + esc(g.ia2) + '): ' + num(g.nota1) + ' e ' + num(g.nota2) + '.</p>';
+  if(g.decidido === 'ia1' || g.decidido === 'ia2') return '<p class="aviso" style="margin:6px 0 0">Divergência decidida por você: vale a nota ' + (g.decidido === 'ia2' ? 'do ' + esc(g.ia2) + ' (' + num(g.nota2) + ')' : 'da 1ª correção (' + num(g.nota1) + ')') + '.</p>';
+  return '<div style="margin:8px 0 0;padding:8px 10px;border:1px solid #e6c200;background:#fff8d6;border-radius:8px"><b>⚠ As duas IAs discordaram nesta questão</b>' +
+    '<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px"><div style="flex:1;min-width:200px"><b>1ª correção' + (g.ia1 ? ' (' + esc(g.ia1) + ')' : '') + ': ' + num(g.nota1) + '</b><div class="aviso">(a que está valendo; veja a justificativa acima)</div></div>' +
+    '<div style="flex:1;min-width:200px"><b>2ª opinião (' + esc(g.ia2) + '): ' + num(g.nota2) + '</b>' + (g.acertos ? '<div class="fb"><b>Acertos:</b> ' + esc(g.acertos) + '</div>' : '') + (g.faltou ? '<div class="fb"><b>Faltou:</b> ' + esc(g.faltou) + '</div>' : '') +
+    (g.leitura ? '<details class="aviso"><summary class="link">o que o ' + esc(g.ia2) + ' leu</summary><div style="white-space:pre-line">' + esc(g.leitura) + '</div></details>' : '') + '</div></div>' +
+    '<div class="botoes" style="margin:6px 0 0"><button type="button" class="mini" data-seg="' + esc(entregaId) + '|' + esc(q.id) + '|ia1">Manter ' + num(g.nota1) + '</button><button type="button" class="mini" data-seg="' + esc(entregaId) + '|' + esc(q.id) + '|ia2">Usar ' + num(g.nota2) + '</button><span class="aviso">ou digite outra nota em "Pontos" e salve</span></div></div>';
+}
 function htmlFbIA(q){
   var sit = {atendeu: '✓', parcial: '◐', nao: '✗'}, cor = {atendeu: '#1a7a3c', parcial: '#b07d00', nao: '#c62828'};
   var top = (q.topicos || []).length ? '<div class="fb" style="margin-bottom:4px"><b>Tópicos do gabarito:</b>' + q.topicos.map(function(t){
@@ -2228,6 +2244,19 @@ function ligarCamposProva(el, entregaId, e, soma){
     });
   });
   vigiar($('eGeral'), $('eGeralSalvar'), 'geral', '');
+  el.querySelectorAll('[data-seg]').forEach(function(b){ b.addEventListener('click', function(){
+    var p = b.dataset.seg.split('|'); b.disabled = true;
+    api('decidirSegunda', {entregaId: p[0], questaoId: p[1], escolha: p[2]}).then(function(){ abrirEntrega(entregaId); }).catch(function(x){ b.disabled = false; erroGeral(x.message); });
+  }); });
+  var bsg = $('eSegunda');
+  if(bsg) bsg.addEventListener('click', function(){
+    bsg.disabled = true; var t0 = Date.now(), m = $('eSegundaMsg');
+    var tic = setInterval(function(){ var s2 = Math.round((Date.now() - t0) / 1000); m.innerHTML = '<span class="carregando">A 2ª IA está lendo a prova… ' + Math.floor(s2 / 60) + ' min ' + (s2 % 60) + ' s</span>'; }, 1000);
+    api('segundaAgora', {entregaId: entregaId}).then(function(r){ clearInterval(tic);
+      if(r && r.aguardando){ bsg.disabled = false; m.textContent = 'O Claude ainda está conferindo (a sessão dele demora para começar). Clique de novo daqui a 2 ou 3 minutos: aproveita o mesmo pedido.'; return; }
+      abrirEntrega(entregaId);
+    }).catch(function(x){ clearInterval(tic); bsg.disabled = false; m.innerHTML = '<span class="t-err">' + esc(x.message) + '</span>'; });
+  });
   var bv = $('eVistaIA');
   if(bv) bv.addEventListener('click', function(){
     bv.disabled = true; $('eVistaMsg').innerHTML = '<p class="carregando">A IA está olhando as fotos e as explicações… (até 1 minuto)</p>';
@@ -2277,6 +2306,11 @@ function abrirEntrega(entregaId){
       var pior = comConf.slice().sort(function(a, b){ return a.confianca - b.confianca; })[0];
       h += '<p class="aviso" style="margin:8px 0 0">Confiança da leitura da IA: <b style="color:' + corConf(media) + '">' + media + '%</b>' + (pior.confianca < 80 ? ' · mais baixa: questão ' + esc(pior.rotulo || pior.ordem) + ' (' + pior.confianca + '%)' : '') + '. Abra "O que a IA leu" para conferir e arrumar.</p>';
     }
+    if(e.segundaAtiva && e.status === 'corrigida'){
+      var sg = e.segunda;
+      h += '<div class="convite" style="margin-top:10px"><b>🤝 Segunda opinião</b> · ' + (!sg || sg.estado === 'nada' ? 'nenhuma questão de risco nesta prova' : sg.estado === 'pendente' ? '⏳ a 2ª IA ainda vai conferir ' + sg.selecionadas + ' questão(ões) de risco' : sg.estado === 'erro' ? '⚠ não conseguiu conferir (' + esc(sg.erro) + ')' : (sg.divergencias ? '<b style="color:#9b6a00">' + sg.divergencias + ' questão(ões) com divergência</b> — decida embaixo de cada uma' : '✓ ' + esc(sg.ia2) + ' conferiu e concordou') + ' · ' + esc(sg.em)) +
+        ' <button type="button" class="mini secundario" id="eSegunda">' + (sg && sg.estado === 'pendente' ? 'Conferir agora' : 'Conferir a prova inteira com a 2ª IA') + '</button><div id="eSegundaMsg" class="aviso"></div></div>';
+    }
     var nVista = e.questoes.filter(function(q){ return q.vista; }).length;
     var jaAnalisou = e.questoes.some(function(q){ return q.vista && q.vista.ia; });
     if(nVista) h += '<div class="convite"><b>Vista de prova:</b> o aluno contestou ' + nVista + ' questão(ões) (veja embaixo de cada uma). ' +
@@ -2290,7 +2324,7 @@ function abrirEntrega(entregaId){
           (q.duvidas ? '<p class="fb" style="color:#9b1c1c"><b>Trechos com dúvida:</b> ' + esc(q.duvidas) + '</p>' : '') +
           '<label class="rot" style="margin-top:8px">Arrumar a leitura (escreva o que o aluno escreveu de fato)</label><textarea data-transc style="min-height:60px">' + esc(q.transcricao) + '</textarea>' +
           '<div class="botoes" style="margin-top:6px"><button type="button" class="secundario mini" data-recorr>Corrigir esta questão de novo com esta leitura</button><span class="aviso">1 chamada da IA de prova, só texto</span></div><div data-recmsg></div></details>' +
-        '<div data-fbia>' + htmlFbIA(q) + '</div>' +
+        '<div data-fbia>' + htmlFbIA(q) + '</div>' + htmlSegunda(q, entregaId) +
         '<div class="campos" style="margin:10px 0 0"><div><label class="rot">Pontos</label><input type="number" min="0" max="' + q.max + '" step="0.25" data-pts value="' + (q.pontos === null ? '' : q.pontos) + '"></div>' +
         '<div class="campoLargo"><label class="rot">Seu comentário para o aluno (opcional)</label><textarea data-com data-salvo="' + esc(q.professor) + '" style="min-height:50px">' + esc(q.professor) + '</textarea>' +
           '<button type="button" class="secundario mini salvarCampo oculto" data-salvacampo="professor">Salvar comentário</button></div></div>' +
