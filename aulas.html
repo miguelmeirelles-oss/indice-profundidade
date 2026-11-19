@@ -5818,16 +5818,23 @@ function desenharClaude(c){
     bq.disabled = true; api('claudePermissoes', {emails: l}).then(function(x){ desenharClaude(x); $('cfgClQuemMsg').innerHTML = '<div class="ok">✓ Salvo.</div>'; }).catch(function(e){ bq.disabled = false; $('cfgClQuemMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   });
 }
-function desenharAuditor(l){
+function desenharAuditor(res){
   var cx = $('cxAuditor'); if(!cx) return; cx.hidden = false;
+  var l = Array.isArray(res) ? res : (res.relatorios || []), pub = res.publicacao;
+  var ghBox = '<details class="aviso" style="margin:6px 0 10px"' + (res.github ? '' : ' open') + '><summary class="link">Publicação automática pelo GitHub: ' + (res.github ? '<b>ligada</b> (token …' + esc(res.githubFim) + ')' : '<b>desligada</b>') + '</summary>' +
+    '<p style="margin:6px 0">Com o token, <b>✅ Aprovar</b> aceita a correção no repositório e o robô do GitHub confere, testa, publica e, se o servidor não responder, volta sozinho à versão anterior. Sem o token, aprovar só marca (e a publicação é pedida no chat).</p>' +
+    '<input type="password" id="audGh" placeholder="github_pat_…' + (res.github ? ' (deixe em branco e salve para desligar)' : '') + '" autocomplete="off" style="max-width:420px"> <button type="button" class="mini secundario" id="audGhSalvar">Salvar token</button></details>';
+  var pubBox = pub ? '<p style="margin:0 0 10px">Última publicação pelo robô: ' + (pub.estado === 'ok' ? '✅ publicada' : pub.estado === 'falhou' ? '❌ <b>não publicou</b> (nada mudou no ar, ou voltou sozinho)' : pub.estado === 'andamento' ? '⏳ em andamento' : pub.estado === 'nenhuma' ? 'nenhuma ainda' : '⚠ ' + esc(pub.erro || '')) +
+    (pub.em ? ' · ' + esc(pub.em) : '') + (pub.url ? ' · <a href="' + esc(pub.url) + '" target="_blank" rel="noopener">detalhes</a>' : '') +
+    (pub.estado === 'ok' || pub.estado === 'falhou' ? ' · <button type="button" class="link" id="audVoltar">↩ voltar à versão anterior</button>' : '') + '</p>' : '';
   var cor = {alta: '#c62828', media: '#b07d00', baixa: '#4b5563'};
   cx.innerHTML = '<h2>🔎 Auditor da madrugada</h2><p class="aviso" style="margin-top:0">Todo dia às 6h o Claude (sua assinatura) lê o que deu errado nas últimas 36 h e as leituras novas de documentos da progressão. Corrige sozinho dado da progressão quando relê o documento original e acha o erro (cada correção pode ser desfeita aqui). Erro de programa vem com diagnóstico e sugestão: o código não muda sozinho — me mostre a sugestão quando quiser corrigir.</p>' +
-    (!l.length ? '<p class="aviso">Nenhum relatório ainda. O primeiro sai na próxima manhã.</p>' : l.map(function(r, k){
+    ghBox + pubBox + (!l.length ? '<p class="aviso">Nenhum relatório ainda. O primeiro sai na próxima manhã.</p>' : l.map(function(r, k){
       return '<details style="margin:8px 0;border:1px solid var(--linha);border-radius:8px;padding:6px 10px"' + (k === 0 ? ' open' : '') + '><summary style="cursor:pointer"><b>' + esc(r.em) + '</b> · ' + esc(r.resumo) + '</summary>' +
         r.itens.map(function(i, ix){ return '<div style="margin:8px 0 0;padding-left:8px;border-left:3px solid ' + (cor[i.gravidade] || '#4b5563') + '"><b>' + esc(i.titulo) + '</b> <span class="aviso">· ' + esc(i.area) + ' · ' + esc(i.gravidade) + '</span>' +
           (i.explicacao ? '<div style="font-size:14px;white-space:pre-line">' + esc(i.explicacao) + '</div>' : '') + (i.feito ? '<div class="aviso">✓ Feito: ' + esc(i.feito) + '</div>' : '') +
           (i.sugestao ? '<details class="aviso"' + (/github\.com/.test(i.sugestao) ? ' open' : '') + '><summary class="link">sugestão de correção</summary><div style="white-space:pre-wrap;font-size:13px">' + esc(i.sugestao).replace(/(https:\/\/github\.com\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>') + '</div></details>' : '') +
-          (/github\.com|auditor\//.test(i.sugestao || '') ? (i.decisao ? '<div class="aviso">' + (i.decisao.decisao === 'aprovada' ? '✅ Aprovada' : '❌ Recusada') + ' em ' + esc(i.decisao.em) + (i.decisao.decisao === 'aprovada' ? ' — peça no chat: "publica as correções aprovadas"' : '') + '</div>'
+          (/github\.com|auditor\//.test(i.sugestao || '') ? (i.decisao ? '<div class="aviso">' + (i.decisao.decisao === 'aprovada' ? '✅ Aprovada' : '❌ Recusada') + ' em ' + esc(i.decisao.em) + esc(i.decisao.nota || '') + (i.decisao.decisao === 'aprovada' && !i.decisao.nota ? ' — peça no chat: "publica as correções aprovadas"' : '') + '</div>'
             : '<div class="botoes" style="margin:4px 0"><button type="button" class="mini" data-audec="' + esc(r.id) + '|' + ix + '|aprovada">✅ Aprovar correção</button><button type="button" class="mini secundario" data-audec="' + esc(r.id) + '|' + ix + '|recusada">❌ Recusar</button></div>') : '') + '</div>'; }).join('') +
         (r.correcoes.length ? '<p style="margin:10px 0 2px"><b>Correções feitas na progressão</b></p>' + r.correcoes.map(function(c){
           return '<div style="font-size:13.5px;margin:4px 0">Item ' + esc(c.chave) + ' · <b>' + esc(c.campo) + '</b>: ' + esc(c.antes) + ' → ' + esc(c.depois) + '<br><span class="aviso">' + esc(c.motivo) + '</span> ' +
@@ -5836,9 +5843,12 @@ function desenharAuditor(l){
     }).join('')) + '<div id="auditorMsg"></div>';
   cx.querySelectorAll('[data-audec]').forEach(function(b){ b.addEventListener('click', function(){
     var p = b.dataset.audec.split('|');
-    if(p[2] === 'aprovada' && !window.confirm('Aprovar esta correção de código? Ela fica marcada; a publicação acontece quando você pedir no chat ("publica as correções aprovadas"), com revisão antes.')) return;
+    if(p[2] === 'aprovada' && !window.confirm(res.github ? 'Aprovar e publicar esta correção? O robô do GitHub roda os testes, publica e, se o servidor não responder, volta sozinho à versão anterior.' : 'Aprovar esta correção? Ela fica marcada; a publicação acontece quando você pedir no chat ("publica as correções aprovadas").')) return;
     b.disabled = true; api('auditorDecidir', {relatorioId: p[0], indice: Number(p[1]), decisao: p[2]}).then(desenharAuditor).catch(function(e){ b.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   }); });
+  var gs = $('audGhSalvar'); if(gs) gs.addEventListener('click', function(){ gs.disabled = true; api('auditorGithubSalvar', {githubToken: $('audGh').value}).then(function(){ return api('auditorListar'); }).then(desenharAuditor).catch(function(e){ gs.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
+  var vv = $('audVoltar'); if(vv) vv.addEventListener('click', function(){ if(!window.confirm('Voltar à versão anterior? O robô desfaz a última mudança no código e publica de novo (leva uns 2 minutos).')) return; vv.disabled = true;
+    api('auditorDesfazerPublicacao', {}).then(function(){ $('auditorMsg').innerHTML = '<div class="ok">Pedido enviado: em uns 2 minutos a versão anterior volta ao ar. Recarregue esta tela para ver.</div>'; }).catch(function(e){ vv.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
   cx.querySelectorAll('[data-audesf]').forEach(function(b){ b.addEventListener('click', function(){
     if(!window.confirm('Desfazer esta correção? O valor volta ao que era antes.')) return;
     b.disabled = true; api('auditorDesfazer', {id: b.dataset.audesf}).then(desenharAuditor).catch(function(e){ b.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
