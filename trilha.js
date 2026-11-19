@@ -54,7 +54,7 @@ var PROMPT_TRILHA = [
 "CENA DE MOLÉCULAS (parte de baixo da tela; mostre o que a fala está explicando, como num desenho animado do fenômeno):",
 "- Declare no bloco: \"cena\": {\"elementos\": [ … ]}. Coordenadas da cena: x de 0 a 100 (esquerda → direita), y de 0 a 60 (topo → base). Elementos começam escondidos.",
 "- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos), \"acido_graxo\" (ácido graxo em zigue-zague com a cabeça COOH; \"forma\": \"saturado\" ou \"trans\" = cadeia reta, \"cis\" = dobrada na dupla ligação; \"unidades\": nº de carbonos, 4 a 24; \"angulo\": giro em graus — várias cadeias retas lado a lado mostram o empacotamento compacto da gordura sólida, as cis dobradas mostram o empacotamento frouxo do óleo). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
-"- Se a explicação precisar de um desenho ou animação que NÃO existe nesta lista, use o mais parecido E descreva o que faltou no campo da aula \"desenhos_faltando\": [{\"nome\": \"micela\", \"descricao\": \"como deve parecer e como se anima\", \"onde\": \"passo 3\"}]. A plataforma programa o desenho novo (o professor aprova) e a aula pode ser refeita depois com ele.",
+"- Se a explicação precisar de um desenho que NÃO existe nesta lista, crie o elemento com um \"tipo\" NOVO (nome curto em minúsculas, ex.: \"micela\"), \"descricao\" (como ele deve parecer e se animar, em detalhe), os parâmetros que quiser (ex.: \"forma\", \"unidades\") e \"reserva\": o elemento da lista mais parecido (ex.: {\"tipo\": \"gordura\", \"tamanho\": 2}). A aula mostra a reserva até a plataforma programar o desenho novo (o professor aprova) e, daí em diante, mostra o desenho novo sozinha.",
 "- Em cada passo, \"cena_acoes\" (mesma regra de \"atraso\"; cada passo herda a cena dos anteriores até um \"limpar_cena\"):",
 "  {\"tipo\":\"aparecer\",\"elemento\":\"id\"} · {\"tipo\":\"sumir\",\"elemento\":\"id\"} · {\"tipo\":\"mover\",\"elemento\":\"id\",\"para\":[x,y],\"duracao\":1500}",
 "  {\"tipo\":\"destacar\",\"elemento\":\"id\"} · {\"tipo\":\"danificar\",\"alvo\":\"id\",\"rotulo\":\"texto\"} · {\"tipo\":\"vagar\",\"elemento\":\"id\",\"agitacao\":0.1}",
@@ -180,6 +180,7 @@ function promptAjuste(trilha, notas, direto){
     'Você vai AJUSTAR uma AULA EM TRILHA já pronta da plataforma "Aula por IA" (aula interativa: slides com gráficos que se animam, narrada por voz de IA, com dúvidas por voz).',
     'Abaixo vêm as regras do formato (as mesmas de quando a aula foi criada), o JSON ATUAL da aula e os AJUSTES que o professor pediu, passo a passo.',
     'Faça SÓ o que foi pedido e mantenha o resto igual: os mesmos ids de blocos e a mesma ordem dos passos (assim a narração já gravada continua valendo onde a fala não mudou).',
+    'Se o professor pedir um desenho ou animação que os tipos de elemento atuais não fazem bem (ou disser que um desenho ficou ruim), NÃO force com o tipo errado: crie o elemento com um "tipo" NOVO, "descricao" detalhada e "reserva" (veja a regra dos desenhos novos). A plataforma programa o desenho novo na madrugada seguinte.',
     direto ? 'Devolva SOMENTE o JSON COMPLETO da aula ajustada (sem texto antes ou depois, sem bloco de código): ele é salvo direto como nova versão da aula.'
       : 'Primeiro mostre ao professor, em poucas linhas, o que você vai mudar em cada passo (se a sua interface permitir, mostre também uma prévia visual do gráfico dos passos alterados). Depois devolva o JSON COMPLETO da aula ajustada, num bloco de código ou arquivo .json.',
     '', PROMPT_TRILHA.slice(ini, fim).replace(/\n?REVISÃO COM O PROFESSOR[^\n]*\n/, '\n').replace(/\n?DIVIDIR EM AULAS CURTAS[^\n]*\n/, '\n').replace(/\n?LOTE:[^\n]*\n/, '\n'),
@@ -598,7 +599,7 @@ function abrirPlayer(t){
       '<label class="aviso" id="tr_rotAjuste" for="txtAjuste" style="display:block;margin-top:8px"></label><textarea id="tr_txtAjuste" style="min-height:60px;font-family:inherit;font-size:14px" placeholder="ex.: a seta tem que apontar para a curva de cima; fala longa demais; trocar o exemplo do leite por café"></textarea>' +
       '<label class="aviso" for="txtAjusteGeral" style="display:block;margin-top:6px">Ajuste na aula toda (opcional)</label><input type="text" id="tr_txtAjusteGeral" style="width:100%" placeholder="ex.: falas mais curtas; mais um bloco sobre histerese">' +
       '<div class="botoes"><button class="mini" id="tr_btAplicarAjuste">✨ Aplicar os ajustes com a IA</button><button class="mini secundario" id="tr_btCopiarAjuste">📋 Copiar o pedido (usar em outra IA)</button><button class="mini secundario" id="tr_btLimparAjuste">Limpar anotações</button><span id="tr_nAjustes" class="aviso"></span></div>' +
-      '<p class="aviso" style="margin-bottom:0"><b>✨ Aplicar</b>: a IA forte escolhida (o chip 🧠 no canto) refaz a aula e ela é salva como <b>nova versão</b>; leva de 1 a 5 minutos. Se não gostar, volte para a anterior em <b>🕘 Versões desta aula</b>. <b>📋 Copiar</b>: para colar em outra IA e trazer o JSON em <b>Criar uma aula em trilha → passo 3</b>.</p><div id="tr_msgAjuste"></div></details>' : '') +
+      '<p class="aviso" style="margin-bottom:0"><b>✨ Aplicar</b>: a IA forte escolhida (o chip 🧠 no canto) refaz a aula e ela é salva como <b>nova versão</b>; leva de 1 a 5 minutos. Se não gostar, volte para a anterior em <b>🕘 Versões desta aula</b>. Se pedir um desenho que a plataforma ainda não sabe fazer (ou que ficou ruim), ele aparece provisório e é programado na madrugada seguinte. <b>📋 Copiar</b>: para colar em outra IA e trazer o JSON em <b>Criar uma aula em trilha → passo 3</b>.</p><div id="tr_msgAjuste"></div></details>' : '') +
     (MODO === 'prof' && !t.previa ? '<details class="convite" id="tr_versoesBox" style="margin-top:14px"><summary class="link"><b>🕘 Versões desta aula</b> (voltar para uma anterior, comentar, apagar)</summary><div id="tr_versoesCorpo"></div></details>' : '') +
     (MODO === 'prof' && !t.previa && tr.video ? '<details class="convite" id="tr_notaBox" style="margin-top:14px"><summary class="link"><b>📌 Nota do professor neste trecho</b> (aparece para o aluno nesse momento do vídeo; serve para corrigir ou completar sem refazer o vídeo)</summary>' +
       '<label class="aviso" id="tr_rotNota" for="txtNota" style="display:block;margin-top:8px"></label><textarea id="tr_txtNota" maxlength="400" style="min-height:56px;font-family:inherit;font-size:14px" placeholder="ex.: atenção: aqui o vídeo diz 0,7, mas o certo é 0,6"></textarea><div class="botoes"><button class="mini" id="tr_btNota">Salvar a nota</button><span id="tr_msgNota" class="aviso"></span></div></details>' : '') +
@@ -606,6 +607,7 @@ function abrirPlayer(t){
     (t.previa || MODO === 'aluno' || tr.video ? '' : '<details class="t-admNarr convite" id="tr_admNarr"><summary class="link"><b>🎙 Narração com voz da IA</b> (gravada uma vez, depois toca para todos sem gastar cota)</summary><div id="tr_admNarrCorpo"></div></details>');
   $('corpo').innerHTML = h;
   if(!t.previa) desenharMarca();
+  if(MODO === 'prof' && $('msgAjuste')){ var prov = desenhosProvisorios(tr); if(prov.length) $('msgAjuste').innerHTML = '<div class="convite">✏️ Desenho(s) novo(s) ainda provisório(s) nesta aula: <b>' + prov.map(esc).join(', ') + '</b>. ' + AVISO_MADRUGADA + '</div>'; }
   if($('txtAjuste')){
     $('txtAjusteGeral').value = lerAjustes().geral || '';
     $('txtAjuste').addEventListener('input', function(){ var a = lerAjustes(), k = blocoAtual().id + ':' + P.passo; if(this.value.trim()) a[k] = this.value.trim(); else delete a[k]; gravarAjustes(a); mostrarAjuste(); });
@@ -621,7 +623,9 @@ function abrirPlayer(t){
         gravarAjustes({});
         var aviso = (r.avisos && r.avisos.length) ? '<br><span class="aviso">' + r.avisos.slice(0, 5).map(esc).join('<br>') + '</span>' : '';
         abrirTrilha(T.id);
-        setTimeout(function(){ if($('msgAjuste')){ $('ajusteBox').open = true; $('msgAjuste').innerHTML = '<div class="ok">✓ Ajustes aplicados por ' + esc(r.modelo || 'IA') + ': salva a versão ' + r.versao + '. Não gostou? Volte em 🕘 Versões desta aula.' + aviso + '</div>'; } }, 1500);
+        setTimeout(function(){ if($('msgAjuste')){ $('ajusteBox').open = true; var prov = desenhosProvisorios(T && T.trilha);
+          $('msgAjuste').innerHTML = '<div class="ok">✓ Ajustes aplicados por ' + esc(r.modelo || 'IA') + ': salva a versão ' + r.versao + '. Não gostou? Volte em 🕘 Versões desta aula.' + aviso + '</div>' +
+            (prov.length ? '<div class="convite" style="margin-top:6px">✏️ O motor ainda não tem o desenho <b>' + prov.map(esc).join(', ') + '</b>: por enquanto aparece um parecido. ' + AVISO_MADRUGADA + '</div>' : ''); } }, 1500);
       }).catch(function(e){ clearInterval(rel); bt.disabled = false; $('msgAjuste').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });
     $('btCopiarAjuste').addEventListener('click', function(){
@@ -1379,6 +1383,8 @@ var Cena = (function () {
     roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6", amino: "#2b8a3e", marrom: "#6b3a1a", redutor: "#e8590c"
   };
   const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6 };
+  // desenhos que este motor sabe fazer (ao programar um desenho novo, acrescente o nome aqui também)
+  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo"];
   const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
@@ -1406,7 +1412,9 @@ var Cena = (function () {
       return e;
     }
     function desenharEl(e) {
-      const d = e.def, g = e.g; g.innerHTML = "";
+      const d0 = e.def, g = e.g; g.innerHTML = "";
+      // desenho novo que este motor ainda não tem: mostra o provisório ("reserva"); quando o motor aprender, aparece o novo sozinho
+      const d = TIPOS_EL.indexOf(d0.tipo) === -1 && d0.reserva ? Object.assign({}, d0.reserva, { id: d0.id, x: d0.x, y: d0.y, rotulo: d0.rotulo || d0.reserva.rotulo }) : d0;
       const t = d.tipo, tam = d.tamanho || 1;
       if (t === "agua") { desenharAgua(g, -90, false, tam); }
       else if (t === "ion") {
@@ -1891,7 +1899,7 @@ var Cena = (function () {
     return {
       executar, limpar,
       parar() { timers.forEach(clearTimeout); timers = []; procs = []; cancelAnimationFrame(raf); raf = 0; root.remove(); },
-      acoes: Object.keys(A)
+      acoes: Object.keys(A), tipos: TIPOS_EL.slice()
     };
   }
 
@@ -1909,6 +1917,14 @@ function pararCena(){ if(CENA){ try{ CENA.parar(); }catch(e){} CENA = null; } }
 // motor de cenas: o cena.js publicado ao lado do trilha.js (o mesmo das prévias do Claude); se não carregar, a cópia embutida
 var MOTOR = {ext: null, acoes: null};
 function motorCena(){ return MOTOR.ext || Cena; }
+// desenhos novos desta aula que o motor publicado ainda não sabe fazer (aparecem com o provisório até o revisor programar)
+function desenhosProvisorios(tr){
+  var sabe = null; try{ var sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), c = motorCena().criar(sv, {elementos: []}, {x: 0, y: 0, largura: 100}); sabe = c.tipos || null; c.parar(); }catch(e){}
+  if(!sabe) return [];
+  var nomes = {}; ((tr && tr.blocos) || []).forEach(function(b){ ((b.cena && b.cena.elementos) || []).forEach(function(e){ if(e && e.reserva && sabe.indexOf(e.tipo) === -1) nomes[e.tipo] = 1; }); });
+  return Object.keys(nomes);
+}
+var AVISO_MADRUGADA = '🌙 Fica provisório só até amanhã: esta madrugada o revisor programa o desenho novo e manda para você aprovar (em Configurações → 🔎 Auditor da madrugada). Aprovou, a aula passa a mostrar o desenho novo sozinha, sem refazer nada.';
 function acoesDoMotor(){
   if(MOTOR.acoes) return MOTOR.acoes;
   try{ var sv = document.createElementNS('http://www.w3.org/2000/svg', 'svg'), c = motorCena().criar(sv, {elementos: []}, {x: 0, y: 0, largura: 100}); MOTOR.acoes = (c.acoes || []).slice(); c.parar(); }catch(e){ MOTOR.acoes = []; }

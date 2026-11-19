@@ -29,6 +29,8 @@
     roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6", amino: "#2b8a3e", marrom: "#6b3a1a", redutor: "#e8590c"
   };
   const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6 };
+  // desenhos que este motor sabe fazer (ao programar um desenho novo, acrescente o nome aqui também)
+  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo"];
   const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
@@ -56,7 +58,9 @@
       return e;
     }
     function desenharEl(e) {
-      const d = e.def, g = e.g; g.innerHTML = "";
+      const d0 = e.def, g = e.g; g.innerHTML = "";
+      // desenho novo que este motor ainda não tem: mostra o provisório ("reserva"); quando o motor aprender, aparece o novo sozinho
+      const d = TIPOS_EL.indexOf(d0.tipo) === -1 && d0.reserva ? Object.assign({}, d0.reserva, { id: d0.id, x: d0.x, y: d0.y, rotulo: d0.rotulo || d0.reserva.rotulo }) : d0;
       const t = d.tipo, tam = d.tamanho || 1;
       if (t === "agua") { desenharAgua(g, -90, false, tam); }
       else if (t === "ion") {
@@ -541,7 +545,7 @@
     return {
       executar, limpar,
       parar() { timers.forEach(clearTimeout); timers = []; procs = []; cancelAnimationFrame(raf); raf = 0; root.remove(); },
-      acoes: Object.keys(A)
+      acoes: Object.keys(A), tipos: TIPOS_EL.slice()
     };
   }
 
