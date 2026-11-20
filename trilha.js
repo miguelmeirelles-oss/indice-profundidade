@@ -616,8 +616,13 @@ function abrirPlayer(t){
     $('btAplicarAjuste').addEventListener('click', function(){
       var l = textoAjustes(), bt = this;
       if(!l.length){ $('msgAjuste').innerHTML = '<div class="erro">Anote pelo menos um ajuste (em algum passo ou na aula toda).</div>'; return; }
-      bt.disabled = true; var t0 = Date.now(), rel = setInterval(function(){ var s = Math.round((Date.now() - t0) / 1000); if($('msgAjuste')) $('msgAjuste').innerHTML = '<p class="carregando">A IA está refazendo a aula com ' + l.length + ' ajuste(s)… ' + Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2) + ' (pode levar até 5 min; não feche a página)</p>'; }, 1000);
-      api('trilhaAjustarIA', {id: T.id, pedido: promptAjuste(T.trilha, l.join('\n'), true), comentario: 'Ajuste pela IA: ' + l.join(' | ').slice(0, 400), motorAcoes: acoesDoMotor()}).then(function(r){
+      bt.disabled = true; var t0 = Date.now(), volta = 0, rel = setInterval(function(){ var s = Math.round((Date.now() - t0) / 1000); if($('msgAjuste')) $('msgAjuste').innerHTML = '<p class="carregando">A IA está refazendo a aula com ' + l.length + ' ajuste(s)… ' + Math.floor(s / 60) + ':' + ('0' + s % 60).slice(-2) + (volta ? ' · continua sozinha (parte ' + (volta + 1) + ')' : '') + ' — não precisa clicar em nada; deixe a página aberta.</p>'; }, 1000);
+      var dadosAj = {id: T.id, pedido: promptAjuste(T.trilha, l.join('\n'), true), comentario: 'Ajuste pela IA: ' + l.join(' | ').slice(0, 400), motorAcoes: acoesDoMotor()};
+      // demorou (o Claude ainda trabalhando, ou o servidor cortou em ~6 min): pede de novo sozinho; a resposta pronta é aproveitada
+      var pedir = function(){ return api('trilhaAjustarIA', dadosAj).catch(function(e){
+        if(volta < 12 && /ainda está trabalhando|Unexpected token|JSON|Sem conexão|tempo máximo|Exceeded|timed out|tempo limite|respondeu 5\d\d/i.test(String(e.message))){ volta++; return new Promise(function(ok){ setTimeout(ok, volta === 1 ? 20000 : 45000); }).then(pedir); }
+        throw e; }); };
+      pedir().then(function(r){
         clearInterval(rel); bt.disabled = false;
         if(r.erros && r.erros.length){ $('msgAjuste').innerHTML = '<div class="erro"><b>A IA devolveu uma aula com problemas; nada foi salvo.</b> Tente de novo ou use 📋 Copiar.<br>' + r.erros.slice(0, 8).map(esc).join('<br>') + '</div>'; return; }
         gravarAjustes({});
@@ -625,6 +630,7 @@ function abrirPlayer(t){
         abrirTrilha(T.id);
         setTimeout(function(){ if($('msgAjuste')){ $('ajusteBox').open = true; var prov = desenhosProvisorios(T && T.trilha);
           $('msgAjuste').innerHTML = '<div class="ok">✓ Ajustes aplicados por ' + esc(r.modelo || 'IA') + ': salva a versão ' + r.versao + '. Não gostou? Volte em 🕘 Versões desta aula.' + aviso + '</div>' +
+            (r.narrando ? '<div class="convite" style="margin-top:6px">🎙 ' + r.narrando + ' trecho(s) com fala nova entraram sozinhos na gravação da voz (mesma voz da aula). Grava no servidor, mesmo com a página fechada.</div>' : '') +
             (prov.length ? '<div class="convite" style="margin-top:6px">✏️ O motor ainda não tem o desenho <b>' + prov.map(esc).join(', ') + '</b>: por enquanto aparece um parecido. ' + AVISO_MADRUGADA + '</div>' : ''); } }, 1500);
       }).catch(function(e){ clearInterval(rel); bt.disabled = false; $('msgAjuste').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });

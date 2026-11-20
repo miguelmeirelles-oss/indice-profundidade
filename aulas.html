@@ -753,7 +753,8 @@ function iniciar(){
     if(r.professor) api('auditorListar').then(function(a){
       var l = (a && a.relatorios) || [], pub = a && a.publicacao;
       var venc = ((a && a.tokens) || []).filter(function(t){ return t.dias <= 30; });
-      var nov = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '') + (venc.length ? '|token ' + venc.map(function(t){ return t.vence; }).join(',') : '');
+      var l0 = l.filter(function(x){ return x.relevante !== false; })[0];
+      var nov = (l0 ? l0.id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '') + (venc.length ? '|token ' + venc.map(function(t){ return t.vence; }).join(',') : '');
       window.NOVIDADE_AUDITOR_FORA = !!nov && vistoCfg()['cxAuditor'] !== nov;
       atualizarBolinhaCfg();
     }).catch(function(){});
@@ -1187,6 +1188,34 @@ function desenharMsgsAluno(){
 
 // ---- professor: escrever, filtrar, prolongar, expirar, apagar ----
 var EMOJIS_MSG = ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'];
+// a mensagem da revisão da madrugada mostra o que importa e deixa aprovar/recusar ali mesmo (as Configurações ficam como histórico)
+function preencherAuditorMsgs(el){
+  var caixas = el.querySelectorAll('[data-audrel]'); if(!caixas.length) return;
+  api('auditorListar').then(function(res){
+    caixas.forEach(function(cx){
+      var r = (res.relatorios || []).filter(function(x){ return x.id === cx.dataset.audrel; })[0];
+      if(!r){ cx.innerHTML = '<p class="aviso">Relatório antigo: veja o histórico em Configurações → 🔎 Auditor da madrugada.</p>'; return; }
+      var itens = r.itens.map(function(it, i){ it._i = i; it._pr = /github\.com\/[^\s]+\/pull\/\d+/.test(it.sugestao || ''); return it; }).filter(function(it){ return it._pr || it.gravidade !== 'baixa'; });
+      cx.innerHTML = itens.map(function(it){
+        var dec = it.decisao;
+        return '<div style="border-left:3px solid ' + (it.gravidade === 'alta' ? 'var(--erro,#c62828)' : '#e0a800') + ';padding:4px 0 4px 10px;margin:8px 0">' +
+          '<b>' + esc(it.titulo) + '</b> <span class="aviso">· ' + esc(it.area) + '</span><br><span style="font-size:14px">' + esc(it.explicacao) + '</span>' +
+          (it.feito ? '<br><span class="aviso">✓ já feito: ' + esc(it.feito) + '</span>' : '') +
+          (!it._pr && it.sugestao ? '<br><span class="aviso">sugestão: ' + esc(it.sugestao) + '</span>' : '') +
+          (it._pr ? (dec ? '<p class="aviso" style="margin:6px 0 0">' + (dec.decisao === 'aprovada' ? '✅ aprovada' : '❌ recusada') + ' em ' + esc(dec.em) + esc(dec.nota || '') + '</p>'
+            : '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" data-msgdec="' + esc(r.id + '|' + it._i + '|aprovada') + '">✅ Aprovar e publicar</button><button type="button" class="mini secundario" data-msgdec="' + esc(r.id + '|' + it._i + '|recusada') + '">❌ Recusar</button></div>') : '') +
+          '</div>';
+      }).join('') + '<p class="aviso" style="margin:4px 0 0">Histórico completo e "voltar à versão anterior": Configurações → 🔎 Auditor da madrugada.</p>';
+    });
+    el.querySelectorAll('[data-msgdec]').forEach(function(b){ b.addEventListener('click', function(){
+      var p = b.dataset.msgdec.split('|');
+      if(!confirm(p[2] === 'aprovada' ? 'Aprovar e publicar esta correção? O robô do GitHub roda os testes, publica e, se o servidor não responder, volta sozinho à versão anterior.' : 'Recusar esta proposta? Ela é descartada.')) return;
+      b.disabled = true; b.textContent = 'Enviando…';
+      api('auditorDecidir', {relatorioId: p[0], indice: Number(p[1]), decisao: p[2]}).then(function(){ preencherAuditorMsgs(el); })
+        .catch(function(e){ b.disabled = false; b.textContent = 'Tentar de novo'; erroGeral(e.message); });
+    }); });
+  }).catch(function(e){ caixas.forEach(function(cx){ cx.innerHTML = '<p class="aviso">' + esc(e.message) + '</p>'; }); });
+}
 function desenharMsgsProf(discPre){
   var r = MSGS.r, el = areaMsgs(), agora = Date.now();
   var discs = r.disciplinas;
@@ -1198,7 +1227,8 @@ function desenharMsgsProf(discPre){
   var h = cabMsgs() + (av.length || arqAv.length ? '<div class="caixa"><h2 style="margin-top:0">🔔 Para você' + (novosAv ? ' <span class="tag t-err">' + novosAv + ' novo(s)</span>' : '') + '</h2>' +
       av.slice(0, 10).map(function(a){
         return '<div class="msgItem' + (a.lido ? '' : ' nova') + '"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) +
-          '<div class="botoes" style="margin-top:6px">' + (a.link ? '<a class="botaoLink" href="' + esc(a.link) + '">' + (a.tipo === 'sistema' ? 'Abrir' : 'Abrir a correção') + '</a>' : '') +
+          (/^auditor:/.test(a.link) ? '<div data-audrel="' + esc(a.link.slice(8)) + '" style="margin-top:6px"><p class="aviso">Carregando a revisão…</p></div>' : '') +
+          '<div class="botoes" style="margin-top:6px">' + (a.link && !/^auditor:/.test(a.link) ? '<a class="botaoLink" href="' + esc(a.link) + '">' + (a.tipo === 'sistema' ? 'Abrir' : 'Abrir a correção') + '</a>' : '') +
           '<button type="button" class="link" style="font-size:12.5px" data-avapagar="' + esc(a.id) + '">apagar</button></div></div>';
       }).join('') + (av.length ? '' : '<p class="aviso">' + (MSGS.avArq ? 'Nenhum aviso arquivado.' : 'Nenhum aviso recente.') + '</p>') + '<p class="aviso" style="margin-top:8px">' + (av.length > 10 ? 'Mostrando os 10 mais recentes. ' : '') + (MSGS.avArq ? 'Arquivados: avisos com mais de 7 dias (ficam aqui por 90 dias). ' : 'Depois de 7 dias cada aviso vai para os arquivados. ') +
         '<button type="button" class="link" style="font-size:12.5px" data-avarq="1">' + (MSGS.avArq ? 'voltar aos avisos recentes' : 'ver arquivados (' + arqAv.length + ')') + '</button>' +
@@ -1242,6 +1272,7 @@ function desenharMsgsProf(discPre){
     }).join('') : '<p class="aviso">' + (MSGS.aba === 'ativas' ? 'Nenhuma mensagem ativa.' : 'Nenhuma mensagem expirada.') + '</p>') + '</div>';
   el.innerHTML = h;
   ligarFecharMsgs();
+  preencherAuditorMsgs(el);
   el.querySelectorAll('[data-avarq]').forEach(function(b){ b.addEventListener('click', function(){ MSGS.avArq = !MSGS.avArq; desenharMsgsProf(); }); });
   el.querySelectorAll('[data-avapagar]').forEach(function(b){ b.addEventListener('click', function(){
     var todos = b.dataset.avapagar === 'todos', alvo = todos ? av.map(function(a){ return a.id; }) : [b.dataset.avapagar];
@@ -5841,7 +5872,8 @@ function desenharAuditor(res){
   var cx = $('cxAuditor'); if(!cx) return; cx.hidden = false;
   var l = Array.isArray(res) ? res : (res.relatorios || []), pub = res.publicacao;
   var vencendo = (res.tokens || []).filter(function(t){ return t.dias <= 30; });
-  cx.dataset.novidade = (l[0] ? l[0].id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '') + (vencendo.length ? '|token ' + vencendo.map(function(t){ return t.vence; }).join(',') : '');
+  var l0 = l.filter(function(x){ return x.relevante !== false; })[0];
+  cx.dataset.novidade = (l0 ? l0.id : '') + (pub && pub.estado === 'falhou' ? '|falhou ' + (pub.em || '') : '') + (vencendo.length ? '|token ' + vencendo.map(function(t){ return t.vence; }).join(',') : '');
   var avisoToken = vencendo.map(function(t){ return '<div class="erro" style="margin:6px 0">⚠ O <b>' + esc(t.nome) + '</b> ' + (t.dias < 0 ? 'venceu em ' + esc(t.vence) + ': a publicação automática parou.' : 'vence em <b>' + t.dias + ' dia(s)</b> (' + esc(t.vence) + ').') +
     ' Para renovar: no GitHub, Settings → Developer settings → Personal access tokens → <i>Regenerate</i> (1 ano) e ' + esc(t.onde) + '. Se preferir, peça ao Claude Code que ele guia.</div>'; }).join('') +
     (res.tokens || []).filter(function(t){ return t.dias > 30; }).map(function(t){ return '<p class="aviso" style="margin:2px 0">🔑 ' + esc(t.nome) + ': vale até ' + esc(t.vence) + '.</p>'; }).join('');
