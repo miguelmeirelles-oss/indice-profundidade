@@ -28,9 +28,9 @@
     azul: "#1f6fd1", laranja: "#d9650b", verde: "#1a8a47", vermelho: "#d62828",
     roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6", amino: "#2b8a3e", marrom: "#6b3a1a", redutor: "#e8590c"
   };
-  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6 };
+  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6, cristal: 4 };
   // desenhos que este motor sabe fazer (ao programar um desenho novo, acrescente o nome aqui também)
-  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo"];
+  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo", "cristal"];
   const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
@@ -102,6 +102,28 @@
         }
         mk("circle", { cx: (pts[0][0] - mx).toFixed(2), cy: (pts[0][1] - my).toFixed(2), r: 1.3 * tam, fill: PAL.o2, opacity: .9 }, gg);   // a "cabeça" (COOH)
         if (d.rotulo) rot(g, 0, 7.5 * tam, d.rotulo, 3.2);
+      }
+      else if (t === "cristal") {   // cristal de sacarose: prisma monoclínico facetado, translúcido, com as moléculas (hexágonos) em grade
+        const cor = PAL[d.cor] || PAL.ambar, w = 7 * tam, h = 4.2 * tam, b = 1.3 * tam, ox = 1.5 * tam, oy = -1.6 * tam;
+        const gg = mk("g", { transform: "rotate(" + (d.angulo || 0) + ") skewX(-10)" }, g);
+        const F = [[-w / 2, 0], [-w / 2 + b, -h / 2], [w / 2 - b, -h / 2], [w / 2, 0], [w / 2 - b, h / 2], [-w / 2 + b, h / 2]];
+        const pol = pts => pts.map((p, i) => (i ? "L" : "M") + p[0].toFixed(2) + "," + p[1].toFixed(2)).join("") + "Z";
+        F.forEach((p, i) => {   // faces laterais que ficam de frente para quem olha (lado de cima e da direita)
+          const q = F[(i + 1) % 6], nx = q[1] - p[1], ny = p[0] - q[0];
+          if (nx * ox + ny * oy > 0) mk("path", { d: pol([p, q, [q[0] + ox, q[1] + oy], [p[0] + ox, p[1] + oy]]), fill: cor, "fill-opacity": ny < 0 ? .38 : .22, stroke: cor, "stroke-width": .3 * Math.min(tam, 1.4), "stroke-linejoin": "round" }, gg);
+        });
+        mk("path", { d: pol(F), fill: cor, "fill-opacity": .16, stroke: cor, "stroke-width": .4 * Math.min(tam, 1.4), "stroke-linejoin": "round" }, gg);
+        if (tam >= .75) {   // as moléculas de sacarose arrumadas em grade dentro do cristal
+          const r = .38 * Math.min(tam, 1.6), px = 2.7 * r, py = 2.35 * r, cols = Math.floor((w - 2 * b) / px) + 1, lins = Math.max(1, Math.floor((h - 1.6 * r) / py));
+          for (let j = 0; j < lins; j++) for (let i = 0; i < cols; i++) {
+            const x = (i - (cols - 1) / 2) * px + (j % 2 ? px / 2 : 0), y = (j - (lins - 1) / 2) * py;
+            if (Math.abs(x) + r > w / 2 - b * (Math.abs(y) / (h / 2)) - .3 * tam) continue;
+            let hp = ""; for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k + Math.PI / 6; hp += (k ? "L" : "M") + (x + r * Math.cos(a)).toFixed(2) + "," + (y + r * Math.sin(a)).toFixed(2); }
+            mk("path", { d: hp + "Z", fill: PAL.acucar, "fill-opacity": .25, stroke: PAL.acucar, "stroke-width": .2 * Math.min(tam, 1.6), "stroke-opacity": .85 }, gg);
+          }
+        }
+        mk("path", { d: "M" + (-w / 2 + b * .55).toFixed(2) + "," + (-h * .2).toFixed(2) + "L" + (-w / 2 + b * 1.2).toFixed(2) + "," + (-h * .4).toFixed(2), stroke: "#ffffff", "stroke-width": .35 * Math.min(tam, 1.4), "stroke-opacity": .75, "stroke-linecap": "round" }, gg);   // brilho
+        if (d.rotulo) rot(g, 0, h / 2 + 4, d.rotulo, 3.2);
       }
       else if (t === "rede") {
         const w = d.w || 30, h = d.h || 24, cor = PAL[d.cor] || PAL.cadeia;
@@ -252,7 +274,8 @@
 
     /* ---------- AÇÕES ---------- */
     const A = {};
-    A.aparecer = (a, an) => { const e = els[a.elemento]; if (!e) return; e.vis = true; fade(e.g, an); };
+    A.aparecer = (a, an) => { const e = els[a.elemento]; if (!e) return; e.vis = true; fade(e.g, an);
+      if (e.tipo === "cristal" && an) tween(1500, k => { e.esc = .25 + .75 * k; posEl(e); }, true); };   // o cristal surge pequeno e cresce
     A.sumir = (a, an) => { const e = els[a.elemento]; if (!e) return; e.vis = false; tween(an ? 600 : 0, k => e.g.setAttribute("opacity", 1 - k), an); };
     A.mover = (a, an) => { const e = els[a.elemento]; if (!e) return; const x0 = e.x, y0 = e.y; if (!e.vis) { e.vis = true; e.g.setAttribute("opacity", 1); } tween(an ? (a.duracao || 1500) : 0, k => { e.x = x0 + (a.para[0] - x0) * k; e.y = y0 + (a.para[1] - y0) * k; posEl(e); }, an); };
     A.destacar = (a, an) => { const e = els[a.elemento]; if (!e || !an) return; tween(1600, k => { e.esc = 1 + .35 * Math.sin(k * Math.PI * 2) * (1 - k); posEl(e); }, true); };
