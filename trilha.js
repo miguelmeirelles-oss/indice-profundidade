@@ -626,11 +626,11 @@ function abrirPlayer(t){
         clearInterval(rel); bt.disabled = false;
         if(r.erros && r.erros.length){ $('msgAjuste').innerHTML = '<div class="erro"><b>A IA devolveu uma aula com problemas; nada foi salvo.</b> Tente de novo ou use 📋 Copiar.<br>' + r.erros.slice(0, 8).map(esc).join('<br>') + '</div>'; return; }
         gravarAjustes({});
+        NARRAR_AUTO = T.id;
         var aviso = (r.avisos && r.avisos.length) ? '<br><span class="aviso">' + r.avisos.slice(0, 5).map(esc).join('<br>') + '</span>' : '';
         abrirTrilha(T.id);
         setTimeout(function(){ if($('msgAjuste')){ $('ajusteBox').open = true; var prov = desenhosProvisorios(T && T.trilha);
           $('msgAjuste').innerHTML = '<div class="ok">✓ Ajustes aplicados por ' + esc(r.modelo || 'IA') + ': salva a versão ' + r.versao + '. Não gostou? Volte em 🕘 Versões desta aula.' + aviso + '</div>' +
-            (r.narrando ? '<div class="convite" style="margin-top:6px">🎙 ' + r.narrando + ' trecho(s) com fala nova entraram sozinhos na gravação da voz (mesma voz da aula). Grava no servidor, mesmo com a página fechada.</div>' : '') +
             (prov.length ? '<div class="convite" style="margin-top:6px">✏️ O motor ainda não tem o desenho <b>' + prov.map(esc).join(', ') + '</b>: por enquanto aparece um parecido. ' + AVISO_MADRUGADA + '</div>' : ''); } }, 1500);
       }).catch(function(e){ clearInterval(rel); bt.disabled = false; $('msgAjuste').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
     });
@@ -673,6 +673,7 @@ function abrirPlayer(t){
   if($('btDemoQ')) $('btDemoQ').addEventListener('click', demoQuadro);
   if($('btIrNarr')) $('btIrNarr').addEventListener('click', function(){ var d = $('admNarr'); d.open = true; desenharNarracao(); d.scrollIntoView({behavior: 'smooth', block: 'start'}); });
   if($('admNarr')) $('admNarr').addEventListener('toggle', function(){ if(this.open) desenharNarracao(); });
+  setTimeout(narrarMudadasAuto, 1200);
   irPara(0, 0, false);
 }
 // o aluno marca a aula como estudada e pode deixar um comentário (o professor vê)
@@ -2593,6 +2594,17 @@ function encerrarDuvida(semFechar, manterCaixa){
 }
 
 /* ===================== NARRAÇÃO COM VOZ DA IA (só o professor grava; uma vez) ===================== */
+// depois do "✨ Aplicar": ao reabrir a aula, grava sozinha (voz da conversa, com a aba aberta) as falas novas ou mudadas
+var NARRAR_AUTO = '';
+function narrarMudadasAuto(){
+  if(!T || NARRAR_AUTO !== T.id || MODO !== 'prof' || N.rodando || !$('admNarr')) return;
+  NARRAR_AUTO = '';
+  var itens = [], gravadas = 0;
+  T.trilha.blocos.forEach(function(b){ b.passos.forEach(function(p, i){ var s = T.narracao[b.id + ':' + i]; if(s) gravadas++; if(s !== 'ok') itens.push({k: b.id + ':' + i, b: b, i: i}); }); });
+  if(!gravadas || !itens.length) return;   // aula ainda sem narração nenhuma: fica para o professor decidir
+  $('admNarr').open = true;   // o 'toggle' desenha o painel da narração
+  setTimeout(function(){ gravarNarracao(itens); if($('narrLog')) $('narrLog').insertAdjacentHTML('afterbegin', '<div class="convite" style="margin:6px 0">🎙 Gravando sozinha, com a voz da conversa, as ' + itens.length + ' fala(s) que mudaram. Deixe esta aba aberta (uns 3 a 5 minutos).</div>'); }, 800);
+}
 var N = {ws: null, fila: [], atual: null, pcm: [], ouvido: '', timer: null, rodando: false, voz: 'Kore', tentativas: 0};
 function desenharNarracao(){
   var box = $('admNarrCorpo'); if(!box) return;
