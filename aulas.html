@@ -2835,22 +2835,25 @@ function carregarBancoEstudo(disc){
 }
 function desenharBancoEstudo(disc){
   var b = EST_PROF.banco, f = EST_PROF.filtro;
-  var n = {todas: b.length, nova: 0, boa: 0, banida: 0};
+  var n = {todas: b.length, nova: 0, boa: 0, banida: 0, pausada: 0};
   b.forEach(function(q){ n[q.status] = (n[q.status] || 0) + 1; });
-  var lista = b.filter(function(q){ return f === 'todas' ? q.status !== 'banida' : q.status === f; });
+  var lista = b.filter(function(q){ return f === 'todas' ? q.status !== 'banida' && q.status !== 'pausada' : q.status === f; });
   var h = '<h2>Banco de questões do estudo ' + ajuda('Todas as questões já criadas para o estudo desta disciplina. <b>✓ boa</b>: marca como exemplo do que você gosta. <b>🚫 banir</b>: tira do estudo; escreva o motivo, porque é com ele que a IA aprende o seu jeito de cobrar (os motivos viram as "regras" lá embaixo). Quem já respondeu uma questão banida mantém o histórico. O banco vai junto quando a disciplina é copiada para o próximo semestre.') + '</h2>' +
-    '<div class="chips" style="margin-bottom:8px">' + [['todas', 'em uso'], ['nova', 'não revisadas'], ['boa', 'boas'], ['banida', 'banidas']].map(function(x){
-      return '<button type="button" class="chip" data-bfiltro="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + ' (' + (x[0] === 'todas' ? b.length - (n.banida || 0) : n[x[0]] || 0) + ')</button>'; }).join('') + '</div>';
+    '<div class="chips" style="margin-bottom:8px">' + [['todas', 'em uso'], ['nova', 'não revisadas'], ['boa', 'boas'], ['pausada', 'pausadas pela madrugada'], ['banida', 'banidas']].filter(function(x){ return x[0] !== 'pausada' || n.pausada; }).map(function(x){
+      return '<button type="button" class="chip" data-bfiltro="' + x[0] + '" aria-pressed="' + (f === x[0]) + '">' + x[1] + ' (' + (x[0] === 'todas' ? b.length - (n.banida || 0) - (n.pausada || 0) : n[x[0]] || 0) + ')</button>'; }).join('') + '</div>' +
+    '<p class="aviso" style="margin:0 0 8px">Nível de cada questão: <b>1</b> básica · <b>2</b> média · <b>3</b> desafio (clique no nível para trocar). Cada aluno recebe as questões do nível que serve para ele: começa no 2, sobe quando vai bem, desce um degrau quando vai mal duas vezes no assunto, e nunca fica só no 1. Respostas de teste não contam. A revisão da madrugada confere o assunto, se dá para responder com a sua aula e o nível; o que ela pausar fica em "pausadas" (desfaz com um clique).</p>';
   if(!lista.length) h += '<p class="aviso">' + (b.length ? 'Nenhuma questão neste filtro.' : 'Ainda não há questões: elas são criadas quando os alunos começam a estudar.') + '</p>';
   lista.forEach(function(q){
     var aberto = EST_PROF.abertos[q.id];
     h += '<div class="linha" style="align-items:flex-start' + (q.status === 'banida' ? ';background:#fdf2f2' : '') + '"><span style="flex:1;min-width:240px">' +
-      '<span class="tag t-azul">' + esc(q.tema) + '</span> ' + (q.status === 'boa' ? '<span class="tag t-ok">boa</span> ' : q.status === 'banida' ? '<span class="tag t-err">banida</span> ' : '') +
+      '<span class="tag t-azul">' + esc(q.tema) + '</span> ' + '<button type="button" class="tag" style="cursor:pointer;border:0" title="trocar o nível" data-bnivel="' + esc(q.id) + '">nível ' + (q.nivel || '?') + '</button> ' +
+      (q.revisada ? '<span class="tag t-ok" title="revisada pela madrugada em ' + esc(q.revisada) + '">🔎 revisada</span> ' : '') +
+      (q.status === 'boa' ? '<span class="tag t-ok">boa</span> ' : q.status === 'banida' ? '<span class="tag t-err">banida</span> ' : q.status === 'pausada' ? '<span class="tag t-err">⏸ pausada</span> ' : '') +
       (q.status === 'banida' ? '<s>' + esc(q.enunciado) + '</s>' : '<b>' + esc(q.enunciado) + '</b>') +
       '<br><span class="aviso">' + (q.alunos ? q.alunos + ' aluno(s) · média ' + dez(q.media) : 'ainda não respondida') + (q.motivo ? ' · <b>motivo:</b> ' + esc(q.motivo) : '') + '</span>' +
       (aberto ? '<div class="ajudaEst" style="margin-top:6px"><b>Ajuda (tópicos):</b> ' + q.ajuda.map(esc).join(' · ') + '</div>' + htmlModelo(q.modelo) : '') + '</span>' +
       '<span class="botoes" style="margin:0"><button type="button" class="link" style="font-size:12.5px" data-bver="' + esc(q.id) + '">' + (aberto ? 'esconder' : 'ver resposta comentada') + '</button>' +
-      (q.status === 'banida' ? '<button type="button" class="secundario mini" data-bacao="desfazer" data-bq="' + esc(q.id) + '">desfazer</button>'
+      (q.status === 'banida' || q.status === 'pausada' ? '<button type="button" class="secundario mini" data-bacao="desfazer" data-bq="' + esc(q.id) + '">' + (q.status === 'pausada' ? '↩ voltar para o estudo' : 'desfazer') + '</button>'
         : (q.status !== 'boa' ? '<button type="button" class="secundario mini" data-bacao="boa" data-bq="' + esc(q.id) + '">✓ boa</button>' : '') +
           '<button type="button" class="secundario mini" style="color:#c62828" data-bacao="banir" data-bq="' + esc(q.id) + '">🚫 banir</button>') + '</span></div>';
   });
@@ -2858,6 +2861,12 @@ function desenharBancoEstudo(disc){
   var box = $('estBanco');
   box.querySelectorAll('[data-bfiltro]').forEach(function(c){ c.addEventListener('click', function(){ EST_PROF.filtro = c.dataset.bfiltro; desenharBancoEstudo(disc); }); });
   box.querySelectorAll('[data-bver]').forEach(function(c){ c.addEventListener('click', function(){ EST_PROF.abertos[c.dataset.bver] = !EST_PROF.abertos[c.dataset.bver]; desenharBancoEstudo(disc); }); });
+  box.querySelectorAll('[data-bnivel]').forEach(function(c){ c.addEventListener('click', function(){
+    var q = EST_PROF.banco.filter(function(x){ return x.id === c.dataset.bnivel; })[0]; if(!q) return;
+    var nv = (Number(q.nivel) || 2) % 3 + 1;   // 1 → 2 → 3 → 1
+    c.disabled = true;
+    api('avaliarQuestaoEstudo', {questaoId: q.id, acao: 'nivel', motivo: String(nv)}).then(function(){ q.nivel = nv; desenharBancoEstudo(disc); }).catch(function(e){ c.disabled = false; alert(e.message); });
+  }); });
   box.querySelectorAll('[data-bacao]').forEach(function(c){ c.addEventListener('click', function(){
     var acao = c.dataset.bacao, motivo = '';
     if(acao === 'banir'){ motivo = window.prompt('Por que banir esta questão? (a IA aprende com o motivo)', ''); if(!motivo) return; }
