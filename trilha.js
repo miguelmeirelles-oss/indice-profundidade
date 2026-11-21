@@ -53,7 +53,7 @@ var PROMPT_TRILHA = [
 "",
 "CENA DE MOLÉCULAS (parte de baixo da tela; mostre o que a fala está explicando, como num desenho animado do fenômeno):",
 "- Declare no bloco: \"cena\": {\"elementos\": [ … ]}. Coordenadas da cena: x de 0 a 100 (esquerda → direita), y de 0 a 60 (topo → base). Elementos começam escondidos.",
-"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos), \"acido_graxo\" (ácido graxo em zigue-zague com a cabeça COOH; \"forma\": \"saturado\" ou \"trans\" = cadeia reta, \"cis\" = dobrada na dupla ligação; \"unidades\": nº de carbonos, 4 a 24; \"angulo\": giro em graus — várias cadeias retas lado a lado mostram o empacotamento compacto da gordura sólida, as cis dobradas mostram o empacotamento frouxo do óleo), \"cristal\" (cristal de sacarose: prisma facetado translúcido âmbar com as moléculas em grade dentro; \"tamanho\": 0,6 = semente minúscula, 1 = pequeno, 2 = cristal médio; \"angulo\": giro em graus; ao \"aparecer\" surge pequeno e cresce; use com \"acucar\" soltos em volta para mostrar a cristalização). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
+"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos), \"acido_graxo\" (ácido graxo em zigue-zague com a cabeça COOH; \"forma\": \"saturado\" ou \"trans\" = cadeia reta, \"cis\" = dobrada na dupla ligação; \"unidades\": nº de carbonos, 4 a 24; \"angulo\": giro em graus — várias cadeias retas lado a lado mostram o empacotamento compacto da gordura sólida, as cis dobradas mostram o empacotamento frouxo do óleo), \"cristal\" (cristal de sacarose: prisma facetado translúcido âmbar com as moléculas em grade dentro; \"tamanho\": 0,6 = semente minúscula, 1 = pequeno, 2 = cristal médio; \"angulo\": giro em graus; ao \"aparecer\" surge pequeno e cresce; use com \"acucar\" soltos em volta para mostrar a cristalização). Também: \"proteina\" (proteína globular: \"forma\": \"nativa\" = novelo ou \"desnaturada\" = fita aberta; \"pos\" e \"neg\" = nº de cargas + e − na superfície, 0 a 12; \"sitio\": true = encaixe do sítio ativo; \"semente\" muda o desenho), \"micela_caseina\" (cacho de submicelas; \"cabeleira\": false = sem a kappa-caseína, depois do coalho; \"neg\" = nº de cargas −; vibra sozinha), \"phmetro\" (visor com \"valor\", ex.: \"4,6\", e régua de 0 a 14), \"radical\" (radical livre: ponto vermelho com halo pulsando; \"rotulo\", ex.: \"ROO•\"), \"oxigenio\" (O₂; \"estado\": \"triplete\" ↑↑ ou \"singlete\" ↑↓ com brilho). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
 "- Se a explicação precisar de um desenho que NÃO existe nesta lista, crie o elemento com um \"tipo\" NOVO (nome curto em minúsculas, ex.: \"micela\"), \"descricao\" (como ele deve parecer e se animar, em detalhe), os parâmetros que quiser (ex.: \"forma\", \"unidades\") e \"reserva\": o elemento da lista mais parecido (ex.: {\"tipo\": \"gordura\", \"tamanho\": 2}). A aula mostra a reserva até a plataforma programar o desenho novo (o professor aprova) e, daí em diante, mostra o desenho novo sozinha.",
 "- Em cada passo, \"cena_acoes\" (mesma regra de \"atraso\"; cada passo herda a cena dos anteriores até um \"limpar_cena\"):",
 "  {\"tipo\":\"aparecer\",\"elemento\":\"id\"} · {\"tipo\":\"sumir\",\"elemento\":\"id\"} · {\"tipo\":\"mover\",\"elemento\":\"id\",\"para\":[x,y],\"duracao\":1500}",
@@ -1389,9 +1389,9 @@ var Cena = (function () {
     azul: "#1f6fd1", laranja: "#d9650b", verde: "#1a8a47", vermelho: "#d62828",
     roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6", amino: "#2b8a3e", marrom: "#6b3a1a", redutor: "#e8590c"
   };
-  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6, cristal: 4 };
+  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6, cristal: 4, proteina: 4.6, micela_caseina: 4.2, phmetro: 8, radical: 1.6, oxigenio: 2.8 };
   // desenhos que este motor sabe fazer (ao programar um desenho novo, acrescente o nome aqui também)
-  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo", "cristal"];
+  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo", "cristal", "proteina", "micela_caseina", "phmetro", "radical", "oxigenio"];
   const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
@@ -1417,6 +1417,108 @@ var Cena = (function () {
       desenharEl(e);
       els[d.id] = e; posEl(e);
       return e;
+    }
+    // ---- desenhos das aulas de proteínas/laticínios e de oxidação de lipídios
+    function sorteioFixo(d) {   // "semente" (ou o id) dá sempre a mesma forma
+      let n = Number(d.semente) ? Number(d.semente) * 7919 + 17 : String(d.id || "x").split("").reduce(function (s, c) { return (s * 31 + c.charCodeAt(0)) % 2147483647; }, 7);
+      n = n % 2147483647 || 1; return function () { n = (n * 16807) % 2147483647; return (n - 1) / 2147483646; };
+    }
+    function pulsar(el, atr, de, ate, dur, comeco) {   // animação contínua (sem fim), sem depender do relógio da cena
+      mk("animate", { attributeName: atr, values: de + ";" + ate + ";" + de, dur: dur + "s", begin: (comeco || 0) + "s", repeatCount: "indefinite" }, el);
+    }
+    function carga(g, x, y, tam, positiva) {
+      mk("circle", { cx: x.toFixed(2), cy: y.toFixed(2), r: (.78 * tam).toFixed(2), fill: positiva ? PAL.hmais : PAL.azul, stroke: "#00000040", "stroke-width": .15 }, g);
+      const tx = mk("text", { x: x.toFixed(2), y: (y + .42 * tam).toFixed(2), "text-anchor": "middle", "font-size": (1.25 * tam).toFixed(2), "font-weight": 700, fill: "#ffffff", "font-family": "system-ui,sans-serif" }, g);
+      tx.textContent = positiva ? "+" : "−";
+    }
+    function curvaSuave(pts, fechar) {   // passa por todos os pontos (Catmull-Rom → Bézier)
+      const n = pts.length, P2 = function (i) { return fechar ? pts[(i + n) % n] : pts[Math.max(0, Math.min(n - 1, i))]; };
+      let s = "M" + pts[0][0].toFixed(2) + "," + pts[0][1].toFixed(2);
+      for (let i = 0; i < (fechar ? n : n - 1); i++) {
+        const p0 = P2(i - 1), p1 = P2(i), p2 = P2(i + 1), p3 = P2(i + 2);
+        s += "C" + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(2) + "," + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(2) + " " + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(2) + "," + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(2) + " " + p2[0].toFixed(2) + "," + p2[1].toFixed(2);
+      }
+      return s + (fechar ? "Z" : "");
+    }
+    function desenharNovos(g, d, t, tam) {
+      const sr = sorteioFixo(d);
+      if (t === "proteina") {   // novelo (nativa) ou fita aberta (desnaturada), com as cargas na superfície
+        const R = 3.2 * tam, cor = PAL[d.cor] || PAL.roxo, aberta = d.forma === "desnaturada";
+        const pos = Math.max(0, Math.min(12, Number(d.pos) || 0)), neg = Math.max(0, Math.min(12, Number(d.neg) || 0)), n = pos + neg;
+        let pts = [], ondas = [];
+        if (aberta) {
+          for (let i = 0; i <= 12; i++) { const x = -1.7 * R + i * (3.4 * R / 12); pts.push([x, Math.sin(i * 1.3 + sr() * .8) * R * .32 + (sr() - .5) * R * .15]); }
+        } else {
+          mk("circle", { r: (R * 1.02).toFixed(2), fill: cor, "fill-opacity": .08 }, g);
+          for (let i = 0; i < 13; i++) { const a = i * 1.85 + sr() * .35, r = R * (i % 2 ? .82 + .12 * sr() : .38 + .18 * sr()); pts.push([Math.cos(a) * r, Math.sin(a) * r * .9]); }   // voltas largas e estreitas alternadas: cara de novelo
+        }
+        mk("path", { d: curvaSuave(pts, !aberta), fill: "none", stroke: cor, "stroke-width": (.45 * tam).toFixed(2), "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-opacity": .95 }, g);
+        if (d.sitio && !aberta) {   // o encaixe (sítio ativo) no topo
+          mk("path", { d: "M" + (-1.1 * tam).toFixed(2) + "," + (-R - .2 * tam).toFixed(2) + "Q0," + (-R + 1.6 * tam).toFixed(2) + " " + (1.1 * tam).toFixed(2) + "," + (-R - .2 * tam).toFixed(2), fill: PAL.fundo, stroke: cor, "stroke-width": (.4 * tam).toFixed(2) }, g);
+        }
+        // cargas alternadas (+ e −) espalhadas na superfície (ou ao longo da fita)
+        const ordem = []; let p = pos, q = neg; while (p || q) { if (p >= q && p) { ordem.push(true); p--; } else { ordem.push(false); q--; } }
+        const giro = sr() * Math.PI * 2;
+        ordem.forEach(function (positiva, i) {
+          if (aberta) { const k = Math.round((i + .5) * (pts.length - 1) / n), pt = pts[Math.min(pts.length - 1, k)]; carga(g, pt[0], pt[1] + (i % 2 ? 1.5 : -1.5) * tam, tam, positiva); }
+          else { const a = giro + i * Math.PI * 2 / n; carga(g, Math.cos(a) * (R + .7 * tam), Math.sin(a) * (R + .7 * tam), tam, positiva); }
+        });
+        if (d.rotulo) rot(g, 0, (aberta ? R * .9 : R) + 4.4 * tam, d.rotulo, 3.2);
+      }
+      else if (t === "micela_caseina") {   // cacho de submicelas, "cabeleira" de kappa-caseína e cargas negativas em volta
+        const R = 3.3 * tam, creme = "#f2e3bd", contorno = PAL.marrom;
+        const gv = mk("g", {}, g), amp = (.14 * tam).toFixed(2);
+        mk("animateTransform", { attributeName: "transform", type: "translate", values: "0,0;" + amp + ",-" + amp + ";-" + amp + "," + amp + ";0,0", dur: (.7 + sr() * .4).toFixed(2) + "s", begin: (sr() * .6).toFixed(2) + "s", repeatCount: "indefinite" }, gv);
+        if (d.cabeleira !== false) {
+          let pelos = ""; for (let i = 0; i < 26; i++) { const a = i * Math.PI * 2 / 26 + sr() * .1, l = (.75 + sr() * .45) * tam; pelos += "M" + (Math.cos(a) * R).toFixed(2) + "," + (Math.sin(a) * R).toFixed(2) + "L" + (Math.cos(a) * (R + l)).toFixed(2) + "," + (Math.sin(a) * (R + l)).toFixed(2); }
+          mk("path", { d: pelos, stroke: contorno, "stroke-width": (.28 * tam).toFixed(2), "stroke-linecap": "round", fill: "none" }, gv);
+        }
+        mk("circle", { r: R.toFixed(2), fill: creme, "fill-opacity": .12, stroke: contorno, "stroke-width": (.22 * tam).toFixed(2), "stroke-dasharray": (.7 * tam).toFixed(2) + " " + (.5 * tam).toFixed(2) }, gv);
+        const nsub = 8 + Math.floor(sr() * 3), rs = R * .33;
+        for (let i = 0; i < nsub; i++) {
+          const a = i * 2.39996 + sr() * .3, r = i === 0 ? 0 : (R - rs * 1.3) * Math.sqrt((i + .3) / nsub);
+          mk("circle", { cx: (Math.cos(a) * r).toFixed(2), cy: (Math.sin(a) * r).toFixed(2), r: (rs * (.85 + sr() * .25)).toFixed(2), fill: creme, stroke: contorno, "stroke-width": (.18 * tam).toFixed(2), "stroke-opacity": .7 }, gv);
+        }
+        const nneg = Math.max(0, Math.min(12, Number(d.neg) || 0)), g0 = sr() * Math.PI * 2;
+        for (let i = 0; i < nneg; i++) {
+          const a = g0 + i * Math.PI * 2 / nneg, rr = R + 1.6 * tam;
+          carga(gv, Math.cos(a) * rr, Math.sin(a) * rr, .75 * tam, false);
+        }
+        if (d.rotulo) rot(g, 0, R + 4.2 * tam, d.rotulo, 3.2);
+      }
+      else if (t === "phmetro") {   // visor digital com o valor e a régua de 0 a 14 (vermelho ácido → azul básico)
+        const s = tam, w = 15 * s, h = 9 * s, txt = String(d.valor == null ? "7,0" : d.valor), v = Math.max(0, Math.min(14, parseFloat(txt.replace(",", ".")) || 7));
+        mk("rect", { x: (-w / 2).toFixed(2), y: (-h / 2).toFixed(2), width: w.toFixed(2), height: h.toFixed(2), rx: (1.1 * s).toFixed(2), fill: "#2b2f36", stroke: "#0f1114", "stroke-width": (.3 * s).toFixed(2) }, g);
+        mk("rect", { x: (-w / 2 + 1.2 * s).toFixed(2), y: (-h / 2 + 1 * s).toFixed(2), width: (w - 2.4 * s).toFixed(2), height: (4.2 * s).toFixed(2), rx: (.5 * s).toFixed(2), fill: "#c9f2c7" }, g);
+        const tv = mk("text", { x: 0, y: (-h / 2 + 4.1 * s).toFixed(2), "text-anchor": "middle", "font-size": (3.1 * s).toFixed(2), "font-weight": 700, fill: "#1d4d1a", "font-family": "ui-monospace,Consolas,monospace" }, g);
+        tv.textContent = "pH " + txt;
+        const gid = "gph" + Math.floor(sr() * 1e9), defs = mk("defs", {}, g), lg = mk("linearGradient", { id: gid, x1: 0, x2: 1, y1: 0, y2: 0 }, defs);
+        [["0", "#d62828"], [".22", "#f08c00"], [".4", "#f2d600"], [".5", "#2f9e44"], [".7", "#1c7ed6"], ["1", "#5f3dc4"]].forEach(function (c) { mk("stop", { offset: c[0], "stop-color": c[1] }, lg); });
+        const bx = -w / 2 + 1.2 * s, bw = w - 2.4 * s, by = h / 2 - 2.6 * s;
+        mk("rect", { x: bx.toFixed(2), y: by.toFixed(2), width: bw.toFixed(2), height: (1.1 * s).toFixed(2), rx: (.4 * s).toFixed(2), fill: "url(#" + gid + ")" }, g);
+        const mx = bx + bw * v / 14;
+        mk("path", { d: "M" + (mx - .8 * s).toFixed(2) + "," + (by - 1.1 * s).toFixed(2) + "L" + (mx + .8 * s).toFixed(2) + "," + (by - 1.1 * s).toFixed(2) + "L" + mx.toFixed(2) + "," + (by - .05 * s).toFixed(2) + "Z", fill: "#ffffff" }, g);
+        [[0, "0"], [7, "7"], [14, "14"]].forEach(function (m) { const tt = mk("text", { x: (bx + bw * m[0] / 14).toFixed(2), y: (by + 2.3 * s).toFixed(2), "text-anchor": "middle", "font-size": (1.1 * s).toFixed(2), fill: "#cfd4da", "font-family": "system-ui,sans-serif" }, g); tt.textContent = m[1]; });
+        if (d.rotulo) rot(g, 0, h / 2 + 3, d.rotulo, 3.2);
+      }
+      else if (t === "radical") {   // o elétron sem par: ponto vermelho com halo que pulsa sem parar (espécie instável)
+        const halo = mk("circle", { r: (1.2 * tam).toFixed(2), fill: PAL.vermelho, "fill-opacity": .35 }, g);
+        pulsar(halo, "r", (1.1 * tam).toFixed(2), (3.4 * tam).toFixed(2), 1, (sr() * .5).toFixed(2));
+        pulsar(halo, "fill-opacity", ".45", "0", 1, (sr() * .5).toFixed(2));
+        mk("circle", { r: (.95 * tam).toFixed(2), fill: PAL.vermelho, stroke: "#00000040", "stroke-width": .15 }, g);
+        mk("circle", { cx: (-.3 * tam).toFixed(2), cy: (-.3 * tam).toFixed(2), r: (.28 * tam).toFixed(2), fill: "#ffffff", "fill-opacity": .7 }, g);
+        rot(g, 0, -3.4 * tam, d.rotulo || "R•", 3);
+      }
+      else if (t === "oxigenio") {   // O₂: duas esferas; triplete ↑↑ (calmo) ou singlete ↑↓ com brilho pulsando (muito reativo)
+        const r = 1.45 * tam, dx = 1.15 * tam, singlete = d.estado === "singlete";
+        if (singlete) { const b = mk("circle", { r: (3.4 * tam).toFixed(2), fill: PAL.vermelho, "fill-opacity": .2 }, g); pulsar(b, "fill-opacity", ".08", ".45", 1.1); pulsar(b, "r", (3 * tam).toFixed(2), (3.8 * tam).toFixed(2), 1.1); }
+        [-dx, dx].forEach(function (x) { mk("circle", { cx: x.toFixed(2), r: r.toFixed(2), fill: PAL.o2, stroke: "#00000050", "stroke-width": .2 }, g); });
+        const tx = mk("text", { x: 0, y: (.5 * tam).toFixed(2), "text-anchor": "middle", "font-size": (1.4 * tam).toFixed(2), "font-weight": 700, fill: "#ffffff", "font-family": "system-ui,sans-serif" }, g);
+        tx.textContent = "O₂";
+        const sp = mk("text", { x: 0, y: (-r - .7 * tam).toFixed(2), "text-anchor": "middle", "font-size": (1.9 * tam).toFixed(2), "font-weight": 700, fill: singlete ? PAL.vermelho : PAL.giz, "font-family": "system-ui,sans-serif" }, g);
+        sp.textContent = singlete ? "↑↓" : "↑↑";
+        if (d.rotulo) rot(g, 0, r + 3.2 * tam, d.rotulo, 3);
+      }
     }
     function desenharEl(e) {
       const d0 = e.def, g = e.g; g.innerHTML = "";
@@ -1486,6 +1588,7 @@ var Cena = (function () {
         mk("path", { d: "M" + (-w / 2 + b * .55).toFixed(2) + "," + (-h * .2).toFixed(2) + "L" + (-w / 2 + b * 1.2).toFixed(2) + "," + (-h * .4).toFixed(2), stroke: "#ffffff", "stroke-width": .35 * Math.min(tam, 1.4), "stroke-opacity": .75, "stroke-linecap": "round" }, gg);   // brilho
         if (d.rotulo) rot(g, 0, h / 2 + 4, d.rotulo, 3.2);
       }
+      else if (t === "proteina" || t === "micela_caseina" || t === "phmetro" || t === "radical" || t === "oxigenio") { desenharNovos(g, d, t, tam); }
       else if (t === "rede") {
         const w = d.w || 30, h = d.h || 24, cor = PAL[d.cor] || PAL.cadeia;
         mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: 2, fill: cor + "10", stroke: "none" }, g);
