@@ -55,7 +55,7 @@
     if (document.getElementById('btAvisoAluno')) return;
     var b = document.createElement('button'); b.type = 'button'; b.id = 'btAvisoAluno';
     b.title = 'Avisar um erro, um conteúdo errado ou mandar uma sugestão';
-    b.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9998;border:1px solid #c9d3e3;border-radius:999px;padding:8px 13px;font-size:13.5px;background:#fff;color:#1f2a44;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;font-family:inherit';
+    b.style.cssText = 'position:fixed;left:12px;bottom:12px;max-width:calc(100% - 24px);z-index:9998;border:1px solid #c9d3e3;border-radius:999px;padding:8px 13px;font-size:13.5px;background:#fff;color:#1f2a44;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer;font-family:inherit';
     pintarBotao(b, false);
     document.body.appendChild(b);
     b.addEventListener('click', abrir);
@@ -77,6 +77,9 @@
       '<div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button type="button" id="avEnviar" disabled style="border:0;border-radius:10px;background:#17389C;color:#fff;padding:9px 18px;font-size:15px;cursor:pointer;font-family:inherit">Enviar</button>' +
       '<button type="button" id="avMeus" style="border:0;background:none;color:#17389C;text-decoration:underline;cursor:pointer;font-size:14px;font-family:inherit">Meus avisos</button></div><div id="avMsg"></div><div id="avLista"></div></div>';
     document.body.appendChild(fundo);
+    // a janela usa a largura VISÍVEL da tela (algumas páginas são mais largas que o celular e esticariam a janela)
+    try { var vis = document.documentElement.clientWidth || window.innerWidth, card = fundo.firstElementChild, w = Math.min(520, vis);
+      fundo.style.justifyContent = 'flex-start'; card.style.maxWidth = w + 'px'; card.style.marginLeft = Math.max(0, (vis - w) / 2) + 'px'; } catch (e) {}
     var $ = function (id) { return document.getElementById(id); }, fechar = function () { fundo.remove(); };
     fundo.addEventListener('click', function (e) { if (e.target === fundo) fechar(); });
     $('avFechar').addEventListener('click', fechar);
