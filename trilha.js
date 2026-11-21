@@ -53,7 +53,7 @@ var PROMPT_TRILHA = [
 "",
 "CENA DE MOLÉCULAS (parte de baixo da tela; mostre o que a fala está explicando, como num desenho animado do fenômeno):",
 "- Declare no bloco: \"cena\": {\"elementos\": [ … ]}. Coordenadas da cena: x de 0 a 100 (esquerda → direita), y de 0 a 60 (topo → base). Elementos começam escondidos.",
-"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos), \"acido_graxo\" (ácido graxo em zigue-zague com a cabeça COOH; \"forma\": \"saturado\" ou \"trans\" = cadeia reta, \"cis\" = dobrada na dupla ligação; \"unidades\": nº de carbonos, 4 a 24; \"angulo\": giro em graus — várias cadeias retas lado a lado mostram o empacotamento compacto da gordura sólida, as cis dobradas mostram o empacotamento frouxo do óleo), \"cristal\" (cristal de sacarose: prisma facetado translúcido âmbar com as moléculas em grade dentro; \"tamanho\": 0,6 = semente minúscula, 1 = pequeno, 2 = cristal médio; \"angulo\": giro em graus; ao \"aparecer\" surge pequeno e cresce; use com \"acucar\" soltos em volta para mostrar a cristalização). Também: \"proteina\" (proteína globular: \"forma\": \"nativa\" = novelo ou \"desnaturada\" = fita aberta; \"pos\" e \"neg\" = nº de cargas + e − na superfície, 0 a 12; \"sitio\": true = encaixe do sítio ativo; \"semente\" muda o desenho), \"micela_caseina\" (cacho de submicelas; \"cabeleira\": false = sem a kappa-caseína, depois do coalho; \"neg\" = nº de cargas −; vibra sozinha), \"phmetro\" (visor com \"valor\", ex.: \"4,6\", e régua de 0 a 14), \"radical\" (radical livre: ponto vermelho com halo pulsando; \"rotulo\", ex.: \"ROO•\"), \"oxigenio\" (O₂; \"estado\": \"triplete\" ↑↑ ou \"singlete\" ↑↓ com brilho). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
+"- Tipos de elemento: \"agua\" (molécula de água; \"tamanho\" para ampliar), \"ion\" (\"rotulo\": \"Na⁺\", \"Cl⁻\"…), \"acucar\", \"cadeia\" (amido, fibra, proteína; \"unidades\": nº de anéis; \"cor\"), \"gordura\", \"particula\", \"bacteria\", \"caixa\" (objeto sólido, ex.: lata, embalagem; \"w\", \"h\"), \"estrutura\" (parede de um alimento, ex.: queijo; \"w\", \"h\"), \"rede\" (rede de gel/polímero; \"w\", \"h\"), \"levedura\" (célula oval com broto), \"fungo\" (bolor: filamentos com esporos), \"acido_graxo\" (ácido graxo em zigue-zague com a cabeça COOH; \"forma\": \"saturado\" ou \"trans\" = cadeia reta, \"cis\" = dobrada na dupla ligação; \"unidades\": nº de carbonos, 4 a 24; \"angulo\": giro em graus — várias cadeias retas lado a lado mostram o empacotamento compacto da gordura sólida, as cis dobradas mostram o empacotamento frouxo do óleo), \"cristal\" (cristal de sacarose: prisma facetado translúcido âmbar com as moléculas em grade dentro; \"tamanho\": 0,6 = semente minúscula, 1 = pequeno, 2 = cristal médio; \"angulo\": giro em graus; ao \"aparecer\" surge pequeno e cresce; use com \"acucar\" soltos em volta para mostrar a cristalização). Também: \"proteina\" (proteína globular: \"forma\": \"nativa\" = novelo ou \"desnaturada\" = fita aberta; \"pos\" e \"neg\" = nº de cargas + e − na superfície, 0 a 12; \"sitio\": true = encaixe do sítio ativo; \"semente\" muda o desenho), \"micela_caseina\" (cacho de submicelas; \"cabeleira\": false = sem a kappa-caseína, depois do coalho; \"neg\" = nº de cargas −; vibra sozinha), \"phmetro\" (visor com \"valor\", ex.: \"4,6\", e régua de 0 a 14), \"radical\" (radical livre: ponto vermelho com halo pulsando; \"rotulo\", ex.: \"ROO•\"), \"oxigenio\" (O₂; \"estado\": \"triplete\" ↑↑ ou \"singlete\" ↑↓ com brilho), \"tubo\" (tubo de ensaio; \"cor\": incolor, rosa, amarelo, azul, leite, marrom, verde; \"grumos\": true), \"bife\" (\"cor\": crua, cozida, palida (PSE), escura (DFD); \"exsudato\": true), \"gota\" (gota de óleo ou \"conteudo\": \"ar\"; \"filme\": proteina, emulsificante ou nenhum), \"copo\" (\"cor\": clara, chope, agua, leite; \"espuma\" 0 a 1), \"cristais_gordura\" (\"solidos\" 0 a 1; \"forma\": alfa, beta_linha, beta), \"triglicerideo\" (\"caudas\" 0 a 3; \"fosfo\": true; \"cores\" e \"formas\" (saturado/cis) por cauda), \"ag_duplas\" (ácido graxo com \"unidades\" e \"duplas\": [9,12]; \"trans\", \"numerar\", \"omega\": true; \"angulo\"), \"fotossensor\" (\"sigla\": Rb, Chl; \"excitado\": true), \"tecido\" (células ao microscópio; \"cristais\": nenhum, pequenos, grandes), \"cubeta\" (espectrofotômetro; \"turbidez\" 0 a 1 → T%). Todos aceitam \"id\", \"x\", \"y\", \"rotulo\" e \"tamanho\". Use SÓ esses tipos.",
 "- Se a explicação precisar de um desenho que NÃO existe nesta lista, crie o elemento com um \"tipo\" NOVO (nome curto em minúsculas, ex.: \"micela\"), \"descricao\" (como ele deve parecer e se animar, em detalhe), os parâmetros que quiser (ex.: \"forma\", \"unidades\") e \"reserva\": o elemento da lista mais parecido (ex.: {\"tipo\": \"gordura\", \"tamanho\": 2}). A aula mostra a reserva até a plataforma programar o desenho novo (o professor aprova) e, daí em diante, mostra o desenho novo sozinha.",
 "- Em cada passo, \"cena_acoes\" (mesma regra de \"atraso\"; cada passo herda a cena dos anteriores até um \"limpar_cena\"):",
 "  {\"tipo\":\"aparecer\",\"elemento\":\"id\"} · {\"tipo\":\"sumir\",\"elemento\":\"id\"} · {\"tipo\":\"mover\",\"elemento\":\"id\",\"para\":[x,y],\"duracao\":1500}",
@@ -1389,9 +1389,9 @@ var Cena = (function () {
     azul: "#1f6fd1", laranja: "#d9650b", verde: "#1a8a47", vermelho: "#d62828",
     roxo: "#6b3fd1", cinza: "#6b6a64", ambar: "#a86f00", rosa: "#d6337a", hmais: "#e03131", acido: "#7a52d6", anion: "#7a52d6", amino: "#2b8a3e", marrom: "#6b3a1a", redutor: "#e8590c"
   };
-  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6, cristal: 4, proteina: 4.6, micela_caseina: 4.2, phmetro: 8, radical: 1.6, oxigenio: 2.8 };
+  const RAIO = { fungo: 4.5, levedura: 2.8, agua: 1.35, ion: 2.6, acucar: 2.9, particula: 1.7, gordura: 3.0, bacteria: 4.8, cadeia: 5.2, o2: 1.6, h: 1.3, ha: 2.0, a: 1.9, red: 2.4, sac: 3.6, amino: 1.6, mel: 2.6, cristal: 4, proteina: 4.6, micela_caseina: 4.2, phmetro: 8, radical: 1.6, oxigenio: 2.8, tubo: 3, bife: 9, gota: 2.4, copo: 5, cristais_gordura: 8, triglicerideo: 7, ag_duplas: 6, fotossensor: 2.4, tecido: 9, cubeta: 14 };
   // desenhos que este motor sabe fazer (ao programar um desenho novo, acrescente o nome aqui também)
-  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo", "cristal", "proteina", "micela_caseina", "phmetro", "radical", "oxigenio"];
+  const TIPOS_EL = ["agua", "ion", "acucar", "particula", "gordura", "bacteria", "caixa", "estrutura", "cadeia", "rede", "levedura", "fungo", "acido_graxo", "cristal", "proteina", "micela_caseina", "phmetro", "radical", "oxigenio", "tubo", "bife", "gota", "copo", "cristais_gordura", "triglicerideo", "ag_duplas", "fotossensor", "tecido", "cubeta"];
   const SOLUTO = { ion: 1, acucar: 1, particula: 1, gordura: 1, bacteria: 1, cadeia: 1 };
   const S = 4.4; // espaçamento da rede de gelo
 
@@ -1519,6 +1519,135 @@ var Cena = (function () {
         sp.textContent = singlete ? "↑↓" : "↑↑";
         if (d.rotulo) rot(g, 0, r + 3.2 * tam, d.rotulo, 3);
       }
+      else if (t === "tubo") {   // tubo de ensaio com líquido até 2/3; "grumos" = flocos brancos (leite coagulado)
+        const s = tam, w = 4.6 * s, h = 18 * s, cores = { incolor: "#dfeef7", rosa: "#f08cb4", amarelo: "#f5d76e", azul: "#7cc4ff", leite: "#f4f1e6", marrom: "#9a6234", verde: "#7fcf8f" };
+        const liq = cores[d.cor] || PAL[d.cor] || cores.incolor, topo = -h / 2, nivel = topo + h / 3, r = w / 2;
+        const corpo = "M" + (-r).toFixed(2) + "," + topo.toFixed(2) + "L" + (-r).toFixed(2) + "," + (h / 2 - r).toFixed(2) + "A" + r.toFixed(2) + "," + r.toFixed(2) + " 0 0 0 " + r.toFixed(2) + "," + (h / 2 - r).toFixed(2) + "L" + r.toFixed(2) + "," + topo.toFixed(2);
+        mk("path", { d: "M" + (-r).toFixed(2) + "," + nivel.toFixed(2) + "L" + (-r).toFixed(2) + "," + (h / 2 - r).toFixed(2) + "A" + r.toFixed(2) + "," + r.toFixed(2) + " 0 0 0 " + r.toFixed(2) + "," + (h / 2 - r).toFixed(2) + "L" + r.toFixed(2) + "," + nivel.toFixed(2) + "Z", fill: liq, "fill-opacity": d.cor === "incolor" || !d.cor ? .45 : .9 }, g);
+        if (d.grumos) for (let i = 0; i < 9; i++) mk("ellipse", { cx: ((sr() - .5) * w * .7).toFixed(2), cy: (nivel + 1.2 * s + sr() * (h * .55)).toFixed(2), rx: (.45 * s + sr() * .35 * s).toFixed(2), ry: (.3 * s).toFixed(2), fill: "#ffffff", stroke: "#bdbdbd", "stroke-width": .1 }, g);
+        mk("path", { d: corpo, fill: "none", stroke: PAL.giz, "stroke-width": (.3 * s).toFixed(2), "stroke-opacity": .8 }, g);
+        mk("path", { d: "M" + (-r - .5 * s).toFixed(2) + "," + topo.toFixed(2) + "L" + (r + .5 * s).toFixed(2) + "," + topo.toFixed(2), stroke: PAL.giz, "stroke-width": (.4 * s).toFixed(2), "stroke-linecap": "round" }, g);
+        mk("path", { d: "M" + (-r * .5).toFixed(2) + "," + (topo + 1.5 * s).toFixed(2) + "L" + (-r * .5).toFixed(2) + "," + (h / 2 - r * 1.4).toFixed(2), stroke: "#ffffff", "stroke-width": (.25 * s).toFixed(2), "stroke-opacity": .45, "stroke-linecap": "round" }, g);
+        if (d.rotulo) rot(g, 0, h / 2 + 3, d.rotulo, 3);
+      }
+      else if (t === "bife") {   // fatia de carne em perfil com veios de gordura; cor = crua, cozida, palida (PSE), escura (DFD)
+        const s = tam, w = 20 * s, h = 8.5 * s, cores = { crua: "#c0392b", cozida: "#8a5a3b", palida: "#eaa3a3", escura: "#5c1a26" }, cor = cores[d.cor] || cores.crua;
+        if (d.exsudato) mk("ellipse", { cx: 0, cy: (h / 2 + .9 * s).toFixed(2), rx: (w * .62).toFixed(2), ry: (1.3 * s).toFixed(2), fill: "#e98aa0", "fill-opacity": .6 }, g);
+        const pts = []; for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; pts.push([Math.cos(a) * w / 2 * (.92 + sr() * .1), Math.sin(a) * h / 2 * (.85 + sr() * .18) - (Math.sin(a) < 0 ? .4 * s : 0)]); }
+        mk("path", { d: curvaSuave(pts, true), fill: cor, stroke: "#00000040", "stroke-width": (.25 * s).toFixed(2) }, g);
+        for (let k = 0; k < 3; k++) {   // veios de gordura
+          const y0 = (-h / 4 + k * h / 4) + (sr() - .5) * s, vp = []; for (let i = 0; i <= 6; i++) vp.push([-w * .38 + i * w * .76 / 6, y0 + Math.sin(i * 1.4 + k * 2) * .7 * s]);
+          mk("path", { d: curvaSuave(vp, false), fill: "none", stroke: "#f3e6d0", "stroke-width": (.35 * s + k * .08 * s).toFixed(2), "stroke-opacity": .85, "stroke-linecap": "round" }, g);
+        }
+        mk("path", { d: curvaSuave(pts.slice(7, 12), false), fill: "none", stroke: "#f3e6d0", "stroke-width": (.9 * s).toFixed(2), "stroke-opacity": .8, "stroke-linecap": "round" }, g);   // capa de gordura em cima
+        if (d.rotulo) rot(g, 0, h / 2 + (d.exsudato ? 4.5 : 3.5) * s, d.rotulo, 3);
+      }
+      else if (t === "gota") {   // gota de óleo (ou bolha de ar) em meio aquoso; filme = proteina | emulsificante | nenhum
+        const R = 2.4 * tam, ar = d.conteudo === "ar";
+        mk("circle", { r: R.toFixed(2), fill: ar ? "#ffffff" : PAL.gordura, "fill-opacity": ar ? .85 : .9, stroke: ar ? "#9aa5b1" : "#00000030", "stroke-width": (.15 * tam).toFixed(2) }, g);
+        mk("circle", { cx: (-R * .35).toFixed(2), cy: (-R * .35).toFixed(2), r: (R * .22).toFixed(2), fill: "#ffffff", "fill-opacity": .6 }, g);
+        if (d.filme === "emulsificante") {
+          const n = Math.max(10, Math.round(14 * tam));
+          for (let i = 0; i < n; i++) { const a = i * Math.PI * 2 / n, c = Math.cos(a), sn = Math.sin(a);
+            mk("path", { d: "M" + (c * (R - .5 * tam)).toFixed(2) + "," + (sn * (R - .5 * tam)).toFixed(2) + "L" + (c * (R + .35 * tam)).toFixed(2) + "," + (sn * (R + .35 * tam)).toFixed(2), stroke: "#8a8f98", "stroke-width": (.18 * tam).toFixed(2) }, g);
+            mk("circle", { cx: (c * (R + .6 * tam)).toFixed(2), cy: (sn * (R + .6 * tam)).toFixed(2), r: (.3 * tam).toFixed(2), fill: PAL.azul }, g); }
+        } else if (d.filme === "proteina") {
+          const n = 5, g0 = sr() * 6;
+          for (let i = 0; i < n; i++) { const a0 = g0 + i * Math.PI * 2 / n, fp = []; for (let k = 0; k <= 8; k++) { const a = a0 + k * .13, rr = R + .35 * tam + Math.sin(k * 1.6) * .28 * tam; fp.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+            mk("path", { d: curvaSuave(fp, false), fill: "none", stroke: PAL.azul, "stroke-width": (.28 * tam).toFixed(2), "stroke-linecap": "round" }, g); }
+        }
+        if (d.rotulo) rot(g, 0, R + 3.2 * tam, d.rotulo, 3);
+      }
+      else if (t === "copo") {   // copo com líquido e espuma por cima ("espuma" de 0 a 1 = altura da espuma)
+        const s = tam, w = 9 * s, h = 16 * s, cores = { clara: "#f6e7a8", chope: "#e2a33b", agua: "#cfe8fa", leite: "#f4f1e6" }, liq = cores[d.cor] || PAL[d.cor] || cores.clara;
+        const esp = Math.max(0, Math.min(1, Number(d.espuma) || 0)), base = h / 2, topoLiq = -h * .05, alt = esp * h * .42;
+        const lado = function (y) { return w / 2 - (base - y) / h * w * .18; };   // copo mais largo em cima
+        const fatia = function (y1, y2) { return "M" + (-lado(y1)).toFixed(2) + "," + y1.toFixed(2) + "L" + lado(y1).toFixed(2) + "," + y1.toFixed(2) + "L" + lado(y2).toFixed(2) + "," + y2.toFixed(2) + "L" + (-lado(y2)).toFixed(2) + "," + y2.toFixed(2) + "Z"; };
+        mk("path", { d: fatia(topoLiq, base), fill: liq, "fill-opacity": .85 }, g);
+        if (alt > .2) {
+          mk("path", { d: fatia(topoLiq - alt, topoLiq), fill: "#ffffff", "fill-opacity": .95 }, g);
+          const nb = Math.round(alt * 2.2); for (let i = 0; i < nb; i++) { const y = topoLiq - sr() * alt; mk("circle", { cx: ((sr() - .5) * lado(y) * 1.7).toFixed(2), cy: y.toFixed(2), r: (.25 * s + sr() * .3 * s).toFixed(2), fill: "none", stroke: "#c9d1d9", "stroke-width": .12 }, g); }
+        }
+        mk("path", { d: fatia(-h / 2, base), fill: "none", stroke: PAL.giz, "stroke-width": (.3 * s).toFixed(2), "stroke-opacity": .8, "stroke-linejoin": "round" }, g);
+        if (d.rotulo) rot(g, 0, base + 3, d.rotulo, 2.8);
+      }
+      else if (t === "cristais_gordura") {   // óleo com cristais de gordura; solidos 0–1; forma alfa | beta_linha | beta
+        const s = tam, w = 16 * s, h = 10 * s, fr = Math.max(0, Math.min(1, Number(d.solidos) || 0)), forma = d.forma || "beta_linha";
+        mk("rect", { x: (-w / 2).toFixed(2), y: (-h / 2).toFixed(2), width: w.toFixed(2), height: h.toFixed(2), rx: (1 * s).toFixed(2), fill: PAL.gordura, "fill-opacity": .35, stroke: PAL.gordura, "stroke-width": (.25 * s).toFixed(2) }, g);
+        const dentro = function (m) { return [(sr() - .5) * (w - 2 * m), (sr() - .5) * (h - 2 * m)]; };
+        if (forma === "alfa") { const n = Math.round(fr * 28); for (let i = 0; i < n; i++) { const p = dentro(.8 * s); mk("circle", { cx: p[0].toFixed(2), cy: p[1].toFixed(2), r: (.45 * s + sr() * .25 * s).toFixed(2), fill: "#ffffff", "fill-opacity": .8, stroke: "#bdbdbd", "stroke-width": .08 }, g); } }
+        else if (forma === "beta") { const n = Math.round(fr * 10); for (let i = 0; i < n; i++) { const p = dentro(1.6 * s), a = sr() * 3, l = (1.3 + sr() * .7) * s, c = Math.cos(a), sn = Math.sin(a);
+          mk("path", { d: "M" + (p[0] + c * l).toFixed(2) + "," + (p[1] + sn * l).toFixed(2) + "L" + (p[0] - sn * l * .45).toFixed(2) + "," + (p[1] + c * l * .45).toFixed(2) + "L" + (p[0] - c * l).toFixed(2) + "," + (p[1] - sn * l).toFixed(2) + "L" + (p[0] + sn * l * .45).toFixed(2) + "," + (p[1] - c * l * .45).toFixed(2) + "Z", fill: "#ffffff", stroke: "#9e9e9e", "stroke-width": .12 }, g); } }
+        else { const n = Math.round(fr * 70); let ag = ""; for (let i = 0; i < n; i++) { const p = dentro(.6 * s), a = sr() * Math.PI, l = .55 * s; ag += "M" + (p[0] - Math.cos(a) * l).toFixed(2) + "," + (p[1] - Math.sin(a) * l).toFixed(2) + "L" + (p[0] + Math.cos(a) * l).toFixed(2) + "," + (p[1] + Math.sin(a) * l).toFixed(2); }
+          if (ag) mk("path", { d: ag, stroke: "#ffffff", "stroke-width": (.22 * s).toFixed(2), "stroke-linecap": "round" }, g); }
+        if (d.rotulo) rot(g, 0, h / 2 + 3, d.rotulo, 3);
+      }
+      else if (t === "triglicerideo") {   // glicerol (barra verde) com 0 a 3 caudas; OH azul onde não há cauda; fosfo = cabeça P na 3ª posição
+        const s = tam, nc = Math.max(0, Math.min(3, Number(d.caudas) === 0 ? 0 : Number(d.caudas) || 3)), cs = Array.isArray(d.cores) ? d.cores : [], fs = Array.isArray(d.formas) ? d.formas : [];
+        mk("rect", { x: (-1.1 * s).toFixed(2), y: (-5 * s).toFixed(2), width: (2.2 * s).toFixed(2), height: (10 * s).toFixed(2), rx: (.6 * s).toFixed(2), fill: PAL.verde, "fill-opacity": .85 }, g);
+        const tg = mk("text", { transform: "translate(" + (-1.9 * s).toFixed(2) + ",0) rotate(-90)", "text-anchor": "middle", "font-size": (1.3 * s).toFixed(2), fill: PAL.verde, "font-family": "system-ui,sans-serif" }, g); tg.textContent = "glicerol";
+        [-3.4, 0, 3.4].forEach(function (yy, i) {
+          const y = yy * s;
+          if (i === 2 && d.fosfo) { mk("path", { d: "M" + (1.1 * s).toFixed(2) + "," + y.toFixed(2) + "L" + (2.6 * s).toFixed(2) + "," + y.toFixed(2), stroke: PAL.azul, "stroke-width": (.3 * s).toFixed(2) }, g);
+            mk("circle", { cx: (3.6 * s).toFixed(2), cy: y.toFixed(2), r: (1.05 * s).toFixed(2), fill: PAL.azul }, g); const tp = mk("text", { x: (3.6 * s).toFixed(2), y: (y + .45 * s).toFixed(2), "text-anchor": "middle", "font-size": (1.3 * s).toFixed(2), "font-weight": 700, fill: "#ffffff", "font-family": "system-ui,sans-serif" }, g); tp.textContent = "P"; return; }
+          if (i >= nc) { const to = mk("text", { x: (2.1 * s).toFixed(2), y: (y + .45 * s).toFixed(2), "text-anchor": "start", "font-size": (1.3 * s).toFixed(2), "font-weight": 700, fill: PAL.azul, "font-family": "system-ui,sans-serif" }, g); to.textContent = "OH"; return; }
+          const cis = fs[i] === "cis", cor = PAL[cs[i]] || PAL.cadeia, n = 12, L = 1.25 * s, pts = []; let x = 1.1 * s, yv = y, dir = 0;
+          for (let k = 0; k < n; k++) { pts.push([x, yv]); if (cis && k === 5) dir += 38; const a = (dir + (k % 2 ? -30 : 30)) * Math.PI / 180; x += L * Math.cos(a); yv += L * Math.sin(a); }
+          mk("path", { d: pts.map(function (p, k) { return (k ? "L" : "M") + p[0].toFixed(2) + "," + p[1].toFixed(2); }).join(""), fill: "none", stroke: cor, "stroke-width": (.45 * s).toFixed(2), "stroke-linejoin": "round", "stroke-linecap": "round" }, g);
+        });
+        if (d.rotulo) rot(g, 0, 7.5 * s, d.rotulo, 3);
+      }
+      else if (t === "ag_duplas") {   // ácido graxo com várias duplas (posições a partir da carboxila); cis dobra ~35° em cada uma
+        const n = Math.max(3, Math.min(26, Number(d.unidades) || 18)), L = 1.5 * tam, duplas = (Array.isArray(d.duplas) ? d.duplas : []).map(Number).filter(function (k) { return k >= 1 && k < n; });
+        const pts = []; let x = 0, y = 0, dir = 0, sinal = 1;
+        for (let i = 0; i < n; i++) { pts.push([x, y]); if (!d.trans && duplas.indexOf(i + 1) !== -1) { dir += 35 * sinal; } const a = (dir + (i % 2 ? -30 : 30)) * Math.PI / 180; x += L * Math.cos(a); y += L * Math.sin(a); }
+        const mx = pts.reduce(function (s2, p) { return s2 + p[0]; }, 0) / n, my = pts.reduce(function (s2, p) { return s2 + p[1]; }, 0) / n;
+        const gg = mk("g", { transform: "rotate(" + (d.angulo || 0) + ")" }, g), X = function (p) { return (p[0] - mx).toFixed(2); }, Y = function (p) { return (p[1] - my).toFixed(2); };
+        mk("path", { d: pts.map(function (p, i) { return (i ? "L" : "M") + X(p) + "," + Y(p); }).join(""), stroke: PAL.cadeia, "stroke-width": (.6 * tam).toFixed(2), fill: "none", "stroke-linejoin": "round", "stroke-linecap": "round" }, gg);
+        duplas.forEach(function (k) {   // a dupla entre C(k) e C(k+1): traço duplo vermelho
+          const a = pts[k - 1], b = pts[k], dx = b[0] - a[0], dy = b[1] - a[1], kk = .7 * tam / Math.hypot(dx, dy), ox = -dy * kk, oy = dx * kk;
+          mk("path", { d: "M" + (a[0] - mx).toFixed(2) + "," + (a[1] - my).toFixed(2) + "L" + (b[0] - mx).toFixed(2) + "," + (b[1] - my).toFixed(2) + "M" + (a[0] - mx + ox + dx * .15).toFixed(2) + "," + (a[1] - my + oy + dy * .15).toFixed(2) + "L" + (b[0] - mx + ox - dx * .15).toFixed(2) + "," + (b[1] - my + oy - dy * .15).toFixed(2), stroke: PAL.vermelho, "stroke-width": (.5 * tam).toFixed(2), "stroke-linecap": "round" }, gg);
+          if (d.numerar) { const tn = mk("text", { x: ((a[0] + b[0]) / 2 - mx - ox * 1.9).toFixed(2), y: ((a[1] + b[1]) / 2 - my - oy * 1.9 + .4 * tam).toFixed(2), "text-anchor": "middle", "font-size": (1.2 * tam).toFixed(2), fill: PAL.vermelho, "font-family": "system-ui,sans-serif" }, gg); tn.textContent = String(k); }
+        });
+        mk("circle", { cx: X(pts[0]), cy: Y(pts[0]), r: (1.3 * tam).toFixed(2), fill: PAL.o2, opacity: .9 }, gg);
+        if (d.numerar) { const t1 = mk("text", { x: X(pts[0]), y: (pts[0][1] - my - 1.8 * tam).toFixed(2), "text-anchor": "middle", "font-size": (1.2 * tam).toFixed(2), fill: PAL.giz, "font-family": "system-ui,sans-serif" }, gg); t1.textContent = "C1"; }
+        if (d.omega) { const u = pts[n - 1]; mk("circle", { cx: X(u), cy: Y(u), r: (1 * tam).toFixed(2), fill: PAL.roxo }, gg); const to = mk("text", { x: X(u), y: (u[1] - my + .45 * tam).toFixed(2), "text-anchor": "middle", "font-size": (1.3 * tam).toFixed(2), "font-weight": 700, fill: "#ffffff", "font-family": "system-ui,sans-serif" }, gg); to.textContent = "ω"; }
+        if (d.rotulo) rot(g, 0, 7.5 * tam, d.rotulo, 3.2);
+      }
+      else if (t === "fotossensor") {   // riboflavina/clorofila: hexágono amarelo com a sigla; excitado = mais vivo e brilho pulsando
+        const R = 2.2 * tam, ex = !!d.excitado;
+        if (ex) { const b = mk("circle", { r: (R * 1.6).toFixed(2), fill: "#ffe066", "fill-opacity": .25 }, g); pulsar(b, "r", (R * 1.3).toFixed(2), (R * 2).toFixed(2), 1); pulsar(b, "fill-opacity", ".4", "0", 1); }
+        let hp = ""; for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k + Math.PI / 6; hp += (k ? "L" : "M") + (R * Math.cos(a)).toFixed(2) + "," + (R * Math.sin(a)).toFixed(2); }
+        mk("path", { d: hp + "Z", fill: ex ? "#ffd43b" : "#e9c46a", stroke: ex ? "#f08c00" : "#b08900", "stroke-width": (.3 * tam).toFixed(2) }, g);
+        const ts = mk("text", { y: (.5 * tam).toFixed(2), "text-anchor": "middle", "font-size": (1.4 * tam).toFixed(2), "font-weight": 700, fill: "#3b2f00", "font-family": "system-ui,sans-serif" }, g); ts.textContent = String(d.sigla || "Rb").slice(0, 4);
+        if (d.rotulo) rot(g, 0, R + 3.2 * tam, d.rotulo, 3);
+      }
+      else if (t === "tecido") {   // tecido ao microscópio: 12 células; cristais pequenos (dentro, paredes inteiras) ou grandes (entre as células, paredes rasgadas)
+        const s = tam, cw = 4.2 * s, ch = 3.6 * s, gap = .9 * s, grandes = d.cristais === "grandes", peq = d.cristais === "pequenos";
+        for (let j = 0; j < 3; j++) for (let i = 0; i < 4; i++) {
+          const x = (i - 1.5) * (cw + gap) - cw / 2, y = (j - 1) * (ch + gap) - ch / 2;
+          mk("rect", { x: x.toFixed(2), y: y.toFixed(2), width: cw.toFixed(2), height: ch.toFixed(2), rx: (.8 * s).toFixed(2), fill: "#f4b6c2", "fill-opacity": .8, stroke: grandes ? PAL.dano : "#c2185b", "stroke-width": (.25 * s).toFixed(2), "stroke-dasharray": grandes ? (.6 * s).toFixed(2) + " " + (.45 * s).toFixed(2) : "none" }, g);
+          if (peq) for (let k = 0; k < 4; k++) mk("circle", { cx: (x + cw * (.2 + .6 * sr())).toFixed(2), cy: (y + ch * (.2 + .6 * sr())).toFixed(2), r: (.22 * s).toFixed(2), fill: PAL.azul }, g);
+        }
+        if (grandes) for (let j = 0; j < 2; j++) for (let i = 0; i < 3; i++) {   // gelo grande entre as células
+          const cx = (i - 1) * (cw + gap), cy = (j - .5) * (ch + gap), r = (1.1 + sr() * .5) * s; let hp = "";
+          for (let k = 0; k < 6; k++) { const a = Math.PI / 3 * k + sr() * .3; hp += (k ? "L" : "M") + (cx + r * Math.cos(a)).toFixed(2) + "," + (cy + r * .8 * Math.sin(a)).toFixed(2); }
+          mk("path", { d: hp + "Z", fill: PAL.gelo, stroke: PAL.azul, "stroke-width": (.2 * s).toFixed(2), "fill-opacity": .95 }, g);
+        }
+        if (d.rotulo) rot(g, 0, 1.5 * (ch + gap) + 3, d.rotulo, 3);
+      }
+      else if (t === "cubeta") {   // espectrofotômetro: lâmpada → feixe → cubeta com a amostra → feixe que sai → detector "T xx%"
+        const s = tam, tb = Math.max(0, Math.min(1, Number(d.turbidez) || 0)), T = Math.round(100 - 95 * tb), w = 30 * s;
+        const lx = -w / 2 + 2 * s, cx = 0, dx = w / 2 - 4 * s;
+        mk("circle", { cx: lx.toFixed(2), r: (1.8 * s).toFixed(2), fill: "#ffd43b", stroke: "#f08c00", "stroke-width": .2 }, g);
+        mk("rect", { x: (lx + 1.8 * s).toFixed(2), y: (-.8 * s).toFixed(2), width: (cx - 2.6 * s - lx - 1.8 * s).toFixed(2), height: (1.6 * s).toFixed(2), fill: "#ffd43b", "fill-opacity": .75 }, g);
+        mk("rect", { x: (cx + 2.6 * s).toFixed(2), y: (-.8 * s).toFixed(2), width: (dx - 2.4 * s - cx - 2.6 * s).toFixed(2), height: (1.6 * s).toFixed(2), fill: "#ffd43b", "fill-opacity": (.75 * T / 100).toFixed(2) }, g);
+        mk("rect", { x: (cx - 2.4 * s).toFixed(2), y: (-4.5 * s).toFixed(2), width: (4.8 * s).toFixed(2), height: (9 * s).toFixed(2), rx: (.3 * s).toFixed(2), fill: tb > .5 ? "#f8f9fa" : "#f3e3a0", "fill-opacity": (.35 + .6 * tb).toFixed(2), stroke: PAL.giz, "stroke-width": (.25 * s).toFixed(2) }, g);
+        for (let i = 0; i < Math.round(tb * 26); i++) mk("circle", { cx: (cx + (sr() - .5) * 4 * s).toFixed(2), cy: ((sr() - .5) * 8 * s).toFixed(2), r: (.22 * s).toFixed(2), fill: "#ffffff", stroke: "#adb5bd", "stroke-width": .06 }, g);
+        mk("rect", { x: (dx - 2.4 * s).toFixed(2), y: (-3 * s).toFixed(2), width: (6.2 * s).toFixed(2), height: (6 * s).toFixed(2), rx: (.6 * s).toFixed(2), fill: "#2b2f36", stroke: "#0f1114", "stroke-width": .2 }, g);
+        const tt = mk("text", { x: (dx + .7 * s).toFixed(2), y: (.55 * s).toFixed(2), "text-anchor": "middle", "font-size": (1.6 * s).toFixed(2), "font-weight": 700, fill: "#c9f2c7", "font-family": "ui-monospace,Consolas,monospace" }, g); tt.textContent = "T " + T + "%";
+        if (d.rotulo) rot(g, 0, 7.5 * s, d.rotulo, 3);
+      }
     }
     function desenharEl(e) {
       const d0 = e.def, g = e.g; g.innerHTML = "";
@@ -1588,7 +1717,7 @@ var Cena = (function () {
         mk("path", { d: "M" + (-w / 2 + b * .55).toFixed(2) + "," + (-h * .2).toFixed(2) + "L" + (-w / 2 + b * 1.2).toFixed(2) + "," + (-h * .4).toFixed(2), stroke: "#ffffff", "stroke-width": .35 * Math.min(tam, 1.4), "stroke-opacity": .75, "stroke-linecap": "round" }, gg);   // brilho
         if (d.rotulo) rot(g, 0, h / 2 + 4, d.rotulo, 3.2);
       }
-      else if (t === "proteina" || t === "micela_caseina" || t === "phmetro" || t === "radical" || t === "oxigenio") { desenharNovos(g, d, t, tam); }
+      else if (["proteina", "micela_caseina", "phmetro", "radical", "oxigenio", "tubo", "bife", "gota", "copo", "cristais_gordura", "triglicerideo", "ag_duplas", "fotossensor", "tecido", "cubeta"].indexOf(t) !== -1) { desenharNovos(g, d, t, tam); }
       else if (t === "rede") {
         const w = d.w || 30, h = d.h || 24, cor = PAL[d.cor] || PAL.cadeia;
         mk("rect", { x: -w / 2, y: -h / 2, width: w, height: h, rx: 2, fill: cor + "10", stroke: "none" }, g);
