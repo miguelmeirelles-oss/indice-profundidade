@@ -671,6 +671,71 @@ function api(acao, dados, tentativa){
 /* Resumo ao entrar: o que as tarefas automáticas fizeram (terminou, parou pela cota e quando volta, falhou).
    Some ao clicar em "Entendido"; continua guardado em Mensagens → Para você. */
 
+// ===== "💬 Avisar ou sugerir" (visão de aluno): erro, conteúdo errado ou sugestão; a tela vai junto =====
+// erros que só o navegador vê (ex.: a voz derrubada pelo Google) vão para o registro do servidor; a revisão da madrugada lê
+window.reportarErroTela = function(onde, msg, ctx){
+  window.ULTIMO_ERRO = {msg: String(onde) + ': ' + String(msg || '').slice(0, 180), em: new Date().toLocaleTimeString()};
+  try{ api('erroCliente', {onde: onde, mensagem: String(msg || ''), contexto: ctx || {}}).catch(function(){}); }catch(e){}
+};
+function contextoAviso(){
+  var c = {tela: VISAO === 'aluno' ? 'aluno: ' + (localStorage.getItem('aulas_abaal') || 'mat') : 'professor: ' + abaAtual, largura: window.innerWidth, celular: /Mobi|Android|iPhone/i.test(navigator.userAgent)};
+  try{ if(EST && EST.m){ c.materia = EST.m.nome || ''; c.profId = EST.m.professorId; c.discId = EST.m.disciplinaId; }
+    if(EST && EST.q) c.questao = {id: EST.q.id, tema: EST.q.tema, enunciado: String(EST.q.enunciado || '').slice(0, 300)}; }catch(e){}
+  try{ var t = window.Trilha && Trilha.contexto ? Trilha.contexto() : null; if(t){ c.aula = t; if(!c.profId){ c.profId = t.professorId; c.discId = t.discId; } } }catch(e){}
+  if(window.ULTIMO_ERRO) c.ultimoErro = window.ULTIMO_ERRO;
+  return c;
+}
+var AVISO_TIPOS = [['erro', '🐞 Algo deu erro', 'travou, não carregou, a voz não funcionou…'], ['conteudo', '❌ Conteúdo errado', 'questão com gabarito errado, aula com informação errada…'], ['sugestao', '💡 Sugestão', 'uma ideia para melhorar']];
+function botaoAviso(){
+  var b = document.getElementById('btAvisoAluno');
+  if(VISAO !== 'aluno'){ if(b) b.remove(); return; }
+  if(b) return;
+  b = document.createElement('button'); b.type = 'button'; b.id = 'btAvisoAluno'; b.textContent = '💬 Avisar';
+  b.title = 'Avisar um erro, um conteúdo errado ou mandar uma sugestão';
+  b.style.cssText = 'position:fixed;left:12px;bottom:12px;z-index:9998;border:1px solid #c9d3e3;border-radius:999px;padding:8px 13px;font-size:13.5px;background:#fff;color:#1f2a44;box-shadow:0 2px 8px rgba(0,0,0,.18);cursor:pointer';
+  document.body.appendChild(b);
+  b.addEventListener('click', abrirAviso);
+  api('meusAvisos', {}).then(function(l){ var vistos = {}; try{ vistos = JSON.parse(localStorage.getItem('avisos_vistos') || '{}'); }catch(e){}
+    if((l || []).some(function(a){ return a.resposta && !vistos[a.id]; })) b.innerHTML = '💬 Avisar <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c62828;margin-left:3px"></span>'; }).catch(function(){});
+}
+function abrirAviso(){
+  var ctx = contextoAviso(), tipo = '';
+  var fundo = document.createElement('div'); fundo.id = 'avisoFundo';
+  fundo.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;display:flex;align-items:flex-end;justify-content:center';
+  var onde = [ctx.materia, ctx.aula ? 'aula "' + ctx.aula.titulo + '", passo ' + ctx.aula.passo : '', ctx.questao ? 'questão sobre ' + ctx.questao.tema : ''].filter(Boolean).join(' · ');
+  fundo.innerHTML = '<div style="background:#fff;width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px 20px;box-sizing:border-box">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">💬 Avisar ou sugerir</b><button type="button" class="link" id="avFechar" style="font-size:20px">✕</button></div>' +
+    '<p class="aviso" style="margin:6px 0 10px">O que você quer mandar?</p><div id="avTipos" style="display:grid;gap:8px">' +
+    AVISO_TIPOS.map(function(t){ return '<button type="button" class="secundario" data-avtipo="' + t[0] + '" style="text-align:left;padding:10px 12px"><b>' + t[1] + '</b><br><span class="aviso" style="font-size:12.5px">' + t[2] + '</span></button>'; }).join('') + '</div>' +
+    '<textarea id="avTexto" maxlength="1500" style="margin-top:10px;min-height:96px;width:100%;box-sizing:border-box;font-family:inherit;font-size:15px" placeholder="Conte o que aconteceu ou a sua ideia (uma frase já ajuda)"></textarea>' +
+    '<p class="aviso" style="margin:6px 0 0;font-size:12.5px">Vai junto, para ajudar a achar o problema: ' + (onde ? esc(onde) : 'a tela em que você está') + (ctx.ultimoErro ? ' e o último erro que apareceu' : '') + '.</p>' +
+    '<div class="botoes" style="margin-top:10px"><button type="button" id="avEnviar" disabled>Enviar</button><button type="button" class="link" id="avMeus">Meus avisos</button></div><div id="avMsg"></div><div id="avLista"></div></div>';
+  document.body.appendChild(fundo);
+  var fechar = function(){ fundo.remove(); };
+  fundo.addEventListener('click', function(e){ if(e.target === fundo) fechar(); });
+  document.getElementById('avFechar').addEventListener('click', fechar);
+  var podeEnviar = function(){ document.getElementById('avEnviar').disabled = !tipo || document.getElementById('avTexto').value.trim().length < 5; };
+  fundo.querySelectorAll('[data-avtipo]').forEach(function(bt){ bt.addEventListener('click', function(){ tipo = bt.dataset.avtipo; fundo.querySelectorAll('[data-avtipo]').forEach(function(x){ x.style.outline = x === bt ? '2px solid #17389C' : 'none'; }); podeEnviar(); document.getElementById('avTexto').focus(); }); });
+  document.getElementById('avTexto').addEventListener('input', podeEnviar);
+  document.getElementById('avEnviar').addEventListener('click', function(){
+    var bt = this; bt.disabled = true; bt.textContent = 'Enviando…';
+    api('avisoEnviar', {tipo: tipo, texto: document.getElementById('avTexto').value, contexto: ctx}).then(function(r){
+      document.getElementById('avMsg').innerHTML = '<div class="ok" style="margin-top:8px">' + esc(r.mensagem) + '</div>';
+      document.getElementById('avTexto').value = ''; bt.textContent = 'Enviar'; window.ULTIMO_ERRO = null;
+    }).catch(function(e){ bt.disabled = false; bt.textContent = 'Enviar'; document.getElementById('avMsg').innerHTML = '<div class="erro" style="margin-top:8px">' + esc(e.message) + '</div>'; });
+  });
+  document.getElementById('avMeus').addEventListener('click', function(){
+    var box = document.getElementById('avLista'); box.innerHTML = '<p class="aviso">Carregando…</p>';
+    api('meusAvisos', {}).then(function(l){
+      var vistos = {}; try{ vistos = JSON.parse(localStorage.getItem('avisos_vistos') || '{}'); }catch(e){}
+      box.innerHTML = l.length ? l.map(function(a){ if(a.resposta) vistos[a.id] = 1;
+        return '<div style="border-top:1px solid #e5e7eb;padding:8px 0;font-size:14px"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) +
+          (a.resposta ? '<div class="ok" style="margin-top:6px">↩ ' + esc(a.resposta) + '</div>' : '<div class="aviso" style="font-size:12.5px">recebido</div>') + '</div>'; }).join('') : '<p class="aviso">Você ainda não mandou avisos.</p>';
+      try{ localStorage.setItem('avisos_vistos', JSON.stringify(vistos)); }catch(e){}
+      var b = document.getElementById('btAvisoAluno'); if(b) b.textContent = '💬 Avisar';
+    }).catch(function(e){ box.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+  });
+}
 function chipIAForte(){
   api('claudeConfig', {}).then(function(c){
     if(!c || !c.professores || !c.permitido) return;   // só o administrador (e com o Claude liberado)
@@ -715,7 +780,7 @@ function mostrarAvisosSistema(){
     });
   }).catch(function(){});
 }
-function erroGeral(msg){ var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
+function erroGeral(msg){ if(msg) window.ULTIMO_ERRO = {msg: String(msg).slice(0, 200), em: new Date().toLocaleTimeString()}; var e = $('erroGeral'); e.textContent = msg || ''; e.classList.toggle('oculto', !msg); if(msg) e.scrollIntoView({block:'nearest'}); }
 // Sem login: vai direto para a tela de entrar (o Avaliador devolve para cá depois).
 // A trava de 15 s evita ficar pulando entre as páginas se algo der errado; aí mostra o cartão.
 function mostrarLogin(){
@@ -773,6 +838,7 @@ function trocarVisao(v){
   $('tProf').classList.toggle('oculto', v !== 'prof');
   try{ localStorage.setItem('aulas_visao', v); }catch(e){}
   VISAO = v;
+  try{ botaoAviso(); }catch(e){}
   atualizarSeloMsgs();
   if(v === 'aluno') abrirAluno(); else abrirProf();
 }
@@ -1216,6 +1282,24 @@ function preencherAuditorMsgs(el){
     }); });
   }).catch(function(e){ caixas.forEach(function(cx){ cx.innerHTML = '<p class="aviso">' + esc(e.message) + '</p>'; }); });
 }
+// aviso de aluno nas Mensagens do professor: o que ele mandou, onde estava, e "resolvido (com resposta) / descartar"
+function preencherAvisosMsgs(el){
+  el.querySelectorAll('[data-avisoid]').forEach(function(cx){
+    api('avisoVer', {id: cx.dataset.avisoid}).then(function(a){
+      var c = a.contexto || {}, onde = [a.materia, c.tela, c.aula ? 'aula "' + c.aula.titulo + '" passo ' + c.aula.passo : '', c.questao ? 'questão: ' + c.questao.enunciado : '', c.celular ? 'celular' : 'computador'].filter(Boolean).join(' · ');
+      cx.innerHTML = '<div style="border-left:3px solid #17389C;padding:4px 0 4px 10px;font-size:14px"><b>' + esc(a.aluno) + '</b> escreveu: “' + esc(a.texto) + '”' +
+        '<br><span class="aviso">onde: ' + esc(onde) + (c.ultimoErro ? ' · último erro: ' + esc(c.ultimoErro.msg) : '') + '</span>' +
+        (a.estado === 'novo' ? '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" data-avres="resolvido">✅ Resolvido (responder ao aluno)</button><button type="button" class="mini secundario" data-avres="descartado">Descartar</button></div>'
+          : '<p class="aviso" style="margin:6px 0 0">' + (a.estado === 'resolvido' ? '✅ resolvido' : a.estado === 'descartado' ? 'descartado' : 'investigado pela madrugada') + (a.resolvidoPor ? ' por ' + esc(a.resolvidoPor) : '') + (a.resposta ? ' · resposta ao aluno: “' + esc(a.resposta) + '”' : '') + '</p>') + '</div>';
+      cx.querySelectorAll('[data-avres]').forEach(function(b){ b.addEventListener('click', function(){
+        var est = b.dataset.avres, resp = '';
+        if(est === 'resolvido'){ resp = window.prompt('Resposta para o aluno (aparece em "Meus avisos" dele). Deixe em branco para não responder.', 'Obrigado pelo aviso! Já corrigimos.'); if(resp === null) return; }
+        b.disabled = true;
+        api('avisoResolver', {id: a.id, estado: est, resposta: resp}).then(function(){ preencherAvisosMsgs(el); }).catch(function(e){ b.disabled = false; alert(e.message); });
+      }); });
+    }).catch(function(e){ cx.innerHTML = '<p class="aviso">' + esc(e.message) + '</p>'; });
+  });
+}
 function desenharMsgsProf(discPre){
   var r = MSGS.r, el = areaMsgs(), agora = Date.now();
   var discs = r.disciplinas;
@@ -1228,7 +1312,8 @@ function desenharMsgsProf(discPre){
       av.slice(0, 10).map(function(a){
         return '<div class="msgItem' + (a.lido ? '' : ' nova') + '"><span class="aviso">' + esc(a.em) + '</span><br>' + esc(a.texto) +
           (/^auditor:/.test(a.link) ? '<div data-audrel="' + esc(a.link.slice(8)) + '" style="margin-top:6px"><p class="aviso">Carregando a revisão…</p></div>' : '') +
-          '<div class="botoes" style="margin-top:6px">' + (a.link && !/^auditor:/.test(a.link) ? '<a class="botaoLink" href="' + esc(a.link) + '">' + (a.tipo === 'sistema' ? 'Abrir' : 'Abrir a correção') + '</a>' : '') +
+          (/^aviso:/.test(a.link) ? '<div data-avisoid="' + esc(a.link.slice(6)) + '" style="margin-top:6px"><p class="aviso">Carregando o aviso…</p></div>' : '') +
+          '<div class="botoes" style="margin-top:6px">' + (a.link && !/^(auditor|aviso):/.test(a.link) ? '<a class="botaoLink" href="' + esc(a.link) + '">' + (a.tipo === 'sistema' ? 'Abrir' : 'Abrir a correção') + '</a>' : '') +
           '<button type="button" class="link" style="font-size:12.5px" data-avapagar="' + esc(a.id) + '">apagar</button></div></div>';
       }).join('') + (av.length ? '' : '<p class="aviso">' + (MSGS.avArq ? 'Nenhum aviso arquivado.' : 'Nenhum aviso recente.') + '</p>') + '<p class="aviso" style="margin-top:8px">' + (av.length > 10 ? 'Mostrando os 10 mais recentes. ' : '') + (MSGS.avArq ? 'Arquivados: avisos com mais de 7 dias (ficam aqui por 90 dias). ' : 'Depois de 7 dias cada aviso vai para os arquivados. ') +
         '<button type="button" class="link" style="font-size:12.5px" data-avarq="1">' + (MSGS.avArq ? 'voltar aos avisos recentes' : 'ver arquivados (' + arqAv.length + ')') + '</button>' +
@@ -1273,6 +1358,7 @@ function desenharMsgsProf(discPre){
   el.innerHTML = h;
   ligarFecharMsgs();
   preencherAuditorMsgs(el);
+  preencherAvisosMsgs(el);
   el.querySelectorAll('[data-avarq]').forEach(function(b){ b.addEventListener('click', function(){ MSGS.avArq = !MSGS.avArq; desenharMsgsProf(); }); });
   el.querySelectorAll('[data-avapagar]').forEach(function(b){ b.addEventListener('click', function(){
     var todos = b.dataset.avapagar === 'todos', alvo = todos ? av.map(function(a){ return a.id; }) : [b.dataset.avapagar];
@@ -2672,7 +2758,7 @@ function carregarTrilha(el, modo, abrirId, questoes){
   var abrir = function(){ Trilha.abrir(el, {api: api, token: function(){ return token; }, backend: BACKEND_AULAS}, {modo: modo, abrirId: abrirId || '', abrirQuestoes: !!questoes}); };
   if(window.Trilha){ abrir(); return; }
   el.innerHTML = '<p class="carregando">Carregando a aula em trilha…</p>';
-  var sc = document.createElement('script'); sc.src = 'trilha.js?v=58';
+  var sc = document.createElement('script'); sc.src = 'trilha.js?v=59';
   sc.onload = abrir;
   sc.onerror = function(){ el.innerHTML = '<div class="erro">Não deu para carregar a aula em trilha. Verifique a internet e abra a aba de novo.</div>'; };
   document.head.appendChild(sc);

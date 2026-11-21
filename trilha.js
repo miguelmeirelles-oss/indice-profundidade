@@ -2755,6 +2755,7 @@ function conectarD(primeira){
   nova.onclose = function(ev){
     if(nova !== wsD) return;
     if(alcaRetomada && tentativasRetomar < 3){ tentativasRetomar++; trocando = true; conectarD(false); return; }
+    if(ev.code !== 1000 && ev.code !== 1005 && window.reportarErroTela) window.reportarErroTela('voz: dúvida por voz', (ev.reason || 'código ' + ev.code), {modelo: tokenVoz && tokenVoz.modelo, aula: T && T.trilha ? T.trilha.titulo : ''});
     if(ev.code !== 1000 && ev.code !== 1005 && $('msgD')) $('msgD').innerHTML = '<div class="erro">A conversa foi encerrada pelo Google' + (ev.reason ? ' (' + esc(ev.reason) + ')' : '') + '.</div>';
     encerrarDuvida(true, true);
   };
@@ -3038,6 +3039,7 @@ inicio = function(){
 window.addEventListener('beforeunload', function(ev){ if(wsD) encerrarDuvida(); if(N.rodando){ ev.preventDefault(); ev.returnValue = 'A voz ainda está sendo gravada. Se sair agora, a gravação para.'; return ev.returnValue; } });
 if('speechSynthesis' in window){ try{ speechSynthesis.getVoices(); }catch(e){} }
 window.Trilha = {
+  contexto: function(){ try{ if(!T || !T.trilha) return null; var b = blocoAtual(); return {id: T.id, titulo: T.trilha.titulo, versao: T.versao, bloco: b ? b.titulo : '', passo: (P.passo || 0) + 1, professorId: T.professorId, discId: T.disciplina_id}; }catch(e){ return null; } },
   // abre a aba dentro do elemento (o painel da aba no aulas.html)
   abrir: function(el, helpers, opc){
     H = helpers;
