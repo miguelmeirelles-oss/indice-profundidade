@@ -6025,6 +6025,7 @@ function desenharUsoModelos(u){
     '<p class="aviso" style="margin-top:6px"><b>' + usadoTot + ' de ' + limTot + '</b> chamadas grátis do dia usadas' + (varias ? ' (somando as ' + nK + ' chaves; cada chave em projeto separado do Google tem o seu limite)' : '') + '. ' +
     'Conta tudo o que <b>este sistema</b> mandou: gravação e ata, questões, correção das respostas dos alunos, provas, apostila, recomendações, chat e teste de chaves. ' +
     'Se a mesma chave for usada em outro lugar (o Estudar com IA, por exemplo), o painel do Google mostra mais. "Freou no limite por minuto" não é falta de cota: são muitas chamadas no mesmo minuto, e libera sozinho. Quando um modelo esgota, o sistema passa para o próximo da lista. Embaixo de cada modelo aparece <b>quais tarefas</b> o usaram e, nos de reserva, <b>por que</b> o sistema desceu até ele. Tudo zera entre 4h e 5h. ' +
+    'As linhas <b>voz ao vivo</b> contam cada conversa de voz aberta (dúvida por voz das aulas, gravação da narração, treino de entrevista), não cada frase; o Google não informa o limite diário da voz (aparece "?"). ' +
     'Confira em <a href="https://aistudio.google.com/rate-limit" target="_blank" rel="noopener">aistudio.google.com/rate-limit</a>.</p>';
 }
 $('cfgSalvar').addEventListener('click', function(){
