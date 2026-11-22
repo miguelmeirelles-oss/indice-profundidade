@@ -5,7 +5,7 @@
    a revisão da madrugada investiga. Quem mandou recebe "recebido" e, se o aviso for aproveitado, a resposta.
    Também anota no servidor os erros que só o navegador vê (ex.: a voz derrubada pelo Google).
    Cada página pode completar o contexto com window.contextoAvisoPagina() (ex.: aula e passo abertos).
-   O administrador não vê o botão (os avisos vão para ele).
+   O administrador também usa: os avisos dele vão direto para a revisão da madrugada.
    ===================================================================== */
 (function () {
   var BACKEND = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPMl4BlccH7eI1-0U9EqqOKV7vgK0qJSe9rgo51XZKxK45V2gOj/exec';
@@ -106,12 +106,12 @@
       }).catch(function (e) { box.innerHTML = '<p style="color:#b3261e">' + esc(e.message) + '</p>'; });
     });
   }
-  // mostra o botão para quem está logado (menos o administrador, que é quem recebe os avisos)
+  // mostra o botão para quem está logado (o administrador também: os avisos dele vão para a revisão da madrugada)
   var tentativas = 0;
   function iniciar() {
     if (!document.body) { setTimeout(iniciar, 300); return; }
     if (!tokenAtual()) { if (++tentativas < 40) setTimeout(iniciar, 1500); return; }   // espera o login da página
-    chamar('sessao', {}).then(function (s) { if (s && s.logado !== false && !s.admin) criarBotao(); }).catch(function () {});
+    chamar('sessao', {}).then(function (s) { if (s && s.logado !== false) criarBotao(); }).catch(function () {});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
