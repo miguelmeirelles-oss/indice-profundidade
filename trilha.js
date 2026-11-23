@@ -2987,9 +2987,11 @@ var U = (function(){
   function iniciar(){
     if(s) enviar(true);
     if(!T || T.previa){ s = null; return; }
-    s = novo(); s.trilha = T.id; mexeu();
+    s = novo(); s.trilha = T.id; s.total = totalPassos(); mexeu();   // guarda o total já aqui: depois o aluno pode sair da aula (T = null)
     clearInterval(tick);
     tick = setInterval(function(){
+      // o aluno saiu da aula e voltou para a lista: envia o que falta e encerra a sessão (antes quebrava a cada minuto)
+      if(s && !T){ enviar(true); s = null; return; }
       // conta o tempo só com a página visível e em uso (aula tocando, conversa aberta ou mexida nos últimos 2 min)
       if(s && document.visibilityState === 'visible' && (P.tocando || wsD || Date.now() < ativoAte)) s.segundos++;
       if(s && Date.now() - ultimoEnvio > 60000 && s.segundos > 5) enviar();
@@ -2997,7 +2999,7 @@ var U = (function(){
   }
   function dados(){
     var acertos = 0, ch = Object.keys(s.checks); ch.forEach(function(k){ if(s.checks[k].primeira) acertos++; });
-    return {segundos: s.segundos, passos: Object.keys(s.vistos).length, total_passos: totalPassos(), duvidas: s.duvidas, duvida_seg: s.duvida_seg, acertos: acertos, checagens: ch.length,
+    return {segundos: s.segundos, passos: Object.keys(s.vistos).length, total_passos: s.total, duvidas: s.duvidas, duvida_seg: s.duvida_seg, acertos: acertos, checagens: ch.length,
       detalhes: {vistos: Object.keys(s.vistos), checagens: s.checks}};
   }
   function enviar(final){
