@@ -1292,7 +1292,7 @@ function desenharCCOAval(a){
     '<div class="botoes"><label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar documentos<input type="file" id="ccoArqs" multiple accept="application/pdf,image/*,.xlsx,.xls" class="oculto"></label></div>' +
     '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><input id="ccoLink" placeholder="ou cole o link da pasta do Drive com o processo" style="flex:1;min-width:220px"><button type="button" class="sec" id="btCcoLink">📁 Importar da pasta</button></div><div id="ccoMsg" class="aviso"></div></div>';
   h += '<div class="caixa"><h2>2 · Avaliação por IA</h2><p class="aviso" style="margin-top:0">Etapa 1: a IA lê a RAD e procura o comprovante de cada linha, recalculando os pontos pelas regras da CPPD. Etapa 2 (dupla verificação): outra leitura confere o relatório da etapa 1 contra os documentos. Leva alguns minutos.</p>' +
-    '<div class="botoes"><button type="button" id="btCcoAvaliar"' + (docs.length ? '' : ' disabled') + '>' + (rel ? '🔁 Avaliar de novo' : a.estado === 'etapa1' ? '▶ Continuar (2ª verificação)' : '🔎 Avaliar com IA') + '</button></div><div id="ccoAvMsg"></div>' + (rel ? htmlRelCCO(rel) : '') + '</div>';
+    '<div class="botoes"><button type="button" id="btCcoAvaliar"' + (docs.length ? '' : ' disabled') + '>' + (rel ? '🔁 Avaliar de novo' : a.estado === 'etapa2' ? '▶ Continuar (conferência das regras)' : a.estado === 'etapa1' ? '▶ Continuar (2ª verificação)' : '🔎 Avaliar com IA') + '</button></div><div id="ccoAvMsg"></div>' + (rel ? htmlRelCCO(rel) : '') + '</div>';
   if(rel) h += '<div class="caixa"><h2>3 · Parecer e ata</h2><label>Parecer da CCO (pode editar)</label><textarea id="ccoParecer" rows="4">' + esc(rel.parecer || '') + '</textarea>' +
     '<div class="botoes"><button type="button" class="sec" id="btCcoParecer">Salvar parecer</button></div>' +
     '<div class="grade" style="margin-top:10px;grid-template-columns:minmax(120px,200px) auto;align-items:end"><div><label>Data da reunião</label><input id="ccoDataAta" value="' + esc(a.data) + '"></div><div><button type="button" id="btCcoAta">Gerar ata da CCO</button></div></div>' +
@@ -1339,10 +1339,12 @@ function desenharCCOAval(a){
     apiCCO('progCCOApagarArquivo', {id: a.id, arquivoId: b.dataset.apagararq}).then(desenharCCOAval).catch(function(e){ alert(e.message); }); }); });
   $('btCcoAvaliar').addEventListener('click', function(){
     var m = $('ccoAvMsg'), bt = this; bt.disabled = true;
-    var etapa2 = function(){ m.innerHTML = '<p class="carregando">2/2 · Dupla verificação: conferindo o relatório contra os documentos… (1 a 3 min)</p>'; return apiCCO('progCCOAvaliar', {id: a.id, etapa: 2}).then(desenharCCOAval); };
-    var p = (a.estado === 'etapa1' && !rel) ? etapa2() : (function(){ m.innerHTML = '<p class="carregando">1/2 · Lendo a RAD e procurando o comprovante de cada linha… (2 a 4 min)</p>';
+    // 3 etapas: 1) leitura de todos os documentos; 2) dupla verificação; 3) conferência das regras, linha por linha
+    var etapa3 = function(){ m.innerHTML = '<p class="carregando">3/3 · Conferência das regras da CPPD, linha por linha (fomento, orientações proporcionais, publicações, tetos)… (1 a 3 min)</p>'; return apiCCO('progCCOAvaliar', {id: a.id, etapa: 3}).then(desenharCCOAval); };
+    var etapa2 = function(){ m.innerHTML = '<p class="carregando">2/3 · Dupla verificação: conferindo o relatório contra os documentos… (1 a 3 min)</p>'; return apiCCO('progCCOAvaliar', {id: a.id, etapa: 2}).then(function(){ a.estado = 'etapa2'; return etapa3(); }); };
+    var p = (a.estado === 'etapa2' && !rel) ? etapa3() : (a.estado === 'etapa1' && !rel) ? etapa2() : (function(){ m.innerHTML = '<p class="carregando">1/3 · Lendo a RAD e procurando o comprovante de cada linha… (2 a 4 min)</p>';
       return apiCCO('progCCOAvaliar', {id: a.id, etapa: 1}).then(function(r){ m.innerHTML = '<p class="ok">Etapa 1: ' + r.linhas + ' linha(s) conferida(s), ' + r.problemas + ' com observação.</p>'; a.estado = 'etapa1'; return etapa2(); }); })();
-    p.catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; if(a.estado === 'etapa1') bt.textContent = '▶ Continuar (2ª verificação)'; });
+    p.catch(function(e){ m.innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; bt.disabled = false; if(a.estado === 'etapa1') bt.textContent = '▶ Continuar (2ª verificação)'; if(a.estado === 'etapa2') bt.textContent = '▶ Continuar (conferência das regras)'; });
   });
   if($('btCcoParecer')) $('btCcoParecer').addEventListener('click', function(){ var b = this; b.disabled = true; api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ b.disabled = false; $('ccoAtaMsg').innerHTML = '<span class="ok">Parecer salvo.</span>'; }).catch(function(e){ b.disabled = false; alert(e.message); }); });
   if($('btCcoAta')) $('btCcoAta').addEventListener('click', function(){ var b = this; b.disabled = true; $('ccoAtaMsg').textContent = 'Escrevendo a ata…';
@@ -1366,6 +1368,7 @@ function htmlRelCCO0(r){
       return '<tr><td>' + esc(NOMES_AREA[l.area] || l.area) + '</td><td>' + esc(l.item) + '</td><td>' + num(l.declarado) + '</td><td>' + num(l.conferido) + '</td><td class="' + SIT_COR[l.situacao] + '">' + SIT_ICO[l.situacao] + ' ' +
         esc((l.comprovante ? l.comprovante + ' · ' : '') + l.obs) + (l.revisao ? '<div class="aviso">' + esc(l.revisao) + '</div>' : '') +
         (r.verificado ? ' <button type="button" class="link" data-contestar="' + o.i + '" title="Discordo do que a IA disse nesta linha">✏ contestar</button>' : '') + '</td></tr>'; }).join('') + '</table></div></details>';
+  if(r.regrasConferidas) h += '<p class="aviso" style="margin:6px 0">🔎 Conferência das regras: ' + r.regrasConferidas.linhas + ' linha(s) conferidas uma a uma' + (r.regrasConferidas.falhou ? ' — não conseguiu terminar desta vez (a avaliação seguiu com as 2 primeiras etapas)' : r.regrasConferidas.mudaram ? ', ' + r.regrasConferidas.mudaram + ' corrigida(s): ' + esc(r.regrasConferidas.resumo) : ', nenhuma mudança') + '.</p>';
   if((r.pendencias || []).length) h += '<p style="margin:8px 0 2px"><b>Pendências</b></p><ul style="margin:0;padding-left:20px">' + r.pendencias.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
   var ign = (r.ignorados || []).filter(function(n){ return !/\.xlsx?$/i.test(n); });
   if(ign.length) h += '<p class="aviso">Não lidos pela IA (formato não suportado): ' + ign.map(esc).join(', ') + '.</p>';
