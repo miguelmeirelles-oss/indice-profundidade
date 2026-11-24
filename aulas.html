@@ -1216,7 +1216,7 @@ function ligarPedidos(el, depois){
     b.disabled = true; b.textContent = 'Enviando…';
     api('auditorPedir', {relatorioId: p[0], indice: Number(p[1]), comentario: com ? com.value : ''}).then(function(r){
       var d = r && r.pedido && r.pedido.disparo;
-      if(d && d !== 'ok') erroGeral(d === 'sem_disparo' ? 'Pedido guardado, mas os "Pedidos na hora" ainda não estão ligados (Configurações → Auditor da madrugada). Ele será feito na próxima madrugada.' : 'Pedido guardado, mas não consegui chamar o Claude agora (' + d + '). Ele será feito na próxima madrugada.');
+      if(d && d !== 'ok') erroGeral(d === 'sem_disparo' ? 'Pedido guardado, mas os "Pedidos na hora" ainda não estão ligados: ligue em Configurações → Auditor da madrugada e ele começa na mesma hora.' : 'Pedido guardado, mas não consegui chamar o Claude agora (' + d + '). Confira os "Pedidos na hora" em Configurações → Auditor da madrugada; ao salvar de novo, ele começa.');
       depois();
     }).catch(function(e){ b.disabled = false; b.textContent = '👍 Pode fazer'; erroGeral(e.message); });
   }); });
