@@ -49,6 +49,10 @@
 
   // ---------- o botão e a janela ----------
   var TIPOS = [['erro', '🐞 Algo deu erro', 'travou, não carregou, a voz não funcionou…'], ['conteudo', '❌ Conteúdo errado', 'questão com gabarito errado, aula ou documento com informação errada…'], ['sugestao', '💡 Sugestão', 'uma ideia para melhorar']];
+  var ADMIN = false;   // o administrador tem também "🛠 Implementar agora" (conversa com o Claude e implementa na hora)
+  var IMPLEMENTAR = ['implementar', '🛠 Implementar agora', 'conversar com o Claude sobre uma mudança e implementar na hora'];
+  function lerConversa() { try { return JSON.parse(localStorage.getItem('av_conversa') || '[]'); } catch (e) { return []; } }
+  function gravarConversa(l) { try { localStorage.setItem('av_conversa', JSON.stringify(l.slice(-30))); } catch (e) {} }
   function lerVistos() { try { return JSON.parse(localStorage.getItem('avisos_vistos') || '{}'); } catch (e) { return {}; } }
   function pintarBotao(b, temNovidade) { b.innerHTML = '💬 Avisar' + (temNovidade ? ' <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#c62828;margin-left:3px"></span>' : ''); }
   function criarBotao() {
@@ -71,11 +75,16 @@
     fundo.innerHTML = '<div style="background:#fff;color:#1f2a44;width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:14px 14px 0 0;padding:16px 16px 20px;box-sizing:border-box;font-size:15px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center"><b style="font-size:16px">💬 Avisar ou sugerir</b><button type="button" id="avFechar" style="border:0;background:none;font-size:20px;cursor:pointer" aria-label="Fechar">✕</button></div>' +
       '<p style="margin:6px 0 10px;color:#4b5563">O que você quer mandar?</p><div style="display:grid;gap:8px">' +
-      TIPOS.map(function (t) { return '<button type="button" data-avtipo="' + t[0] + '" style="' + bt + ';text-align:left;padding:10px 12px"><b>' + t[1] + '</b><br><span style="font-size:12.5px;color:#4b5563">' + t[2] + '</span></button>'; }).join('') + '</div>' +
-      '<textarea id="avTexto" maxlength="1500" style="margin-top:10px;min-height:96px;width:100%;box-sizing:border-box;font-family:inherit;font-size:15px;padding:8px;border:1px solid #c9d3e3;border-radius:8px" placeholder="Conte o que aconteceu ou a sua ideia (uma frase já ajuda)"></textarea>' +
-      '<p style="margin:6px 0 0;font-size:12.5px;color:#4b5563">Vai junto, para ajudar a achar o problema: ' + esc(onde) + (ctx.ultimoErro ? ' e o último erro que apareceu' : '') + '.</p>' +
+      (ADMIN ? TIPOS.concat([IMPLEMENTAR]) : TIPOS).map(function (t) { return '<button type="button" data-avtipo="' + t[0] + '" style="' + bt + ';text-align:left;padding:10px 12px"><b>' + t[1] + '</b><br><span style="font-size:12.5px;color:#4b5563">' + t[2] + '</span></button>'; }).join('') + '</div>' +
+      '<div id="avComum"><textarea id="avTexto" maxlength="1500" style="margin-top:10px;min-height:96px;width:100%;box-sizing:border-box;font-family:inherit;font-size:15px;padding:8px;border:1px solid #c9d3e3;border-radius:8px" placeholder="Conte o que aconteceu ou a sua ideia (uma frase já ajuda)"></textarea>' +
+      '<p style="margin:6px 0 0;font-size:12.5px;color:#4b5563">Vai junto, para ajudar a achar o problema: ' + esc(onde) + (ctx.ultimoErro ? ' e o último erro que apareceu' : '') + '.</p></div>' +
       '<div style="display:flex;gap:10px;align-items:center;margin-top:10px"><button type="button" id="avEnviar" disabled style="border:0;border-radius:10px;background:#17389C;color:#fff;padding:9px 18px;font-size:15px;cursor:pointer;font-family:inherit">Enviar</button>' +
-      '<button type="button" id="avMeus" style="border:0;background:none;color:#17389C;text-decoration:underline;cursor:pointer;font-size:14px;font-family:inherit">Meus avisos</button></div><div id="avMsg"></div><div id="avLista"></div></div>';
+      '<button type="button" id="avMeus" style="border:0;background:none;color:#17389C;text-decoration:underline;cursor:pointer;font-size:14px;font-family:inherit">Meus avisos</button></div><div id="avMsg"></div><div id="avLista"></div>' +
+      (ADMIN ? '<div id="avChat" style="display:none;margin-top:10px"><div id="avChatLista" style="max-height:46vh;overflow:auto;display:grid;gap:8px"></div>' +
+        '<textarea id="avChatTxt" maxlength="3000" style="margin-top:10px;min-height:80px;width:100%;box-sizing:border-box;font-family:inherit;font-size:15px;padding:8px;border:1px solid #c9d3e3;border-radius:8px" placeholder="Diga o que quer mudar (ou responda ao Claude)"></textarea>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px"><button type="button" id="avChatEnviar" style="border:0;border-radius:10px;color:#fff;padding:9px 16px;font-size:15px;cursor:pointer;font-family:inherit;background:#17389C">Enviar</button>' +
+        '<button type="button" id="avImplementar" style="border:0;border-radius:10px;color:#fff;padding:9px 16px;font-size:15px;cursor:pointer;font-family:inherit;background:#1e6b3a">✅ Implementar</button>' +
+        '<button type="button" id="avNova" style="border:0;background:none;color:#17389C;text-decoration:underline;cursor:pointer;font-size:14px;font-family:inherit">nova conversa</button></div><div id="avChatMsg"></div></div>' : '') + '</div>';
     document.body.appendChild(fundo);
     // a janela usa a largura VISÍVEL da tela (algumas páginas são mais largas que o celular e esticariam a janela)
     try { var vis = document.documentElement.clientWidth || window.innerWidth, card = fundo.firstElementChild, w = Math.min(520, vis);
@@ -85,7 +94,39 @@
     $('avFechar').addEventListener('click', fechar);
     var pode = function () { $('avEnviar').disabled = !tipo || $('avTexto').value.trim().length < 5; $('avEnviar').style.opacity = $('avEnviar').disabled ? .5 : 1; };
     pode();
-    fundo.querySelectorAll('[data-avtipo]').forEach(function (b) { b.addEventListener('click', function () { tipo = b.dataset.avtipo; fundo.querySelectorAll('[data-avtipo]').forEach(function (x) { x.style.outline = x === b ? '2px solid #17389C' : 'none'; }); pode(); $('avTexto').focus(); }); });
+    // "🛠 Implementar agora" (só o administrador): conversa de ida e volta com o Claude; no fim, "✅ Implementar" programa e publica na hora
+    var desenharChat = function () {
+      var l = lerConversa(), box = $('avChatLista'); if (!box) return;
+      box.innerHTML = l.length ? l.map(function (m) { var eu = m.papel !== 'ia';
+        return '<div style="padding:8px 10px;border-radius:10px;font-size:14.5px;white-space:pre-wrap;' + (eu ? 'background:#e8eefc;margin-left:24px' : 'background:#f3f4f6;margin-right:24px') + '"><b style="font-size:12.5px;color:#4b5563">' + (eu ? 'Você' : 'Claude') + '</b><br>' + esc(m.texto) + '</div>'; }).join('')
+        : '<p style="color:#4b5563;font-size:14px;margin:0">Conte a mudança que você quer. O Claude responde com a proposta; vocês conversam até decidir e, quando estiver bom, é só clicar em <b>✅ Implementar</b>: ele programa e publica na hora.</p>';
+      box.scrollTop = box.scrollHeight;
+      var bi = $('avImplementar'); bi.disabled = !l.some(function (m) { return m.papel === 'ia'; }); bi.style.opacity = bi.disabled ? .5 : 1;
+    };
+    var modo = function () {
+      var chat = tipo === 'implementar', c = $('avChat');
+      $('avComum').style.display = chat ? 'none' : ''; $('avEnviar').style.display = chat ? 'none' : ''; if (c) c.style.display = chat ? '' : 'none';
+      if (chat) desenharChat();
+    };
+    var msgChat = function (t, erro) { $('avChatMsg').innerHTML = t ? '<div style="margin-top:8px;padding:8px 10px;border-radius:8px;background:' + (erro ? '#fdecea;color:#b3261e' : '#e8f5ec;color:#1e6b3a') + '">' + esc(t) + '</div>' : ''; };
+    if (ADMIN) {
+      $('avChatEnviar').addEventListener('click', function () {
+        var t = $('avChatTxt').value.trim(), b = this; if (t.length < 3) return;
+        var l = lerConversa(); l.push({ papel: 'eu', texto: t }); gravarConversa(l); $('avChatTxt').value = ''; desenharChat();
+        b.disabled = true; b.textContent = 'O Claude está pensando…'; msgChat('');
+        chamar('conversaMudanca', { mensagens: l, contexto: ctx }).then(function (r) { var l2 = lerConversa(); l2.push({ papel: 'ia', texto: r.resposta }); gravarConversa(l2); desenharChat(); })
+          .catch(function (e) { msgChat(e.message, true); }).then(function () { b.disabled = false; b.textContent = 'Enviar'; });
+      });
+      $('avImplementar').addEventListener('click', function () {
+        var l = lerConversa(), b = this; if (!l.length) return;
+        if (!window.confirm('Implementar agora o que foi combinado nesta conversa? O Claude programa, testa e publica sozinho (o robô volta à versão anterior se o servidor falhar).')) return;
+        b.disabled = true; b.textContent = 'Enviando…';
+        chamar('conversaImplementar', { mensagens: l, contexto: ctx }).then(function (r) { gravarConversa([]); desenharChat(); msgChat(r.mensagem); })
+          .catch(function (e) { msgChat(e.message, true); }).then(function () { b.textContent = '✅ Implementar'; desenharChat(); });
+      });
+      $('avNova').addEventListener('click', function () { if (lerConversa().length && !window.confirm('Apagar esta conversa e começar outra?')) return; gravarConversa([]); desenharChat(); msgChat(''); });
+    }
+    fundo.querySelectorAll('[data-avtipo]').forEach(function (b) { b.addEventListener('click', function () { tipo = b.dataset.avtipo; modo(); fundo.querySelectorAll('[data-avtipo]').forEach(function (x) { x.style.outline = x === b ? '2px solid #17389C' : 'none'; }); pode(); $('avTexto').focus(); }); });
     $('avTexto').addEventListener('input', pode);
     $('avEnviar').addEventListener('click', function () {
       var b = this; b.disabled = true; b.textContent = 'Enviando…';
@@ -111,7 +152,7 @@
   function iniciar() {
     if (!document.body) { setTimeout(iniciar, 300); return; }
     if (!tokenAtual()) { if (++tentativas < 40) setTimeout(iniciar, 1500); return; }   // espera o login da página
-    chamar('sessao', {}).then(function (s) { if (s && s.logado !== false) criarBotao(); }).catch(function () {});
+    chamar('sessao', {}).then(function (s) { if (s && s.logado !== false) { ADMIN = !!s.admin; criarBotao(); } }).catch(function () {});
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 })();
