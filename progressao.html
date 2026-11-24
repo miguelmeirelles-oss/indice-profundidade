@@ -53,6 +53,16 @@ var BACKEND_AULAS = 'https://script.google.com/macros/s/AKfycbyK-YXssnq1iBhqVAPM
 function tokenSalvo(){ try{ return localStorage.getItem('ip_token') || sessionStorage.getItem('ip_token') || ''; }catch(e){ return ''; } }
 var token = tokenSalvo(), R = null, LIDO = null, CAL = null, ARQC = null;
 function $(id){ return document.getElementById(id); }
+// máscaras: o docente digita só os números e os pontos, traços e barras entram sozinhos
+function formatarCpf(v){ var d = String(v || '').replace(/\D/g, '').slice(0, 11); return d.replace(/^(\d{3})(\d)/, '$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/, '$1.$2.$3').replace(/\.(\d{3})(\d{1,2})$/, '.$1-$2'); }
+function formatarData(v){ var d = String(v || '').replace(/\D/g, '').slice(0, 8); return d.length > 4 ? d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4) : d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d; }
+// campos de data: os marcados com data-mascara="data", os "dd/mm/aaaa" e os de data conhecidos (admissão, protocolo, ata, CCO, estágio)
+function ehCampoData(el){ return el.dataset.mascara === 'data' || el.placeholder === 'dd/mm/aaaa' || /^(protData|dataAta|estData|ccoData|ccoDataAta|ccoAdm)$/.test(el.id) || el.dataset.pf === 'admissao' || (el.dataset.c === 'admissao' && el.dataset.doc !== undefined) || ((el.dataset.c === 'inicio' || el.dataset.c === 'fim') && (el.dataset.cal !== undefined || el.closest('[data-estal]'))); }
+document.addEventListener('input', function(e){
+  var el = e.target; if(!el || el.tagName !== 'INPUT' || /^delete/.test(e.inputType || '')) return;   // apagando: não reescreve (senão a barra volta)
+  var novo = el.id === 'protCpf' ? formatarCpf(el.value) : ehCampoData(el) ? formatarData(el.value) : null;
+  if(novo !== null && novo !== el.value){ el.value = novo; try { el.setSelectionRange(novo.length, novo.length); } catch(x){} }
+});
 function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 function num(n, c){ return (Math.round(Number(n || 0) * Math.pow(10, c === undefined ? 2 : c)) / Math.pow(10, c === undefined ? 2 : c)).toString().replace('.', ','); }
 function api(acao, dados){
@@ -870,7 +880,7 @@ function carregarPacote(){
 }
 function arqDo(n){ return (PAC.arquivos || []).filter(function(a){ return a.nome.indexOf(n + ' - ') === 0; }); }
 // PDFs assinados (gov.br): guardam a "impressão" dos dados de quando foram assinados; se os dados mudaram, alerta vermelho
-var ASSINADOS = {3: {nome: '3 - RAD assinada.pdf', qual: 'rad', oque: 'a RAD'}, 4: {nome: '4 - Comprovantes da RAD (assinado).pdf', qual: 'comp', oque: 'a lista de comprovantes'}};
+var ASSINADOS = {1: {nome: '1 - Folha de protocolo (assinada).pdf', qual: '', oque: 'a folha de protocolo'}, 3: {nome: '3 - RAD assinada.pdf', qual: 'rad', oque: 'a RAD'}, 4: {nome: '4 - Comprovantes da RAD (assinado).pdf', qual: 'comp', oque: 'a lista de comprovantes'}};
 function assinadoVelho(a){ var m = String(a.desc || '').match(/^impressao:([\w-]+)/), cfg = ASSINADOS[a.nome.charAt(0)]; return !!(m && cfg && a.nome === cfg.nome && PAC.impressao && PAC.impressao[cfg.qual] && m[1] !== PAC.impressao[cfg.qual]); }
 function linkArq(n){ var l = arqDo(n); return l.length ? l.map(function(a){ var velho = assinadoVelho(a);
   return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener"' + (velho ? ' style="color:#b3261e;text-decoration:line-through"' : '') + '>' + (velho ? '✗ ' : '✓ ') + esc(a.nome) + '</a> <span class="aviso">' + esc(a.em) + '</span>' +
@@ -889,11 +899,11 @@ function desenharPacote(){
   var nomesArea = {doc: 'Docência', ori: 'Orientações', out: 'Outras acadêmicas', art: 'Artísticas', comp: 'Complementares', ext: 'Extensão', pes: 'Pesquisa'};
   var passo = function(n, tit, conteudo, botoes){ return '<div class="item"><div><b>' + n + ' · ' + tit + '</b><div style="margin-top:3px">' + conteudo + '</div></div><div class="botoes" style="margin:0">' + (botoes || '') + '</div></div>'; };
   b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso" style="margin-top:0">Tudo vai para <a href="' + esc(p.pasta) + '" target="_blank" rel="noopener">a pasta do ciclo no seu Drive</a>, numerado como o SUAP pede. Depois é só assinar pelo gov.br e mandar para a CCO.</p>' +
-    passo(1, 'Folha de protocolo', linkArq(1) + '<div class="grade" style="margin-top:4px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"><div><label>CPF (não fica guardado)</label><input id="protCpf" placeholder="000.000.000-00" autocomplete="off"></div><div><label>Data</label><input id="protData" value="' + new Date().toLocaleDateString('pt-BR') + '"></div><div><label>Local</label><input id="protLocal" value="' + esc(({VA: 'Valença', MA: 'Rio de Janeiro', MG: 'Rio de Janeiro', NI: 'Nova Iguaçu', NF: 'Nova Friburgo', PE: 'Petrópolis', IT: 'Itaguaí', AR: 'Angra dos Reis'}[p.perfil.campus] || 'Valença') + ' - RJ') + '"></div></div><div class="aviso">Modelo oficial da CPPD com "Progressão/Promoção" marcado. Abra no Word, confira, salve em PDF e assine. Para o CPF ir no documento, digite acima (ele não é guardado na plataforma).</div>', '<button type="button" id="btProt">Gerar folha</button>') +
+    passo(1, 'Folha de protocolo', linkArq(1) + '<div class="grade" style="margin-top:4px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"><div><label>CPF (não fica guardado)</label><input id="protCpf" placeholder="000.000.000-00" autocomplete="off"></div><div><label>Data</label><input id="protData" value="' + new Date().toLocaleDateString('pt-BR') + '"></div><div><label>Local</label><input id="protLocal" value="' + esc(({VA: 'Valença', MA: 'Rio de Janeiro', MG: 'Rio de Janeiro', NI: 'Nova Iguaçu', NF: 'Nova Friburgo', PE: 'Petrópolis', IT: 'Itaguaí', AR: 'Angra dos Reis'}[p.perfil.campus] || 'Valença') + ' - RJ') + '"></div></div><div class="aviso">Modelo oficial da CPPD com "Progressão/Promoção" marcado. Abra no Word, confira, salve em PDF, assine pelo gov.br e envie abaixo. Para o CPF ir no documento, digite acima (ele não é guardado na plataforma).</div>' + htmlAssinado(1), '<button type="button" id="btProt">Gerar folha</button>') +
     passo(2, 'Portaria da última progressão', linkArq(2) + ' <span class="aviso">(na 1ª progressão, o termo de posse)</span>', '<label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar<input type="file" id="arqPortaria" accept="application/pdf,image/*" class="oculto"></label>') +
     passo(3, 'Planilha RAD preenchida', linkArq(3) + '<div class="aviso">Total ' + num(p.resumo.total) + ' · nota ' + p.resumo.nota + '. Abra no Excel, confira, salve em PDF (aba TOTAL primeiro) e assine.</div>' + htmlAssinado(3), '<button type="button" id="btRad">Gerar planilha</button>') +
     passo(4, 'Comprovantes da RAD (um PDF, na ordem da planilha)', linkArq(4) + '<div class="aviso">' + (p.comprovantes.length ? p.comprovantes.length + ' arquivo(s): ' + p.comprovantes.map(function(c){ return nomesArea[c.area] + ': ' + esc(c.nome); }).join(' · ') : 'nenhum comprovante ainda') + '</div>' + htmlAssinado(4), p.comprovantes.length ? '<button type="button" id="btComp">Montar PDF</button>' : '') +
-    passo(5, 'Avaliação de desempenho e parecer (formulário da CCO)', linkArq(5) + '<div class="aviso">Formulário oficial com a sua identificação, a comissão e a chefia já escritos. As notas e o parecer ficam para a CCO.</div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btCco">Preencher formulário</button>' : '<span class="aviso">escolha os 3 membros da CCO acima</span>') +
+    passo(5, 'Avaliação de desempenho e parecer (formulário da CCO)', linkArq(5) + '<div class="aviso">Formulário oficial com a sua identificação, a comissão e a chefia já escritos. As notas e o parecer ficam para a CCO.</div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btCco">Preencher formulário</button>' : '<span class="aviso">escolha os 3 membros da CCO acima</span>') + faltasCCO() +
     passo(6, 'Ata da reunião da CCO (modelo pré-preenchido)', linkArq(6) + '<div style="margin-top:4px;max-width:200px"><label>Data da reunião</label><input id="dataAta" placeholder="dd/mm/aaaa"></div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btAta">Gerar ata</button>' : '') +
     passo(7, 'Avaliar se está tudo certo', '<div class="aviso">Depois de montar tudo: a IA confere cada linha da RAD com o PDF dos comprovantes, faz uma segunda verificação dos problemas que achar e emite um relatório final (fica na pasta do ciclo).</div><div id="confBox"></div>', '<button type="button" id="btConferir">✅ Avaliar se está tudo certo</button>') +
     '<div id="msgPac" class="aviso" style="margin-top:8px"></div>' + emailCCO();
@@ -911,9 +921,9 @@ function desenharPacote(){
   if($('btProt')) $('btProt').addEventListener('click', function(){ this.disabled = true; gerarProtocolo(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(function(r){ if(r && r.aviso) alert(r.aviso); return salvarRetornado(r); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btComp')) $('btComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
-  if($('btCco')) $('btCco').addEventListener('click', function(){ this.disabled = true; preencherCCO(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btCco')) $('btCco').addEventListener('click', function(){ var bt = this; bt.disabled = true; completarPerfilCCO().then(function(){ return preencherCCO(msg); }).catch(function(e){ bt.disabled = false; throw e; }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btConferir')) $('btConferir').addEventListener('click', conferir);
-  if($('btAta')) $('btAta').addEventListener('click', function(){ this.disabled = true; msg('Escrevendo a ata…'); api('progGerarAta', {data: $('dataAta').value.trim()}).then(salvarRetornado).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  if($('btAta')) $('btAta').addEventListener('click', function(){ this.disabled = true; msg('Escrevendo a ata no modelo oficial…'); gerarAta($('dataAta').value.trim()).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
 }
 function emailCCO(){
   var p = PAC, cco = (p.cco || []).filter(function(c){ return c.nome; });
@@ -933,7 +943,8 @@ function preencherProtocoloXml(xml, textos, caixas, campusIdx) {
     var k = xml.indexOf('FORMTEXT', pos); if (k < 0) break;
     var sepTag = '<w:fldChar w:fldCharType="separate"/>', endTag = '<w:fldChar w:fldCharType="end"/>';
     var s = xml.indexOf(sepTag, k), e = xml.indexOf(endTag, s); if (s < 0 || e < 0) break;
-    var sFim = xml.indexOf('</w:r>', s) + 6, eIni = xml.lastIndexOf('<w:r', e);
+    // início da run do "end": a última <w:r> ou <w:r …> antes dele (não pode pegar <w:rPr>/<w:rFonts>, senão o Word fica quebrado e não abre)
+    var sFim = xml.indexOf('</w:r>', s) + 6, eIni = Math.max(xml.lastIndexOf('<w:r>', e), xml.lastIndexOf('<w:r ', e));
     var seg = xml.slice(sFim, eIni), rpr = (seg.match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0];
     var v = textos[i] === undefined || textos[i] === null || textos[i] === '' ? '     ' : String(textos[i]);
     v = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -950,16 +961,36 @@ function preencherProtocoloXml(xml, textos, caixas, campusIdx) {
   return xml;
 }
 
+function carregarJSZip(){ return window.JSZip ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de Word.')); }; document.head.appendChild(s); }); }
+// troca os {{CAMPOS}} de um XML do Word pelo texto (com &, < e > escapados); trecho entre **…** sai em negrito (o nome do docente na ata)
+function preencherCamposXml(xml, campos){
+  var e = function(t){ return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+  return xml.replace(/\{\{(\w+)\}\}/g, function(m, k, pos){
+    if(campos[k] === undefined) return m; var v = String(campos[k]); if(v.indexOf('**') < 0) return e(v);
+    var ini = Math.max(xml.lastIndexOf('<w:r>', pos), xml.lastIndexOf('<w:r ', pos)), rpr = (xml.slice(ini, xml.indexOf('<w:t', ini)).match(/<w:rPr>[\s\S]*<\/w:rPr>/) || [''])[0];
+    var rprB = rpr ? rpr.replace('<w:rPr>', '<w:rPr><w:b/>') : '<w:rPr><w:b/></w:rPr>';
+    return v.split('**').map(function(seg, i){ return i % 2 ? '</w:t></w:r><w:r>' + rprB + '<w:t xml:space="preserve">' + e(seg) + '</w:t></w:r><w:r>' + rpr + '<w:t xml:space="preserve">' : e(seg); }).join('');
+  });
+}
+// 6 · ata da CCO: os textos vêm do servidor e entram no modelo oficial em Word (mesma formatação do campus)
+function gerarAta(data){
+  var r;
+  return api('progGerarAta', {data: data}).then(function(x){ r = x; if(r.aviso) alert(r.aviso); return carregarJSZip(); })
+    .then(function(){ return fetch('modelo-ata-cco.docx?v=1'); }).then(function(f){ if(!f.ok) throw new Error('Modelo da ata não encontrado.'); return f.arrayBuffer(); })
+    .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){
+      return Promise.all(['word/document.xml', 'word/header1.xml'].map(function(n){ return z.file(n) ? z.file(n).async('string').then(function(x){ z.file(n, preencherCamposXml(x, r.campos)); }) : null; }))
+        .then(function(){ return z.generateAsync({type: 'base64'}); }); })
+    .then(function(b64){ return salvarGerado({nome: r.nome, dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
+}
 // 1 · folha de protocolo: o modelo oficial (Word, publicado em branco no site) preenchido aqui no navegador
 function gerarProtocolo(msg){
   var pf = PAC.perfil, tel = function(t){ var m = String(t || '').match(/\(?(\d{2})\)?\s*([\d\s-]{8,})/); return m ? [m[1], m[2].trim()] : ['', '']; }, ce = tel(pf.celular), te = tel(pf.telefone);
   var campus = {AR: 0, IT: 1, MA: 2, MG: 3, NF: 4, NI: 5, PE: 6, VA: 7}[pf.campus || 'VA'];
   var carga = pf.regime === '20h' ? 2 : pf.regime === '40h' ? 3 : 4, caixas = [false, false, false, false, false, false, true, false, false, false, false, false];
   caixas[(pf.carreira || 'EBTT') === 'MS' ? 1 : 0] = true; caixas[carga] = true;
-  var textos = [pf.nome, $('protCpf').value.trim(), pf.siape, pf.email, te[0], te[1], ce[0], ce[1], pf.colegiado, '', $('protData').value.trim(), $('protLocal').value.trim()];
+  var textos = [pf.nome, formatarCpf($('protCpf').value), pf.siape, pf.email, te[0], te[1], ce[0], ce[1], pf.colegiado, '', $('protData').value.trim(), $('protLocal').value.trim()];
   msg('Preenchendo a folha de protocolo…');
-  var carregarZip = window.JSZip ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de Word.')); }; document.head.appendChild(s); });
-  return carregarZip.then(function(){ return fetch('modelo-protocolo-cppd.docx?v=1'); }).then(function(r){ if(!r.ok) throw new Error('Modelo do protocolo não encontrado.'); return r.arrayBuffer(); })
+  return carregarJSZip().then(function(){ return fetch('modelo-protocolo-cppd.docx?v=1'); }).then(function(r){ if(!r.ok) throw new Error('Modelo do protocolo não encontrado.'); return r.arrayBuffer(); })
     .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){ return z.file('word/document.xml').async('string').then(function(x){ z.file('word/document.xml', preencherProtocoloXml(x, textos, caixas, campus)); return z.generateAsync({type: 'base64'}); }); })
     .then(function(b64){ return salvarGerado({nome: '1 - Folha de protocolo.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
 }
@@ -1073,9 +1104,23 @@ function montarComprovantes(msg, opts){
       .then(function(){ if(falhas.length) alert('Não deu para incluir: ' + falhas.join(', ') + '. Confira esses arquivos.'); });
   });
 }
+// 5 · campos que faltam para o formulário sair completo (o ano da admissão e o SIAPE da chefia)
+function faltasCCO(){
+  var pf = PAC.perfil, ch = PAC.chefia || {}, h = '';
+  if(!/\d{2}\/\d{2}\/\d{4}/.test(pf.admissao || '')) h += '<div><label>Sua data de admissão, com o ano</label><input id="ccoAdm" data-mascara="data" placeholder="dd/mm/aaaa" value="' + esc(pf.admissao || '') + '"></div>';
+  if(ch.nome && !(ch.siape || pf.chefiaSiape)) h += '<div><label>SIAPE da chefia (' + esc(ch.nome) + ')</label><input id="ccoChefSiape" inputmode="numeric" value=""></div>';
+  return h ? '<div class="caixa" style="border-color:#b3261e;margin-top:6px"><b class="erro">Falta para o formulário sair completo:</b><div class="grade" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">' + h + '</div></div>' : '';
+}
+function completarPerfilCCO(){
+  var adm = $('ccoAdm'), sia = $('ccoChefSiape'), mud = {};
+  if(adm){ if(!/^\d{2}\/\d{2}\/\d{4}$/.test(adm.value.trim())) return Promise.reject(new Error('Escreva a sua data de admissão completa (dd/mm/aaaa).')); mud.admissao = adm.value.trim(); }
+  if(sia){ if(!/^\d{5,8}$/.test(sia.value.trim())) return Promise.reject(new Error('Escreva o SIAPE da chefia (só números).')); mud.chefiaSiape = sia.value.trim(); }
+  if(!Object.keys(mud).length) return Promise.resolve();
+  return api('progPerfil', {perfil: mud}).then(function(){ Object.keys(mud).forEach(function(k){ PAC.perfil[k] = mud[k]; }); });
+}
 // 5 · formulário oficial da CCO com a identificação escrita nas posições do modelo
 function preencherCCO(msg){
-  var p = PAC, pf = p.perfil, cco = p.cco, ch = p.chefia || {};
+  var p = PAC, pf = p.perfil, cco = p.cco, ch = Object.assign({}, p.chefia || {}); if(!ch.siape) ch.siape = pf.chefiaSiape || '';
   msg('Baixando o formulário oficial…');
   return carregarPdfLib().then(function(){ return api('progArquivo', {id: p.modelos.cco}); }).then(function(a){ return PDFLib.PDFDocument.load(b64ParaBytes(a.dados), {ignoreEncryption: true}); }).then(function(doc){
     return doc.embedFont(PDFLib.StandardFonts.Helvetica).then(function(f){
@@ -1134,7 +1179,7 @@ function arquivosConferencia(){
   if(!proprio()) return Promise.resolve(null);
   return pastaCicloDrv().then(function(c){ return drvListar(c.id).then(function(fs){ var l = fs.filter(function(f){ return /^[1-6] - /.test(f.name); });
     return Promise.all(l.map(function(f){ var o = {id: f.id, nome: f.name, em: new Date(f.modifiedTime).getTime(), desc: f.description || '', mime: f.mimeType, url: f.webViewLink};
-      return /^[234] - /.test(f.name) && !/assinad/i.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }); }); }
+      return !/assinad/i.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }); }); }
 function conferir(){
   var box = $('confBox'), bt = $('btConferir'); bt.disabled = true, ARQC = null;
   box.innerHTML = '<p class="carregando">1/2 · A IA está conferindo cada linha da RAD com o PDF dos comprovantes… (1 a 3 min)</p>';
