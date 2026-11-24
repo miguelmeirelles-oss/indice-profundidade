@@ -937,20 +937,38 @@ function emailCCO(){
     '<p class="aviso">Anexe os arquivos 1 a 6 da pasta do ciclo (da RAD e dos comprovantes, os PDFs assinados).</p></details>';
 }
 // preenche o protocolo da CPPD (docx com campos de formulário antigos do Word): textos em ordem, caixas em ordem, campus
+// conserta runs sem o começo: "</w:r><w:rFonts …/>…</w:rPr>" (falta "<w:r><w:rPr>"). O modelo da CPPD publicado no site
+// tem isso nos 12 campos de texto e o Word se recusa a abrir; aqui o começo da run é recolocado antes de preencher.
+function consertarRunsXml(xml){
+  return xml.replace(/<\/w:r>((?:<w:(?:rFonts|rStyle|b|bCs|i|iCs|caps|u|color|sz|szCs|kern|spacing|position|highlight|vertAlign|noProof|lang)\b[^>]*\/>)+<\/w:rPr>)/g, '</w:r><w:r><w:rPr>$1');
+}
 function preencherProtocoloXml(xml, textos, caixas, campusIdx) {
+  xml = consertarRunsXml(xml);
+  // cada campo de texto do Word: <begin> FORMTEXT [<separate> resultado] <end>. Troca só o resultado, sem quebrar as runs
+  // (o modelo pode ter campo sem <separate>, atributos extras no fldChar e runs com <w:rPr>/<w:rFonts>)
   var i = 0, pos = 0;
+  var iniRun = function(p){ return Math.max(xml.lastIndexOf('<w:r>', p), xml.lastIndexOf('<w:r ', p)); };
+  var fimRun = function(p){ var f = xml.indexOf('</w:r>', p); return f < 0 ? -1 : f + 6; };
+  var proxFld = function(p){ var re = /<w:fldChar\b[^>]*w:fldCharType="(begin|separate|end)"[^>]*?(\/>|>[\s\S]*?<\/w:fldChar>)/g; re.lastIndex = p; var m = re.exec(xml); return m ? {tipo: m[1], pos: m.index} : null; };
   while (true) {
     var k = xml.indexOf('FORMTEXT', pos); if (k < 0) break;
-    var sepTag = '<w:fldChar w:fldCharType="separate"/>', endTag = '<w:fldChar w:fldCharType="end"/>';
-    var s = xml.indexOf(sepTag, k), e = xml.indexOf(endTag, s); if (s < 0 || e < 0) break;
-    // início da run do "end": a última <w:r> ou <w:r …> antes dele (não pode pegar <w:rPr>/<w:rFonts>, senão o Word fica quebrado e não abre)
-    var sFim = xml.indexOf('</w:r>', s) + 6, eIni = Math.max(xml.lastIndexOf('<w:r>', e), xml.lastIndexOf('<w:r ', e));
-    var seg = xml.slice(sFim, eIni), rpr = (seg.match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0];
-    var v = textos[i] === undefined || textos[i] === null || textos[i] === '' ? '     ' : String(textos[i]);
+    var v = textos[i] === undefined || textos[i] === null || textos[i] === '' ? '     ' : String(textos[i]); i++;
     v = v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    var novo = '<w:r>' + rpr + '<w:t xml:space="preserve">' + v + '</w:t></w:r>';
-    xml = xml.slice(0, sFim) + novo + xml.slice(eIni);
-    pos = sFim + novo.length; i++;
+    var a = proxFld(k); if (!a || a.tipo === 'begin') { pos = k + 8; continue; }
+    if (a.tipo === 'separate') {
+      var b = proxFld(a.pos + 10); if (!b || b.tipo !== 'end') { pos = k + 8; continue; }
+      var sFim = fimRun(a.pos), eIni = iniRun(b.pos);
+      if (sFim < 0 || eIni < sFim) { pos = b.pos + 10; continue; }   // separate e end na mesma run: deixa como está
+      var seg = xml.slice(sFim, eIni), rpr = (seg.match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || xml.slice(eIni, b.pos).match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0];
+      var novo = '<w:r>' + rpr + '<w:t xml:space="preserve">' + v + '</w:t></w:r>';
+      xml = xml.slice(0, sFim) + novo + xml.slice(eIni); pos = sFim + novo.length;
+    } else {   // campo sem resultado: cria o <separate> e o texto antes do <end>
+      var eI = iniRun(a.pos); if (eI < k - 2000) { pos = a.pos + 10; continue; }
+      var rp = (xml.slice(eI, a.pos).match(/<w:rPr>[\s\S]*?<\/w:rPr>/) || [''])[0];
+      var ins = '<w:r>' + rp + '<w:fldChar w:fldCharType="separate"/></w:r><w:r>' + rp + '<w:t xml:space="preserve">' + v + '</w:t></w:r>';
+      if (eI < fimRun(k)) { pos = a.pos + 10; continue; }   // instrução e end na mesma run: deixa como está
+      xml = xml.slice(0, eI) + ins + xml.slice(eI); pos = eI + ins.length;
+    }
   }
   var j = 0;
   xml = xml.replace(/<w:checkBox>([\s\S]*?)<\/w:checkBox>/g, function (a, dentro) {
