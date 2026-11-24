@@ -838,7 +838,7 @@ function baixarArquivo(id){
 // arquivos 1–6 do pacote: na pasta do ciclo (Drive próprio) ou pelo servidor
 function salvarGerado(o){
   if(!proprio()) return api('progSalvarGerado', o);
-  return pastaCicloDrv().then(function(p){ return drvSalvar(p.id, o.nome, o.dados, o.mime, o.incluidos ? 'incluidos:' + JSON.stringify(o.incluidos) : ''); }); }
+  return pastaCicloDrv().then(function(p){ return drvSalvar(p.id, o.nome, o.dados, o.mime, o.incluidos ? 'incluidos:' + JSON.stringify(o.incluidos) : o.impressao ? 'impressao:' + o.impressao : ''); }); }
 function salvarRetornado(r){ return r && r.dados ? salvarGerado({nome: r.nome, dados: r.dados, mime: r.mime}) : Promise.resolve(r); }
 function conectarDrive(){
   var b = $('btDrive'), m = $('msgDrive'); if(b) b.disabled = true; if(m) m.innerHTML = '<span class="giro"></span>Abrindo a janela do Google…';
@@ -866,10 +866,24 @@ function ligarDrive(){
 // ===================== etapa 2: o pacote para a CCO =====================
 var PAC = null;
 function carregarPacote(){
-  api('progPacote').then(function(p){ PAC = p; if(!p.proprio) return; return pastaCicloDrv().then(function(c){ PAC.pasta = c.webViewLink; return drvListar(c.id); }).then(function(fs){ PAC.arquivos = fs.filter(function(f){ return /^[1-6] - /.test(f.name); }).map(function(f){ return {nome: f.name, url: f.webViewLink, em: new Date(f.modifiedTime).toLocaleDateString('pt-BR')}; }).sort(function(a, b){ return a.nome.localeCompare(b.nome); }); }).catch(function(e){ PAC.erroDrive = e.message; }); }).then(function(){ desenharPacote(); }).catch(function(e){ var b = $('pacoteBox'); if(b) b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso">' + esc(e.message) + '</p>'; });
+  api('progPacote').then(function(p){ PAC = p; if(!p.proprio) return; return pastaCicloDrv().then(function(c){ PAC.pasta = c.webViewLink; return drvListar(c.id); }).then(function(fs){ PAC.arquivos = fs.filter(function(f){ return /^[1-6] - /.test(f.name); }).map(function(f){ return {nome: f.name, url: f.webViewLink, em: new Date(f.modifiedTime).toLocaleDateString('pt-BR'), desc: f.description || ''}; }).sort(function(a, b){ return a.nome.localeCompare(b.nome); }); }).catch(function(e){ PAC.erroDrive = e.message; }); }).then(function(){ desenharPacote(); }).catch(function(e){ var b = $('pacoteBox'); if(b) b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso">' + esc(e.message) + '</p>'; });
 }
 function arqDo(n){ return (PAC.arquivos || []).filter(function(a){ return a.nome.indexOf(n + ' - ') === 0; }); }
-function linkArq(n){ var l = arqDo(n); return l.length ? l.map(function(a){ return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener">✓ ' + esc(a.nome) + '</a> <span class="aviso">' + esc(a.em) + '</span>'; }).join('<br>') : '<span class="aviso">ainda não gerado</span>'; }
+// PDFs assinados (gov.br): guardam a "impressão" dos dados de quando foram assinados; se os dados mudaram, alerta vermelho
+var ASSINADOS = {3: {nome: '3 - RAD assinada.pdf', qual: 'rad', oque: 'a RAD'}, 4: {nome: '4 - Comprovantes da RAD (assinado).pdf', qual: 'comp', oque: 'a lista de comprovantes'}};
+function assinadoVelho(a){ var m = String(a.desc || '').match(/^impressao:([\w-]+)/), cfg = ASSINADOS[a.nome.charAt(0)]; return !!(m && cfg && a.nome === cfg.nome && PAC.impressao && PAC.impressao[cfg.qual] && m[1] !== PAC.impressao[cfg.qual]); }
+function linkArq(n){ var l = arqDo(n); return l.length ? l.map(function(a){ var velho = assinadoVelho(a);
+  return '<a href="' + esc(a.url) + '" target="_blank" rel="noopener"' + (velho ? ' style="color:#b3261e;text-decoration:line-through"' : '') + '>' + (velho ? '✗ ' : '✓ ') + esc(a.nome) + '</a> <span class="aviso">' + esc(a.em) + '</span>' +
+    (velho ? '<div style="margin:6px 0;padding:8px 10px;border:2px solid #b3261e;border-radius:8px;background:#fdecea;color:#b3261e;font-weight:bold">⚠ ESTE PDF ASSINADO ESTÁ DESATUALIZADO: ' + esc(ASSINADOS[n].oque) + ' mudou depois da assinatura. NÃO mande este para a CCO: gere o documento de novo, assine pelo gov.br e envie o novo PDF assinado.</div>' : ''); }).join('<br>') : '<span class="aviso">ainda não gerado</span>'; }
+// caixa para enviar o PDF assinado de um passo (3 = RAD, 4 = comprovantes)
+function htmlAssinado(n){
+  var cfg = ASSINADOS[n], tem = arqDo(n).some(function(a){ return a.nome === cfg.nome; });
+  var h = '<div style="margin-top:6px;padding:8px;border:1px dashed var(--borda,#c9d3e3);border-radius:8px"><b>✍ PDF assinado pelo gov.br</b>' + (tem ? '' : ' <span class="aviso">(ainda não enviado)</span>');
+  if(n === 3){ var j = PAC.justificativaRad;
+    h += '<div class="aviso">Mudou pontos no Excel? Escreva aqui o que mudou e por quê (opcional). A IA confere com as regras e os comprovantes. <b>A sua pontuação e o seu PDF ficam sempre como você mandou.</b></div><textarea id="justRad" rows="3" maxlength="2000" placeholder="Ex.: no item X coloquei 4 pontos e não 2, porque…"></textarea>' +
+      (j ? '<div style="margin-top:6px;padding:8px 10px;border-radius:8px;background:' + (j.concorda ? '#e8f5ec;color:#1e6b3a' : '#fff4e5;color:#8a4b00') + '"><b>' + (j.concorda ? '✓ A IA concordou com a sua mudança (e aprendeu com ela)' : 'ℹ A IA viu a regra de outro jeito, mas a sua pontuação foi mantida') + '</b> <span class="aviso">' + esc(j.em) + '</span><br>' + esc(j.explicacao) + '</div>' : ''); }
+  return h + '<label class="btn sec" style="margin:6px 0 0;color:var(--navy);font-size:14px">📤 Enviar PDF assinado<input type="file" data-assinado="' + n + '" accept="application/pdf" class="oculto"></label></div>';
+}
 function desenharPacote(){
   var b = $('pacoteBox'); if(!b) return; var p = PAC, cco = p.cco || [];
   var nomesArea = {doc: 'Docência', ori: 'Orientações', out: 'Outras acadêmicas', art: 'Artísticas', comp: 'Complementares', ext: 'Extensão', pes: 'Pesquisa'};
@@ -877,8 +891,8 @@ function desenharPacote(){
   b.innerHTML = '<h2>📦 Pacote para a CCO</h2><p class="aviso" style="margin-top:0">Tudo vai para <a href="' + esc(p.pasta) + '" target="_blank" rel="noopener">a pasta do ciclo no seu Drive</a>, numerado como o SUAP pede. Depois é só assinar pelo gov.br e mandar para a CCO.</p>' +
     passo(1, 'Folha de protocolo', linkArq(1) + '<div class="grade" style="margin-top:4px;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))"><div><label>CPF (não fica guardado)</label><input id="protCpf" placeholder="000.000.000-00" autocomplete="off"></div><div><label>Data</label><input id="protData" value="' + new Date().toLocaleDateString('pt-BR') + '"></div><div><label>Local</label><input id="protLocal" value="' + esc(({VA: 'Valença', MA: 'Rio de Janeiro', MG: 'Rio de Janeiro', NI: 'Nova Iguaçu', NF: 'Nova Friburgo', PE: 'Petrópolis', IT: 'Itaguaí', AR: 'Angra dos Reis'}[p.perfil.campus] || 'Valença') + ' - RJ') + '"></div></div><div class="aviso">Modelo oficial da CPPD com "Progressão/Promoção" marcado. Abra no Word, confira, salve em PDF e assine. Para o CPF ir no documento, digite acima (ele não é guardado na plataforma).</div>', '<button type="button" id="btProt">Gerar folha</button>') +
     passo(2, 'Portaria da última progressão', linkArq(2) + ' <span class="aviso">(na 1ª progressão, o termo de posse)</span>', '<label class="btn sec" style="margin:0;color:var(--navy);font-size:14px">📤 Enviar<input type="file" id="arqPortaria" accept="application/pdf,image/*" class="oculto"></label>') +
-    passo(3, 'Planilha RAD preenchida', linkArq(3) + '<div class="aviso">Total ' + num(p.resumo.total) + ' · nota ' + p.resumo.nota + '. Abra no Excel, confira, salve em PDF (aba TOTAL primeiro) e assine.</div>', '<button type="button" id="btRad">Gerar planilha</button>') +
-    passo(4, 'Comprovantes da RAD (um PDF, na ordem da planilha)', linkArq(4) + '<div class="aviso">' + (p.comprovantes.length ? p.comprovantes.length + ' arquivo(s): ' + p.comprovantes.map(function(c){ return nomesArea[c.area] + ': ' + esc(c.nome); }).join(' · ') : 'nenhum comprovante ainda') + '</div>', p.comprovantes.length ? '<button type="button" id="btComp">Montar PDF</button>' : '') +
+    passo(3, 'Planilha RAD preenchida', linkArq(3) + '<div class="aviso">Total ' + num(p.resumo.total) + ' · nota ' + p.resumo.nota + '. Abra no Excel, confira, salve em PDF (aba TOTAL primeiro) e assine.</div>' + htmlAssinado(3), '<button type="button" id="btRad">Gerar planilha</button>') +
+    passo(4, 'Comprovantes da RAD (um PDF, na ordem da planilha)', linkArq(4) + '<div class="aviso">' + (p.comprovantes.length ? p.comprovantes.length + ' arquivo(s): ' + p.comprovantes.map(function(c){ return nomesArea[c.area] + ': ' + esc(c.nome); }).join(' · ') : 'nenhum comprovante ainda') + '</div>' + htmlAssinado(4), p.comprovantes.length ? '<button type="button" id="btComp">Montar PDF</button>' : '') +
     passo(5, 'Avaliação de desempenho e parecer (formulário da CCO)', linkArq(5) + '<div class="aviso">Formulário oficial com a sua identificação, a comissão e a chefia já escritos. As notas e o parecer ficam para a CCO.</div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btCco">Preencher formulário</button>' : '<span class="aviso">escolha os 3 membros da CCO acima</span>') +
     passo(6, 'Ata da reunião da CCO (modelo pré-preenchido)', linkArq(6) + '<div style="margin-top:4px;max-width:200px"><label>Data da reunião</label><input id="dataAta" placeholder="dd/mm/aaaa"></div>', cco.filter(function(c){ return c.nome; }).length === 3 ? '<button type="button" id="btAta">Gerar ata</button>' : '') +
     passo(7, 'Avaliar se está tudo certo', '<div class="aviso">Depois de montar tudo: a IA confere cada linha da RAD com o PDF dos comprovantes, faz uma segunda verificação dos problemas que achar e emite um relatório final (fica na pasta do ciclo).</div><div id="confBox"></div>', '<button type="button" id="btConferir">✅ Avaliar se está tudo certo</button>') +
@@ -887,6 +901,13 @@ function desenharPacote(){
   var ok = function(){ carregarPacote(); };
   if($('arqPortaria')) $('arqPortaria').addEventListener('change', function(){ var f = this.files[0]; if(!f) return; msg('Enviando…');
     (/^image\//.test(f.type) ? imagemParaPdf(f) : lerArquivo(f)).then(function(b64){ return salvarGerado({nome: '2 - Portaria da última progressão.pdf', dados: b64, mime: 'application/pdf'}); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
+  b.querySelectorAll('[data-assinado]').forEach(function(inp){ inp.addEventListener('change', function(){ var f = this.files[0], n = Number(this.dataset.assinado), cfg = ASSINADOS[n]; if(!f) return;
+    if(!/pdf$/i.test(f.type) && !/\.pdf$/i.test(f.name)){ msg('<span class="erro">Envie o PDF assinado (arquivo .pdf).</span>'); return; }
+    var just = n === 3 && $('justRad') ? $('justRad').value.trim() : '', dados = '';
+    msg('<span class="giro"></span>Enviando o PDF assinado…');
+    lerArquivo(f).then(function(b64){ dados = b64; return salvarGerado({nome: cfg.nome, dados: b64, mime: 'application/pdf', impressao: PAC.impressao && PAC.impressao[cfg.qual]}); })
+      .then(function(){ if(!just) return; msg('<span class="giro"></span>A IA está conferindo a sua justificativa…'); return api('progJustificarRad', {justificativa: just, dados: dados, mime: 'application/pdf'}); })
+      .then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); }); });
   if($('btProt')) $('btProt').addEventListener('click', function(){ this.disabled = true; gerarProtocolo(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btRad')) $('btRad').addEventListener('click', function(){ this.disabled = true; msg('Preenchendo a planilha oficial…'); api('progGerarRad').then(function(r){ if(r && r.aviso) alert(r.aviso); return salvarRetornado(r); }).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
   if($('btComp')) $('btComp').addEventListener('click', function(){ this.disabled = true; montarComprovantes(msg).then(ok).catch(function(e){ msg('<span class="erro">' + esc(e.message) + '</span>'); }); });
@@ -903,7 +924,7 @@ function emailCCO(){
   return '<details style="margin-top:10px"><summary style="cursor:pointer"><b>✉ E-mail para a CCO</b> <span class="aviso">(você envia do seu e-mail; a plataforma não envia)</span></summary>' +
     '<p class="aviso" style="margin:6px 0 2px">Para: ' + esc(cco.map(function(c){ return c.nome + (c.email ? ' <' + c.email + '>' : ' (sem e-mail na lista)'); }).join(', ')) + '<br>Assunto: <b>' + esc(assunto) + '</b></p>' +
     '<textarea rows="8" id="txtEmailCCO">' + esc(corpo) + '</textarea><div class="botoes"><a class="btn sec" id="lnkMail" href="mailto:' + encodeURIComponent(mails.join(',')) + '?subject=' + encodeURIComponent(assunto) + '&body=' + encodeURIComponent(corpo) + '">Abrir no meu e-mail</a></div>' +
-    '<p class="aviso">Anexe os arquivos 1 a 6 da pasta do ciclo.</p></details>';
+    '<p class="aviso">Anexe os arquivos 1 a 6 da pasta do ciclo (da RAD e dos comprovantes, os PDFs assinados).</p></details>';
 }
 // preenche o protocolo da CPPD (docx com campos de formulário antigos do Word): textos em ordem, caixas em ordem, campus
 function preencherProtocoloXml(xml, textos, caixas, campusIdx) {
@@ -1113,7 +1134,7 @@ function arquivosConferencia(){
   if(!proprio()) return Promise.resolve(null);
   return pastaCicloDrv().then(function(c){ return drvListar(c.id).then(function(fs){ var l = fs.filter(function(f){ return /^[1-6] - /.test(f.name); });
     return Promise.all(l.map(function(f){ var o = {id: f.id, nome: f.name, em: new Date(f.modifiedTime).getTime(), desc: f.description || '', mime: f.mimeType, url: f.webViewLink};
-      return /^[234] - /.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }); }); }
+      return /^[234] - /.test(f.name) && !/assinad/i.test(f.name) ? drvBaixar(f.id).then(function(a){ o.dados = bytesParaB64(a.bytes); o.mime = a.mime; return o; }) : o; })); }); }); }
 function conferir(){
   var box = $('confBox'), bt = $('btConferir'); bt.disabled = true, ARQC = null;
   box.innerHTML = '<p class="carregando">1/2 · A IA está conferindo cada linha da RAD com o PDF dos comprovantes… (1 a 3 min)</p>';
@@ -1291,6 +1312,6 @@ function htmlRelCCO0(r){
 document.querySelectorAll('.abas button[data-aba]').forEach(function(b){ b.addEventListener('click', function(){ trocarAba(b.dataset.aba); }); });
 abrir();
 </script>
-<script src="avisos.js?v=4"></script>
+<script src="avisos.js?v=5"></script>
 </body>
 </html>

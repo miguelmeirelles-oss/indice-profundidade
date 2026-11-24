@@ -89,8 +89,13 @@
     // a janela usa a largura VISÍVEL da tela (algumas páginas são mais largas que o celular e esticariam a janela)
     try { var vis = document.documentElement.clientWidth || window.innerWidth, card = fundo.firstElementChild, w = Math.min(520, vis);
       fundo.style.justifyContent = 'flex-start'; card.style.maxWidth = w + 'px'; card.style.marginLeft = Math.max(0, (vis - w) / 2) + 'px'; } catch (e) {}
-    var $ = function (id) { return document.getElementById(id); }, fechar = function () { fundo.remove(); };
-    fundo.addEventListener('click', function (e) { if (e.target === fundo) fechar(); });
+    var $ = function (id) { return document.getElementById(id); };
+    // fechar (✕ ou clique fora): se há texto digitado, pergunta antes, para não perder o que foi escrito
+    var temTexto = function () { return ['avTexto', 'avChatTxt'].some(function (id) { var t = $(id); return t && t.value.trim(); }); };
+    var fechar = function () { if (temTexto() && !window.confirm('Fechar esta janela? O que você escreveu e ainda não enviou será apagado.')) return; fundo.remove(); };
+    var apertouFora = false;   // só conta como "clique fora" se o clique começou e terminou fora da janela (arrastar para selecionar texto não fecha)
+    fundo.addEventListener('mousedown', function (e) { apertouFora = e.target === fundo; });
+    fundo.addEventListener('click', function (e) { if (e.target === fundo && apertouFora) fechar(); apertouFora = false; });
     $('avFechar').addEventListener('click', fechar);
     var pode = function () { $('avEnviar').disabled = !tipo || $('avTexto').value.trim().length < 5; $('avEnviar').style.opacity = $('avEnviar').disabled ? .5 : 1; };
     pode();
@@ -101,7 +106,8 @@
         return '<div style="padding:8px 10px;border-radius:10px;font-size:14.5px;white-space:pre-wrap;' + (eu ? 'background:#e8eefc;margin-left:24px' : 'background:#f3f4f6;margin-right:24px') + '"><b style="font-size:12.5px;color:#4b5563">' + (eu ? 'Você' : 'Claude') + '</b><br>' + esc(m.texto) + '</div>'; }).join('')
         : '<p style="color:#4b5563;font-size:14px;margin:0">Conte a mudança que você quer. O Claude responde com a proposta; vocês conversam até decidir e, quando estiver bom, é só clicar em <b>✅ Implementar</b>: ele programa e publica na hora.</p>';
       box.scrollTop = box.scrollHeight;
-      var bi = $('avImplementar'); bi.disabled = !l.some(function (m) { return m.papel === 'ia'; }); bi.style.opacity = bi.disabled ? .5 : 1;
+      // o botão fica clicável (com o visual de sempre); sem resposta do Claude ainda, o clique explica o que fazer
+      var bi = $('avImplementar'); bi.style.opacity = l.some(function (m) { return m.papel === 'ia'; }) ? 1 : .5;
     };
     var modo = function () {
       var chat = tipo === 'implementar', c = $('avChat');
@@ -118,11 +124,13 @@
           .catch(function (e) { msgChat(e.message, true); }).then(function () { b.disabled = false; b.textContent = 'Enviar'; });
       });
       $('avImplementar').addEventListener('click', function () {
-        var l = lerConversa(), b = this; if (!l.length) return;
+        var l = lerConversa(), b = this;
+        if ($('avChatTxt').value.trim()) { msgChat('Você escreveu uma mensagem que ainda não foi enviada. Clique primeiro em "Enviar" e espere a resposta do Claude; depois clique em ✅ Implementar.', true); return; }
+        if (!l.some(function (m) { return m.papel === 'ia'; })) { msgChat('Primeiro escreva a mudança que você quer e clique em "Enviar". Quando o Claude responder com a proposta, aí sim clique em ✅ Implementar.', true); return; }
         if (!window.confirm('Implementar agora o que foi combinado nesta conversa? O Claude programa, testa e publica sozinho (o robô volta à versão anterior se o servidor falhar).')) return;
         b.disabled = true; b.textContent = 'Enviando…';
         chamar('conversaImplementar', { mensagens: l, contexto: ctx }).then(function (r) { gravarConversa([]); desenharChat(); msgChat(r.mensagem); })
-          .catch(function (e) { msgChat(e.message, true); }).then(function () { b.textContent = '✅ Implementar'; desenharChat(); });
+          .catch(function (e) { msgChat(e.message, true); }).then(function () { b.disabled = false; b.textContent = '✅ Implementar'; desenharChat(); });
       });
       $('avNova').addEventListener('click', function () { if (lerConversa().length && !window.confirm('Apagar esta conversa e começar outra?')) return; gravarConversa([]); desenharChat(); msgChat(''); });
     }
