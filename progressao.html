@@ -1241,7 +1241,7 @@ function htmlConferencia(r){
   if((r.faltando || []).length) h += '<p style="margin:8px 0 0"><b>Pode estar faltando</b></p><ul style="margin:4px 0;padding-left:20px">' + r.faltando.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
   if((r.observacoes || []).length) h += '<p style="margin:8px 0 0"><b>Outras observações</b></p><ul style="margin:4px 0;padding-left:20px">' + r.observacoes.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
   if(r.url) h += '<p style="margin:8px 0 0"><a href="' + esc(r.url) + '" target="_blank" rel="noopener">📄 Relatório final no Drive</a></p>';
-  return h + '</div>';
+  return h + '</div>' + caixaTreinar('conferência do processo pelo docente');
 }
 // ---------- aba "Sou membro de CCO" ----------
 var CCO = null, ROT_CONC = {favoravel: 'Parecer FAVORÁVEL', favoravel_com_ressalvas: 'FAVORÁVEL COM RESSALVAS', desfavoravel: 'Parecer DESFAVORÁVEL'};
@@ -1349,7 +1349,7 @@ function desenharCCOAval(a){
     api('progCCOParecer', {id: a.id, parecer: $('ccoParecer').value}).then(function(){ return apiCCO('progCCOAta', {id: a.id, data: $('ccoDataAta').value.trim()}); }).then(desenharCCOAval)
       .catch(function(e){ b.disabled = false; $('ccoAtaMsg').innerHTML = '<span class="erro">' + esc(e.message) + '</span>'; }); });
 }
-function htmlRelCCO(r){ return ((r.checagensFixas || []).length ? '<div style="background:var(--bloco);border-radius:10px;padding:8px 10px;margin:6px 0"><b>Conferência fixa da planilha</b> <span class="aviso">(fórmulas oficiais, feita pelo sistema)</span><ul style="margin:4px 0;padding-left:20px">' + r.checagensFixas.map(function(q){ return '<li class="' + (q.ok ? 'ok' : 'warn') + '">' + (q.ok ? '✓ ' : '✗ ') + esc(q.txt) + '</li>'; }).join('') + '</ul>' + ((r.inventario || []).length ? '<div class="aviso">A IA inventariou ' + r.inventario.length + ' documento(s) nos arquivos.</div>' : '') + '</div>' : '') + htmlRelCCO0(r); }
+function htmlRelCCO(r){ return ((r.checagensFixas || []).length ? '<div style="background:var(--bloco);border-radius:10px;padding:8px 10px;margin:6px 0"><b>Conferência fixa da planilha</b> <span class="aviso">(fórmulas oficiais, feita pelo sistema)</span><ul style="margin:4px 0;padding-left:20px">' + r.checagensFixas.map(function(q){ return '<li class="' + (q.ok ? 'ok' : 'warn') + '">' + (q.ok ? '✓ ' : '✗ ') + esc(q.txt) + '</li>'; }).join('') + '</ul>' + ((r.inventario || []).length ? '<div class="aviso">A IA inventariou ' + r.inventario.length + ' documento(s) nos arquivos.</div>' : '') + '</div>' : '') + htmlRelCCO0(r) + caixaTreinar('avaliação da CCO' + (r.docente ? ' de ' + r.docente : '')); }
 function htmlRelCCO0(r){
   var h = '<div style="margin-top:10px;padding:10px 12px;border-radius:10px;background:var(--bloco)"><div style="font-size:18px;font-weight:bold">' + esc(ROT_CONC[r.conclusao] || '') + '</div><div>' + esc(r.resumo || '') + '</div>' +
     '<div class="aviso" style="margin-top:4px">' + esc([r.docente, r.siape && 'SIAPE ' + r.siape, r.periodo, r.nivelAtual && (r.nivelAtual + ' → ' + (r.nivelPretendido || '?')), r.em && 'avaliado em ' + r.em].filter(Boolean).join(' · ')) + '</div></div>';
@@ -1373,6 +1373,31 @@ function htmlRelCCO0(r){
   return h;
 }
 document.querySelectorAll('.abas button[data-aba]').forEach(function(b){ b.addEventListener('click', function(){ trocarAba(b.dataset.aba); }); });
+
+// "🧠 Ajude a treinar a IA" (conferência do docente e avaliação da CCO): a IA confere a observação com os documentos do
+// CEFET; só vira regra o que tem base escrita (onde está escrito). O resto fica como observação para revisão.
+function caixaTreinar(onde){
+  return '<details class="treinar" style="margin-top:10px;border:1px dashed var(--linha,#c9d3e3);border-radius:10px;padding:8px 10px"><summary style="cursor:pointer"><b>🧠 Ajude a treinar a IA</b> <span class="aviso">— discordou de algo? achou um erro? anote aqui</span></summary>' +
+    '<p class="aviso" style="margin:6px 0">Qualquer observação, discordância ou erro: diga o quê e por quê (de preferência, a regra ou o documento do CEFET). A IA confere com a resolução e a planilha RAD oficial. Se tiver base escrita, vira regra para as próximas avaliações de todos; se não tiver, fica guardada como observação (não vira regra).</p>' +
+    '<textarea data-treinartxt rows="3" style="width:100%" placeholder="Ex.: a IA contou a bolsa de IC como projeto com fomento, mas bolsa de aluno não é fomento (nota 7 da aba Pesquisa da RAD)"></textarea>' +
+    '<div class="botoes"><button type="button" class="sec" data-treinar="' + esc(onde) + '">Enviar para a IA conferir</button>' + (R && R.admin ? '<button type="button" class="link" data-treinarver="1">ver regras aprendidas</button>' : '') + '</div><div data-treinarmsg></div></details>';
+}
+document.addEventListener('click', function(ev){
+  var b = ev.target.closest && ev.target.closest('[data-treinar],[data-treinarver],[data-treinarrem]'); if(!b) return;
+  var cx = b.closest('.treinar'), msg = cx.querySelector('[data-treinarmsg]');
+  var lista = function(x){ msg.innerHTML = '<p style="margin:8px 0 2px"><b>Regras aprendidas</b> <span class="aviso">(entram em toda conferência)</span></p>' + (x.regras.length ? x.regras.map(function(t, i){ return '<div style="font-size:14px;margin:4px 0">• ' + esc(t) + ' <button type="button" class="link" data-treinarrem="' + i + '">tirar</button></div>'; }).join('') : '<p class="aviso">Nenhuma ainda.</p>') +
+    (x.observacoes.length ? '<p style="margin:8px 0 2px"><b>Observações guardadas</b> <span class="aviso">(não viraram regra)</span></p>' + x.observacoes.map(function(o){ return '<div style="font-size:13.5px;margin:4px 0"><span class="aviso">' + esc(o.em + ' · ' + o.origem + ' · ' + o.motivo) + '</span><br>' + esc(o.texto) + '</div>'; }).join('') : ''); };
+  if(b.dataset.treinarver){ api('progAprendido', {}).then(lista).catch(function(e){ msg.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; }); return; }
+  if(b.dataset.treinarrem !== undefined){ if(!confirm('Tirar esta regra? Ela deixa de valer nas próximas conferências.')) return; api('progAprendido', {remover: b.dataset.treinarrem}).then(lista).catch(function(e){ msg.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; }); return; }
+  var t = cx.querySelector('[data-treinartxt]').value.trim(); if(t.length < 15){ msg.innerHTML = '<p class="erro">Escreva com um pouco mais de detalhe.</p>'; return; }
+  b.disabled = true; msg.innerHTML = '<p class="aviso"><span class="giro"></span>A IA está conferindo com a resolução e a planilha RAD oficial…</p>';
+  api('progTreinar', {texto: t, contexto: b.dataset.treinar}).then(function(r){ b.disabled = false;
+    msg.innerHTML = r.aprendeu ? '<p class="ok">✓ Obrigado! Procede e tem base escrita: virou regra para as próximas avaliações.<br>' + esc(r.regra) + ' <span class="aviso">(fonte: ' + esc(r.fonte) + ')</span><br><span class="aviso">' + esc(r.explicacao) + '</span></p>'
+      : r.procede ? '<p class="warn">A IA concorda, mas não achou onde isso está escrito nos documentos do CEFET: ficou guardado como observação (não virou regra). ' + esc(r.explicacao) + '</p>'
+      : '<p class="warn">A IA não concordou: ' + esc(r.explicacao) + ' <span class="aviso">(ficou guardado como observação)</span></p>';
+    cx.querySelector('[data-treinartxt]').value = '';
+  }).catch(function(e){ b.disabled = false; msg.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+});
 abrir();
 </script>
 <script src="avisos.js?v=5"></script>
