@@ -758,7 +758,9 @@ function iniciar(){
     });
     $('btMensagens').classList.remove('oculto');
     if(r.professor) chipIAForte();
-    if(r.professor) api('auditorListar').then(function(a){
+    // "já vi" das Configurações fica na conta (vale em todo aparelho): junta o do servidor com o deste aparelho antes de acender a bolinha
+    if(r.professor) api('cfgVistoLer').then(function(sv){ var v = vistoCfg(); Object.keys(sv || {}).forEach(function(k){ v[k] = sv[k]; }); try { localStorage.setItem('cfgVisto', JSON.stringify(v)); } catch(e){} }, function(){})
+      .then(function(){ return api('auditorListar'); }).then(function(a){
       var l = (a && a.relatorios) || [], pub = a && a.publicacao;
       var venc = ((a && a.tokens) || []).filter(function(t){ return t.dias <= 30; });
       var l0 = l.filter(function(x){ return x.relevante !== false; })[0];
@@ -3258,7 +3260,7 @@ function desenharPF(){
       '<div class="aviso">Orient.: ' + esc(g.orientador || '—') + (g.coorientadores.length ? ' · coorient.: ' + esc(g.coorientadores.join(', ')) : '') + '</div>' +
       (g.titulo ? '<div class="aviso" style="font-style:italic">' + esc(g.titulo) + '</div>' : '<div class="aviso t-warn">sem título</div>') +
       (e2 && g.banca.length ? '<div class="aviso">Banca: ' + esc(g.banca.join(' · ')) + '</div>' : '') +
-      (e2 && g.defesa ? '<div style="font-size:14px;margin-top:2px"><b>📅 Defesa:</b> ' + esc(g.defesa.data || 'data a definir') + (g.defesa.hora ? ' às ' + esc(g.defesa.hora) : '') + ' · Local: ' + (g.defesa.local ? esc(g.defesa.local) : 'não informado') + '</div>' : '') +
+      (e2 && g.defesa ? '<div style="font-size:14px;margin-top:2px"><b>📅 Defesa:</b> ' + esc(g.defesa.data || 'data a definir') + (g.defesa.hora ? ' às ' + esc(g.defesa.hora) : '') + ' · Local: ' + (g.defesa.local ? esc(g.defesa.local) : 'não informado') + ' <button type="button" class="link" data-pflocal="' + esc(g.id) + '">✏ editar local</button></div>' : '') +
       (e2 && g.ata ? '<div class="aviso" style="margin-top:4px">📄 Ata gerada pelo formulário em ' + esc(g.ata.em) + ' · ' +
         (g.ata.ataUrl ? '<a href="' + esc(g.ata.ataUrl) + '" target="_blank" rel="noopener">ata</a>' : '') + (g.ata.planilhaUrl ? ' · <a href="' + esc(g.ata.planilhaUrl) + '" target="_blank" rel="noopener">planilha</a>' : '') + (g.ata.pastaUrl ? ' · <a href="' + esc(g.ata.pastaUrl) + '" target="_blank" rel="noopener">pasta</a>' : '') + '</div>' : '') +
       (e2 && r.podeEnviar && ((g.ata && !g.docs.B) || g.docs.B) ? '<div class="botoes" style="margin:6px 0 0">' +
@@ -3292,6 +3294,12 @@ function desenharPF(){
       .then(function(l){ PFV.lido = l; desenharLidoPF(); }).catch(function(e){ $('pfLido').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); };
     fr.readAsDataURL(f);
   });
+  el.querySelectorAll('[data-pflocal]').forEach(function(b){ b.addEventListener('click', function(){
+    var g = r.grupos.filter(function(x){ return x.id === b.dataset.pflocal; })[0];
+    var novo = window.prompt('Local da defesa (ex.: Sala 301, Laboratório de Alimentos, on-line pelo Google Meet). Vai para a tela, o convite da banca e a ata/planilha geradas depois:', (g && g.defesa && g.defesa.local) || '');
+    if(novo === null) return; b.disabled = true;
+    api('pfDefesaLocal', {disciplinaId: PFV.d.id, grupoId: b.dataset.pflocal, local: novo}).then(function(x){ PFV.r = x; desenharPF(); $('pfMsg').innerHTML = '<span class="ok">✓ Local salvo. Se a ata já tinha sido gerada, gere de novo pelo formulário para sair com o local novo.</span>'; })
+      .catch(function(e){ b.disabled = false; alert(e.message); }); }); });
   el.querySelectorAll('[data-pfnota]').forEach(function(inp){ inp.addEventListener('change', function(){ inp.disabled = true;
     api('pfNota', {disciplinaId: PFV.d.id, grupoId: inp.dataset.pfnota, nota: inp.value}).then(function(x){ PFV.r = x; desenharPF(); }).catch(function(e){ inp.disabled = false; alert(e.message); }); }); });
   el.querySelectorAll('[data-pfedit]').forEach(function(b){ b.addEventListener('click', function(){
@@ -6014,6 +6022,7 @@ function marcarVistoCfg(cx){
   if(cx.id === 'cxAuditor' && window.NOVIDADE_AUDITOR_FORA){ window.NOVIDADE_AUDITOR_FORA = false; atualizarBolinhaCfg(); }
   var v = vistoCfg(); if(v[chave] === nov) return; v[chave] = nov;
   try { localStorage.setItem('cfgVisto', JSON.stringify(v)); } catch(e){}
+  if(typeof api === 'function') api('cfgVistoSalvar', {visto: v}).catch(function(e){});   // guarda também na conta: não reaparece em outro aparelho
   cx.classList.remove('novidade'); atualizarBolinhaCfg();
 }
 // bolinha vermelha na aba: novidade numa caixa já desenhada, ou relatório novo do auditor visto na entrada

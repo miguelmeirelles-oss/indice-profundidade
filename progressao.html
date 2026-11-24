@@ -1215,6 +1215,20 @@ function desenharCCOAval(a){
     a.arquivos.filter(function(f){ return f.gerado; }).map(function(f){ return '<div style="margin-top:6px"><a href="' + esc(f.url) + '" target="_blank" rel="noopener">📄 ' + esc(f.nome) + '</a></div>'; }).join('') + '<div id="ccoAtaMsg" class="aviso"></div></div>';
   $('corpo').innerHTML = h; window.scrollTo(0, 0);
   $('ccoVoltar').addEventListener('click', abrirCCO);
+  // contestar a avaliação da IA numa linha: a IA confere a justificativa nas regras; se procede, corrige e aprende
+  document.querySelectorAll('[data-contestar]').forEach(function(b){ b.addEventListener('click', function(){
+    var just = window.prompt('Por que a avaliação da IA nesta linha está errada? Cite a regra ou o documento (ex.: "artigo vale por 3 anos, está na aba Pesquisa da RAD").');
+    if(!just || just.trim().length < 8) return;
+    var m = $('ccoAvMsg'); b.disabled = true; m.innerHTML = '<p class="aviso"><span class="giro"></span>A IA está conferindo sua justificativa nas regras da CPPD…</p>';
+    apiCCO('progCCOContestar', {id: a.id, indice: Number(b.dataset.contestar), justificativa: just}).then(function(r){
+      var ct = r.contestacao || {};
+      if(ct.mudou){ desenharCCOAval(r); $('ccoAvMsg').innerHTML = '<p class="ok">✓ Você tinha razão: a linha foi corrigida. ' + esc(ct.explicacao) + (ct.regra ? '<br><span class="aviso">Aprendido para as próximas avaliações: ' + esc(ct.regra) + '</span>' : '') + '</p>'; return; }
+      m.innerHTML = '<p class="warn">A IA não concordou: ' + esc(ct.explicacao) + '</p>';
+      if(window.confirm('A IA não concordou:\n\n' + ct.explicacao + '\n\nQuer manter a sua correção mesmo assim? (a linha fica como ok e com o valor declarado; nada é aprendido)'))
+        return apiCCO('progCCOContestar', {id: a.id, indice: Number(b.dataset.contestar), justificativa: just, forcar: true}).then(function(r2){ desenharCCOAval(r2); $('ccoAvMsg').innerHTML = '<p class="ok">✓ Mantida a sua correção.</p>'; });
+      b.disabled = false;
+    }).catch(function(e){ b.disabled = false; m.innerHTML = '<p class="erro">' + esc(e.message) + '</p>'; });
+  }); });
   $('btCcoLink').addEventListener('click', function(){ var b = this, link = $('ccoLink').value.trim(), m = $('ccoMsg'); if(!link) return; b.disabled = true; m.innerHTML = '<span class="giro"></span>Copiando os arquivos da pasta…';
     var imp = null;
     api('progCCOImportar', {id: a.id, link: link}).then(function(r){ imp = r.importacao;
@@ -1264,9 +1278,10 @@ function htmlRelCCO0(r){
   var ls = r.linhas || [], prob = ls.filter(function(l){ return l.situacao !== 'ok'; });
   h += '<p style="margin:8px 0 2px"><b>Linhas da RAD</b> <span class="aviso">' + (ls.length - prob.length) + ' de ' + ls.length + ' ok' + (prob.length ? ', ' + prob.length + ' com observação' : '') + '</span></p>' +
     '<details' + (prob.length ? ' open' : '') + '><summary class="aviso" style="cursor:pointer">ver a tabela</summary><div class="tbox"><table><tr><th>Área</th><th>Item</th><th>Decl.</th><th>Conf.</th><th>Comprovante / observação</th></tr>' +
-    ls.slice().sort(function(a, b){ return (a.situacao === 'ok') - (b.situacao === 'ok'); }).map(function(l){
+    ls.map(function(l, i){ return {l: l, i: i}; }).sort(function(a, b){ return (a.l.situacao === 'ok') - (b.l.situacao === 'ok'); }).map(function(o){ var l = o.l;
       return '<tr><td>' + esc(NOMES_AREA[l.area] || l.area) + '</td><td>' + esc(l.item) + '</td><td>' + num(l.declarado) + '</td><td>' + num(l.conferido) + '</td><td class="' + SIT_COR[l.situacao] + '">' + SIT_ICO[l.situacao] + ' ' +
-        esc((l.comprovante ? l.comprovante + ' · ' : '') + l.obs) + (l.revisao ? '<div class="aviso">' + esc(l.revisao) + '</div>' : '') + '</td></tr>'; }).join('') + '</table></div></details>';
+        esc((l.comprovante ? l.comprovante + ' · ' : '') + l.obs) + (l.revisao ? '<div class="aviso">' + esc(l.revisao) + '</div>' : '') +
+        (r.verificado ? ' <button type="button" class="link" data-contestar="' + o.i + '" title="Discordo do que a IA disse nesta linha">✏ contestar</button>' : '') + '</td></tr>'; }).join('') + '</table></div></details>';
   if((r.pendencias || []).length) h += '<p style="margin:8px 0 2px"><b>Pendências</b></p><ul style="margin:0;padding-left:20px">' + r.pendencias.map(function(t){ return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
   var ign = (r.ignorados || []).filter(function(n){ return !/\.xlsx?$/i.test(n); });
   if(ign.length) h += '<p class="aviso">Não lidos pela IA (formato não suportado): ' + ign.map(esc).join(', ') + '.</p>';
