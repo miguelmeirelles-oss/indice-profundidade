@@ -1197,6 +1197,28 @@ function desenharMsgsAluno(){
 // ---- professor: escrever, filtrar, prolongar, expirar, apagar ----
 var EMOJIS_MSG = ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'];
 // a mensagem da revisão da madrugada mostra o que importa e deixa aprovar/recusar ali mesmo (as Configurações ficam como histórico)
+// sugestão avaliada pela revisão: "👍 Pode fazer" (com comentário) → o Claude programa na hora e a proposta volta para aprovar
+function pedidoHTML(rid, it){
+  var pd = it.pedido;
+  if(pd){
+    var txt = {liberado: '⏳ Pedido enviado em ' + esc(pd.em) + ': o Claude vai começar em instantes.', andamento: '🛠 O Claude está fazendo agora (pedido de ' + esc(pd.em) + ').',
+      pronto: '✅ Pronto: a proposta chegou em Mensagens para você aprovar.', publicado: '✅ Feito e publicado.', falhou: '⚠ Não deu para fazer: ' + esc(pd.nota || 'sem detalhes') + '.'}[pd.estado] || esc(pd.estado);
+    return '<p class="aviso" style="margin:6px 0 0">' + txt + '</p>';
+  }
+  return '<div style="margin-top:6px"><textarea data-pedcom="' + esc(rid + '|' + it._i) + '" rows="2" placeholder="Comentário para o Claude (opcional): como você quer, o que não pode mudar…" style="width:100%;font-size:14px"></textarea>' +
+    '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-pedir="' + esc(rid + '|' + it._i) + '">👍 Pode fazer</button></div></div>';
+}
+function ligarPedidos(el, depois){
+  el.querySelectorAll('[data-pedir]').forEach(function(b){ b.addEventListener('click', function(){
+    var p = b.dataset.pedir.split('|'), com = el.querySelector('[data-pedcom="' + b.dataset.pedir + '"]');
+    b.disabled = true; b.textContent = 'Enviando…';
+    api('auditorPedir', {relatorioId: p[0], indice: Number(p[1]), comentario: com ? com.value : ''}).then(function(r){
+      var d = r && r.pedido && r.pedido.disparo;
+      if(d && d !== 'ok') erroGeral(d === 'sem_disparo' ? 'Pedido guardado, mas os "Pedidos na hora" ainda não estão ligados (Configurações → Auditor da madrugada). Ele será feito na próxima madrugada.' : 'Pedido guardado, mas não consegui chamar o Claude agora (' + d + '). Ele será feito na próxima madrugada.');
+      depois();
+    }).catch(function(e){ b.disabled = false; b.textContent = '👍 Pode fazer'; erroGeral(e.message); });
+  }); });
+}
 function preencherAuditorMsgs(el){
   var caixas = el.querySelectorAll('[data-audrel]'); if(!caixas.length) return;
   api('auditorListar').then(function(res){
@@ -1210,11 +1232,13 @@ function preencherAuditorMsgs(el){
           '<b>' + esc(it.titulo) + '</b> <span class="aviso">· ' + esc(it.area) + '</span><br><span style="font-size:14px">' + esc(it.explicacao) + '</span>' +
           (it.feito ? '<br><span class="aviso">✓ já feito: ' + esc(it.feito) + '</span>' : '') +
           (!it._pr && it.sugestao ? '<br><span class="aviso">sugestão: ' + esc(it.sugestao) + '</span>' : '') +
+          (!it._pr && it.sugestao ? pedidoHTML(r.id, it) : '') +
           (it._pr ? (dec ? '<p class="aviso" style="margin:6px 0 0">' + (dec.decisao === 'aprovada' ? '✅ aprovada' : '❌ recusada') + ' em ' + esc(dec.em) + esc(dec.nota || '') + '</p>'
             : '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" data-msgdec="' + esc(r.id + '|' + it._i + '|aprovada') + '">✅ Aprovar e publicar</button><button type="button" class="mini secundario" data-msgdec="' + esc(r.id + '|' + it._i + '|recusada') + '">❌ Recusar</button></div>') : '') +
           '</div>';
       }).join('') + '<p class="aviso" style="margin:4px 0 0">Histórico completo e "voltar à versão anterior": Configurações → 🔎 Auditor da madrugada.</p>';
     });
+    ligarPedidos(el, function(){ preencherAuditorMsgs(el); });
     el.querySelectorAll('[data-msgdec]').forEach(function(b){ b.addEventListener('click', function(){
       var p = b.dataset.msgdec.split('|');
       if(!confirm(p[2] === 'aprovada' ? 'Aprovar e publicar esta correção? O robô do GitHub roda os testes, publica e, se o servidor não responder, volta sozinho à versão anterior.' : 'Recusar esta proposta? Ela é descartada.')) return;
@@ -5917,16 +5941,21 @@ function desenharAuditor(res){
   var ghBox = '<details class="aviso" style="margin:6px 0 10px"' + (res.github ? '' : ' open') + '><summary class="link">Publicação automática pelo GitHub: ' + (res.github ? '<b>ligada</b> (token …' + esc(res.githubFim) + ')' : '<b>desligada</b>') + '</summary>' +
     '<p style="margin:6px 0">Com o token, <b>✅ Aprovar</b> aceita a correção no repositório e o robô do GitHub confere, testa, publica e, se o servidor não responder, volta sozinho à versão anterior. Sem o token, aprovar só marca (e a publicação é pedida no chat).</p>' +
     '<input type="password" id="audGh" placeholder="github_pat_…' + (res.github ? ' (deixe em branco e salve para desligar)' : '') + '" autocomplete="off" style="max-width:420px"> <button type="button" class="mini secundario" id="audGhSalvar">Salvar token</button></details>' + avisoToken;
+  var pc = res.pedidosClaude || {};
+  var pedBox = '<details class="aviso" style="margin:6px 0 10px"' + (pc.ligado ? '' : ' open') + '><summary class="link">Pedidos na hora (Claude): ' + (pc.ligado ? '<b>ligados</b> (código …' + esc(pc.fim) + ')' : '<b>desligados</b>') + '</summary>' +
+    '<p style="margin:6px 0">Liga o <b>👍 Pode fazer</b> das sugestões e as <b>sugestões que você manda pelo 💬 Avisar</b>: o Claude começa a programar na hora. As suas são publicadas sozinhas; as de outras pessoas voltam para você aprovar. Para ligar: abra a rotina <b>“Aula por IA — pedidos de melhoria (na hora)”</b> em claude.ai/code/routines → <i>Add trigger → API → Generate token</i>, e cole aqui a URL e o código.</p>' +
+    '<input type="text" id="pedUrl" placeholder="https://api.anthropic.com/v1/claude_code/routines/trig_…/fire" style="max-width:520px"><br><input type="password" id="pedTk" placeholder="sk-ant-…' + (pc.ligado ? ' (deixe os dois em branco e salve para desligar)' : '') + '" autocomplete="off" style="max-width:420px;margin-top:4px"> <button type="button" class="mini secundario" id="pedSalvar">Salvar</button><div id="pedMsg"></div></details>';
   var pubBox = pub ? '<p style="margin:0 0 10px">Última publicação pelo robô: ' + (pub.estado === 'ok' ? '✅ publicada' : pub.estado === 'falhou' ? '❌ <b>não publicou</b> (nada mudou no ar, ou voltou sozinho)' : pub.estado === 'andamento' ? '⏳ em andamento' : pub.estado === 'nenhuma' ? 'nenhuma ainda' : '⚠ ' + esc(pub.erro || '')) +
     (pub.em ? ' · ' + esc(pub.em) : '') + (pub.url ? ' · <a href="' + esc(pub.url) + '" target="_blank" rel="noopener">detalhes</a>' : '') +
     (pub.estado === 'ok' || pub.estado === 'falhou' ? ' · <button type="button" class="link" id="audVoltar">↩ voltar à versão anterior</button>' : '') + '</p>' : '';
   var cor = {alta: '#c62828', media: '#b07d00', baixa: '#4b5563'};
   cx.innerHTML = '<h2>🔎 Auditor da madrugada</h2><p class="aviso" style="margin-top:0">Todo dia às 5h30 o Claude (sua assinatura) confere o que deu errado nas últimas 36 h, os documentos gerados (como um avaliador do órgão) e as leituras novas da progressão, com as regras do site do CEFET. Corrige sozinho dado da progressão quando relê o documento original e acha o erro (cada correção pode ser desfeita aqui). Erro de programa e desenho novo das aulas em trilha vêm como proposta: <b>✅ Aprovar</b> e o robô do GitHub testa e publica sozinho (dá para voltar à versão anterior aqui); <b>❌ Recusar</b> descarta. Nada muda no código sem a sua aprovação.</p>' +
-    ghBox + pubBox + (!l.length ? '<p class="aviso">Nenhum relatório ainda. O primeiro sai na próxima manhã.</p>' : l.map(function(r, k){
+    ghBox + pedBox + pubBox + (!l.length ? '<p class="aviso">Nenhum relatório ainda. O primeiro sai na próxima manhã.</p>' : l.map(function(r, k){
       return '<details style="margin:8px 0;border:1px solid var(--linha);border-radius:8px;padding:6px 10px"' + (k === 0 ? ' open' : '') + '><summary style="cursor:pointer"><b>' + esc(r.em) + '</b> · ' + esc(r.resumo) + '</summary>' +
         r.itens.map(function(i, ix){ return '<div style="margin:8px 0 0;padding-left:8px;border-left:3px solid ' + (cor[i.gravidade] || '#4b5563') + '"><b>' + esc(i.titulo) + '</b> <span class="aviso">· ' + esc(i.area) + ' · ' + esc(i.gravidade) + '</span>' +
           (i.explicacao ? '<div style="font-size:14px;white-space:pre-line">' + esc(i.explicacao) + '</div>' : '') + (i.feito ? '<div class="aviso">✓ Feito: ' + esc(i.feito) + '</div>' : '') +
           (i.sugestao ? '<details class="aviso"' + (/github\.com/.test(i.sugestao) ? ' open' : '') + '><summary class="link">sugestão de correção</summary><div style="white-space:pre-wrap;font-size:13px">' + esc(i.sugestao).replace(/(https:\/\/github\.com\/[^\s<]+)/g, '<a href="$1" target="_blank" rel="noopener">$1</a>') + '</div></details>' : '') +
+          (i.sugestao && !/github\.com|auditor\//.test(i.sugestao) ? pedidoHTML(r.id, Object.assign({_i: ix}, i)) : '') +
           (/github\.com|auditor\//.test(i.sugestao || '') ? (i.decisao ? '<div class="aviso">' + (i.decisao.decisao === 'aprovada' ? '✅ Aprovada' : '❌ Recusada') + ' em ' + esc(i.decisao.em) + esc(i.decisao.nota || '') + (i.decisao.decisao === 'aprovada' && !i.decisao.nota ? ' — peça no chat: "publica as correções aprovadas"' : '') + '</div>'
             : '<div class="botoes" style="margin:4px 0"><button type="button" class="mini" data-audec="' + esc(r.id) + '|' + ix + '|aprovada">✅ Aprovar correção</button><button type="button" class="mini secundario" data-audec="' + esc(r.id) + '|' + ix + '|recusada">❌ Recusar</button></div>') : '') + '</div>'; }).join('') +
         (r.correcoes.length ? '<p style="margin:10px 0 2px"><b>Correções feitas na progressão</b></p>' + r.correcoes.map(function(c){
@@ -5939,6 +5968,8 @@ function desenharAuditor(res){
     if(p[2] === 'aprovada' && !window.confirm(res.github ? 'Aprovar e publicar esta correção? O robô do GitHub roda os testes, publica e, se o servidor não responder, volta sozinho à versão anterior.' : 'Aprovar esta correção? Ela fica marcada; a publicação acontece quando você pedir no chat ("publica as correções aprovadas").')) return;
     b.disabled = true; api('auditorDecidir', {relatorioId: p[0], indice: Number(p[1]), decisao: p[2]}).then(desenharAuditor).catch(function(e){ b.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
   }); });
+  ligarPedidos(cx, function(){ api('auditorListar').then(desenharAuditor); });
+  var ps = $('pedSalvar'); if(ps) ps.addEventListener('click', function(){ ps.disabled = true; api('pedidosClaudeSalvar', {url: $('pedUrl').value, claudeToken: $('pedTk').value}).then(function(){ return api('auditorListar'); }).then(desenharAuditor).catch(function(e){ ps.disabled = false; $('pedMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
   var gs = $('audGhSalvar'); if(gs) gs.addEventListener('click', function(){ gs.disabled = true; api('auditorGithubSalvar', {githubToken: $('audGh').value}).then(function(){ return api('auditorListar'); }).then(desenharAuditor).catch(function(e){ gs.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
   var vv = $('audVoltar'); if(vv) vv.addEventListener('click', function(){ if(!window.confirm('Voltar à versão anterior? O robô desfaz a última mudança no código e publica de novo (leva uns 2 minutos).')) return; vv.disabled = true;
     api('auditorDesfazerPublicacao', {}).then(function(){ $('auditorMsg').innerHTML = '<div class="ok">Pedido enviado: em uns 2 minutos a versão anterior volta ao ar. Recarregue esta tela para ver.</div>'; }).catch(function(e){ vv.disabled = false; $('auditorMsg').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; }); });
