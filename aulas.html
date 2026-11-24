@@ -5979,6 +5979,8 @@ function recolherCaixasCfg(){
 function vistoCfg(){ try { return JSON.parse(localStorage.getItem('cfgVisto') || '{}'); } catch(e){ return {}; } }
 function marcarVistoCfg(cx){
   var nov = cx.dataset.novidade || '', chave = cx.dataset.chaveRec; if(!nov || !chave) return;
+  // a caixa do auditor aberta = relatório visto: apaga também a bolinha acesa na entrada (antes só sumia ao recarregar)
+  if(cx.id === 'cxAuditor' && window.NOVIDADE_AUDITOR_FORA){ window.NOVIDADE_AUDITOR_FORA = false; atualizarBolinhaCfg(); }
   var v = vistoCfg(); if(v[chave] === nov) return; v[chave] = nov;
   try { localStorage.setItem('cfgVisto', JSON.stringify(v)); } catch(e){}
   cx.classList.remove('novidade'); atualizarBolinhaCfg();
