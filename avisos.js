@@ -26,7 +26,14 @@
     chamar('erroCliente', { onde: onde, mensagem: String(msg || ''), contexto: Object.assign({ pagina: location.pathname.split('/').pop() || 'index.html' }, ctx || {}) }).catch(function () {});
   };
   window.addEventListener('error', function (e) { if (e && e.message && !/Script error/i.test(e.message)) window.reportarErroTela('erro de programa na página', e.message + (e.filename ? ' (' + String(e.filename).split('/').pop() + ':' + e.lineno + ')' : '')); });
-  window.addEventListener('unhandledrejection', function (e) { var m = e && e.reason && (e.reason.message || String(e.reason)); if (m && !/sessão expirou|Failed to fetch|NetworkError|Load failed/i.test(m)) window.reportarErroTela('erro de programa na página', m); });
+  // erro dentro de uma resposta do servidor (promessa): o navegador não diz o arquivo nem a linha,
+  // então tiramos do "stack" o primeiro lugar do nosso código (ex.: aulas.html:3301) para a revisão achar a causa
+  function linhaDoErro(r) {
+    var st = r && r.stack ? String(r.stack).split('\n') : [];
+    for (var i = 0; i < st.length; i++) { var x = st[i].match(/([^\/\s()@]+\.(?:html|js))(?:\?[^:\s)]*)?:(\d+)/); if (x) return ' (' + x[1] + ':' + x[2] + ')'; }
+    return '';
+  }
+  window.addEventListener('unhandledrejection', function (e) { var m = e && e.reason && (e.reason.message || String(e.reason)); if (m && !/sessão expirou|Failed to fetch|NetworkError|Load failed/i.test(m)) window.reportarErroTela('erro de programa na página', m + linhaDoErro(e.reason)); });
   // a última mensagem de erro que apareceu na tela (as páginas usam a classe "erro") vai junto no aviso
   try {
     new MutationObserver(function (lista) {
