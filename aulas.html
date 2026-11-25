@@ -1200,17 +1200,28 @@ function desenharMsgsAluno(){
 var EMOJIS_MSG = ['🚨','📣','⚠️','❗','🥳','🎉','🔬','🧪','📅','⏰','❌','✅','📚','📝','💡','🎓'];
 // a mensagem da revisão da madrugada mostra o que importa e deixa aprovar/recusar ali mesmo (as Configurações ficam como histórico)
 // sugestão avaliada pela revisão: "👍 Pode fazer" (com comentário) → o Claude programa na hora e a proposta volta para aprovar
+// o "👍 Pode fazer" só aparece quando a sugestão é mudança no programa; "✋ Dispensar" (com motivo) aparece em toda sugestão/apontamento
+function ehDoPrograma(it){ return !!it.sugestao && !/nada (a mudar|para mudar) no (programa|c[oó]digo|sistema)|n[aã]o [eé] (um )?(erro|problema|defeito) (do|no) (programa|c[oó]digo|sistema)|nada a programar/i.test((it.sugestao || '') + ' ' + (it.feito || '')); }
 function pedidoHTML(rid, it){
+  var dc = it.decisao;
+  if(dc && dc.decisao === 'dispensada') return '<p class="aviso" style="margin:6px 0 0">✋ Dispensada em ' + esc(dc.em) + (dc.nota ? ': ' + esc(dc.nota) : '') + '</p>';
   var pd = it.pedido;
   if(pd){
     var txt = {liberado: '⏳ Pedido enviado em ' + esc(pd.em) + ': o Claude vai começar em instantes.', andamento: '🛠 O Claude está fazendo agora (pedido de ' + esc(pd.em) + ').',
       pronto: '✅ Pronto: a proposta chegou em Mensagens para você aprovar.', publicado: '✅ Feito e publicado.', falhou: '⚠ Não deu para fazer: ' + esc(pd.nota || 'sem detalhes') + '.'}[pd.estado] || esc(pd.estado);
     return '<p class="aviso" style="margin:6px 0 0">' + txt + '</p>';
   }
-  return '<div style="margin-top:6px"><textarea data-pedcom="' + esc(rid + '|' + it._i) + '" rows="2" placeholder="Comentário para o Claude (opcional): como você quer, o que não pode mudar…" style="width:100%;font-size:14px"></textarea>' +
-    '<div class="botoes" style="margin-top:4px"><button type="button" class="mini" data-pedir="' + esc(rid + '|' + it._i) + '">👍 Pode fazer</button></div></div>';
+  var prog = ehDoPrograma(it);
+  return '<div style="margin-top:6px"><textarea data-pedcom="' + esc(rid + '|' + it._i) + '" rows="2" placeholder="' + (prog ? 'Comentário (opcional): como você quer, o que não pode mudar… ou, se for dispensar, o porquê' : 'Se discordar, diga o porquê (opcional): as próximas revisões levam em conta') + '" style="width:100%;font-size:14px"></textarea>' +
+    '<div class="botoes" style="margin-top:4px">' + (prog ? '<button type="button" class="mini" data-pedir="' + esc(rid + '|' + it._i) + '">👍 Pode fazer</button>' : '') + '<button type="button" class="mini secundario" data-dispensar="' + esc(rid + '|' + it._i) + '">✋ Dispensar</button></div></div>';
 }
 function ligarPedidos(el, depois){
+  el.querySelectorAll('[data-dispensar]').forEach(function(b){ b.addEventListener('click', function(){
+    var p = b.dataset.dispensar.split('|'), com = el.querySelector('[data-pedcom="' + b.dataset.dispensar + '"]');
+    b.disabled = true; b.textContent = 'Enviando…';
+    api('auditorDispensar', {relatorioId: p[0], indice: Number(p[1]), motivo: com ? com.value : ''}).then(function(){ depois(); })
+      .catch(function(e){ b.disabled = false; b.textContent = '✋ Dispensar'; erroGeral(e.message); });
+  }); });
   el.querySelectorAll('[data-pedir]').forEach(function(b){ b.addEventListener('click', function(){
     var p = b.dataset.pedir.split('|'), com = el.querySelector('[data-pedcom="' + b.dataset.pedir + '"]');
     b.disabled = true; b.textContent = 'Enviando…';
@@ -1234,7 +1245,7 @@ function preencherAuditorMsgs(el){
           '<b>' + esc(it.titulo) + '</b> <span class="aviso">· ' + esc(it.area) + '</span><br><span style="font-size:14px">' + esc(it.explicacao) + '</span>' +
           (it.feito ? '<br><span class="aviso">✓ já feito: ' + esc(it.feito) + '</span>' : '') +
           (!it._pr && it.sugestao ? '<br><span class="aviso">sugestão: ' + esc(it.sugestao) + '</span>' : '') +
-          (!it._pr && it.sugestao ? pedidoHTML(r.id, it) : '') +
+          (!it._pr ? pedidoHTML(r.id, it) : '') +
           (it._pr ? (dec ? '<p class="aviso" style="margin:6px 0 0">' + (dec.decisao === 'aprovada' ? '✅ aprovada' : '❌ recusada') + ' em ' + esc(dec.em) + esc(dec.nota || '') + '</p>'
             : '<div class="botoes" style="margin-top:6px"><button type="button" class="mini" data-msgdec="' + esc(r.id + '|' + it._i + '|aprovada') + '">✅ Aprovar e publicar</button><button type="button" class="mini secundario" data-msgdec="' + esc(r.id + '|' + it._i + '|recusada') + '">❌ Recusar</button></div>') : '') +
           '</div>';
