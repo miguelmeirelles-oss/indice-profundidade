@@ -686,12 +686,14 @@ function desenharMarca(){
     '<textarea id="tr_txtComent" maxlength="2000" style="min-height:70px;font-family:inherit;font-size:14px" placeholder="O que ficou claro, o que ainda ficou confuso, uma sugestão…">' + esc(m.comentario) + '</textarea>' +
     '<div class="botoes" style="margin-top:6px"><button class="mini" id="tr_btComent">Salvar comentário</button></div></details><div id="tr_msgMarca"></div>';
   var salvar = function(msg){
-    var est = $('chkEstudei').checked, com = $('txtComent').value;
-    $('msgMarca').innerHTML = '<p class="aviso">Salvando…</p>';
-    api('trilhaMarcar', {id: T.id, estudei: est, comentario: com}).then(function(r){
-      var x = minhaMarca(); x.estudei = r.estudei; x.comentario = r.comentario;
-      $('msgMarca').innerHTML = '<div class="ok" style="margin:6px 0 0">' + msg(r) + '</div>';
-    }).catch(function(e){ $('msgMarca').innerHTML = '<div class="erro">' + esc(e.message) + '</div>'; });
+    var est = $('chkEstudei').checked, com = $('txtComent').value, id = T.id;
+    // se o aluno saiu da aula antes da resposta, a caixinha não existe mais: só não escreve nada
+    var aviso = function(h){ var m = $('msgMarca'); if(m) m.innerHTML = h; };
+    aviso('<p class="aviso">Salvando…</p>');
+    api('trilhaMarcar', {id: id, estudei: est, comentario: com}).then(function(r){
+      var x = L.trilhas.filter(function(y){ return y.id === id; })[0]; if(x){ x.estudei = r.estudei; x.comentario = r.comentario; }
+      aviso('<div class="ok" style="margin:6px 0 0">' + msg(r) + '</div>');
+    }).catch(function(e){ aviso('<div class="erro">' + esc(e.message) + '</div>'); });
   };
   $('chkEstudei').addEventListener('change', function(){ salvar(function(r){ return r.estudei ? '✓ Marcada como estudada.' : 'Desmarcada.'; }); });
   $('btComent').addEventListener('click', function(){ salvar(function(){ return '✓ Comentário salvo.'; }); });
