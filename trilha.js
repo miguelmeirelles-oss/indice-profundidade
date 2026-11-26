@@ -739,7 +739,7 @@ function abrirAvaliacao(ass){
   var ctl = document.querySelector('.t-app .t-controles'); if(ctl) ctl.style.position = 'static';   // a barra fixa não cobre a avaliação
   var box = $('avalBox'); if(!box) return;
   box.innerHTML = '<b>🎤 ' + esc(ass.nome) + '</b> <span class="aviso">· Estudar com IA</span>' +
-    '<iframe id="tr_frAval" src="index.html?embed=trilha&sub=' + encodeURIComponent(ass.id) + '" allow="microphone" title="Avaliação de profundidade" style="width:100%;border:0;min-height:460px;margin-top:6px;background:transparent"></iframe>';
+    '<iframe id="tr_frAval" src="index.html?embed=trilha&sub=' + encodeURIComponent(ass.id) + '&nome=' + encodeURIComponent(ass.nome || '') + '" allow="microphone" title="Avaliação de profundidade" style="width:100%;border:0;min-height:460px;margin-top:6px;background:transparent"></iframe>';
 }
 var telaAval = '';
 window.addEventListener('message', function(ev){

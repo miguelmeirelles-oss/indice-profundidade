@@ -833,6 +833,15 @@ if((voltarParaAulas || querConta) && !sessao.token) setTimeout(abrirArea, 0);
 // modo embutido (Aula em trilha): abre direto o assunto do bloco e avisa a página de fora o tamanho
 var embutido = document.documentElement.classList.contains('embutido');
 var subEmbutido = (location.search.match(/[?&]sub=([\w-]+)/) || [])[1] || '';
+// a trilha manda também o nome do assunto: o aluno já vê o tema certo enquanto o histórico carrega
+var nomeEmbutido = '';
+try{ nomeEmbutido = (new URLSearchParams(location.search).get('nome') || '').slice(0, 120); }catch(e){}
+if(embutido && subEmbutido && nomeEmbutido && sessao.token) setTimeout(function(){
+  subtopicoAtual = {id: subEmbutido, nome: nomeEmbutido};
+  document.getElementById('subTitulo').textContent = nomeEmbutido;
+  document.getElementById('listaHistorico').innerHTML = '<p class="aviso">carregando o seu histórico…</p>';
+  mostrar('pSubtopico');
+}, 0);
 if(embutido){
   var alturaEnviada = 0;
   setInterval(function(){
@@ -914,7 +923,8 @@ if(sessao.token){
       document.getElementById('btConta').classList.remove('oculto');
       if(querConta){ querConta = false; abrirConta(); }
       if(colega) comecarColega();
-      if(embutido && subEmbutido) abrirSubtopico(subEmbutido);
+      // (se o aluno já começou a falar, não tira ele da gravação)
+      if(embutido && subEmbutido && (!nomeEmbutido || telaAtual === 'pSubtopico')) abrirSubtopico(subEmbutido);
     }
     else {
       sessao.token = ''; apagarToken();
