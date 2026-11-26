@@ -78,9 +78,11 @@ function rotuloChave(k){
   if(/^ori_/.test(k)) return 'Orientação: ' + ((c.orient[k.slice(4)] || [''])[0]);
   if(c.itens[k]) return c.itens[k][1]; if(c.cargos[k]) return c.cargos[k][0]; return k;
 }
+// aba que está na tela: uma resposta atrasada do servidor só é desenhada se a aba dela ainda estiver aberta
+var ABA = 'prog';
 function abrir(){
   if(!token){ $('corpo').innerHTML = '<div class="caixa"><p>Entre na sua conta pelo <a href="aulas.html">Aula por IA</a> e volte aqui.</p></div>'; return; }
-  api('progAbrir').then(function(r){ R = r; desenhar(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+  api('progAbrir').then(function(r){ R = r; if(ABA === 'prog') desenhar(); }).catch(function(e){ if(ABA === 'prog') $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 function desenhar(){
   var p = R.perfil, per = R.periodo, rs = R.resumo, h = '';
@@ -592,7 +594,7 @@ var CAMPUS_NOME = {VA: 'valença', MA: 'maracanã', MG: 'maria da graça', NI: '
 function abrirAnual(ano){
   if(ano) ANO_SEL = ano;
   $('corpo').innerHTML = '<div class="caixa"><p class="carregando"><span class="giro"></span>Juntando o que você já tem do ano letivo…</p></div>';
-  apiAn('progAnualAbrir', {ano: ANO_SEL}).then(function(r){ AN = r; ANO_SEL = r.ano; desenharAnual(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+  apiAn('progAnualAbrir', {ano: ANO_SEL}).then(function(r){ AN = r; ANO_SEL = r.ano; if(ABA === 'ppa') desenharAnual(); }).catch(function(e){ if(ABA === 'ppa') $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 function nomeChave(k){ var c = AN.catalogo; if(k === 'doc') return 'Docência'; if(/^ori_/.test(k)) return (c.orient[k.slice(4)] || ['Orientação'])[0]; return (c.itens[k] || c.cargos[k] || [k, k])[c.itens[k] ? 1 : 0]; }
 function descItem(it){ var d = it.dados || {};
@@ -1158,6 +1160,7 @@ function preencherCCO(msg){
 // ===================== v197 · varredura, conferência final e "Sou membro de CCO" =====================
 function hojeCCO(){ var d = new Date(); return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear(); }
 function trocarAba(a){
+  ABA = a;
   document.querySelectorAll('.abas button[data-aba]').forEach(function(b){ var on = b.dataset.aba === a; b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.classList.toggle('sec', !on); });
   if(a === 'cco') abrirCCO(); else if(a === 'ppa') abrirAnual(); else if(R) desenhar(); else abrir();
 }
@@ -1247,7 +1250,7 @@ function htmlConferencia(r){
 var CCO = null, ROT_CONC = {favoravel: 'Parecer FAVORÁVEL', favoravel_com_ressalvas: 'FAVORÁVEL COM RESSALVAS', desfavoravel: 'Parecer DESFAVORÁVEL'};
 function abrirCCO(){
   $('corpo').innerHTML = '<p class="carregando">Carregando…</p>';
-  api('progCCOListar').then(function(r){ CCO = r; desenharCCOLista(); }).catch(function(e){ $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+  api('progCCOListar').then(function(r){ CCO = r; if(ABA === 'cco') desenharCCOLista(); }).catch(function(e){ if(ABA === 'cco') $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 function desenharCCOLista(){
   var r = CCO, est = {documentos: 'enviando documentos', etapa1: 'falta a 2ª verificação', avaliado: 'avaliado'};

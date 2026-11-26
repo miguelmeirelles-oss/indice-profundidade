@@ -4411,7 +4411,9 @@ function abrirNotas(){
   el.innerHTML = (resumo.planilhaUrl ? '<p style="text-align:right;margin:0 0 6px"><a class="link" target="_blank" rel="noopener" href="' + esc(resumo.planilhaUrl) + '">Abrir planilha no Drive</a></p>' : '') +
     '<div id="notasCorpo"><div class="caixa"><p class="carregando">Calculando notas…</p></div></div><div id="notasAulas"></div><div id="notasErradas"></div>';
 
+  var discPedida = notasDisc;
   api('notasDisciplina', {disciplinaId: notasDisc}).then(function(r){
+    if(discPedida !== notasDisc) return;   // o professor já trocou de disciplina: esta resposta é da anterior
     var c = $('notasCorpo'), cp = r.composicao;
     if(!r.alunos.length){ c.innerHTML = '<div class="caixa"><p class="aviso">Nenhum aluno inscrito nesta disciplina.</p></div>'; return; }
 
@@ -4508,7 +4510,7 @@ function abrirNotas(){
     $('notasErradas').innerHTML = r.erradas.length ? '<div class="caixa"><h2>Questões que a turma mais errou</h2>' + r.erradas.map(function(e){
       return '<div class="linha"><span><span class="nota n' + classe(e.acerto) + '">' + e.acerto + '%</span> &nbsp;Aula ' + e.aula + ' · ' + esc(e.enunciado) + '</span><span class="aviso">' + e.respostas + ' respostas</span></div>';
     }).join('') + '<p class="aviso" style="margin-top:8px">Bom ponto para retomar no início da próxima aula.</p></div>' : '';
-  }).catch(function(e){ $('notasCorpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
+  }).catch(function(e){ if(discPedida === notasDisc) $('notasCorpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
 
 function detalheAluno(r, al){
