@@ -785,7 +785,7 @@ function iniciar(){
     try{ if(new URLSearchParams(location.search).get('msgs')){ history.replaceState(null, '', location.pathname); setTimeout(function(){ abrirMensagens(); }, 300); } }catch(x){}
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
 }
-/* ---- "Mais funções": lista que abre no cabeçalho, com as outras partes da plataforma ---- */
+/* ---- "Mais funções" (28/11/2026): lista que abre no cabeçalho, com as outras partes da plataforma ---- */
 function menuMaisHTML(prof){
   var it = prof ? [
     ['provas.html', '📝 Prova por IA'], ['progressao.html', '📊 Progressão / PT'], ['index.html', '🎙️ Estudar com IA (Avaliador)'],
