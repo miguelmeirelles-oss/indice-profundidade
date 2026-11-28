@@ -258,6 +258,16 @@
   .cabecalho .quem{color:var(--tinta-fraca)}
   .cabecalho .quem b{color:var(--navy)}
   .cabecalho .quem a{color:var(--azul)}
+  .maisFuncoes{display:inline-block;position:relative}
+  .maisFuncoes>summary{display:inline;cursor:pointer;color:var(--azul);text-decoration:underline;list-style:none}
+  .maisFuncoes>summary::-webkit-details-marker{display:none}
+  .maisLista{position:absolute;right:0;top:1.6em;z-index:50;background:#fff;border:1px solid #c9d3e6;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.15);min-width:250px;max-width:85vw;text-align:left;padding:4px 0}
+  .maisLista a,.maisLista .emBreve{display:block;padding:9px 14px;font-size:14.5px;text-decoration:none;white-space:normal}
+  .maisLista a{color:#1a3a8f!important}
+  .maisLista a:hover{background:#eef2fa}
+  .maisLista .emBreve{color:#888}
+  .janelaDiario{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:12px}
+  .janelaDiario .caixa{max-width:520px;width:100%;max-height:90vh;overflow:auto}
   .visao button{background:#fff;color:#41546C;border:1.5px solid var(--linha);border-radius:4px;box-shadow:none;font-weight:normal}
   .visao button[aria-pressed="true"]{background:var(--menu);color:#fff;border-color:var(--menu);box-shadow:none}
   .btMsg{border-radius:4px;border:1.5px solid var(--menu);color:var(--menu);font-weight:bold}
@@ -747,7 +757,8 @@ function iniciar(){
     if(r.admin){ $('abaTrilha').classList.remove('oculto'); if(/[?&]aba=trilha/.test(location.search)) abaAtual = 'trilha'; }
     if(r.professor && /[?&]aba=cfg/.test(location.search)) abaAtual = 'cfg';   // vindo do Prova por IA (botão Configurações)
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      (r.professor ? '<a href="provas.html">Prova por IA</a> · <a href="progressao.html">Progressão/PT</a> · ' : '') + '<a href="index.html">Avaliador</a> · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + menuMaisHTML(r.professor) + ' · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+    ligarMenuMais();
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
       if(G.fase === 'gravando'){ erroGeral('Encerre a aula antes de sair.'); return; }
@@ -773,6 +784,49 @@ function iniciar(){
     else trocarVisao('aluno');
     try{ if(new URLSearchParams(location.search).get('msgs')){ history.replaceState(null, '', location.pathname); setTimeout(function(){ abrirMensagens(); }, 300); } }catch(x){}
   }).catch(function(e){ $('tCarregando').classList.add('oculto'); erroGeral(e.message); });
+}
+/* ---- "Mais funções": lista que abre no cabeçalho, com as outras partes da plataforma ---- */
+function menuMaisHTML(prof){
+  var it = prof ? [
+    ['provas.html', '📝 Prova por IA'], ['progressao.html', '📊 Progressão / PT'], ['index.html', '🎙️ Estudar com IA (Avaliador)'],
+    ['#diario', '📋 Preencher o diário automaticamente']
+  ] : [
+    ['index.html', '🎙️ Estudar com IA (Avaliador)'], ['extensao.html', '⏱️ Carga horária de extensão'], ['entrevista.html', '💼 Treino de entrevista'],
+    ['', '📄 Currículo (empresa e Lattes) · em breve']
+  ];
+  return '<details class="maisFuncoes" id="maisFuncoes"><summary>☰ Mais funções</summary><div class="maisLista">' + it.map(function(x){
+    return x[0] ? '<a href="' + x[0] + '"' + (x[0] === '#diario' ? ' id="linkDiarioAuto"' : '') + '>' + x[1] + '</a>' : '<span class="emBreve">' + x[1] + '</span>';
+  }).join('') + '</div></details>';
+}
+function ligarMenuMais(){
+  var m = $('maisFuncoes'); if(!m) return;
+  document.addEventListener('click', function(e){ if(m.open && !m.contains(e.target)) m.open = false; });
+  var d = $('linkDiarioAuto'); if(!d) return;
+  d.addEventListener('click', function(e){
+    e.preventDefault(); m.open = false;
+    // o portal abre numa aba nova (o professor faz o login lá); aqui vai para o Histórico com o Diário e as instruções abertos
+    window.open('https://professor.cefet-rj.br/professor/', '_blank', 'noopener');
+    if(VISAO !== 'prof') trocarVisao('prof');
+    DIARIO.abrirAjuda = true;
+    abrirAba('hist');
+    var n = 0, t = setInterval(function(){
+      var dd = $('histDiario');
+      if(dd){ clearInterval(t); if(!dd.open){ dd.open = true; if(!dd.dataset.carregado) carregarDiario(); } dd.scrollIntoView({behavior: 'smooth', block: 'start'}); }
+      else if(++n > 40) clearInterval(t);
+    }, 250);
+    janelaDiarioAuto();
+  });
+}
+function janelaDiarioAuto(){
+  var v = document.createElement('div'); v.className = 'janelaDiario';
+  v.innerHTML = '<div class="caixa"><h2 style="margin-top:0">📋 Preencher o diário automaticamente</h2><ol style="padding-left:20px;margin:0 0 10px">' +
+    '<li>Na aba nova que abriu, <b>entre no Portal do Professor</b> com seu login.</li>' +
+    '<li>Na primeira vez, <b>instale a extensão do Chrome</b>: o passo a passo ficou aberto aqui, no Diário do portal (Histórico).</li>' +
+    '<li>No portal, abra a <b>agenda da turma</b> e clique em <b>Preencher só o que está em branco</b>. A extensão lança frequência e conteúdo com a chamada e o tema daqui.</li>' +
+    '<li>No fim, confira o relatório da extensão. Aqui no Diário cada aula fica marcada como lançada.</li></ol>' +
+    '<p class="aviso">Sua senha do portal nunca passa pelo Aula por IA.</p><button type="button" class="sec">Entendi</button></div>';
+  v.addEventListener('click', function(e){ if(e.target === v || e.target.tagName === 'BUTTON') v.remove(); });
+  document.body.appendChild(v);
 }
 function lerPref(){ try{ return localStorage.getItem('aulas_visao'); }catch(e){ return null; } }
 function trocarVisao(v){
@@ -4641,7 +4695,7 @@ function desenharDiario(){
   var feitas = r.aulas.filter(function(a){ return a.conteudoOk && a.faltasOk; }).length;
   var h = '';
   // como instalar e usar a extensão que preenche a frequência no Portal do Professor (fica fechado)
-  h += '<details class="convite" style="margin:0 0 10px"><summary style="cursor:pointer;font-weight:bold">🧩 Preencher frequência e conteúdo no portal sozinho (extensão do Chrome)</summary>' +
+  h += '<details class="convite" style="margin:0 0 10px"' + (DIARIO.abrirAjuda ? ' open' : '') + '><summary style="cursor:pointer;font-weight:bold">🧩 Preencher frequência e conteúdo no portal sozinho (extensão do Chrome)</summary>' +
     '<p style="margin:8px 0 4px;font-size:14px">Uma extensão do Chrome marca presenças e faltas e escreve o conteúdo ministrado no Portal do Professor, com a chamada e o tema daqui. <b>Você confere e clica em Salvar</b> no portal; a senha do portal nunca passa pelo Aula por IA.</p>' +
     '<p style="margin:8px 0 2px;font-size:14px"><b>Instalar (uma vez em cada computador que você usa para lançar):</b></p><ol style="margin:0 0 0 20px;font-size:14px">' +
       '<li><a class="link" href="extensao-portal.zip" download>Baixe a extensão (arquivo .zip)</a> e descompacte numa pasta que não vá apagar (ex.: Documentos\\extensao-portal).</li>' +
