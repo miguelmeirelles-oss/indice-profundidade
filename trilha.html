@@ -3,11 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Aula em trilha — Aula por IA</title>
-<!-- A aula em trilha agora é uma aba dentro do Aula por IA (o código fica em trilha.js). -->
-<script>location.replace('aulas.html?aba=trilha');</script>
+<title>O Aula por IA mudou de endereço</title>
+<link rel="canonical" href="https://estudar-ia.github.io/">
+<style>
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#EFF1F5;color:#0E2A5C;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+  .c{background:#fff;border-top:4px solid #17389C;border-radius:12px;padding:24px;max-width:480px;width:100%;box-shadow:0 2px 16px rgba(0,0,0,.08)}
+  h1{font-size:21px;color:#3E76C4;font-weight:400;margin:0 0 10px}
+  a.bt{display:block;text-align:center;margin:14px 0 4px;background:#F5C518;color:#0E2A5C;border:2.5px solid #0E2A5C;border-radius:14px;padding:12px;font-weight:bold;text-decoration:none}
+  .app{background:#fff8e6;border-left:4px solid #b07d00;padding:10px 12px;border-radius:6px;font-size:14.5px;margin-top:12px}
+  ol{margin:6px 0 0 18px;padding:0}
+</style>
 </head>
-<body style="font-family:Arial,Helvetica,sans-serif;padding:16px">
-<p>A aula em trilha agora fica dentro do <a href="aulas.html?aba=trilha">Aula por IA</a>.</p>
+<body>
+<div class="c">
+  <h1>O Aula por IA mudou de endereço</h1>
+  <p>Agora o endereço é <b>estudar-ia.github.io</b>. Na primeira vez, entre na sua conta de novo (e, se usava, ative de novo os avisos no celular).</p>
+  <a class="bt" id="ir" href="https://estudar-ia.github.io/">Abrir o endereço novo</a>
+  <div class="app" id="app" hidden><b>Você abriu pelo app instalado.</b> Para voltar a ter o app:
+    <ol><li>Toque em <b>Abrir o endereço novo</b>.</li><li>No navegador, use <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li><li>Apague este ícone antigo.</li></ol></div>
+</div>
+<script>
+  var arq = location.pathname.replace(/^\/indice-profundidade\/?/, '');
+  var novo = 'https://estudar-ia.github.io/' + arq + location.search + location.hash;
+  document.getElementById('ir').href = novo;
+  var app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
+  if (app) document.getElementById('app').hidden = false; else location.replace(novo);
+</script>
 </body>
 </html>

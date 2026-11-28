@@ -3,47 +3,31 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Política de privacidade — Aula por IA</title>
-<link rel="icon" href="favicon.ico" sizes="any">
+<title>O Aula por IA mudou de endereço</title>
+<link rel="canonical" href="https://estudar-ia.github.io/">
 <style>
-  body{margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#0E2A5C;background:#fff;font-size:15px;line-height:1.55}
-  .wrap{max-width:820px;margin:0 auto}
-  h1{color:#3E76C4;font-weight:400;font-size:28px;margin:10px 0 4px}
-  h2{font-size:16px;color:#17389C;margin:22px 0 6px}
-  p,li{margin:0 0 8px}
-  .aviso{font-size:13px;color:#5b6b86}
-  a{color:#2E62C6}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#EFF1F5;color:#0E2A5C;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+  .c{background:#fff;border-top:4px solid #17389C;border-radius:12px;padding:24px;max-width:480px;width:100%;box-shadow:0 2px 16px rgba(0,0,0,.08)}
+  h1{font-size:21px;color:#3E76C4;font-weight:400;margin:0 0 10px}
+  a.bt{display:block;text-align:center;margin:14px 0 4px;background:#F5C518;color:#0E2A5C;border:2.5px solid #0E2A5C;border-radius:14px;padding:12px;font-weight:bold;text-decoration:none}
+  .app{background:#fff8e6;border-left:4px solid #b07d00;padding:10px 12px;border-radius:6px;font-size:14.5px;margin-top:12px}
+  ol{margin:6px 0 0 18px;padding:0}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <h1>Política de privacidade — Aula por IA</h1>
-  <p class="aviso">Plataforma de apoio às aulas do curso de Engenharia de Alimentos (CEFET/RJ). Última atualização: 28/11/2026.</p>
-
-  <h2>Quais dados usamos</h2>
-  <ul>
-    <li><b>Conta:</b> nome e e-mail usados para entrar na plataforma.</li>
-    <li><b>Atividades de aula:</b> respostas, notas, frequência e mensagens enviadas dentro da plataforma.</li>
-    <li><b>Certificados e documentos</b> que você mesmo carrega (currículo, progressão docente).</li>
-    <li><b>Chave do Gemini</b> que você cadastrar (opcional): guardada só no servidor da plataforma e nunca mostrada inteira de novo.</li>
-  </ul>
-
-  <h2>Acesso ao seu Google Drive</h2>
-  <p>Quando você clica em <b>Conectar meu Google Drive</b>, a plataforma pede a permissão <b>drive.file</b>: ela só consegue ver e gravar os arquivos e pastas que <b>ela mesma criou</b> no seu Drive (por exemplo, a pasta "Currículo (Aula por IA)"). Ela não enxerga nenhum outro arquivo seu. O acesso fica só no seu navegador e você pode desconectar a qualquer momento na própria página ou em <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">myaccount.google.com/permissions</a>.</p>
-
-  <h2>Inteligência artificial</h2>
-  <p>Para ler certificados, corrigir respostas e gerar materiais, o conteúdo enviado é processado pela IA do Google (Gemini). Quando você usa a sua própria chave gratuita, o Google pode usar esse conteúdo para melhorar os serviços dele, conforme os termos do Google AI Studio. Não envie documentos com dados sensíveis desnecessários.</p>
-
-  <h2>Certificados com outras pessoas</h2>
-  <p>Se um certificado que você carregar tiver o nome de outras pessoas, uma cópia fica numa pasta de transição da plataforma. <b>Só as pessoas cujo nome aparece no certificado</b> conseguem vê-lo e trazê-lo para a própria conta.</p>
-
-  <h2>Compartilhamento</h2>
-  <p>Os dados não são vendidos nem compartilhados com terceiros. São usados apenas para as finalidades acadêmicas da plataforma, pelo professor responsável.</p>
-
-  <h2>Seus direitos</h2>
-  <p>Você pode pedir a correção ou exclusão dos seus dados a qualquer momento pelo botão <b>💬 Avisar</b> da plataforma ou falando com o professor responsável.</p>
-
-  <p class="aviso" style="margin-top:22px"><a href="index.html">Voltar ao início</a></p>
+<div class="c">
+  <h1>O Aula por IA mudou de endereço</h1>
+  <p>Agora o endereço é <b>estudar-ia.github.io</b>. Na primeira vez, entre na sua conta de novo (e, se usava, ative de novo os avisos no celular).</p>
+  <a class="bt" id="ir" href="https://estudar-ia.github.io/">Abrir o endereço novo</a>
+  <div class="app" id="app" hidden><b>Você abriu pelo app instalado.</b> Para voltar a ter o app:
+    <ol><li>Toque em <b>Abrir o endereço novo</b>.</li><li>No navegador, use <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</li><li>Apague este ícone antigo.</li></ol></div>
 </div>
+<script>
+  var arq = location.pathname.replace(/^\/indice-profundidade\/?/, '');
+  var novo = 'https://estudar-ia.github.io/' + arq + location.search + location.hash;
+  document.getElementById('ir').href = novo;
+  var app = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
+  if (app) document.getElementById('app').hidden = false; else location.replace(novo);
+</script>
 </body>
 </html>
