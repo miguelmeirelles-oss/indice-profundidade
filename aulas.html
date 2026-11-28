@@ -757,7 +757,7 @@ function iniciar(){
     if(r.admin){ $('abaTrilha').classList.remove('oculto'); if(/[?&]aba=trilha/.test(location.search)) abaAtual = 'trilha'; }
     if(r.professor && /[?&]aba=cfg/.test(location.search)) abaAtual = 'cfg';   // vindo do Prova por IA (botão Configurações)
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '') + menuMaisHTML(r.professor) + ' · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '<a href="#certificados" data-cert="1">📎 Carregar certificados</a> · ') + menuMaisHTML(r.professor) + ' · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     ligarMenuMais();
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
@@ -791,16 +791,24 @@ function menuMaisHTML(prof){
     ['provas.html', '📝 Prova por IA'], ['progressao.html', '📊 Progressão / PT'], ['index.html', '🎙️ Estudar com IA (Avaliador)'],
     ['#diario', '📋 Preencher o diário automaticamente']
   ] : [
-    ['index.html', '🎙️ Estudar com IA (Avaliador)'], ['extensao.html', '⏱️ Carga horária de extensão'], ['entrevista.html', '💼 Treino de entrevista'],
+    ['#certificados', '📎 Carregar certificados'], ['index.html', '🎙️ Estudar com IA (Avaliador)'], ['extensao.html', '⏱️ Carga horária de extensão'], ['entrevista.html', '💼 Treino de entrevista'],
     ['', '📄 Currículo (empresa e Lattes) · em breve']
   ];
   return '<details class="maisFuncoes" id="maisFuncoes"><summary>☰ Mais funções</summary><div class="maisLista">' + it.map(function(x){
-    return x[0] ? '<a href="' + x[0] + '"' + (x[0] === '#diario' ? ' id="linkDiarioAuto"' : '') + '>' + x[1] + '</a>' : '<span class="emBreve">' + x[1] + '</span>';
+    return x[0] ? '<a href="' + x[0] + '"' + (x[0] === '#diario' ? ' id="linkDiarioAuto"' : x[0] === '#certificados' ? ' data-cert="1"' : '') + '>' + x[1] + '</a>' : '<span class="emBreve">' + x[1] + '</span>';
   }).join('') + '</div></details>';
 }
 function ligarMenuMais(){
   var m = $('maisFuncoes'); if(!m) return;
   document.addEventListener('click', function(e){ if(m.open && !m.contains(e.target)) m.open = false; });
+  // Carregar certificados (base do currículo): a tela vem junto com o currículo; por enquanto avisa
+  document.querySelectorAll('[data-cert]').forEach(function(a){ a.addEventListener('click', function(e){
+    e.preventDefault(); m.open = false;
+    var v = document.createElement('div'); v.className = 'janelaDiario';
+    v.innerHTML = '<div class="caixa"><h2 style="margin-top:0">📎 Carregar certificados</h2><p>Em breve você vai poder enviar aqui os seus certificados (cursos, eventos, extensão, monitoria…). Eles vão servir para montar o seu currículo para empresas e o Lattes.</p><button type="button" class="sec">Entendi</button></div>';
+    v.addEventListener('click', function(ev){ if(ev.target === v || ev.target.tagName === 'BUTTON') v.remove(); });
+    document.body.appendChild(v);
+  }); });
   var d = $('linkDiarioAuto'); if(!d) return;
   d.addEventListener('click', function(e){
     e.preventDefault(); m.open = false;
