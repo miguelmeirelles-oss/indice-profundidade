@@ -944,7 +944,7 @@ function emailCCO(){
 function consertarRunsXml(xml){
   return xml.replace(/<\/w:r>((?:<w:(?:rFonts|rStyle|b|bCs|i|iCs|caps|u|color|sz|szCs|kern|spacing|position|highlight|vertAlign|noProof|lang)\b[^>]*\/>)+<\/w:rPr>)/g, '</w:r><w:r><w:rPr>$1');
 }
-function preencherProtocoloXml(xml, textos, caixas, campusIdx) {
+function preencherProtocoloXml(xml, textos, caixas, campusIdx, campusNome) {
   xml = consertarRunsXml(xml);
   // cada campo de texto do Word: <begin> FORMTEXT [<separate> resultado] <end>. Troca só o resultado, sem quebrar as runs
   // (o modelo pode ter campo sem <separate>, atributos extras no fldChar e runs com <w:rPr>/<w:rFonts>)
@@ -977,8 +977,29 @@ function preencherProtocoloXml(xml, textos, caixas, campusIdx) {
     dentro = dentro.replace(/<w:checked(?:\s[^>]*)?\/>/g, ''); var marcar = !!caixas[j++];
     return '<w:checkBox>' + dentro + (marcar ? '<w:checked/>' : '') + '</w:checkBox>';
   });
-  if (campusIdx !== undefined && campusIdx !== null) xml = xml.replace(/(<w:ddList><w:result w:val=")\d+("\/>)/, '$1' + campusIdx + '$2');
+  if (campusIdx !== undefined && campusIdx !== null) xml = escolherCampusXml(xml, campusIdx, campusNome);
   return xml;
+}
+// escolhe o campus na lista suspensa do Word. Antes só trocava a opção se o modelo já tivesse uma marcada (<w:result>);
+// no modelo em branco não tem, e o campus saía vazio (aviso de 27/11). Agora: acha a opção pelo nome do campus (se der),
+// escreve o <w:result> mesmo quando ele não existe e põe o nome do campus no texto que o Word mostra.
+function escolherCampusXml(xml, idx, nome){
+  var m = xml.match(/<w:ddList\b[^>]*>([\s\S]*?)<\/w:ddList>/); if(!m) return xml;
+  var limpa = function(t){ return String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); };
+  var opcoes = (m[1].match(/<w:listEntry\b[^>]*w:val="[^"]*"/g) || []).map(function(e){ return e.match(/w:val="([^"]*)"/)[1]; });
+  if(nome){ var achou = opcoes.map(limpa).findIndex(function(o){ return o.indexOf(limpa(nome)) !== -1; }); if(achou >= 0) idx = achou; }
+  var dentro = m[1].replace(/<w:result\b[^>]*\/>|<w:result\b[^>]*>[\s\S]*?<\/w:result>/g, '');
+  var bloco = '<w:ddList><w:result w:val="' + idx + '"/>' + dentro + '</w:ddList>', ini = m.index;
+  xml = xml.slice(0, ini) + bloco + xml.slice(ini + m[0].length);
+  // texto mostrado do campo (entre o "separate" e o "end" que vêm depois do FORMDROPDOWN), se o modelo tiver
+  var txt = opcoes[idx]; if(txt === undefined) return xml;
+  var k = xml.indexOf('FORMDROPDOWN', ini); if(k < 0) return xml;
+  var sep = xml.slice(k).search(/w:fldCharType="(separate|end)"/); if(sep < 0) return xml;
+  var tipo = xml.slice(k + sep).match(/w:fldCharType="(separate|end)"/)[1]; if(tipo !== 'separate') return xml;
+  var a = k + sep, fim = xml.indexOf('w:fldCharType="end"', a); if(fim < 0) return xml;
+  var meio = xml.slice(a, fim), primeiro = true;
+  meio = meio.replace(/(<w:t\b[^>]*>)[\s\S]*?(<\/w:t>)/g, function(t, i1, i2){ var v = primeiro ? txt.replace(/&/g, '&amp;').replace(/</g, '&lt;') : ''; primeiro = false; return i1 + v + i2; });
+  return xml.slice(0, a) + meio + xml.slice(fim);
 }
 
 function carregarJSZip(){ return window.JSZip ? Promise.resolve() : new Promise(function(ok, falha){ var s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; s.onload = ok; s.onerror = function(){ falha(new Error('Não deu para carregar o montador de Word.')); }; document.head.appendChild(s); }); }
@@ -1011,7 +1032,7 @@ function gerarProtocolo(msg){
   var textos = [pf.nome, formatarCpf($('protCpf').value), pf.siape, pf.email, te[0], te[1], ce[0], ce[1], pf.colegiado, '', $('protData').value.trim(), $('protLocal').value.trim()];
   msg('Preenchendo a folha de protocolo…');
   return carregarJSZip().then(function(){ return fetch('modelo-protocolo-cppd.docx?v=1'); }).then(function(r){ if(!r.ok) throw new Error('Modelo do protocolo não encontrado.'); return r.arrayBuffer(); })
-    .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){ return z.file('word/document.xml').async('string').then(function(x){ z.file('word/document.xml', preencherProtocoloXml(x, textos, caixas, campus)); return z.generateAsync({type: 'base64'}); }); })
+    .then(function(b){ return JSZip.loadAsync(b); }).then(function(z){ return z.file('word/document.xml').async('string').then(function(x){ z.file('word/document.xml', preencherProtocoloXml(x, textos, caixas, campus, CAMPUS_NOME[pf.campus || 'VA'])); return z.generateAsync({type: 'base64'}); }); })
     .then(function(b64){ return salvarGerado({nome: '1 - Folha de protocolo.docx', dados: b64, mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}); });
 }
 function carregarPdfLib(){
@@ -1128,7 +1149,7 @@ function montarComprovantes(msg, opts){
 function faltasCCO(){
   var pf = PAC.perfil, ch = PAC.chefia || {}, h = '';
   if(!/\d{2}\/\d{2}\/\d{4}/.test(pf.admissao || '')) h += '<div><label>Sua data de admissão, com o ano</label><input id="ccoAdm" data-mascara="data" placeholder="dd/mm/aaaa" value="' + esc(pf.admissao || '') + '"></div>';
-  if(ch.nome && !(ch.siape || pf.chefiaSiape)) h += '<div><label>SIAPE da chefia (' + esc(ch.nome) + ')</label><input id="ccoChefSiape" inputmode="numeric" value=""></div>';
+  if(!(ch.siape || pf.chefiaSiape)) h += '<div><label>SIAPE da chefia' + (ch.nome ? ' (' + esc(ch.nome) + ')' : ' imediata') + '</label><input id="ccoChefSiape" inputmode="numeric" value=""></div>';
   return h ? '<div class="caixa" style="border-color:#b3261e;margin-top:6px"><b class="erro">Falta para o formulário sair completo:</b><div class="grade" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">' + h + '</div></div>' : '';
 }
 function completarPerfilCCO(){
