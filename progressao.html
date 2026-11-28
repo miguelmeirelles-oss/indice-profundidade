@@ -84,6 +84,20 @@ function abrir(){
   if(!token){ $('corpo').innerHTML = '<div class="caixa"><p>Entre na sua conta pelo <a href="aulas.html">Aula por IA</a> e volte aqui.</p></div>'; return; }
   api('progAbrir').then(function(r){ R = r; if(ABA === 'prog') desenhar(); }).catch(function(e){ if(ABA === 'prog') $('corpo').innerHTML = '<div class="caixa"><p class="erro">' + esc(e.message) + '</p></div>'; });
 }
+// apontamentos da revisão da madrugada nos lançamentos DESTE docente: ele decide (aplicar a sugestão ou ignorar)
+function htmlApontamentos(){
+  var l = R.apontamentos || []; if(!l.length) return '';
+  return '<div class="caixa" style="border-left:4px solid #e0a800"><h2>🔎 A revisão encontrou ' + l.length + ' possível(is) erro(s) nos seus lançamentos</h2><p class="aviso" style="margin-top:0">Confira cada um. Se concordar, aplique a sugestão (ou corrija o lançamento você mesmo); se não, ignore. Nada foi mudado sem você.</p>' +
+    l.map(function(a){ return '<div class="item" style="display:block"><b>' + esc(a.item) + '</b><div style="font-size:14px">' + esc(a.motivo) + '</div>' +
+      (a.campo ? '<div class="aviso">Sugestão: ' + esc(a.rotuloCampo || a.campo) + ' → <b>' + esc(a.valor) + '</b>' + (a.atual !== '' ? ' (hoje: ' + esc(a.atual) + ')' : '') + '</div>' : '') +
+      '<div class="botoes" style="margin-top:4px">' + (a.campo ? '<button type="button" class="sec" data-apont="' + esc(a.id) + '|aplicar">✓ Aplicar a sugestão</button>' : '') +
+      '<button type="button" class="sec" data-apont="' + esc(a.id) + '|corrigi">Já corrigi</button><button type="button" class="link" data-apont="' + esc(a.id) + '|ignorar">ignorar</button></div></div>'; }).join('') + '</div>';
+}
+document.addEventListener('click', function(ev){
+  var b = ev.target.closest && ev.target.closest('[data-apont]'); if(!b) return;
+  var p = b.dataset.apont.split('|'); b.disabled = true;
+  api('progApontamento', {id: p[0], acao: p[1]}).then(function(x){ R = x; desenhar(); }).catch(function(e){ b.disabled = false; alert(e.message); });
+});
 function desenhar(){
   var p = R.perfil, per = R.periodo, rs = R.resumo, h = '';
   // ---------- período e pontuação ----------
@@ -95,6 +109,7 @@ function desenhar(){
       (R.pastaUrl ? ' <a class="chip" href="' + esc(R.pastaUrl) + '" target="_blank" rel="noopener">📁 pasta</a>' : '') + '</div></div>';
     h += htmlPlacar();
   }
+  h += htmlApontamentos();
   // ---------- perfil ----------
   var incompleto = !per || !p.siape || (!p.pastaId && !R.admin && !R.proprio);
   if(R.simulando) h = '<div class="caixa" style="border:3px solid #d97706;background:rgba(217,119,6,.08)"><b>🧪 SIMULAÇÃO: ' + esc(R.simulando) + '</b> <span class="aviso">— dados à parte dos seus, pasta "Simulações de progressão", nada vai para a pasta compartilhada.</span><div class="botoes"><button type="button" class="sec" id="btSimSair">Sair da simulação</button><button type="button" class="sec" id="btSimApagar">Apagar os dados desta simulação</button></div></div>' + h;
