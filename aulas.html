@@ -757,7 +757,7 @@ function iniciar(){
     if(r.admin){ $('abaTrilha').classList.remove('oculto'); if(/[?&]aba=trilha/.test(location.search)) abaAtual = 'trilha'; }
     if(r.professor && /[?&]aba=cfg/.test(location.search)) abaAtual = 'cfg';   // vindo do Prova por IA (botão Configurações)
     $('quem').innerHTML = '<b>' + esc(r.nome) + '</b>' + (r.email ? '<span style="display:block">' + esc(r.email) + (r.professor ? ' · professor' : ' · conta de aluno') + '</span>' : (r.professor ? 'professor · ' : '')) +
-      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '<a href="#certificados" data-cert="1">📎 Carregar certificados</a> · ') + menuMaisHTML(r.professor) + ' · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
+      (r.professor ? '<a href="provas.html">Prova por IA</a> · ' : '<a href="curriculo.html">📎 Carregar certificados</a> · ') + menuMaisHTML(r.professor) + ' · <a href="index.html?conta=1">minha conta</a> · <a href="#" id="linkSair">trocar de conta / sair</a>';
     ligarMenuMais();
     $('linkSair').addEventListener('click', function(e){
       e.preventDefault();
@@ -789,10 +789,10 @@ function iniciar(){
 function menuMaisHTML(prof){
   var it = prof ? [
     ['provas.html', '📝 Prova por IA'], ['progressao.html', '📊 Progressão / PT'], ['index.html', '🎙️ Estudar com IA (Avaliador)'],
-    ['#diario', '📋 Preencher o diário automaticamente']
+    ['#diario', '📋 Preencher o diário automaticamente'], ['curriculo.html', '📄 Currículo e certificados']
   ] : [
-    ['#certificados', '📎 Carregar certificados'], ['index.html', '🎙️ Estudar com IA (Avaliador)'], ['extensao.html', '⏱️ Carga horária de extensão'], ['entrevista.html', '💼 Treino de entrevista'],
-    ['', '📄 Currículo (empresa e Lattes) · em breve']
+    ['curriculo.html', '📎 Carregar certificados'], ['index.html', '🎙️ Estudar com IA (Avaliador)'], ['extensao.html', '⏱️ Carga horária de extensão'], ['entrevista.html', '💼 Treino de entrevista'],
+    ['curriculo.html', '📄 Currículo (empresa e Lattes)']
   ];
   return '<details class="maisFuncoes" id="maisFuncoes"><summary>☰ Mais funções</summary><div class="maisLista">' + it.map(function(x){
     return x[0] ? '<a href="' + x[0] + '"' + (x[0] === '#diario' ? ' id="linkDiarioAuto"' : x[0] === '#certificados' ? ' data-cert="1"' : '') + '>' + x[1] + '</a>' : '<span class="emBreve">' + x[1] + '</span>';
